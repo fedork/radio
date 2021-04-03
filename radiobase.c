@@ -4,11 +4,20 @@
 #include <time.h>
 
 #define MAX_K 10
-#define MAX_N 300
+#define MAX_N 200
 #define MAX_SBB MAX_N*MAX_N/4
-#define MAX_SPLITS (MAX_N/2 + 1) * (MAX_N/2 +2)
+#define MAX_SPLITS (MAX_N/2) * (MAX_N/2 +2)
+#define BY_MAGIC 0
+#define BY_MAX 1
+#define BY_SP0 2
+#define BY_SP1 3
+#define BY_SP2 4
+#define BY_MIN 5
+#define DESC 16
+#define DESC_MASK 15
+#define PROGRESS_INTERVAL CLOCKS_PER_SEC*60
 
-typedef struct { int size; int splitsl[MAX_SPLITS][6]; } splits;
+typedef struct { int size; int splitsl[MAX_SPLITS][6]; int ind[6][MAX_SPLITS]; } splits;
 
 int power3[MAX_K+1];
 int n_to_sbb[MAX_N+1][MAX_N/2 + 1];
@@ -23,90 +32,17 @@ int sbb_greater[MAX_SBB+1][MAX_SBB+1];
 
 splits sbb_splits[MAX_SBB+1];
 
-//sorting lifted from JDK
-
-void swap(int* x, int a, int b) {
-	int t = x[a];
-	x[a] = x[b];
-	x[b] = t;
-    }
-
-void vecswap(int *x, int a, int b, int n) {
-	int i;
-	for (i=0; i<n; i++, a++, b++)
-	    swap(x, a, b);
-    }
-
-    /**
-     * Returns the index of the median of the three indexed integers.
-     */
-int med3(int *x, int a, int b, int c) {
-	return (x[a] < x[b] ?
-		(x[b] < x[c] ? b : x[a] < x[c] ? c : a) :
-		(x[b] > x[c] ? b : x[a] > x[c] ? c : a));
-    }
-    
 int min(int a,int b){
 	return a<b?a:b;
 }
-    /**
-     * Sorts the specified sub-array of integers into desc order.
-     */
+
+int desc (const void * a, const void * b) {
+   return ( *(int*)b - *(int*)a );
+}
+
 void sort1(int *x, int off, int len) {
-	// Insertion sort on smallest arrays
-	int i,j;
-	if (len < 7) {
-	    for (i=off; i<len+off; i++)
-		for (j=i; j>off && x[j-1]<x[j]; j--)
-		    swap(x, j, j-1);
-	    return;
-	}
-
-	// Choose a partition element, v
-	int m = off + (len >> 1);       // Small arrays, middle element
-	if (len > 7) {
-	    int l = off;
-	    int n = off + len - 1;
-	    if (len > 40) {        // Big arrays, pseudomedian of 9
-		int s = len/8;
-		l = med3(x, l,     l+s, l+2*s);
-		m = med3(x, m-s,   m,   m+s);
-		n = med3(x, n-2*s, n-s, n);
-	    }
-	    m = med3(x, l, m, n); // Mid-size, med of 3
-	}
-	int v = x[m];
-
-	// Establish Invariant: v* (<v)* (>v)* v*
-	int a = off, b = a, c = off + len - 1, d = c;
-	while(1) {
-	    while (b <= c && x[b] >= v) {
-		if (x[b] == v)
-		    swap(x, a++, b);
-		b++;
-	    }
-	    while (c >= b && x[c] <= v) {
-		if (x[c] == v)
-		    swap(x, c, d--);
-		c--;
-	    }
-	    if (b > c)
-		break;
-	    swap(x, b++, c--);
-	}
-
-	// Swap partition elements back to middle
-	int s, n = off + len;
-	s = min(a-off, b-a  );  vecswap(x, off, b-s, s);
-	s = min(d-c,   n-d-1);  vecswap(x, b,   n-s, s);
-
-	// Recursively sort non-partition-elements
-	if ((s = b-a) > 1)
-	    sort1(x, off, s);
-	if ((s = d-c) > 1)
-	    sort1(x, n-s, s);
-    }
-//end sorting lifted from JDK
+    qsort(x, len, sizeof(int), desc);
+}
 
 int max(int a,int b){
     return a>b?a:b;
@@ -344,7 +280,11 @@ int canSolveB(int *sb, int size, int k){
 			pairs+=sb_pairs[sbb];
 		}
 	}
-//	printf("pairs=%d\n", pairs);
+
+//    printf("in canSolveB in %d ", k);
+//    printSb(tmp, newsize);
+//    printf("\n");
+//    printf("pairs=%d\n", pairs);
 	
 	// check pairs
 	if (pairs<=1) return 1;
@@ -354,41 +294,57 @@ int canSolveB(int *sb, int size, int k){
 
 	sort1(tmp, 0, size);
 	
+//    printf("sorted: ");
+//    printSb(tmp, size);
+//    printf("\n");
+ 
 	//check cache
 	int ck = checkCache(tmp, size, k);
 	// 2 == unknown;
-//	printf("got from cache %d\n", ck); 
+//	printf("got from cache %d\n", ck);
 	if (ck != 2) {
 		return ck;
 	}
     
     // maybe remove - slows down?
-    if (size>1 && !canSolveB(tmp, size - 1, k)) {
-        return 0;
-    }
+//    if (size>1 && !canSolveB(tmp, size - 1, k)) {
+//        return 0;
+//    }
     
     //full search
 	clock_t start = clock();
+    clock_t progress = start + PROGRESS_INTERVAL;
 
 	int sb0[size],sb2[size],sb1[size*2];
-	splits *splitsarr[size];
+    int sb0p[size],sb2p[size],sb1p[size];
+    
+    long long maxsplits = 1;
+    splits *splitsarr[size];
 	for(i=0;i<size;i++){
-		splitsarr[i] = &sbb_splits[tmp[i]];
+		maxsplits *= (splitsarr[i] = &sbb_splits[tmp[i]])->size;
 	}
 	
+    int splitincr[size];
+    splitincr[0] = size == 1 ? BY_MAGIC : ((size>2 && sb_pairs[0] < pairs / 2) ? DESC + BY_MIN : BY_MAX);
+    
 	int splitindex[size];
 	memset(splitindex, 0, size * sizeof(int));
 	splitindex[0] = splitsarr[0]->size;
     
-    printf("solving in %d ", k);
+    printf("solving in %d maxsplits=%llu ", k, maxsplits);
     printSb(tmp, size);
     printf("\n");
+    fflush(stdout);
     
 	i = 0;
 	int cont=1;
 	int ck0,ck1,ck2;
     long long totalsplits=0;
+    int spi, spi2;
 	while(cont) {
+//        printf("totalsplits=%llu\n", totalsplits);
+        
+
 		while(splitindex[i] == 0) {
 			if (i==0) {
 				// can't solve
@@ -397,52 +353,175 @@ int canSolveB(int *sb, int size, int k){
 			}
 			i--;
 		}
+
+//        printf("i=%d\n", i);
+//        fflush(stdout);
 		if (!cont) break;
-		int spi = --splitindex[i];
-		int *s = splitsarr[i]->splitsl[spi];
-        while (s[4]<k) {
+		spi = --splitindex[i];
+//        printf("spi=%d\n", spi);
+//        printf("splitincr[i]=%d\n", splitincr[i]);
+//        fflush(stdout);
+        spi2 = (splitincr[i] & DESC) ?
+                splitsarr[i]->ind[splitincr[i] & DESC_MASK][splitsarr[i]->size - 1 - spi] :
+                splitsarr[i]->ind[splitincr[i] & DESC_MASK][spi];
+//        printf("spi2=%d\n", spi2);
+//        fflush(stdout);
+        int *s = splitsarr[i]->splitsl[spi2];
+        while (size > 1 && s[4]<k) { // don't do this for size==1 messes up counts
             int kk = s[4]++;
-            if (canSolveB(s, 1, kk) && canSolveB(s+3, 1, kk) && canSolveB(s+1, 2, kk))
+            if (
+//                kk>=6 || // don't do this for large k
+                canSolveB(s, 1, kk) && canSolveB(s+3, 1, kk) && canSolveB(s+1, 2, kk))
                 s[4] = MAX_K;
             else
                 s[5] = s[4];
         }
         if (s[5]<k)
         {
-            sb0[i] = s[0];
-            sb1[i*2] = s[1];
-            sb1[i*2+1] = s[2];
-            sb2[i] = s[3];
             totalsplits++;
-            if (canSolveB(sb1, (i+1) * 2, k-1))
-                if (canSolveB(sb2, i+1, k-1))
-                    if (canSolveB(sb0, i+1, k-1)) {
-                        if (i == size - 1) {
-                            //can solve
-                            canSolve=1;
-                            cont=0;
-                            break;
+            int p0 = sb0p[i] = sb_pairs[sb0[i] = s[0]] + (i>0?sb0p[i-1]:0);
+            int p1 = sb1p[i] = sb_pairs[sb1[i*2] = s[1]] + sb_pairs[sb1[i*2+1] = s[2]] + (i>0?sb1p[i-1]:0);
+            int p2 = sb2p[i] = sb_pairs[sb2[i] = s[3]] + (i>0?sb2p[i-1]:0);
+//            printf("i=%d p0=%d p1=%d p2=%d\n", i, p0, p1, p2);
+//            fflush(stdout);
+//            int cs;
+//            if (p0>p1) {
+//                if (p0>p2) {
+//                    cs = canSolveB(sb0, i+1, k-1);
+//                    if (cs) {
+//                        if (p1>p2) {
+//                            cs = canSolveB(sb1, (i+1) * 2, k-1) && canSolveB(sb2, i+1, k-1);
+//                        } else {
+//                            cs = canSolveB(sb2, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1);
+//                        }
+//                    }
+//                } else {
+//                    cs = canSolveB(sb2, i+1, k-1) && canSolveB(sb0, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1);
+//                }
+//            } else { // p1 >= p0
+//                if (p1 > p2) {
+//                    cs = canSolveB(sb1, (i+1) * 2, k-1);
+//                    if (cs) {
+//                        if (p0>p2) {
+//                            cs = canSolveB(sb0, i+1, k-1) && canSolveB(sb2, i+1, k-1);
+//                        } else {
+//                            cs = canSolveB(sb2, i+1, k-1) && canSolveB(sb0, i+1, k-1);
+//                        }
+//                    }
+//                } else { // p2 >= p1 >= p0
+//                    cs = canSolveB(sb2, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1) && canSolveB(sb0, i+1, k-1);
+//                }
+//            }
+//            printf("cs=%d\n", cs);
+//            fflush(stdout);
+//            if (cs)
+            if ((p0 <= power3[k-1]) && (p1 <= power3[k-1]) && (p2 <= power3[k-1])) {
+                if (i == size - 1) {
+                    clock_t cur = clock();
+                    if (cur >= progress) {
+                        printf("still solving in %d ", k);
+                        printSb(tmp, size);
+                        printf(" trying ");
+                        printSb(sb0, size);
+                        printSb(sb1, size*2);
+                        printSb(sb2, size);
+                        printf(" elapsed %ld left=%d/%d totalsplits=%llu of %llu\n", (cur - start)/CLOCKS_PER_SEC, splitindex[0], splitsarr[0]->size, totalsplits, maxsplits);
+                        fflush(stdout);
+                        progress = cur + PROGRESS_INTERVAL;
+                    }
+                }
+                if (canSolveB(sb0, i+1, k-1) && canSolveB(sb2, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1))
+                {
+                    if (i == size - 1) {
+                        //can solve
+                        canSolve=1;
+                        cont=0;
+                        break;
+                    } else {
+                        i++;
+    //                    splitindex[i] = tmp[i]==tmp[i-1] ? splitindex[i-1]+1 : splitsarr[i]->size;
+                        splitindex[i] = splitsarr[i]->size;
+
+                        int e = sb_pairs[tmp[i]] / 3; // is 3 a good factor?
+    //                    int e=1;
+                        if (max(abs(p0-p1), max(abs(p0-p2), abs(p2-p1))) <= e) {
+                            splitincr[i] = BY_MAX; // if routhly equal - split equally
                         } else {
-                            i++;
-                            splitindex[i] = tmp[i]==tmp[i-1] ? splitindex[i-1]+1 : splitsarr[i]->size;
+                            if (p0 > p1) {
+                                if (p1 > p2) {
+                                    splitincr[i] = ( p0 - p1 > p1 - p2) ? BY_SP2 : (DESC + BY_SP0);
+                                } else {
+                                    if (p0 > p2) { // p0 > p2 >= p1
+                                        splitincr[i] = ( p0 - p2 > p2 - p1) ? BY_SP2 : (DESC + BY_SP1);
+                                        }
+                                    } else { // p2 >= p0 > p1
+                                        splitincr[i] = ( p2 - p0 > p0 - p1) ? BY_SP0 : (DESC + BY_SP1);
+                                        }
+                                    }
+                                }
+                            } else { // p1 >=p0
+                                if (p0 > p2) {
+                                    splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1 : (DESC + BY_SP0);
+                                    }
+                                } else {
+                                    if (p1 > p2) { // p1 > p2 >= p0
+                                        splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1 : (DESC + BY_SP2);
+                                    } else { // p2 >= p1 >= p0
+                                        splitincr[i] = ( p2 - p1 > p1 - p0) ? BY_SP0 : (DESC + BY_SP2);
+                                    }
+                                }
+                            }
                         }
                     }
+                }
+            }
         }
 	}
 
 	if (canSolve) {
+//        printf("cansolve=true\n");
+//        fflush(stdout);
 		printf("can solve ");
 		printSb(tmp, size);
 		printf(" in %d  with following:",k);
 		printSb(sb0,size);
 		printSb(sb1,size*2);
 		printSb(sb2,size);
+//        printf("cansolve=true\n");
+//        printf("totalsplits=%llu\n", totalsplits);
+//        fflush(stdout);
+        
+
+        i=0;
+        while(i < size && splitindex[i] == splitsarr[i]->size-1) i++;
+//        printf("i=%d\n", i);
+//        fflush(stdout);
+        if (i<size) {
+            printf(" suboptimal for i=%d splitincr=%d tried: ", i, splitincr[i]);
+            int desc = splitincr[i] & DESC;
+//            printf("desc=%d\n", desc);
+            int *ind = splitsarr[i]->ind[splitincr[i] & DESC_MASK];
+            for (spi = splitsarr[i]->size-1; spi> splitindex[i]; spi--) {
+//                printf("spi=%d\n", spi);
+                spi2 = desc ? ind[splitsarr[i]->size - 1 - spi] : ind[spi];
+//                printf("spi2=%d\n", spi2);
+                int *s = splitsarr[i]->splitsl[spi2];
+                printf(" ");
+                printSb(s,1);
+                printSb(s+1,2);
+                printSb(s+3,1);
+                printf(";");
+//                fflush(stdout);
+            }
+        }
+
 	} else {
 		printf("can't solve ");
 		printSb(tmp, size);
 		printf(" in %d",k);
 	}
-	printf(" took %ld totalsplits=%llu\n", (clock() - start)/CLOCKS_PER_SEC, totalsplits);
+	printf(" took %ld totalsplits=%llu of %llu\n", (clock() - start)/CLOCKS_PER_SEC, totalsplits, maxsplits);
+    fflush(stdout);
 	cache(tmp, size, canSolve, k, pairs);
 	return canSolve;
 }
@@ -507,8 +586,85 @@ int canSolveA(int n, int k) {
 	return canSolve;
 } 
 
+void indexSpl(int sbb, splits* s, int indexindex, int (*f)(int, int[])) {
+    int splitsort[MAX_SPLITS][2];
+    int e;
+    int c = s->size;
+    for(e = 0; e<c; e++) {
+        splitsort[e][0] = f(sbb, s->splitsl[e]);
+        splitsort[e][1] = e;
+    }
+    qsort(splitsort, c, sizeof(int)*2, desc); // sort by first element
+    for(e = 0; e<c; e++) {
+        s->ind[indexindex][e] = splitsort[e][1];
+    }
+}
+
+int maxpairsraw(int sbb, int spl[]) {
+    return max(sb_pairs[spl[0]], max(sb_pairs[spl[3]], sb_pairs[spl[1]] + sb_pairs[spl[2]]));
+}
+
+int minpairsraw(int sbb, int spl[]) {
+    return min(sb_pairs[spl[0]], min(sb_pairs[spl[3]], sb_pairs[spl[1]] + sb_pairs[spl[2]]));
+}
+
+int maxpairs(int sbb, int spl[]) {
+    return (1+maxpairsraw(sbb, spl)) * (1+sb_pairs[sbb]) - minpairsraw(sbb, spl);
+}
+
+int minpairs(int sbb, int spl[]) {
+    return (1+minpairsraw(sbb, spl)) * (1+sb_pairs[sbb]) - maxpairsraw(sbb, spl);
+}
+
+int pairs2(int sbb, int spl[]) {
+    return sb_pairs[spl[0]];
+}
+
+int pairs0(int sbb, int spl[]) {
+    return sb_pairs[spl[3]];
+}
+
+int pairs1(int sbb, int spl[]) {
+    return sb_pairs[spl[1]] + sb_pairs[spl[2]];
+}
+
+int magic(int sbb, int spl[]) {
+    int n1 = sbb_to_n1[sbb];
+    int n2 = sbb_to_n2[sbb];
+    int msum = ((n1+n2)*577+999)/1000;
+    int m1 = min(n1, (n1*577+999)/1000);
+    int m2 = min(n2, msum-m1);
+    if (spl[3] == 0 || spl[0] == 0) return 1000000;
+    int h11 = sbb_to_n1[spl[0]];
+    int h12 = sbb_to_n2[spl[0]];
+    int h21 = sbb_to_n1[spl[3]];
+    int h22 = sbb_to_n2[spl[3]];
+    int dx1, dx2, dy1, dy2;
+    if (h11 + h21 == n1) {
+        dx1 = h11 - m1;
+        dx2 = h21 - m1;
+        dy1 = h12 - m2;
+        dy2 = h22 - m2;
+    } else if (h11 + h22 == n1) {
+        dx1 = h11 - m1;
+        dx2 = h22 - m1;
+        dy1 = h12 - m2;
+        dy2 = h21 - m2;
+    } else if (h12 + h21 == n1) {
+        dx1 = h12 - m1;
+        dx2 = h21 - m1;
+        dy1 = h11 - m2;
+        dy2 = h22 - m2;
+    } else {
+        printf("unexpected for %d-%d : %d-%d %d-%d", n1, n2, h11, h12, h21, h22);
+        exit(1);
+    }
+    return min(dx1*dx1 + dy1*dy1, dx2*dx2 + dy2*dy2);
+}
+
 void initSplits() {
     int sbb;
+    int maxsplits = 0;
     for(sbb=1; sbb<=MAX_SBB; sbb++) {
         splits *s = &sbb_splits[sbb];
         printf("initializing splits for ");
@@ -520,33 +676,55 @@ void initSplits() {
         int e=0;
         int m1,m2;
         int d1,d2;
-        
+        int bestmaxpairs = sb_pairs[sbb];
         
         // SPLITS ARE ITERATED in reverse order, so generate them in the order OPPOSITE to intended iteration
+        
         // iterate outside-in on smaller side
-        m2=0;
-        d2=n2;
-        while(1) {
+//        m2=0;
+//        d2=n2;
+//        while(1) {
 
-            // iterate inside-out on greater side, unless n1==n2 in which case just 0 to m2
-            for(m1=(n1+1)/2, d1=(n1/2)*2+1; m1>=0 && m1 <= n1; m1=d1-m1, d1 = 2*n1+1-d1) {
+//            int min2 = min(m2, n2-m2); // smaller part of the  smaller side split
+            // iterate inside-out on greater side
+//            for(m1=(n1+1)/2, d1=(n1/2)*2+1; m1>=0 && m1 <= n1; m1=d1-m1, d1 = 2*n1+1-d1) {
 //        for (m2=(n2+1)/2, d2=(n2 ^ 1)+1; m2>=0 && m2 <=n2; m2=d2-m2, d2=2*n2+1-d2) { // iterate middle-out on smaller side
             
             // iterate outside-in on greater side, unless n1==n2 in which case just 0 to m2
 //            m1 = 0;
 //            d1 = n1;
 //            while (1) {
-//        for (m1=0; m1<=n1; m1++) {
-//            for (m2=(n2==n1?m1:n2); m2>=0; m2--) {
-                s->splitsl[c][0]=getSbb(m1, m2);
-                s->splitsl[c][1]=getSbb(n1-m1, m2);
-                s->splitsl[c][2]=getSbb(m1, n2-m2);
-                s->splitsl[c][3]=getSbb(n1-m1, n2-m2);
-                int maxpairs = max(sb_pairs[s->splitsl[c][0]],max(sb_pairs[s->splitsl[c][3]], sb_pairs[s->splitsl[c][1]] + sb_pairs[s->splitsl[c][2]]));
-                int k=0;
-                while (power3[k]<=maxpairs) k++;
-                s->splitsl[c][4] = s->splitsl[c][5] = k-1;
-                c++;
+        for (m1=0; m1<=n1; m1++) {
+            for (m2=(n2==n1?m1:n2); m2>=0; m2--) {
+        
+        //estimate optimal split - empirical. proof?
+//        int midm2 = n2 * 577 / 1000;
+//        int midm1 = n1 * 577 / 1000;
+        
+        // iterate by sum.
+
+//        int summ;
+//        for (summ = n1+n2; summ >= 0 ; summ--) {
+//            printf("summ = %d\n", summ);
+            
+//            for (m2 = min(summ, n2); m2>=0 && (m1 = summ - m2)<=n1; m2--) {
+//                printf("m2 = %d, m1 = %d\n", m2, m1);
+                // EXPERIMENTAL - NEED RIGOROUS PROOF!!!!! MAY BE WRONG!!!
+                // only consider splits on longer side where both halves are no less than the smaller part of the shorter side
+
+//                if (m1 >= min2 && (n1-m1) >= min2)  //  !!!!!!  SEE ABOVE !!!!
+                {
+                    s->splitsl[c][0]=getSbb(m1, m2);
+                    s->splitsl[c][1]=getSbb(n1-m1, m2);
+                    s->splitsl[c][2]=getSbb(m1, n2-m2);
+                    s->splitsl[c][3]=getSbb(n1-m1, n2-m2);
+                    int maxpairs = max(sb_pairs[s->splitsl[c][0]],max(sb_pairs[s->splitsl[c][3]], sb_pairs[s->splitsl[c][1]] + sb_pairs[s->splitsl[c][2]]));
+                      
+                    int k=0;
+                    while (power3[k]<=maxpairs) k++;
+                    s->splitsl[c][4] = s->splitsl[c][5] = k-1;
+                    c++;
+                }
                 
 //                if (n1==n2) {
 //                    m1++;
@@ -557,9 +735,9 @@ void initSplits() {
 //                    d1=2*n1+1-d1;
 //                }
             }
-            if (m2==(n2+1)/2) break;
-            m2=d2-m2;
-            d2=2*n2+1-d2;
+//            if (m2==(n2+1)/2) break;
+//            m2=d2-m2;
+//            d2=2*n2+1-d2;
         }
         if (c>MAX_SPLITS) {
             printf("c=%d MAX_SPLITS=%d\n",c,MAX_SPLITS);
@@ -567,10 +745,28 @@ void initSplits() {
         }
 
         s->size = c;
+        if (c>maxsplits) maxsplits = c;
+        indexSpl(sbb, s, BY_MAX, maxpairs);
+        indexSpl(sbb, s, BY_MAGIC, magic);
+        indexSpl(sbb, s, BY_SP0, pairs0);
+        indexSpl(sbb, s, BY_SP1, pairs1);
+        indexSpl(sbb, s, BY_SP2, pairs2);
+        indexSpl(sbb, s, BY_MIN, minpairs);
+//        int r;
+//        for(r=0; r<5; r++)
+//            for(e = 0; e<c; e++) {
+//                printf("sorted %d: ", r);
+//                printSb(s->splitsl[s->ind[r][e]], 1);
+//                printSb(s->splitsl[s->ind[r][e]]+1, 2);
+//                printSb(s->splitsl[s->ind[r][e]]+3, 1);
+//                printf("\n");
+//            }
+    }
+    if (maxsplits < MAX_SPLITS) {
+        printf("expected MAX_SPLITS: %d - actual: %d\n", MAX_SPLITS, maxsplits);
+        exit(1);
     }
 }
-
-
 
 void init(){
   int i,pow,k,n;
