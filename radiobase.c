@@ -13,11 +13,12 @@
 #define BY_SP1 3
 #define BY_SP2 4
 #define BY_MIN 5
+#define BY_MAGIC2 6
 #define DESC 16
 #define DESC_MASK 15
 #define PROGRESS_INTERVAL CLOCKS_PER_SEC*60
 
-typedef struct { int size; int splitsl[MAX_SPLITS][6]; int ind[6][MAX_SPLITS]; } splits;
+typedef struct { int size; int splitsl[MAX_SPLITS][8]; int ind[7][MAX_SPLITS]; } splits;
 
 int power3[MAX_K+1];
 int n_to_sbb[MAX_N+1][MAX_N/2 + 1];
@@ -40,7 +41,7 @@ int desc (const void * a, const void * b) {
    return ( *(int*)b - *(int*)a );
 }
 
-void sort1(int *x, int off, int len) {
+void sort1(int *x, int len) {
     qsort(x, len, sizeof(int), desc);
 }
 
@@ -292,7 +293,7 @@ int canSolveB(int *sb, int size, int k){
 	
 	size = newsize;
 
-	sort1(tmp, 0, size);
+	sort1(tmp, size);
 	
 //    printf("sorted: ");
 //    printSb(tmp, size);
@@ -325,7 +326,9 @@ int canSolveB(int *sb, int size, int k){
 	}
 	
     int splitincr[size];
-    splitincr[0] = size == 1 ? BY_MAGIC : ((size>2 && sb_pairs[0] < pairs / 2) ? DESC + BY_MIN : BY_MAX);
+    splitincr[0] = size == 1 ? BY_MAGIC : (size==2 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 2) ? DESC + BY_MIN : BY_MAX));
+//    splitincr[0] = size == 1 ? BY_MAGIC : BY_MAX;
+//    splitincr[0] = size == 1 ? BY_MAGIC : ( (size>2 && sb_pairs[0] < pairs / 2) ? DESC + BY_MIN : BY_MAX);
     
 	int splitindex[size];
 	memset(splitindex, 0, size * sizeof(int));
@@ -416,27 +419,28 @@ int canSolveB(int *sb, int size, int k){
 //            fflush(stdout);
 //            if (cs)
             if ((p0 <= power3[k-1]) && (p1 <= power3[k-1]) && (p2 <= power3[k-1])) {
-                if (i == size - 1) {
-                    clock_t cur = clock();
-                    if (cur >= progress) {
-                        printf("still solving in %d ", k);
-                        printSb(tmp, size);
-                        printf(" trying ");
-                        printSb(sb0, size);
-                        printSb(sb1, size*2);
-                        printSb(sb2, size);
-                        printf(" elapsed %ld left=%d/%d totalsplits=%llu of %llu\n", (cur - start)/CLOCKS_PER_SEC, splitindex[0], splitsarr[0]->size, totalsplits, maxsplits);
-                        fflush(stdout);
-                        progress = cur + PROGRESS_INTERVAL;
-                    }
-                }
-                if (canSolveB(sb0, i+1, k-1) && canSolveB(sb2, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1))
+//                if (canSolveB(sb0, i+1, k-1) && canSolveB(sb2, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1))
                 {
                     if (i == size - 1) {
-                        //can solve
-                        canSolve=1;
-                        cont=0;
-                        break;
+                        clock_t cur = clock();
+                        if (cur >= progress) {
+                            printf("still solving in %d ", k);
+                            printSb(tmp, size);
+                            printf(" trying ");
+                            printSb(sb0, size);
+                            printSb(sb1, size*2);
+                            printSb(sb2, size);
+                            printf(" elapsed %ld left=%d/%d totalsplits=%llu of %llu\n", (cur - start)/CLOCKS_PER_SEC, splitindex[0], splitsarr[0]->size, totalsplits, maxsplits);
+                            fflush(stdout);
+                            progress = cur + PROGRESS_INTERVAL;
+                        }
+                        
+                        if (canSolveB(sb0, i+1, k-1) && canSolveB(sb2, i+1, k-1) && canSolveB(sb1, (i+1) * 2, k-1)) {
+                            //can solve
+                            canSolve=1;
+                            cont=0;
+                            break;
+                        }
                     } else {
                         i++;
     //                    splitindex[i] = tmp[i]==tmp[i-1] ? splitindex[i-1]+1 : splitsarr[i]->size;
@@ -453,16 +457,13 @@ int canSolveB(int *sb, int size, int k){
                                 } else {
                                     if (p0 > p2) { // p0 > p2 >= p1
                                         splitincr[i] = ( p0 - p2 > p2 - p1) ? BY_SP2 : (DESC + BY_SP1);
-                                        }
                                     } else { // p2 >= p0 > p1
                                         splitincr[i] = ( p2 - p0 > p0 - p1) ? BY_SP0 : (DESC + BY_SP1);
-                                        }
                                     }
                                 }
                             } else { // p1 >=p0
                                 if (p0 > p2) {
                                     splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1 : (DESC + BY_SP0);
-                                    }
                                 } else {
                                     if (p1 > p2) { // p1 > p2 >= p0
                                         splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1 : (DESC + BY_SP2);
@@ -632,34 +633,23 @@ int magic(int sbb, int spl[]) {
     int n1 = sbb_to_n1[sbb];
     int n2 = sbb_to_n2[sbb];
     int msum = ((n1+n2)*577+999)/1000;
-    int m1 = min(n1, (n1*577+999)/1000);
-    int m2 = min(n2, msum-m1);
-    if (spl[3] == 0 || spl[0] == 0) return 1000000;
-    int h11 = sbb_to_n1[spl[0]];
-    int h12 = sbb_to_n2[spl[0]];
-    int h21 = sbb_to_n1[spl[3]];
-    int h22 = sbb_to_n2[spl[3]];
-    int dx1, dx2, dy1, dy2;
-    if (h11 + h21 == n1) {
-        dx1 = h11 - m1;
-        dx2 = h21 - m1;
-        dy1 = h12 - m2;
-        dy2 = h22 - m2;
-    } else if (h11 + h22 == n1) {
-        dx1 = h11 - m1;
-        dx2 = h22 - m1;
-        dy1 = h12 - m2;
-        dy2 = h21 - m2;
-    } else if (h12 + h21 == n1) {
-        dx1 = h12 - m1;
-        dx2 = h21 - m1;
-        dy1 = h11 - m2;
-        dy2 = h22 - m2;
-    } else {
-        printf("unexpected for %d-%d : %d-%d %d-%d", n1, n2, h11, h12, h21, h22);
-        exit(1);
-    }
-    return min(dx1*dx1 + dy1*dy1, dx2*dx2 + dy2*dy2);
+    int magicm1 = min(n1, (n1*577+999)/1000);
+    int magicm2 = min(n2, msum-magicm1);
+    int dx = spl[6] - magicm1;
+    int dy = spl[7] - magicm2;
+    return dx*dx + dy*dy;
+}
+
+
+int magic2(int sbb, int spl[]) {
+    int n1 = sbb_to_n1[sbb];
+    int n2 = sbb_to_n2[sbb];
+    int msum = ((n1+n2)*666+500)/1000;
+    int magicm1 = min(n1, (n1*666+500)/1000);
+    int magicm2 = min(n2, msum-magicm1);
+    int dx = spl[6] - magicm1;
+    int dy = spl[7] - magicm2;
+    return dx*dx + dy*dy;
 }
 
 void initSplits() {
@@ -677,9 +667,7 @@ void initSplits() {
         int m1,m2;
         int d1,d2;
         int bestmaxpairs = sb_pairs[sbb];
-        
-        // SPLITS ARE ITERATED in reverse order, so generate them in the order OPPOSITE to intended iteration
-        
+    
         // iterate outside-in on smaller side
 //        m2=0;
 //        d2=n2;
@@ -715,14 +703,18 @@ void initSplits() {
 //                if (m1 >= min2 && (n1-m1) >= min2)  //  !!!!!!  SEE ABOVE !!!!
                 {
                     s->splitsl[c][0]=getSbb(m1, m2);
-                    s->splitsl[c][1]=getSbb(n1-m1, m2);
-                    s->splitsl[c][2]=getSbb(m1, n2-m2);
+                    int sbb1 = getSbb(n1-m1, m2);
+                    int sbb2 = getSbb(m1, n2-m2);
+                    s->splitsl[c][1]=max(sbb1, sbb2);
+                    s->splitsl[c][2]=min(sbb1, sbb2);
                     s->splitsl[c][3]=getSbb(n1-m1, n2-m2);
                     int maxpairs = max(sb_pairs[s->splitsl[c][0]],max(sb_pairs[s->splitsl[c][3]], sb_pairs[s->splitsl[c][1]] + sb_pairs[s->splitsl[c][2]]));
                       
                     int k=0;
                     while (power3[k]<=maxpairs) k++;
                     s->splitsl[c][4] = s->splitsl[c][5] = k-1;
+                    s->splitsl[c][6] = m1;
+                    s->splitsl[c][7] = m2;
                     c++;
                 }
                 
@@ -752,6 +744,7 @@ void initSplits() {
         indexSpl(sbb, s, BY_SP1, pairs1);
         indexSpl(sbb, s, BY_SP2, pairs2);
         indexSpl(sbb, s, BY_MIN, minpairs);
+        indexSpl(sbb, s, BY_MAGIC2, magic2);
 //        int r;
 //        for(r=0; r<5; r++)
 //            for(e = 0; e<c; e++) {
@@ -822,7 +815,7 @@ void init(){
 					}
 				}
 				//!!! must be sorted!!!!
-				sort1(sbb_lesser[sbb],0, c);
+				sort1(sbb_lesser[sbb], c);
 				sbb_lesser[sbb][c++]=0; //terminator
   		}
   	}
