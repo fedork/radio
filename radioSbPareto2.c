@@ -1,5 +1,7 @@
 #include "radiobase.c"
 
+#define MAX_N 1030
+
 int main(int argc, char **argv){
   init();
   int k,n;
