@@ -118,7 +118,7 @@ int cacheCanSolve(struct node *n, int* sb, int size, int k, int arrsize){
         }
         int sbb=*sb;
         int *lesser;
-        int minSbb = size>1?sb[1]:1;
+        int minSbb = size>1?sb[1]:2; // see Unit Group Trivilaity Lemma
         //		printf("minSbb = %d\n",minSbb);
         int sbb2;
         lesser = sbb_lesser[sbb];
@@ -135,44 +135,101 @@ int cacheCanSolve(struct node *n, int* sb, int size, int k, int arrsize){
         }
     }
     return updated;
+    
+//  ------- more comprehensive, but seems counterproductive:
+        
+//    int cacheCanSolve(struct node *n, int* sbOrig, int size, int k, int arrsize){
+//    int updated =0;
+//    if(n->can > k){
+//        //        printf("cache n->can was %d, now %d\n",n->can, k);
+//        n->can = k;
+//        updated = 1;
+//    }
+//    if (size>0) {
+//        if (n->next == NULL) {
+//            n->next = alloc_next(arrsize+1);
+//        }
+//        int sb[size];
+//        memcpy(sb, sbOrig, size*sizeof(int));
+//        int i = 0;
+//        int sbb=*sb;
+//        int *lesser;
+//        int minSbb = size>1?sb[1]:1;
+//        //        printf("minSbb = %d\n",minSbb);
+//        int sbb2;
+//        lesser = sbb_lesser[sbb];
+//        while(1) {
+//            int nxt = *lesser;
+//            while (nxt<minSbb) {
+//                if (++i>=size) break;
+//                sb[i-1] = sb[i];
+//                minSbb=size>i+1?sb[i+1]:2; // see Unit Group Trivilaity Lemma
+//            }
+//            sb[i] = nxt;
+//            sbb2 = sb[0];
+//            //            printf("sbb2 = %d\n",sbb2);
+//            if (cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2)) {
+//                updated=1;
+//            }
+//            else {
+//                break;
+//            }
+//            lesser++;
+//        }
+//    }
+//    return updated;
 }
 
 int cacheCantSolve(struct node *n, int* sb, int size, int k, int arrsize, int pairs){
     int updated =0;
-    //	printf("size=%d\n",size);
+    int tmp;
+    //    printf("size=%d\n",size);
     if (size<1) {
         if (n->cant < k){
-            //			printf("cache n->cant was %d, now %d\n",n->cant, k);
+            //            printf("cache n->cant was %d, now %d\n",n->cant, k);
             n->cant = k;
             updated = 1;
         }
     } else {
         if (n->next == NULL) {
-            //			printf("arrsize=%d\n",arrsize);
+            //            printf("arrsize=%d\n",arrsize);
             n->next = alloc_next(arrsize+1);
         }
-        int sbb = *sb;
-        //		printf("sbb=%d\n",sbb);
-        int *greater;
-        greater = sbb_greater[sbb];
-        int pairs_without_this = pairs - sb_pairs[sbb];
-        //		printf("pairs_without_this=%d\n",pairs_without_this);
-        int max_pairs = power3[k] - pairs_without_this;
-        //		printf("max_pairs=%d\n",max_pairs);
-        while(1) {
-            int sbb2 = *greater;
-            //			printf("sbb2=%d %s\n",sbb2,sbb_to_str[sbb2]);
-            if (sbb2>arrsize) break;
-            int pairs_new = sb_pairs[sbb2];
-            //			printf("pairs_new=%d\n",pairs_new);
-            if (pairs_new>max_pairs) break;
-            
-            if (cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new)) {
-                updated = 1;
-            } else {
-                break;
+        int i;
+        int sb2[size];
+        memcpy(sb2, sb, size*sizeof(int));
+        sb=sb2;
+        for (i=0; i < size; i++) {
+            if (i>0) {
+                tmp = sb[i];
+                sb[i]=sb[0];
+                sb[0]=tmp;
             }
-            greater++;
+            int sbb = *sb;
+            //        printf("sbb=%d\n",sbb);
+            int *greater;
+            greater = sbb_greater[sbb];
+            int pairs_without_this = pairs - sb_pairs[sbb];
+            //        printf("pairs_without_this=%d\n",pairs_without_this);
+            int max_pairs = power3[k] - pairs_without_this;
+            //        printf("max_pairs=%d\n",max_pairs);
+            while(1) {
+                int sbb2 = *greater;
+                if (size==1 || sbb2>=sb[1]) {
+                    //            printf("sbb2=%d %s\n",sbb2,sbb_to_str[sbb2]);
+                    if (sbb2>arrsize) break;
+                    int pairs_new = sb_pairs[sbb2];
+                    //            printf("pairs_new=%d\n",pairs_new);
+                    if (pairs_new>max_pairs) break;
+
+                    if (cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new)) {
+                        updated = 1;
+                    } else {
+                        break;
+                    }
+                }
+                greater++;
+            }
         }
     }
     return updated;
@@ -218,11 +275,14 @@ int canSolveB(int *sb, int size, int k, int fast_only){
     //todo: replace with memcpy
     int i;
     int pairs=0;
+    int pairs_full=0;
     int newsize=0;
     int sbb;
     for(i=0;i<size;i++) {
         sbb=sb[i];
-        if (sbb) {
+        pairs_full+=sb_pairs[sbb];
+        // Unit Group Trivilaity Lemma: Unit Groups (1-1) do not affect solvability within information maximum and can be ignored
+        if (sbb>1) {
             tmp[newsize++]=sbb;
             pairs+=sb_pairs[sbb];
         }
@@ -234,8 +294,8 @@ int canSolveB(int *sb, int size, int k, int fast_only){
     //    printf("pairs=%d\n", pairs);
     
     // check pairs
-    if (pairs<=1) return 1;
-    if (pairs>power3[k]) return 0;
+    if (pairs_full<=1) return 1;
+    if (pairs_full>power3[k]) return 0;
     
     size = newsize;
     
@@ -279,7 +339,7 @@ int canSolveB(int *sb, int size, int k, int fast_only){
     }
     
     
-    splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 2) ? BY_MAGIC3 : BY_MAX));
+    splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
     //    splitincr[0] = size == 1 ? BY_MAGIC : BY_MAX;
     //    splitincr[0] = size == 1 ? BY_MAGIC : ( (size>2 && sb_pairs[0] < pairs / 2) ? DESC + BY_MIN : BY_MAX);
     
@@ -322,14 +382,17 @@ int canSolveB(int *sb, int size, int k, int fast_only){
         //        printf("spi2=%d\n", spi2);
         //        fflush(stdout);
         int *s = splitsarr[i]->splitsl[spi2];
-        while (size > 1 && s[4]<k) { // don't do this for size==1 messes up counts
-            int kk = s[4]++;
-            if (
-                //                kk>=6 || // don't do this for large k
-                canSolveB(s, 1, kk, 0) && canSolveB(s+3, 1, kk, 0) && canSolveB(s+1, 2, kk, 0))
+        
+//        while (size > 1 && s[4]<k) { // don't do this for size==1 messes up counts
+        while (s[4]<k) {
+            int kk = s[4];
+
+            int t = canSolveB(s, 1, kk, 1) * canSolveB(s+3, 1, kk, 1) * canSolveB(s+1, 2, kk, 1);
+            if (t == 1)
                 s[4] = MAX_K;
-            else
-                s[5] = s[4];
+            else if (t == 0)
+                s[5] = ++s[4];
+            else break;
         }
         if (s[5]<k) {
             if (i==0 &&
@@ -378,9 +441,20 @@ int canSolveB(int *sb, int size, int k, int fast_only){
                             //                    int e=1;
                             //                        if ( p1<=max(p0,p1) && max(abs(p0-p1), max(abs(p0-p2), abs(p2-p1))) <= e) {
                             //                        if ( (p1<=p0 && p1<=p2) && max(abs(p0-p1), max(abs(p0-p2), abs(p2-p1))) <= e)
+//                            if (size<=3 && i==1)
+//                            {
+//                                splitincr[i] = BY_MAGIC2;
+//                            }
+//                            else
+//                            if (size/(i+1)>=2)
+//                            {
+//                                splitincr[i] = /*(sb_pairs[tmp[i]] < pairs / 3) ? BY_MAGIC3 : */ BY_MAX;
+//                            }
+//                            else
                             if ( abs(p0-p1) <= e && abs(p0-p2) <= e && abs(p2-p1) <= e)
                             {
-                                splitincr[i] = BY_MAGIC3; // if routhly equal - split equally
+//                                splitincr[i] = BY_MAGIC3; // if routhly equal - split equally
+                                splitincr[i] = (size - i > 1)? BY_MAGIC : BY_MAGIC3; // if routhly equal - split equally
                             }
                             else
                             {
@@ -629,17 +703,21 @@ int maxpairs(int sbb, int spl[]) {
     return (1+maxpairsraw(sbb, spl)) * (1+sb_pairs[sbb]) - minpairsraw(sbb, spl);
 }
 
+int distance(int spl[], int magicm1, int magicm2, int n1, int n2) {
+    int dx = (spl[6] - magicm1) * 1000/n1;
+    int dy = (spl[7] - magicm2)* 1000/n2;
+    int dx2 = (spl[6] - (n1 - magicm1))* 1000/n1;
+    int dy2 = (spl[7] - (n2 - magicm2))* 1000/n2;
+    return min(dx*dx + dy*dy, dx2*dx2 + dy2*dy2);
+}
+
 int magic(int sbb, int spl[]) {
     int n1 = sbb_to_n1[sbb];
     int n2 = sbb_to_n2[sbb];
     int msum = ((n1+n2)*577+999)/1000;
     int magicm1 = min(n1, (n1*577+999)/1000);
     int magicm2 = min(n2, msum-magicm1);
-    int dx = spl[6] - magicm1;
-    int dy = spl[7] - magicm2;
-    int dx2 = spl[6] - (n1 - magicm1);
-    int dy2 = spl[7] - (n2 - magicm2);
-    return min(dx*dx + dy*dy, dx2*dx2 + dy2*dy2);
+    return distance(spl, magicm1, magicm2, n1, n2);
 }
 
 
@@ -649,24 +727,18 @@ int magic2(int sbb, int spl[]) {
     int msum = ((n1+n2)*666+500)/1000;
     int magicm1 = min(n1, (n1*666+500)/1000);
     int magicm2 = min(n2, msum-magicm1);
-    int dx = spl[6] - magicm1;
-    int dy = spl[7] - magicm2;
-    int dx2 = spl[6] - (n1 - magicm1);
-    int dy2 = spl[7] - (n2 - magicm2);
-    return min(dx*dx + dy*dy, dx2*dx2 + dy2*dy2);
+    return distance(spl, magicm1, magicm2, n1, n2);
 }
 
 int magic3(int sbb, int spl[]) {
     //    return (1+minpairsraw(sbb, spl)) * (1+sb_pairs[sbb]) - maxpairsraw(sbb, spl);
     int n1 = sbb_to_n1[sbb];
     int n2 = sbb_to_n2[sbb];
+//    int msum = (n1+n2-3)/2;
     int magicm1 = n1/2;
     int magicm2 = n2/2;
-    int dx = spl[6] - magicm1;
-    int dy = spl[7] - magicm2;
-    int dx2 = spl[6] - (n1 - magicm1);
-    int dy2 = spl[7] - (n2 - magicm2);
-    return min(dx*dx + dy*dy, dx2*dx2 + dy2*dy2);
+//    int magicm2 = min(n2/2, magicm1-1);
+    return distance(spl, magicm1, magicm2, n1, n2);
 }
 
 void init(){
