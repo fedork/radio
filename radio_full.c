@@ -3,7 +3,6 @@
 
 double all_solutions(int sb[], int size, int k) {
     int tmp[size];
-    //todo: replace with memcpy
     int i;
     int pairs=0;
     int newsize=0;
@@ -24,9 +23,8 @@ double all_solutions(int sb[], int size, int k) {
     int sb0[size*2], sb1[size*2], sb2[size*2];
     
     int counts[size][MAX_N+1][MAX_N+1];
-    memset(counts, 0, sizeof(int) * size*(MAX_N+1)*(MAX_N+1));
-    double solvability[size][MAX_N+1][MAX_N+1];
-    memset(solvability, 0, sizeof(double) * size*(MAX_N+1)*(MAX_N+1));
+    memset(counts, 0, sizeof(counts));
+
     
     for(i=0;i<size;i++) {
         n[i*2] = sbb_to_n1[tmp[i]];
@@ -50,7 +48,7 @@ double all_solutions(int sb[], int size, int k) {
                         for(m2 = 0; m2 <= n[i*2+1]; m2++) {
                             int count = counts[i][m1][m2];
                             if (count > 0) {
-                                printf("[%d-%d]:%d:%f\n", m1, m2, count, solvability[i][m1][m2]);
+                                printf("[%d:%d]:%d\n", m1, m2, count);
                             }
                         }
                     }
@@ -63,7 +61,7 @@ double all_solutions(int sb[], int size, int k) {
                                     printf("%d", count);
                                 else
                                     printf("*");
-                            } else printf(" ");
+                            } else printf(".");
                         }
                         printf("\n");
                     }
@@ -89,6 +87,19 @@ double all_solutions(int sb[], int size, int k) {
             total++;
             if (canSolveB(sb0, size, k-1, 2) == 1 && canSolveB(sb2, size, k-1, 2) == 1 && canSolveB(sb1, size*2, k-1, 2) == 1) {
                 solved++;
+                printf("result in %d can solve ", k);
+                printSb(tmp, size);
+                printf(" with [");
+                for (i = 0; i<size; i++) {
+                    if (i>0) printf(",");
+                    printf("%d:%d", m[i*2], m[i*2+1]);
+                    counts[i][m[i*2]][m[i*2+1]]++;
+                }
+                printf("] => ");
+                printSb(sb0, size);
+                printSb(sb1, size*2);
+                printSb(sb2, size);
+                printf("\n");
             }
         } else {
             j++;
@@ -116,5 +127,5 @@ int main(int argc, char **argv){
     printf("k=%d ", k);
     printSb(sb, size);
     printf("\n");
-    
+    all_solutions(sb, size, k);
 }
