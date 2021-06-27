@@ -85,7 +85,12 @@ double all_solutions(int sb[], int size, int k) {
         
         if (j == size*2 - 1) {
             total++;
-            if (canSolveB(sb0, size, k-1, 2) == 1 && canSolveB(sb2, size, k-1, 2) == 1 && canSolveB(sb1, size*2, k-1, 2) == 1) {
+            if (canSolveB(sb0, size, k-1, CACHE_ONLY) != FALSE &&
+                canSolveB(sb2, size, k-1, CACHE_ONLY) != FALSE &&
+                canSolveB(sb1, size*2, k-1, CACHE_ONLY) != FALSE &&
+                canSolveB(sb0, size, k-1, 2) == TRUE &&
+                canSolveB(sb2, size, k-1, 2) == TRUE &&
+                canSolveB(sb1, size*2, k-1, 2) == TRUE) {
                 solved++;
                 printf("result in %d can solve ", k);
                 printSb(tmp, size);
