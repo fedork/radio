@@ -568,7 +568,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                                    int s2 = i;
 //                                    while (s2>0 && canSolveB(sb2, s2, k-1, deadline)==0) s2--;
 //                                }
-                            } else if((cs1 = canSolveB(sb1, (i+1) * 2, k_1, deadline))  != TRUE) {
+                            } else if((cs1 = canSolveB(sb1, (i+1) * 2, k_1, child_deadline))  != TRUE) {
                                 if (cs1!=FALSE)
                                     skipped_some = 1;
 //                                else {
