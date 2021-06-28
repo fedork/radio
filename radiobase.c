@@ -35,7 +35,7 @@
 #define FAST 8
 #define SPLIT_FIELD_COUNT 9
 
-#define DEADLINE_RATIO 10
+#define DEADLINE_RATIO 6
 
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
