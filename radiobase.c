@@ -414,7 +414,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     int skipped_some;
     int pass = 0;
 
-    clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
 //    clock_t first_deadline;
     while (cont2) {
         pass++;
@@ -438,6 +437,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printSb(tmp, size);
         printf("\n");
 
+        
+        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
         //    fflush(stdout);
         
         i = 0;
@@ -466,8 +467,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                        return MAYBE;
                     } else {
                         if (parent_deadline == NO_DEADLINE) {
-                            // bump deadline
-                            deadline+= CLOCKS_PER_SEC * 1000;
+                            // double deadline
+                            deadline+= (deadline - start);
                         } else {
                             if (pass>1) return MAYBE;
                         }
