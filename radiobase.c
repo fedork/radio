@@ -105,7 +105,8 @@ void printSb(int *sb, int size){
 
 typedef struct node {
     struct node *next;
-    int can; int cant;
+    char can;
+    char cant;
 //    int not_fast;
 } node_struct;
 
@@ -431,11 +432,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         memset(splitindex, 0, size * sizeof(int));
         splitindex[0] = splitsarr[0]->size;
     
-//        clock_t t = clock();
-//        printf("solving in %d pass=%d ", k, pass);
-//        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
-//        printSb(tmp, size);
-//        printf("\n");
+        clock_t t = clock();
+        printf("solving in %d pass=%d ", k, pass);
+        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
+        printSb(tmp, size);
+        printf("\n");
 
         //    fflush(stdout);
         
@@ -465,8 +466,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                        return MAYBE;
                     } else {
                         if (parent_deadline == NO_DEADLINE) {
-                            // double deadline
-                            deadline+= (deadline - start);
+                            // bump deadline
+                            deadline+= CLOCKS_PER_SEC * 1000;
                         } else {
                             if (pass>1) return MAYBE;
                         }
