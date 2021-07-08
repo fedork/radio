@@ -66,7 +66,7 @@ double all_solutions(int sb[], int size, int k) {
                         printf("\n");
                     }
                 }
-                double s = exp(log((long double)solved / total)/2/size);
+                double s = (double)solved / total;
                 printf("result in %d ratio = %llu/%llu solvability %f ", k, solved, total, s);
                 printSb(tmp, size);
                 printf("\n");
