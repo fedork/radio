@@ -35,7 +35,7 @@
 #define FAST 8
 #define SPLIT_FIELD_COUNT 9
 
-#define DEADLINE_RATIO 6
+#define DEADLINE_RATIO 10
 
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
@@ -431,11 +431,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         memset(splitindex, 0, size * sizeof(int));
         splitindex[0] = splitsarr[0]->size;
     
-        clock_t t = clock();
-        printf("solving in %d pass=%d ", k, pass);
-        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
-        printSb(tmp, size);
-        printf("\n");
+//        clock_t t = clock();
+//        printf("solving in %d pass=%d ", k, pass);
+//        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
+//        printSb(tmp, size);
+//        printf("\n");
 
         
         clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
@@ -844,11 +844,11 @@ int magic(int sbb, int spl[]) {
 }
 
 
-int magic2(int sbb, int spl[]) {
+int magic2(int sbb, int spl[]) { // magic ration is .666 = 2/3
     int n1 = sbb_to_n1[sbb];
     int n2 = sbb_to_n2[sbb];
-    int msum = ((n1+n2)*666+500)/1000;
-    int magicm1 = min(n1, (n1*666+500)/1000);
+    int msum = ((n1+n2)*700+500)/1000;
+    int magicm1 = min(n1, (n1*700+500)/1000);
     int magicm2 = min(n2, msum-magicm1);
     return distance(spl, magicm1, magicm2, n1, n2);
 }
