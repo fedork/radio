@@ -25,6 +25,7 @@ int sbb_to_n2[MAX_K+1][MAX_SBB+1];
 int n_to_sbb[MAX_K+1][MAX_N][MAX_N];
 int sbb_pairs[MAX_K+1][MAX_SBB+1];
 int splits_count[MAX_K+1][MAX_SBB+1];
+int splits_count_asym[MAX_K+1][MAX_SBB+1];
 char sbb_str[MAX_K+1][MAX_SBB+1][8];
 int max_n1[MAX_K+1][MAX_N+1];
 
@@ -46,6 +47,24 @@ void printSb(int k, int* sb, int size) {
         n+=sbb_to_n2[k][sbb];
     }
     printf(")[%d,%d]",pairs,n);
+}
+
+
+int sprintSb(char* buf, int k, int* sb, int size) {
+    int j = sprintf(buf, "Sb(");
+    int pairs=0;
+    int n=0;
+    int i;
+    for (i=0; i<size; i++) {
+        if (i>0) j+=sprintf(buf+j, ",");
+        int sbb = sb[i];
+        j+=sprintf(buf+j, "%s",sbb_str[k][sbb]);
+        pairs+=sbb_pairs[k][sbb];
+        n+=sbb_to_n1[k][sbb];
+        n+=sbb_to_n2[k][sbb];
+    }
+    j+=sprintf(buf+j, ")[%d,%d]",pairs,n);
+    return j;
 }
 
 int canSolveB(int* sb, int size, int k) {
@@ -71,7 +90,7 @@ int canSolveB(int* sb, int size, int k) {
             tmp[new_size++] = sbb;
         }
     }
-    if (pairs == 0) {
+    if (new_size <= 1 ) {
 //        printf("can solve 1\n");
 //        fflush(stdout);
         return 1;
@@ -88,9 +107,7 @@ int canSolveB(int* sb, int size, int k) {
 //        printf("i=%d dummy=%p node=%p\n", i, dummy, node);
 //        fflush(stdout);
         if (node == dummy) {
-            printf("dummy unexpected\n");
-            fflush(stdout);
-            exit(1);
+            return 0;
         }
         node = (node[tmp[i]]);
         if (node == NULL) {
@@ -104,41 +121,119 @@ int canSolveB(int* sb, int size, int k) {
     return 1;
 }
 
-int solveAll(void** results, int k, int* sb, int size_1, int max_size, int max_sbb) {
+typedef struct {int solved_size; void** res;} solve_res;
+
+char buf[4096];
+
+solve_res solveAll(int k, int* sb, int size_1, int max_size, int max_sbb, int min_solvable_size) {
+    solve_res r;
+    if (size_1 == 0) {
+        r.res = cache[k];
+    } else {
+        r.res = NULL;
+    }
+    r.solved_size = min_solvable_size;
     int can_solve_any = 0;
     int size = size_1+1;
-    int canSolve = (size_1==0); // for size_1==0 we know they are all solvable
-    int pairs = 0;
+    int pairs_parent = 0;
+    int n_parent = 0;
     int i;
     for (i = 0; i < size_1; i++) {
-        pairs+=sbb_pairs[k][sb[i]];
+        pairs_parent+=sbb_pairs[k][sb[i]];
+        n_parent+=sbb_to_n1[k][sb[i]];
+        n_parent+=sbb_to_n2[k][sb[i]];
     }
     for (int sbb = max_sbb; sbb > 1; sbb--) {
         sb[size_1] = sbb;
-        clock_t start = clock();
-        clock_t progress = start + 60 * CLOCKS_PER_SEC;
-        long long total_splits = 0;
+        
+        int n_this = n_parent + sbb_to_n1[k][sbb] + sbb_to_n2[k][sbb];
+        if (n_this > MAX_N) continue;
+
         int sb2[size];
         int sb1[size*2];
         int sb0[size];
-        if (pairs + sbb_pairs[k][sbb] > power3[k]) {
-            canSolve = 0;
-        } else if (!canSolve) {
+        int pairs_this = pairs_parent + sbb_pairs[k][sbb];
+        if (pairs_this > power3[k]) continue;
+        if (pairs_this + 2 <= power3[k] && n_this + 3 <= MAX_N) {
+//            printf("descending  in %d ", k);
+//            printSb(k, sb, size);
+//            printf("\n");
+            solve_res cr = solveAll(k, sb, size, max_size, sbb, min_solvable_size);
+//            printf("descended   in %d ", k);
+//            printSb(k, sb, size);
+//            printf("\n");
+            if (cr.res == NULL) {
+//                printf("cr.res == NULL cr.solved_size = %d size_1 = %d\n", cr.solved_size, size_1);
+                
+                r.solved_size = cr.solved_size;
+                if (cr.solved_size < size_1) {
+                    // shorter state is not solvable, so go back
+//                    printf("shorter state is not solvable, so go back\n");
+                    if (r.res != NULL) {
+                        printf("expected r.res==NULL but was %p\n", r.res);
+                        fflush(stdout);
+                        exit(1);
+                    }
+                    return r;
+                } else if (cr.solved_size == size_1) {
+                    // parent is solvable but this one isn't, so continue iterating
+//                    printf("parent is solvable but this one isn't, so continue iterating\n");
+//                    canSolve = 0;
+                    min_solvable_size = size_1;
+                    continue;
+                } else {
+                    // this is solvable but none of the longer ones are
+//                    printf("this is solvable but none of the longer ones are\n");
+                    if (cr.solved_size != size) {
+                        printf("unexpected: cr.solved_size = %d size = %d\n", cr.solved_size, size);
+                        fflush(stdout);
+                        exit(1);
+                    }
+//                    canSolve = 1;
+                    
+                    if (r.res == NULL) {
+                        r.res = (void**)malloc((max_sbb+1)*sizeof(void*));
+                        if (r.res == NULL) {
+                            printf("out of memory\n");
+                            fflush(stdout);
+                            exit(1);
+                        }
+                    }
+                    r.res[sbb] = dummy;
+                }
+            } else { // cr.res != NULL
+                if (r.res == NULL) {
+                    r.res = (void**)malloc((max_sbb+1)*sizeof(void*));
+                    if (r.res == NULL) {
+                        printf("out of memory\n");
+                        fflush(stdout);
+                        exit(1);
+                    }
+                }
+                r.res[sbb] = cr.res;
+            }
+        } else {
             // find a solution
+            clock_t start = clock();
+            clock_t progress = start + 60 * CLOCKS_PER_SEC;
+            long long total_splits = 0;
+//            printf("solving     in %d ", k);
+//            printSb(k, sb, size);
+//            printf("\n");
             sp_struct *sp[size];
             int sp_count[size];
             int sp_index[size];
-            
+            sprintf(buf, "");
             i = 0;
             for (i = 0; i < size; i++) {
                 sp[i] = splits[k][sb[i]];
-                sp_count[i] = splits_count[k][sb[i]];
-                //TODO: do not iterate redundant splits at the top
+                sp_count[i] = i==0 ? splits_count_asym[k][sb[i]] : splits_count[k][sb[i]];
                 sp_index[i] = i==0 ? sp_count[i] : 0;
             }
             
             i = 0;
             int cont = 1;
+            int canSolve = 0;
             while(cont) {
                 total_splits++;
                 while(sp_index[i] == 0) {
@@ -157,71 +252,66 @@ int solveAll(void** results, int k, int* sb, int size_1, int max_size, int max_s
                 sb1[i*2] = s->sbb1_1;
                 sb1[i*2+1] = s->sbb1_2;
                 if (clock()>=progress) {
-                    printf("still solving elapsed %lu splits %llu in %d ", (clock() - start), total_splits, k);
+                    printf("still solving elapsed %lu splits %llu in %d ", (clock() - start) / CLOCKS_PER_SEC, total_splits, k);
                     printSb(k, sb, size);
                     printf(" with ");
                     printSb(k_1, sb2, i+1);
                     printSb(k_1, sb1, i*2+2);
                     printSb(k_1, sb0, i+1);
                     printf("\n");
+                    fflush(stdout);
                     progress = clock() + 60 * CLOCKS_PER_SEC;
                 }
                 if (i==0 || // for i==0 we know they are all solvable
                     (canSolveB(sb2, i+1, k_1) && canSolveB(sb0, i+1, k_1) && canSolveB(sb1, i*2+2, k_1))) {
-                    if (i == size_1) {
+                    i++;
+                    
+                    if (i > min_solvable_size) {
+                        // found a solution longer than already known
+                        int j = 0;
+                        j = sprintf(buf, "can   solve in %d ", k);
+                        j += sprintSb(buf + j, k, sb, i);
+                        j += sprintf(buf + j, " with ");
+                        j += sprintSb(buf + j, k_1, sb2, i);
+                        j += sprintSb(buf + j, k_1, sb1, i*2);
+                        j += sprintSb(buf + j, k_1, sb0, i);
+                        j += sprintf(buf + j, "\n");
+                        r.solved_size = i;
+                        if (i<size) {
+                            min_solvable_size = i;
+                        }
+                    }
+                    if (i == size) {
                         canSolve = 1;
                         cont = 0;
-
+                        if (r.res == NULL) {
+                            r.res = (void**)malloc((max_sbb+1)*sizeof(void*));
+                            if (r.res == NULL) {
+                                printf("out of memory\n");
+                                fflush(stdout);
+                                exit(1);
+                            }
+                        }
+                        r.res[sbb] = dummy;
                         break;
                     } else {
-                        i++;
-                        sp_index[i] = sp_count[i];
+                        sp_index[i] = (i>1 && sb[i] == sb[i-1]) ? sp_index[i-1]+1 : sp_count[i];
                     }
                 }
             }
+            printf("%s", buf);
             if (!canSolve) {
                 printf("can't solve in %d ", k);
-                printSb(k, sb, size);
+                printSb(k, sb, min_solvable_size+1);
                 printf("\n");
+                // if parent not solvable, quit now
+                if (min_solvable_size < size_1) break;
     //            fflush(stdout);
             }
         }
-        if (canSolve) {
-            can_solve_any = 1;
-            if (size < max_size) {
-                
-                // create next cache entry
-                void** next = (void**)malloc((sbb+1)*sizeof(void*));
-                if (next == NULL) {
-                    printf("out of memory\n");
-                    fflush(stdout);
-                    exit(1);
-                }
-                results[sbb] = next;
-                // descend
-                if (!solveAll(next, k, sb, size, max_size, sbb)) {
-                    // only pring if longer ones are not solvable
-                    printf("can solve in %d ", k);
-                    printSb(k, sb, size);
-                    printf(" with ");
-                    printSb(k_1, sb2, size);
-                    printSb(k_1, sb1, size*2);
-                    printSb(k_1, sb0, size);
-                    printf("\n");
-//                    fflush(stdout);
-                }
-            } else {
-                results[sbb] = dummy; // means this is solvable, but we do not need to check longer ones
-            }
-            // if we reach diagonal, we start next row and need to start checking solvability again
-            if (sbb_to_n2[sbb] == sbb_to_n1[sbb]) {
-                canSolve = 0;
-            }
-        } else { // can't solve
-            results[sbb] = NULL;
-        }
     }
-    return can_solve_any;
+    
+    return r;
 }
 
 int getSbb(int k, int n1, int n2) {
@@ -265,13 +355,14 @@ int main(int argc, char **argv){
         while (1) {
 
             int n1 = n2;
-            while (1) {
+            while (n1+n2 <= MAX_N) {
                 printf("starting splits for %d:%d\n", n1, n2);
                 fflush(stdout);
                 // enumerate all solvable splits
                 int m1, m2;
                 int split_count = 0;
-                for (m1 = 0 ; m1 <= n1; m1++) {
+                int split_count_asym = 0;
+                for (m1 = n1 ; m1 >= 0; m1--) {
 
                     int m1_c = n1 - m1;
                     for (m2 = 0; m2 <= (n1==n2 ? m1 : n2) ; m2++) {
@@ -293,12 +384,14 @@ int main(int argc, char **argv){
                                 splits[k][sbb][split_count].sbb1_1 = sb1[0];
                                 splits[k][sbb][split_count].sbb1_2 = sb1[1];
                                 split_count++;
+                                if (m1>=(n1+1)/2) split_count_asym++;
                             }
                         }
                     }
                 }
                 if (split_count==0) break;
                 splits_count[k][sbb] = split_count;
+                splits_count_asym[k][sbb] = split_count_asym;
             
                 // solvable sbb
                 sbb_to_n1[k][sbb] = n1;
@@ -326,7 +419,7 @@ int main(int argc, char **argv){
         printf("done with splits for k=%d\n", k);
         fflush(stdout);
         
-        solveAll(cache[k], k, sb, 0, max_size, sbb_count-1);
+        solveAll(k, sb, 0, max_size, sbb_count-1, 1);
         
         
         // done for k
