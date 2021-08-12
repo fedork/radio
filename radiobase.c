@@ -3,14 +3,25 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef DEBUG
+#define debug_printf(...) do{ printf( __VA_ARGS__ ); fflush(stdout);} while( 0 )
+#define DEBUG1 1
+#else
+#define debug_printf(...) /* Nothing */
+#ifndef DEBUG1
+#define OPT 1
+#endif
+#endif
+
 #define MAX_K 10
 
 #ifndef MAX_N
-#define MAX_N 200
+#define MAX_N 196
 #endif
 
 #define MAX_SBB MAX_N*MAX_N/4
 #define MAX_SPLITS (MAX_N/2) * (MAX_N/2 + 2)
+#define MAX_PROD (MAX_N/2)*(MAX_N - MAX_N/2)
 #define BY_MAGIC 0
 #define BY_MAX 1
 #define BY_SP0 2
@@ -35,7 +46,8 @@
 #define FAST 8
 #define SPLIT_FIELD_COUNT 9
 
-#define DEADLINE_RATIO 10
+#define DEADLINE_RATIO 6
+#define MIN_DEADLINE 3
 
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
@@ -47,7 +59,7 @@ typedef struct {
     int ind[INDEX_COUNT][MAX_SPLITS];
 } splits;
 
-unsigned long power3[MAX_K+1];
+int power3[MAX_K+1];
 int n_to_sbb[MAX_N+1][MAX_N/2 + 1];
 int sbb_to_n1[MAX_SBB+1];
 int sbb_to_n2[MAX_SBB+1];
@@ -57,6 +69,7 @@ int sa_can[MAX_N+1];
 int sa_cant[MAX_N+1];
 int sbb_lesser[MAX_SBB+1][MAX_SBB+1];
 int sbb_greater[MAX_SBB+1][MAX_SBB+1];
+int max_sbb_for_pairs[MAX_PROD+1];
 clock_t wasted = 0;
 clock_t not_wasted = 0;
 
@@ -105,213 +118,240 @@ void printSb(int *sb, int size){
 
 typedef struct node {
     struct node *next;
-    char can;
-    char cant;
-//    int not_fast;
 } node_struct;
 
-struct node sb_cache_root;
+struct node can_solve_marker[1];
+struct node cant_solve_marker[1];
+
+struct node sb_cache_root[MAX_K+1];
+
+long long alloc_count = 0;
+long long alloc_size = 0;
 
 struct node *alloc_next(int arrsize){
     struct node * next;
-    next = (struct node *)malloc((arrsize)*sizeof(struct node));
+    int size = (arrsize)*sizeof(struct node);
+    next = (struct node *)malloc(size);
+    alloc_count++;
+    alloc_size+=arrsize;
     if (next == NULL){
-        printf("out of memory\n");
-        fflush(stdout);
+        printf("\nout of memory\n");
         exit(1);
     }
-    int j;
-    for (j=0; j<arrsize; j++) {
-        next[j].can = MAX_K+1;
-        next[j].cant = 0;
-//        next[j].not_fast = 0;
-        next[j].next = NULL;
-    }
+    memset(next, 0, size);
+    debug_printf("in alloc n=%p arrsize=%d\n", next, arrsize);
     return next;
 }
 
-int cacheCanSolve(struct node *n, int* sb, int size, int k, int arrsize){
+void free_recursive(struct node *n, int arrsize, int pairs_remaining) {
+    debug_printf("can't marker %p\n", cant_solve_marker);
+    debug_printf("can marker %p\n", can_solve_marker);
+    debug_printf("in free n=%p arrsize=%d pairs_remaining=%d\n", n, arrsize, pairs_remaining);
+    int sbb;
+    for (sbb=2; sbb<arrsize; sbb++) {
+        struct node *next = n[sbb].next;
+        if (next == NULL || next == can_solve_marker || next == cant_solve_marker) continue;
+        int new_pairs_remaining = pairs_remaining - sb_pairs[sbb];
+        int sbb2 = min(sbb, max_sbb_for_pairs[min(MAX_PROD, new_pairs_remaining)]);
+        free_recursive(next, sbb2+1, new_pairs_remaining);
+    }
+    alloc_count--;
+    alloc_size-=arrsize;
+    free(n);
+}
+
+int cacheCanSolve(struct node *n, int* sb, int size, int k, int max_sbb, int pairs_remaining){
     //	printf("size = %d\n",size);
-    int updated =0;
-    if(n->can > k){
-        //		printf("cache n->can was %d, now %d\n",n->can, k);
-        n->can = k;
-        updated = 1;
+#ifdef DEBUG
+    printf("in cacheCanSolve n=%p n->next=%p max_sbb=%d pairs_remaining=%d ", n, n->next, max_sbb, pairs_remaining);
+    printSb(sb, size);
+    printf("\n");
+#endif
+#ifndef OPT
+    if (n->next == cant_solve_marker) {
+        printf("\nencountered cant_solve_marker when caching can solve\n");
+        fflush(stdout);
+        exit(2);
     }
-    if (size>0) {
-        if (n->next == NULL) {
-            //			printf("cache allocating %d\n", arrsize);
-            n->next = alloc_next(arrsize+1);
-        }
-        int sbb=*sb;
-        int *lesser;
-        int minSbb = size>1?sb[1]:2; // see Unit Group Triviality Lemma
-        //		printf("minSbb = %d\n",minSbb);
-        int sbb2;
-        lesser = sbb_lesser[sbb];
-        while(1) {
-            sbb2 = *lesser;
-            if (sbb2<minSbb) break;
-            //			printf("sbb2 = %d\n",sbb2);
-            if (cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2)) {
-                updated=1;
-            }
-// ????????
-//            else {
-//                break;
-//            }
-            lesser++;
-        }
-    }
-    return updated;
-    
-    //  ------- more comprehensive, but seems counterproductive:
-    
-    //    int cacheCanSolve(struct node *n, int* sbOrig, int size, int k, int arrsize){
-    //    int updated =0;
-    //    if(n->can > k){
-    //        //        printf("cache n->can was %d, now %d\n",n->can, k);
-    //        n->can = k;
-    //        updated = 1;
-    //    }
-    //    if (size>0) {
-    //        if (n->next == NULL) {
-    //            n->next = alloc_next(arrsize+1);
-    //        }
-    //        int sb[size];
-    //        memcpy(sb, sbOrig, size*sizeof(int));
-    //        int i = 0;
-    //        int sbb=*sb;
-    //        int *lesser;
-    //        int minSbb = size>1?sb[1]:1;
-    //        //        printf("minSbb = %d\n",minSbb);
-    //        int sbb2;
-    //        lesser = sbb_lesser[sbb];
-    //        while(1) {
-    //            int nxt = *lesser;
-    //            while (nxt<minSbb) {
-    //                if (++i>=size) break;
-    //                sb[i-1] = sb[i];
-    //                minSbb=size>i+1?sb[i+1]:2; // see Unit Group Trivilaity Lemma
-    //            }
-    //            sb[i] = nxt;
-    //            sbb2 = sb[0];
-    //            //            printf("sbb2 = %d\n",sbb2);
-    //            if (cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2)) {
-    //                updated=1;
-    //            }
-    //            else {
-    //                break;
-    //            }
-    //            lesser++;
-    //        }
-    //    }
-    //    return updated;
-}
-
-int cacheCantSolve(struct node *n, int* sb, int size, int k, int arrsize, int pairs){
-    int updated =0;
-    int tmp;
-    //    printf("size=%d\n",size);
+#endif
     if (size<1) {
-        if (n->cant < k){
-            //            printf("cache n->cant was %d, now %d\n",n->cant, k);
-            n->cant = k;
-            updated = 1;
+        if (n->next == can_solve_marker) {
+            debug_printf("already cached, returning 0\n");
+            return 0;
         }
-    } else {
         if (n->next == NULL) {
-            //            printf("arrsize=%d\n",arrsize);
-            n->next = alloc_next(arrsize+1);
-        }
-        int i;
-        int sb2[size];
-        memcpy(sb2, sb, size*sizeof(int));
-        sb=sb2;
-        for (i=0; i < size; i++) {
-            if (i>0) {
-                tmp = sb[i];
-                sb[i]=sb[0];
-                sb[0]=tmp;
+            debug_printf("was NULL, setting \n");
+            n->next = can_solve_marker;
+        } else {
+            if (n->next[0].next == can_solve_marker){
+                debug_printf("already cached, returning 0\n");
+                return 0;
             }
-            int sbb = *sb;
-            //        printf("sbb=%d\n",sbb);
-            int *greater;
-            greater = sbb_greater[sbb];
-            int pairs_without_this = pairs - sb_pairs[sbb];
-            //        printf("pairs_without_this=%d\n",pairs_without_this);
-            int max_pairs = power3[k] - pairs_without_this;
-            //        printf("max_pairs=%d\n",max_pairs);
-            while(1) {
-                int sbb2 = *greater;
-                if (size==1 || sbb2>=sb[1]) {
-                    //            printf("sbb2=%d %s\n",sbb2,sbb_to_str[sbb2]);
-                    if (sbb2>arrsize) break;
-                    int pairs_new = sb_pairs[sbb2];
-                    //            printf("pairs_new=%d\n",pairs_new);
-                    if (pairs_new>max_pairs) break;
-                    
-                    if (cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new)) {
-                        updated = 1;
-                    }
-//                    else {
-//                        break;
-//                    }
-                }
-                greater++;
-            }
+            debug_printf("n->next[0].next = can_solve_marker\n");
+            n->next[0].next = can_solve_marker;
         }
+        return 1;
     }
+    int updated =0;
+    max_sbb=min(max_sbb, max_sbb_for_pairs[min(MAX_PROD, pairs_remaining)]);
+#ifdef DEBUG
+    printf("in cacheCanSolve size=%d max_sbb=%d after ", size, max_sbb);
+    printSb(&max_sbb, 1);
+    printf("\n");
+#endif
+    if (n->next == NULL || n->next == can_solve_marker) {
+        n->next = alloc_next(max_sbb+1);
+    }
+    if(n->next[0].next != can_solve_marker) {
+        n->next[0].next = can_solve_marker;
+        updated++;
+    }
+    
+    int sbb=*sb;
+    int *lesser;
+    int minSbb = size>1?sb[1]:2; // see Unit Group Triviality Lemma
+    //		printf("minSbb = %d\n",minSbb);
+    int sbb2;
+    lesser = sbb_lesser[sbb];
+    while(1) {
+        sbb2 = *lesser;
+        if (sbb2<minSbb) break;
+        debug_printf("sbb2 = %d(%s)\n", sbb2, sbb_to_str[sbb2]);
+        updated+=cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2, pairs_remaining - sb_pairs[sbb2]);
+        lesser++;
+    }
+    debug_printf("updated=%d\n", updated);
     return updated;
 }
 
-//void cacheNotFast(struct node *n, int* sb, int size, int k, int arrsize){
-//
-//    if (size == 0) {
-//        n->not_fast = 1;
-//    } else {
-//        if (n->next == NULL) {
-////            printf("cache allocating %d\n", arrsize);
-////            fflush(stdout);
-//            n->next = alloc_next(arrsize+1);
-//        }
-//
-//        cacheNotFast(&(n->next)[sb[0]], sb+1, size-1,k, sb[0]);
-//    }
-//}
+int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, int pairs, int pairs_remaining){
+    
+    debug_printf("in cache n=%p n->next=%p can't solve size=%d max_sbb=%d before pairs=%d, pairs_remaining=%d ", n, n->next, size, max_sbb, pairs, pairs_remaining);
+    
+#ifdef DEBUG
+    printSb(sb_orig, size);
+    printf("\n");
+#endif
+    
+    //    printf("size=%d\n",size);
+    if (n->next == cant_solve_marker) {
+        debug_printf("already cached, returning 0\n");
+        return 0;
+    }
+    max_sbb = min(max_sbb, max_sbb_for_pairs[min(MAX_PROD, pairs_remaining)]);
+    debug_printf("in can't solve size=%d max_sbb=%d(%s) after\n", size, max_sbb, sbb_to_str[max_sbb]);
+    if (size < 1) {
+#ifndef OPT
+        if (n->next == can_solve_marker) {
+            printf("\nencountered can_solve_marker when caching can't solve (1)\n");
+            exit(3);
+        }
+#endif
+        if (n->next != NULL) {
+            debug_printf("before free\n");
+            free_recursive(n->next, max_sbb+1, pairs_remaining);
+            debug_printf("after free\n");
+        }
+        n->next = cant_solve_marker;
+        return 1;
+    }
+    if (n->next == NULL || n->next == can_solve_marker) {
+        //            printf("arrsize=%d\n",arrsize);
+        debug_printf("before alloc\n");
+        n->next = alloc_next(max_sbb+1);
+        debug_printf("after alloc\n");
+    }
+    int updated = 0;
+    int tmp;
+    int i;
+    int sb[size];
+    memcpy(sb, sb_orig, size*sizeof(int));
+    for (i=0; i < size; i++) {
+        if (i>0) {
+            tmp = sb[i];
+            sb[i]=sb[0];
+            sb[0]=tmp;
+        }
+        int sbb = *sb;
+        //        printf("sbb=%d\n",sbb);
+        int *greater;
+        greater = sbb_greater[sbb];
+        int pairs_without_this = pairs - sb_pairs[sbb];
+        //        printf("pairs_without_this=%d\n",pairs_without_this);
+        int max_pairs = power3[k] - pairs_without_this;
+        //        printf("max_pairs=%d\n",max_pairs);
+        while(1) {
+            int sbb2 = *greater;
+            if (size==1 || sbb2>=sb[1]) {
+                //            printf("sbb2=%d %s\n",sbb2,sbb_to_str[sbb2]);
+                if (sbb2>max_sbb) break;
+                int pairs_new = sb_pairs[sbb2];
+                //            printf("pairs_new=%d\n",pairs_new);
+                if (pairs_new>max_pairs) break;
+                int next_pairs_remaining = pairs_remaining - pairs_new;
+                debug_printf("sbb2 = %d(%s)\n", sbb2, sbb_to_str[sbb2]);
+                updated+=cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new, next_pairs_remaining);
+            }
+            greater++;
+        }
+    }
+    
+    return updated;
+}
 
 void cache(int *sb, int size, int canSolve, int k, int pairs) {
-    struct node *n=&sb_cache_root;
-    if (canSolve==TRUE) {
-        cacheCanSolve(n,sb,size,k, MAX_SBB);
-//    } else if (canSolve == MAYBE_SLOW) {
-//        cacheNotFast(n,sb,size,k, MAX_SBB);
+    
+#ifdef DEBUG
+    printf("\nin cache for ");
+    printSb(sb, size);
+    printf(" cs=%d k=%d pairs=%d\n", canSolve, k, pairs);
+    fflush(stdout);
+#endif
+    
+    long long alloc_count_before = alloc_count;
+    long long alloc_size_before = alloc_size;
+    
+    int updated;
+    if (canSolve) {
+        updated = cacheCanSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, power3[k]);
     } else {
-        cacheCantSolve(n,sb,size,k, MAX_SBB, pairs);
+        updated = cacheCantSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, pairs, power3[k]);
     }
+    printf(" cache=%lld/%lld(%+lld/%+lld)", alloc_count, alloc_size, alloc_count-alloc_count_before, alloc_size-alloc_size_before);
+    
+#ifndef OPT
+    if (updated == 0) {
+        printf("\nupdated == 0 when caching result\n");
+        fflush(stdout);
+        exit(4);
+    }
+#endif
 }
 
 int checkCache(int *sb, int size, int k) {
-    //	printf("in checkcache\n");
     int i;
-    struct node *n=&sb_cache_root;
+    struct node *n=&sb_cache_root[k];
     for (i=0; i <= size; i++) {
         //		printf("checkcache i=%d\n",i);
-        if(n->cant >= k){
+        if(n->next == cant_solve_marker){
             //			printf("checkcache can't solve: n->cant=%d k=%d\n", n->cant, k);
-            return 0;
+            return FALSE;
         } else {
             if (i==size) {
-                if (n->can <= k){
-                //				printf("checkcache can solve: n->can=%d k=%d\n", n->can, k);
+                if (n->next == can_solve_marker){
+                    //				printf("checkcache can solve: n->can=%d k=%d\n", n->can, k);
                     return TRUE;
-//                } else {
-//                    if (n->not_fast) return MAYBE_SLOW;
-                } else {
+                    //                } else {
+                    //                    if (n->not_fast) return MAYBE_SLOW;
+                } else if (n->next == NULL) {
                     return MAYBE;
+                } else if (n->next[0].next == NULL) {
+                    return MAYBE;
+                } else {
+                    return TRUE;
                 }
             }
-            if (n->next == NULL) {
+            if (n->next == NULL || n->next == can_solve_marker) {
                 //				printf("checkcache n->next is null, return 2");
                 return MAYBE;
             }
@@ -323,6 +363,14 @@ int checkCache(int *sb, int size, int k) {
 }
 
 int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
+#ifdef DEBUG1
+    if(k>7) {
+        printf("in canSolveB k=%d ", k);
+        printSb(sb, size);
+        printf("\n");
+        fflush(stdout);
+    }
+#endif
     int canSolve=FALSE;
     int tmp[size];
     //todo: replace with memcpy
@@ -333,11 +381,37 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     int sbb;
     for(i=0;i<size;i++) {
         sbb=sb[i];
+#ifdef DEBUG1
+        if(k>7) {
+            printf("sbb=%d\n", sbb);
+            printSb(&sbb, 1);
+            printf("\n");
+            fflush(stdout);
+        }
+#endif
         pairs_full+=sb_pairs[sbb];
+#ifdef DEBUG1
+        if(k>7) {
+            printf("b_pairs[sbb]=%d\n", sb_pairs[sbb]);
+            fflush(stdout);
+        }
+#endif
+#ifdef DEBUG1
+        if(k>7) {
+            printf("pairs_full=%d\n", pairs_full);
+            fflush(stdout);
+        }
+#endif
         // Unit Group Trivilaity Lemma: Unit Groups (1-1) do not affect solvability within information maximum and can be ignored
         if (sbb>1) {
             tmp[newsize++]=sbb;
             pairs+=sb_pairs[sbb];
+#ifdef DEBUG1
+            if(k>7) {
+                printf("pairs=%d\n", pairs);
+                fflush(stdout);
+            }
+#endif
         }
     }
     
@@ -346,28 +420,48 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     //    printf("\n");
     //    printf("pairs=%d\n", pairs);
     
+
+#ifdef DEBUG1
+    if(k>7) {
+        printf("newsize = %d pairs_full= %d\n", newsize, pairs_full);
+        fflush(stdout);
+    }
+#endif
     // check pairs
-    if (pairs_full<=1) return TRUE;
     if (pairs_full>power3[k]) return FALSE;
+    if (newsize == 0) return TRUE; // if we only had unit groups
     
     size = newsize;
-    
-    sort1(tmp, size);
-    
-    //    printf("sorted: ");
-    //    printSb(tmp, size);
-    //    printf("\n");
-    
+#ifdef DEBUG1
+    if(k>7) {
+        printf("before sort: ");
+        printSb(tmp, size);
+        printf("\n");
+        fflush(stdout);
+    }
+#endif
+    if (size>1) sort1(tmp, size);
+#ifdef DEBUG
+    printf("sorted: ");
+    printSb(tmp, size);
+    printf("\n");
+    fflush(stdout);
+#elif defined( DEBUG1 )
+    if(k>7) {
+        printf("sorted: ");
+        printSb(tmp, size);
+        printf("\n");
+        fflush(stdout);
+    }
+#endif
     //check cache
     int ck = checkCache(tmp, size, k);
     //	printf("got from cache %d\n", ck);
     if (parent_deadline == CACHE_ONLY || ck == TRUE || ck == FALSE) {
+        debug_printf("returning ck=%d\n", ck);
         return ck;
     }
-//    if (parent_deadline == FAST_ONLY && ck == MAYBE_SLOW) {
-//        return ck;
-//    }
-
+    
     int size_1 = size-1;
     int size2 = size*2;
     int k_1 = k-1;
@@ -395,26 +489,24 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     clock_t deadline = 0;
     if (parent_deadline == NO_DEADLINE) {
         deadline = start + CLOCKS_PER_SEC * (1000);
-//    } else if (parent_deadline == FAST_ONLY) {
-//        deadline = start + CLOCKS_PER_SEC * (power3[k] * (1 << k)) / 100000;
     } else {
         if (start > parent_deadline) return MAYBE;
 //        int deadline_ratio = size;
         int deadline_ratio = DEADLINE_RATIO;
-        if (parent_deadline - start > CLOCKS_PER_SEC * deadline_ratio) {
+        if (parent_deadline - start > CLOCKS_PER_SEC * MIN_DEADLINE * deadline_ratio) {
             deadline = start + ((parent_deadline - start) / deadline_ratio);
         } else {
-            deadline = start + CLOCKS_PER_SEC * 1 + 300;
+            deadline = start + CLOCKS_PER_SEC * MIN_DEADLINE + 300;
         }
     }
     
-//    printf("k=%d parent_deadline=%llu start=%llu deadline=%llu\n", k, parent_deadline, start, deadline);
-
+    //    printf("k=%d parent_deadline=%llu start=%llu deadline=%llu\n", k, parent_deadline, start, deadline);
+    
     int cont2=1;
     int skipped_some;
     int pass = 0;
+    int max_solvable_maybe = 0;
 
-//    clock_t first_deadline;
     while (cont2) {
         pass++;
         clock_t max_time = (deadline - start) / CLOCKS_PER_SEC;
@@ -430,13 +522,15 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         
         memset(splitindex, 0, size * sizeof(int));
         splitindex[0] = splitsarr[0]->size;
-    
-//        clock_t t = clock();
-//        printf("solving in %d pass=%d ", k, pass);
-//        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
-//        printSb(tmp, size);
-//        printf("\n");
-
+        
+#ifdef DEBUG1
+        clock_t t = clock();
+        printf("solving in %d pass=%d ", k, pass);
+        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
+        printSb(tmp, size);
+        printf("\n");
+        fflush(stdout);
+#endif
         
         clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
         //    fflush(stdout);
@@ -445,18 +539,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         int ck0,ck1,ck2;
         
         while(cont) {
-//            if (i > 0 && clock() > first_deadline) {
-//                clock_t t = clock();
-//                if (t < deadline) {
-//                    first_deadline = t + (deadline - t) / 2 + CLOCKS_PER_SEC;
-//                    i = 0;
-//                    skipped_some = 1;
-//                }
-//            }
-            while(splitindex[i] == 0
-//                  || ( i > 0 && pass == 1 && i < size / 2 && splitindex[i] < splitsarr[i]->size / 2  && (clock()-start) * 2 > (deadline - start))
-                  ) {
-//                if (splitindex[i] > 0) skipped_some = 1;
+            while(splitindex[i] == 0) {
+                //                if (splitindex[i] > 0) skipped_some = 1;
                 if (i==0) {
                     // can't solve
                     cont=0;
@@ -468,8 +552,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     } else {
                         if (parent_deadline == NO_DEADLINE) {
                             // double deadline
-                            clock_t now = clock();
-                            deadline = now + (now - start);
+                            deadline += (deadline - start);
                         } else {
                             if (pass>1) return MAYBE;
                         }
@@ -483,6 +566,16 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             spi2 = (splitincr[i] & DESC) ?
             splitsarr[i]->ind[splitincr[i] & DESC_MASK][splitsarr[i]->size - 1 - spi] :
             splitsarr[i]->ind[splitincr[i] & DESC_MASK][spi];
+            
+            // for identical groups avoid trying redundant permutations
+            if (i>1 && tmp[i] == tmp[i-1]) { // do not do this for i==1 because it conflicts with skiptop
+                int spi_1 = splitindex[i-1];
+                int spi2_1 = (splitincr[i-1] & DESC) ?
+                splitsarr[i-1]->ind[splitincr[i-1] & DESC_MASK][splitsarr[i-1]->size - 1 - spi_1] :
+                splitsarr[i-1]->ind[splitincr[i-1] & DESC_MASK][spi_1];
+                if (spi2 > spi2_1) continue;
+            }
+            
             int *s = splitsarr[i]->splitsl[spi2];
             
             while (s[4]<k) {
@@ -527,35 +620,44 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     int p2 = sb2p[i] = sb_pairs[sb2[i] = s[3]] + (i>0?sb2p[i-1]:0);
                     
                     int cs0, cs1, cs2;
-
+                    
+#ifdef DEBUG
+                    printSb(sb0, i+1);
+                    printSb(sb1, 2*i+2);
+                    printSb(sb2, i+1);
+                    
+                    debug_printf(" i=%d p0=%d p1=%d p2=%d\n", i, p0,p1,p2);
+#endif
                     if ((p0 <= max_pairs_1) && (p1 <= max_pairs_1) && (p2 <= max_pairs_1)
                         && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY)) && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY)) && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
                         )
                     {
+                        debug_printf("can solve\n");
                         if (i == size_1) {
-                            clock_t t = clock();
-                            if (t>deadline){
-                                if (parent_deadline != NO_DEADLINE) {
-                                    return MAYBE;
-                                } else {
-                                    cont=0;
-                                    //                                    deadline=0;  // now do full solution
-                                    // double deadline
-                                    deadline+= (deadline - start);
-                                    break;
+                            if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
+                                clock_t t = clock();
+                                if (t>deadline){
+                                    if (parent_deadline != NO_DEADLINE) {
+                                        return MAYBE;
+                                    } else {
+                                        cont=0;
+                                        //                                    deadline=0;  // now do full solution
+                                        // double deadline
+                                        deadline+= (deadline - start);
+                                        break;
+                                    }
                                 }
-                            }
-                            if (t >= progress) {
-                                printf("still solving in %d pass=%d ", k, pass);
-//                                printf("wasted %lu \tnot_wasted %lu ", wasted / CLOCKS_PER_SEC, not_wasted / CLOCKS_PER_SEC);
-                                printSb(tmp, size);
-                                printf(" trying ");
-                                printSb(sb0, size);
-                                printSb(sb1, size2);
-                                printSb(sb2, size);
-                                printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu\n", (t - start)/CLOCKS_PER_SEC, max_time, splitindex[0], splitsarr[0]->size, totalsplits);
-                                fflush(stdout);
-                                progress = t + PROGRESS_INTERVAL;
+                                if (t >= progress) {
+                                    printf("still solving in %d pass=%d ", k, pass);
+                                    printSb(tmp, size);
+                                    printf(" trying ");
+                                    printSb(sb0, size);
+                                    printSb(sb1, size2);
+                                    printSb(sb2, size);
+                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu\n", (t - start)/CLOCKS_PER_SEC, max_time, splitindex[0], splitsarr[0]->size, totalsplits);
+                                    fflush(stdout);
+                                    progress = t + PROGRESS_INTERVAL;
+                                }
                             }
                             if ((cs0 = canSolveB(sb0, i+1, k_1, child_deadline)) != TRUE) {
                                 if (cs0 != FALSE)
@@ -575,6 +677,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             }
                         } else {
                             i++;
+                            if (i>max_solvable_maybe) {
+                                debug_printf("max_solvable_maybe=%d\n", max_solvable_maybe);
+                                max_solvable_maybe = i;
+                            }
                             splitindex[i] = splitsarr[i]->size;
 //                            int e = sb_pairs[tmp[i]] / 3; // is this a good factor?
 //                            if ( abs(p0-p1) <= e && abs(p0-p2) <= e && abs(p2-p1) <= e)
@@ -651,19 +757,36 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         return MAYBE;
     } else {
         printf("can't solve ");
+        if (max_solvable_maybe + 1 < size) {
+            printf("size=%d/", size);
+            size = max_solvable_maybe + 1;
+            printf("%d ", size);
+            // recompute pairs
+            pairs = 0;
+            for(i=0;i<size;i++) {
+                pairs+=sb_pairs[sb[i]];
+            }
+        }
         printSb(tmp, size);
         printf(" in %d",k);
     }
     clock_t t = clock()-start;
     clock_t s = t/CLOCKS_PER_SEC;
     if (s>0)
-        printf(" took %ld ", s);
+        printf(" took %ld", s);
     else
-        printf(" took 0.%03ld ", t * 1000/CLOCKS_PER_SEC);
-    printf("totalsplits=%llu of %llu skiptop=%d pass=%d\n", totalsplits, maxsplits, skiptop, pass);
-    //    fflush(stdout);
+        printf(" took 0.%03ld", t * 1000/CLOCKS_PER_SEC);
+    printf(" totalsplits=%llu of %llu skiptop=%d pass=%d", totalsplits, maxsplits, skiptop, pass);
+    
+#ifdef DEBUG1
+    fflush(stdout);
+#endif
     cache(tmp, size, canSolve, k, pairs);
-
+    //    fflush(stdout);
+    printf("\n");
+#ifdef DEBUG1
+    fflush(stdout);
+#endif
     return canSolve;
 }
 
@@ -680,17 +803,24 @@ int canSolveA(int n, int k) {
         return 1;
     }
     if (sa_can[n]<=k) {
-        //		printf("sa_can[%d]=%d, can solve\n", n, sa_can[n]);
+#ifdef DEBUG1
+        printf("k=%d sa_can[%d]=%d, can solve\n", k, n, sa_can[n]);
+#endif
         return 1;
     }
     if (sa_cant[n]>=k) {
-        //		printf("sa_cant[%d]=%d, can't solve\n", n, sa_cant[n]);
+#ifdef DEBUG1
+        printf("k=%d sa_cant[%d]=%d, can't solve\n", k, n, sa_cant[n]);
+#endif
         return 0;
     }
     int canSolve = 0;
     
     clock_t start = clock();
-    //  	printf("solving Sa(%d) in %d\n",n,k);
+#ifdef DEBUG1
+    printf("solving Sa(%d) in %d\n",n,k);
+    fflush(stdout);
+#endif
     if (pairs<=power3[k]){
         int n1 = n-1;
         int sb[1];
@@ -701,7 +831,7 @@ int canSolveA(int n, int k) {
                 //				printf("sb[0]=%d \n",sb[0]);
                 //				printSb(sb,1);
                 //				printf("\n");
-                if (canSolveB(sb,1,k-1,NO_DEADLINE)>0) {
+                if (canSolveB(sb,1,k-1,NO_DEADLINE)) {
                     canSolve = 1;
                     printf("can solve Sa(%d) in %d with following:",n,k);
                     printSa(n1);
@@ -709,14 +839,17 @@ int canSolveA(int n, int k) {
                     printSa(n - n1);
                     printf(",");
                     printSb(sb,1);
+#ifdef DEBUG1
+                    fflush(stdout);
+#endif
                 }
             }
             n1--;
         }
     } else {
-        printf("power3[%d]=%lu can't solve should not be here\n", k, power3[k]);
+        printf("power3[%d]=%d can't solve should not be here\n", k, power3[k]);
         fflush(stdout);
-        exit(1);
+        exit(5);
     }
     if(canSolve){
         int i;
@@ -736,6 +869,9 @@ int canSolveA(int n, int k) {
         printf(" took %ld\n", s);
     else
         printf(" took 0.%03ld\n", t * 1000/CLOCKS_PER_SEC);
+#ifdef DEBUG1
+    fflush(stdout);
+#endif
     return canSolve;
 } 
 
@@ -880,18 +1016,18 @@ void init(){
         sa_cant[i] = k;
         //  	printf("can't solve %d in %d pairs = %d power3 = %d\n", i,k,saPairs(i),power3[k+1]);
     }
-    //  exit(0);
-    
-    sb_cache_root.next = NULL;
+    for (i=0; i<=k; i++) {
+        sb_cache_root[k].next = NULL;
+    }
     
     int n1, n2, sbb;
     sbb=0;
     sb_pairs[0]=0;
     sprintf(sbb_to_str[0],"0:0");
     int prod;
-    int maxprod = (MAX_N/2)*(MAX_N - MAX_N/2);
     //  printf("maxprod=%d\n", maxprod);
-    for (prod =1; prod<=maxprod;prod++) {
+    for (prod =1; prod<=MAX_PROD;prod++) {
+        max_sbb_for_pairs[prod] = sbb;
         //  	printf("prod=%d\n", prod);
         for (n2 = MAX_N-1; n2 > prod/n2; n2--);
         for (; n2>0; n2--) {
@@ -906,7 +1042,7 @@ void init(){
                 n_to_sbb[n1][n2] = ++sbb;
                 if (sbb>=MAX_SBB+1) {
                     printf ("sbb=%d, MAX_SBB=%d\n", sbb, MAX_SBB);
-                    exit(1);
+                    exit(6);
                 }
                 
                 //		  		printf("sbb=%d\n", sbb);
@@ -914,6 +1050,7 @@ void init(){
                 sbb_to_n1[sbb]=n1;
                 sbb_to_n2[sbb]=n2;
                 sb_pairs[sbb]=n1*n2;
+                max_sbb_for_pairs[prod] = sbb;
                 sprintf(sbb_to_str[sbb],"%d:%d",n1,n2);
                 int c=0;
                 int k1,k2;
@@ -931,7 +1068,7 @@ void init(){
     
     if (sbb>MAX_SBB) {
         printf ("sbb=%d, MAX_SBB=%d\n", sbb, MAX_SBB);
-        exit(1);
+        exit(7);
     }
     
     for (i=1; i<=MAX_SBB; i++) {
@@ -991,7 +1128,7 @@ void init(){
         }
         if (c>MAX_SPLITS) {
             printf("c=%d MAX_SPLITS=%d\n",c,MAX_SPLITS);
-            exit(1);
+            exit(8);
         }
         
         s->size = c;
@@ -1003,21 +1140,10 @@ void init(){
         indexSpl(sbb, s, BY_SP2, pairs2);
         indexSpl(sbb, s, BY_MAGIC3, magic3);
         indexSpl(sbb, s, BY_MAGIC2, magic2);
-//        indexSpl(sbb, s, BY_SP1_0, pairs1_0);
-//        indexSpl(sbb, s, BY_SP1_2, pairs1_2);
-        //        int r;
-        //        for(r=0; r<5; r++)
-        //            for(e = 0; e<c; e++) {
-        //                printf("sorted %d: ", r);
-        //                printSb(s->splitsl[s->ind[r][e]], 1);
-        //                printSb(s->splitsl[s->ind[r][e]]+1, 2);
-        //                printSb(s->splitsl[s->ind[r][e]]+3, 1);
-        //                printf("\n");
-        //            }
     }
-    if (maxsplits < MAX_SPLITS) {
+    if (maxsplits != MAX_SPLITS) {
         printf("expected MAX_SPLITS: %d - actual: %d\n", MAX_SPLITS, maxsplits);
-        exit(1);
+        exit(9);
     }
     printf("\ninit done\n");
     fflush(stdout);
