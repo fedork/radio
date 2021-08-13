@@ -659,13 +659,13 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     progress = t + PROGRESS_INTERVAL;
                                 }
                             }
-                            if ((cs0 = canSolveB(sb0, i+1, k_1, child_deadline)) != TRUE) {
+                            if ((cs0 = (cs0==MAYBE?canSolveB(sb0, i+1, k_1, child_deadline):cs0)) != TRUE) {
                                 if (cs0 != FALSE)
                                     skipped_some = 1;
-                            } else if ((cs2 = canSolveB(sb2, i+1, k_1, child_deadline)) != TRUE) {
+                            } else if ((cs2 = (cs2==MAYBE?canSolveB(sb2, i+1, k_1, child_deadline):cs2)) != TRUE) {
                                 if (cs2 != FALSE)
                                     skipped_some = 1;
-                            } else if((cs1 = canSolveB(sb1, (i+1) * 2, k_1, deadline))  != TRUE) {
+                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, deadline):cs1))  != TRUE) {
                                 if (cs1!=FALSE)
                                     skipped_some = 1;
                             } else {
