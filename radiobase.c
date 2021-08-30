@@ -491,10 +491,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     if (parent_deadline == NO_DEADLINE) {
         deadline = start + CLOCKS_PER_SEC * (100);
     } else {
-        if (start > parent_deadline) return MAYBE;
+//        if (start > ) return MAYBE;
 //        int deadline_ratio = size;
         int deadline_ratio = DEADLINE_RATIO;
-        if (parent_deadline - start > CLOCKS_PER_SEC * MIN_DEADLINE * deadline_ratio) {
+        if (parent_deadline > start && parent_deadline - start > CLOCKS_PER_SEC * MIN_DEADLINE * deadline_ratio) {
             deadline = start + ((parent_deadline - start) / deadline_ratio);
         } else {
             deadline = start + CLOCKS_PER_SEC * MIN_DEADLINE + 300;
