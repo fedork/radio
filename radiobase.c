@@ -70,8 +70,6 @@ int sa_cant[MAX_N+1];
 int sbb_lesser[MAX_SBB+1][MAX_SBB+1];
 int sbb_greater[MAX_SBB+1][MAX_SBB+1];
 int max_sbb_for_pairs[MAX_PROD+1];
-clock_t wasted = 0;
-clock_t not_wasted = 0;
 
 splits sbb_splits[MAX_SBB+1];
 
@@ -362,6 +360,8 @@ int checkCache(int *sb, int size, int k) {
     return MAYBE;
 }
 
+long long cant_solve_count=0;
+
 int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #ifdef DEBUG1
     if(k>7) {
@@ -486,9 +486,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     clock_t start = clock();
     clock_t progress = start + PROGRESS_INTERVAL;
     
+    long long cant_solve_count_min = cant_solve_count + 10; // do not bail out until you make at least some progress
     clock_t deadline = 0;
     if (parent_deadline == NO_DEADLINE) {
-        deadline = start + CLOCKS_PER_SEC * (1000);
+        deadline = start + CLOCKS_PER_SEC * (100);
     } else {
         if (start > parent_deadline) return MAYBE;
 //        int deadline_ratio = size;
@@ -554,7 +555,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             // double deadline
                             deadline += (deadline - start);
                         } else {
-                            if (pass>1) return MAYBE;
+                            // do not bail out until you make at least some progress
+                            if (pass>1 && cant_solve_count>=cant_solve_count_min) return MAYBE;
                         }
                     }
                     break;
@@ -634,7 +636,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     {
                         debug_printf("can solve\n");
                         if (i == size_1) {
-                            if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
+                            // do not bail out until you make at least some progress
+                            if (cant_solve_count>=cant_solve_count_min && (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE)) {
                                 clock_t t = clock();
                                 if (t>deadline){
                                     if (parent_deadline != NO_DEADLINE) {
@@ -756,6 +759,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     } else if (skipped_some) {
         return MAYBE;
     } else {
+        cant_solve_count++;
         printf("can't solve ");
         if (max_solvable_maybe + 1 < size) {
             printf("size=%d/", size);
