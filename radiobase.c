@@ -714,7 +714,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                         //                                    splitincr[i] = (DESC + BY_SP2);
                                         splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1 : BY_SP2_DESC;
                                     } else { // p2 >= p1 >= p0
-                                        splitincr[i] = ( p2 - p1 > p1 - p0) ? BY_SP0 : BY_SP2_DESC);
+                                        splitincr[i] = ( p2 - p1 > p1 - p0) ? BY_SP0 : BY_SP2_DESC;
                                     }
                                 }
                             }
