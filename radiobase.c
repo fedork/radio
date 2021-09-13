@@ -29,19 +29,17 @@
 #define BY_SP2 4
 #define BY_MAGIC3 5
 #define BY_MAGIC2 6
-//#define BY_SP1_0 7
-//#define BY_SP1_2 8
+#define BY_SP0_DESC 7
+#define BY_SP1_DESC 8
+#define BY_SP2_DESC 9
 
-#define INDEX_COUNT 7
+#define INDEX_COUNT 10
 
-#define DESC 16
-#define DESC_MASK 15
 #define PROGRESS_INTERVAL CLOCKS_PER_SEC*60
 
 #define FALSE 0
 #define TRUE 1
 #define MAYBE 2
-//#define MAYBE_SLOW 3
 
 #define FAST 8
 #define SPLIT_FIELD_COUNT 9
@@ -515,7 +513,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         totalsplits=0;
         skiptop = 0;
         cont=1;
-        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
+//        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
+        splitincr[0] = size == 1 ? BY_SP2_DESC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? (DESC + BY_SP0) : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
         //    splitincr[0] = size == 1 ? BY_MAGIC : BY_MAX;
         //    splitincr[0] = size == 1 ? BY_MAGIC : ( (size>2 && sb_pairs[0] < pairs / 2) ? DESC + BY_MIN : BY_MAX);
@@ -565,16 +564,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             }
             if (!cont) break;
             spi = --splitindex[i];
-            spi2 = (splitincr[i] & DESC) ?
-            splitsarr[i]->ind[splitincr[i] & DESC_MASK][splitsarr[i]->size - 1 - spi] :
-            splitsarr[i]->ind[splitincr[i] & DESC_MASK][spi];
+            spi2 = splitsarr[i]->ind[splitincr[i]][spi];
             
             // for identical groups avoid trying redundant permutations
             if (i>1 && tmp[i] == tmp[i-1]) { // do not do this for i==1 because it conflicts with skiptop
                 int spi_1 = splitindex[i-1];
-                int spi2_1 = (splitincr[i-1] & DESC) ?
-                splitsarr[i-1]->ind[splitincr[i-1] & DESC_MASK][splitsarr[i-1]->size - 1 - spi_1] :
-                splitsarr[i-1]->ind[splitincr[i-1] & DESC_MASK][spi_1];
+                int spi2_1 = splitsarr[i-1]->ind[splitincr[i-1]][spi_1];
                 if (spi2 > spi2_1) continue;
             }
             
@@ -701,25 +696,25 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 // confusingly enough p0 corresponds to BY_SP2 and p2 to BY_SP0
                                 if (p0 > p1) {
                                     if (p1 > p2) { // p0 > p1 > p2
-                                        splitincr[i] = ( p0 - p1 > p1 - p2) ? BY_SP2 : (DESC + BY_SP0);
+                                        splitincr[i] = ( p0 - p1 > p1 - p2) ? BY_SP2 : BY_SP0_DESC;
                                     } else if (p0 > p2) { // p0 > p2 >= p1
-                                        splitincr[i] = ( p0 - p2 > p2 - p1) ? BY_SP2 : (DESC + BY_SP1);
+                                        splitincr[i] = ( p0 - p2 > p2 - p1) ? BY_SP2 : BY_SP1_DESC;
                                     } else { // p2 >= p0 > p1
-                                        splitincr[i] = ( p2 - p0 > p0 - p1) ? BY_SP0 : (DESC + BY_SP1);
+                                        splitincr[i] = ( p2 - p0 > p0 - p1) ? BY_SP0 : BY_SP1_DESC;
                                     }
                                 } else { // p1 >=p0
                                     if (p0 > p2) { // p1 >= p0 > p2
                                         //                                    splitincr[i] = (p1 - p2 > e*2) ? (DESC + BY_SP0) : BY_MAGIC3;
                                         //                                    splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1_2 : (DESC + BY_SP0);
                                         //                                    splitincr[i] = (DESC + BY_SP0);
-                                        splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1 : (DESC + BY_SP0);
+                                        splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1 : BY_SP0_DESC;
                                     } else if (p1 > p2) { // p1 > p2 >= p0
                                         //                                    splitincr[i] = (p1 - p0 > e*2) ? (DESC + BY_SP2) : BY_MAGIC3;
                                         //                                    splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1_0 : (DESC + BY_SP2);
                                         //                                    splitincr[i] = (DESC + BY_SP2);
-                                        splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1 : (DESC + BY_SP2);
+                                        splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1 : BY_SP2_DESC;
                                     } else { // p2 >= p1 >= p0
-                                        splitincr[i] = ( p2 - p1 > p1 - p0) ? BY_SP0 : (DESC + BY_SP2);
+                                        splitincr[i] = ( p2 - p1 > p1 - p0) ? BY_SP0 : BY_SP2_DESC);
                                     }
                                 }
                             }
@@ -739,9 +734,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printf(" in %d  with [",k);
         for (i = 0; i<size; i++) {
             spi = splitindex[i];
-            spi2 = (splitincr[i] & DESC) ?
-            splitsarr[i]->ind[splitincr[i] & DESC_MASK][splitsarr[i]->size - 1 - spi] :
-            splitsarr[i]->ind[splitincr[i] & DESC_MASK][spi];
+            spi2 = splitsarr[i]->ind[splitincr[i]][spi];
             int *s = splitsarr[i]->splitsl[spi2];
             if (i>0) printf(",");
             printf("%d:%d", s[6], s[7]);
@@ -914,6 +907,15 @@ void indexSpl(int sbb, splits* s, int indexindex, int (*f)(int, int[])) {
         s->ind[indexindex][e] = splitsort[e].index;
     }
 }
+
+void indexDesc(splits* s, int indexSource, int indexDest) {
+    int e;
+    int c = s->size;
+    for(e = 0; e<c; e++) {
+        s->ind[indexDest][e] = s->ind[indexSource][c - 1 - e];
+    }
+}
+
 
 int maxpairsraw(int sbb, int spl[]) {
     return max(sb_pairs[spl[0]], max(sb_pairs[spl[3]], sb_pairs[spl[1]] + sb_pairs[spl[2]]));
@@ -1145,8 +1147,11 @@ void init(){
         indexSpl(sbb, s, BY_MAX, maxpairs);
         indexSpl(sbb, s, BY_MAGIC, magic);
         indexSpl(sbb, s, BY_SP0, pairs0);
+        indexDesc(s, BY_SP0, BY_SP0_DESC);
         indexSpl(sbb, s, BY_SP1, pairs1);
+        indexDesc(s, BY_SP1, BY_SP1_DESC);
         indexSpl(sbb, s, BY_SP2, pairs2);
+        indexDesc(s, BY_SP2, BY_SP2_DESC);
         indexSpl(sbb, s, BY_MAGIC3, magic3);
         indexSpl(sbb, s, BY_MAGIC2, magic2);
     }

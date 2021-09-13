@@ -7,7 +7,7 @@ int main(int argc, char **argv){
     int sb[1];
     int k, n1, n2;
     k=8;
-    n1=121;
+    n1=122;
     n2=22;
     while (n2>9) {
         sb[0]=getSbb(n1,n2);
