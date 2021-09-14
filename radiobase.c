@@ -625,7 +625,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     debug_printf(" i=%d p0=%d p1=%d p2=%d\n", i, p0,p1,p2);
 #endif
                     if ((p0 <= max_pairs_1) && (p1 <= max_pairs_1) && (p2 <= max_pairs_1)
-                        && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY)) && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY)) && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
+                        && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY))
+                        && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY))
+                        && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
                         )
                     {
                         debug_printf("can solve\n");
@@ -644,8 +646,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     } else {
                                         cont=0;
                                         //                                    deadline=0;  // now do full solution
-                                        // factorial deadline increase
-                                        deadline+= pass * (deadline - start);
+                                        // double deadline
+                                        deadline+= (deadline - start);
                                         break;
                                     }
                                 }
@@ -684,13 +686,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 max_solvable_maybe = i;
                             }
                             splitindex[i] = splitsarr[i]->size;
-//                            int e = sb_pairs[tmp[i]] / 3; // is this a good factor?
-//                            if ( abs(p0-p1) <= e && abs(p0-p2) <= e && abs(p2-p1) <= e)
-//                            {
-//                                //                                splitincr[i] = BY_MAGIC3; // if routhly equal - split equally
-//                                splitincr[i] = (size - i > 1)? BY_MAGIC : BY_MAGIC3; // if routhly equal - split equally
-//                            }
-//                            else
                             {
                                 // confusingly enough p0 corresponds to BY_SP2 and p2 to BY_SP0
                                 if (p0 > p1) {
@@ -703,14 +698,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     }
                                 } else { // p1 >=p0
                                     if (p0 > p2) { // p1 >= p0 > p2
-                                        //                                    splitincr[i] = (p1 - p2 > e*2) ? (DESC + BY_SP0) : BY_MAGIC3;
-                                        //                                    splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1_2 : (DESC + BY_SP0);
-                                        //                                    splitincr[i] = (DESC + BY_SP0);
                                         splitincr[i] = (p1 - p0 > p0 - p2) ? BY_SP1 : BY_SP0_DESC;
                                     } else if (p1 > p2) { // p1 > p2 >= p0
-                                        //                                    splitincr[i] = (p1 - p0 > e*2) ? (DESC + BY_SP2) : BY_MAGIC3;
-                                        //                                    splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1_0 : (DESC + BY_SP2);
-                                        //                                    splitincr[i] = (DESC + BY_SP2);
                                         splitincr[i] = ( p1 - p2 > p2 - p0) ? BY_SP1 : BY_SP2_DESC;
                                     } else { // p2 >= p1 >= p0
                                         splitincr[i] = ( p2 - p1 > p1 - p0) ? BY_SP0 : BY_SP2_DESC;
