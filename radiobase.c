@@ -44,7 +44,7 @@
 #define FAST 8
 #define SPLIT_FIELD_COUNT 9
 
-#define DEADLINE_RATIO 6
+#define DEADLINE_RATIO 10
 #define MIN_DEADLINE 3
 
 #define CACHE_ONLY 1
@@ -508,7 +508,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 
     while (cont2) {
         pass++;
-        clock_t max_time = (deadline - start) / CLOCKS_PER_SEC;
         skipped_some = 0;
         totalsplits=0;
         skiptop = 0;
@@ -657,7 +656,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     printSb(sb0, size);
                                     printSb(sb1, size2);
                                     printSb(sb2, size);
-                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu\n", (t - start)/CLOCKS_PER_SEC, max_time, splitindex[0], splitsarr[0]->size, totalsplits);
+                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu\n", (t - start)/CLOCKS_PER_SEC, (deadline - start) / CLOCKS_PER_SEC, splitindex[0], splitsarr[0]->size, totalsplits);
                                     fflush(stdout);
                                     progress = t + PROGRESS_INTERVAL;
                                 }
