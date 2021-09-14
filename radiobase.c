@@ -532,7 +532,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         fflush(stdout);
 #endif
         
-        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
+        clock_t child_deadline = /*(parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE :*/ deadline;
         //    fflush(stdout);
         
         i = 0;
