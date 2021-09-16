@@ -635,9 +635,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             // do not bail out until you make at least some progress
                             if (cant_solve_count>=cant_solve_count_min && (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE)) {
                                 clock_t t = clock();
-                                // if we just fulfilled min progress, allow at least as much time as it took to get here
+                                // if we just fulfilled min progress, give it a bit more time
                                 if (cant_solve_count == cant_solve_count_min) {
-                                    clock_t new_deadline = t+(t-start);
+                                    clock_t new_deadline = t + CLOCKS_PER_SEC * 1;
                                     if (new_deadline>deadline) deadline = new_deadline;
                                 }
                                 if (t>deadline){
