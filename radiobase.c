@@ -484,7 +484,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     clock_t start = clock();
     clock_t progress = start + PROGRESS_INTERVAL;
     
-    long long cant_solve_count_min = cant_solve_count + 10; // do not bail out until you make at least some progress
+    long long cant_solve_count_min = cant_solve_count + 1; // min progress before bailing out
     clock_t deadline = 0;
     if (parent_deadline == NO_DEADLINE) {
         deadline = start + CLOCKS_PER_SEC * (100);
