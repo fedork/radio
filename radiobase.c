@@ -487,7 +487,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     long long cant_solve_count_min = cant_solve_count + 1; // min progress before bailing out
     clock_t deadline = 0;
     if (parent_deadline == NO_DEADLINE) {
-        deadline = start + CLOCKS_PER_SEC * (100);
+        deadline = start + CLOCKS_PER_SEC * (1000);
     } else {
 //        if (start > ) return MAYBE;
 //        int deadline_ratio = size;
@@ -512,9 +512,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         totalsplits=0;
         skiptop = 0;
         cont=1;
-//        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
+        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_SP2_DESC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
-        splitincr[0] = size == 1 ? BY_SP1 : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
+//        splitincr[0] = size == 1 ? BY_SP1 : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? (DESC + BY_SP0) : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
         //    splitincr[0] = size == 1 ? BY_MAGIC : BY_MAX;
         //    splitincr[0] = size == 1 ? BY_MAGIC : ( (size>2 && sb_pairs[0] < pairs / 2) ? DESC + BY_MIN : BY_MAX);
@@ -972,12 +972,13 @@ int distance(int spl[], int magicm1, int magicm2, int n1, int n2) {
 }
 
 int magic(int sbb, int spl[]) {
-    int n1 = sbb_to_n1[sbb];
-    int n2 = sbb_to_n2[sbb];
-    int msum = ((n1+n2)*577+999)/1000;   // magic ratio is 0.577 = (1/sqrt(3))
-    int magicm1 = min(n1, (n1*577+999)/1000);
-    int magicm2 = min(n2, msum-magicm1);
-    return distance(spl, magicm1, magicm2, n1, n2);
+//    int n1 = sbb_to_n1[sbb];
+//    int n2 = sbb_to_n2[sbb];
+//    int msum = ((n1+n2)*577+999)/1000;   // magic ratio is 0.577 = (1/sqrt(3))
+//    int magicm1 = min(n1, (n1*577+999)/1000);
+//    int magicm2 = min(n2, msum-magicm1);
+//    return distance(spl, magicm1, magicm2, n1, n2);
+    return max(pairs1raw(sbb, spl) * 10000, 14141 * max(pairs0raw(sbb, spl), pairs2raw(sbb, spl))); // sqrt(2) ratio seems right
 }
 
 
