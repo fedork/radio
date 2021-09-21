@@ -628,7 +628,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     debug_printf(" i=%d p0=%d p1=%d p2=%d\n", i, p0,p1,p2);
 #endif
                     if ((p0 <= max_pairs_1) && (p1 <= max_pairs_1) && (p2 <= max_pairs_1)
-                        && (cs0 = canSolveB(sb0, i+1, k_1, SUBSPLIT_DEADLINE)
+                        && (cs0 = canSolveB(sb0, i+1, k_1, SUBSPLIT_DEADLINE))
                         && (cs2 = canSolveB(sb2, i+1, k_1, SUBSPLIT_DEADLINE))
                         && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, SUBSPLIT_DEADLINE))
                         )
