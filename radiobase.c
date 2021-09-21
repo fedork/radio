@@ -532,7 +532,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         fflush(stdout);
 #endif
         
-        clock_t child_deadline = /*(parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE :*/ deadline;
+//        clock_t child_deadline = /*(parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE :*/ deadline;
+        clock_t child_deadline = NO_DEADLINE;
         //    fflush(stdout);
         
         i = 0;
@@ -670,7 +671,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             } else if ((cs2 = (cs2==MAYBE?canSolveB(sb2, i+1, k_1, child_deadline):cs2)) != TRUE) {
                                 if (cs2 != FALSE)
                                     skipped_some = 1;
-                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, deadline):cs1))  != TRUE) {
+                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, NO_DEADLINE):cs1))  != TRUE) {
                                 if (cs1!=FALSE)
                                     skipped_some = 1;
                             } else {
