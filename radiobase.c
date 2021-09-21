@@ -50,7 +50,7 @@
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
 #define FAST_ONLY 3
-#define SUBSPLIT_DEADLINE NO_DEADLINE
+#define SUBSPLIT_DEADLINE (clock() + CLOCKS_PER_SEC * 1)
 
 typedef struct {
     int size;
