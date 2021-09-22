@@ -636,7 +636,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                             && ((cs2 == TRUE) || (cs2 = canSolveB(sb2, i+1, k_1, SUBSPLIT_DEADLINE)))
 //                             && ((cs1 == TRUE) || (cs1 = canSolveB(sb1, (i+1) * 2, k_1, SUBSPLIT_DEADLINE)))
 //                             ))
-//                        )
+                        )
                     {
                         debug_printf("can solve\n");
                         if (i == size_1) {
