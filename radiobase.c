@@ -631,12 +631,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                         && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY))
                         && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY))
                         && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
-                        && ((i != size/2) ||
-                            (((cs0 == TRUE) || (cs0 = canSolveB(sb0, i+1, k_1, SUBSPLIT_DEADLINE)))
-                             && ((cs2 == TRUE) || (cs2 = canSolveB(sb2, i+1, k_1, SUBSPLIT_DEADLINE)))
-                             && ((cs1 == TRUE) || (cs1 = canSolveB(sb1, (i+1) * 2, k_1, SUBSPLIT_DEADLINE)))
-                             ))
-                        )
+//                        && ((i != size/2) ||
+//                            (((cs0 == TRUE) || (cs0 = canSolveB(sb0, i+1, k_1, SUBSPLIT_DEADLINE)))
+//                             && ((cs2 == TRUE) || (cs2 = canSolveB(sb2, i+1, k_1, SUBSPLIT_DEADLINE)))
+//                             && ((cs1 == TRUE) || (cs1 = canSolveB(sb1, (i+1) * 2, k_1, SUBSPLIT_DEADLINE)))
+//                             ))
+//                        )
                     {
                         debug_printf("can solve\n");
                         if (i == size_1) {
