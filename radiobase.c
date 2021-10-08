@@ -513,7 +513,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         totalsplits=0;
         skiptop = 0;
         cont=1;
-        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP2_DESC : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
+        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP1 : BY_MAGIC3);
+//        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP2_DESC : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_SP2_DESC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_SP1 : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
@@ -534,7 +535,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         fflush(stdout);
 #endif
         
-        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
+        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
+        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
 //        clock_t child_deadline = NO_DEADLINE;
         //    fflush(stdout);
         
@@ -609,8 +611,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                 {
                     skiptop++;
                 } else if (pass == 1
-                           && !s[FAST]
+                           && size > 2
                            && (i<size_1)
+                           && !s[FAST]
                            ) {
                     skipped_some = 1;
                 } else {
@@ -678,7 +681,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             } else if ((cs2 = (cs2==MAYBE?canSolveB(sb2, i+1, k_1, child_deadline):cs2)) != TRUE) {
                                 if (cs2 != FALSE)
                                     skipped_some = 1;
-                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, deadline):cs1))  != TRUE) {
+                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, middle_child_deadline):cs1))  != TRUE) {
                                 if (cs1!=FALSE)
                                     skipped_some = 1;
                             } else {
@@ -697,7 +700,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             splitindex[i] = splitsarr[i]->size;
                             {
                                 // confusingly enough p0 corresponds to BY_SP2 and p2 to BY_SP0
-                                if (p0 > p1) {
+                                if (size<=3) {
+                                    splitincr[i] = BY_SP1; // special case for size== 2 or 3
+                                } else if (p0 > p1) {
                                     if (p1 > p2) { // p0 > p1 > p2
                                         splitincr[i] = ( p0 - p1 > p1 - p2) ? BY_SP2 : BY_SP0_DESC;
                                     } else if (p0 > p2) { // p0 > p2 >= p1
@@ -783,7 +788,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     cache(tmp, size, canSolve, k, pairs);
     //    fflush(stdout);
     printf("\n");
-#ifdef DEBUG1
+#ifndef OPT_2
     fflush(stdout);
 #endif
     return canSolve;
