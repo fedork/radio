@@ -555,12 +555,13 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         fast_solve = FALSE;
         if(pass==1) {
             fast_solve = TRUE
+//                && size <= 8
 //                && size > 2
 //                && (sb_pairs[tmp[0]] + sb_pairs[tmp[0]]) * 4 < pairs * 3  // if the tail is at least 1/4 pairts of the total
                 ;
         }
         
-        int no_deadline = fast_solve || parent_deadline == NO_DEADLINE;
+        int no_deadline = (fast_solve && size <= 4) || parent_deadline == NO_DEADLINE;
         
         skipped_some = 0;
         totalsplits=0;
@@ -624,7 +625,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             deadline += (deadline - start);
                         } else {
                             // do not bail out until you make at least some progress
-                            if (pass>1 && cant_solve_count>=cant_solve_count_min) return MAYBE;
+                            if (!fast_solve && cant_solve_count>=cant_solve_count_min) return MAYBE;
                         }
                     }
                     break;
@@ -729,11 +730,13 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 }
                                 if (t>deadline){
                                     if (no_deadline) {
-                                        cont=0;
                                         //                                    deadline=0;  // now do full solution
                                         // double deadline
-                                        deadline+= (deadline - start);
-                                        break;
+//                                        deadline+= (deadline - start);
+                                        // bump deadline
+                                        deadline = t + 10 * CLOCKS_PER_SEC;
+//                                        cont=0;
+//                                        break;
                                     } else {
                                         return MAYBE;
                                     }
@@ -1101,6 +1104,137 @@ int magic3(int sbb, int spl[]) {
     //int magicm2 = ((n1-n2)<2)?(n2/2-1):(n2/2);
     //    int magicm2 = min(n2/2, magicm1-1);
     return distance(spl, magicm1, magicm2, n1, n2);
+}
+
+
+void all_solutions(int sb[], int size, int k) {
+    int tmp[size];
+    int i;
+    int pairs=0;
+    int newsize=0;
+    int sbb;
+    for(i=0;i<size;i++) {
+        sbb=sb[i];
+        if (sbb > 0) {
+            pairs+=sb_pairs[sbb];
+            tmp[newsize++]=sbb;
+        }
+    }
+    size = newsize;
+    
+    sort1(tmp, size);
+   
+    int n[size*2], m[size*2];
+    int sb0[size*2], sb1[size*2], sb2[size*2];
+    
+    int counts[size][MAX_N+1][MAX_N+1];
+    memset(counts, 0, sizeof(counts));
+
+    
+    for(i=0;i<size;i++) {
+        n[i*2] = sbb_to_n1[tmp[i]];
+        n[i*2+1] = sbb_to_n2[tmp[i]];
+        m[i*2] = 0;
+        m[i*2+1] = 0;
+    }
+    
+    m[0] = 1 + n[0];
+    int j = 0;
+    unsigned long long solved = 0;
+    unsigned long long total = 0;
+    while(1) {
+        while(m[j] == 0) {
+            if (j==0) {
+                int m1, m2;
+                //headers
+                for (i=0; i<size; i++) {
+                    printf("result ");
+                    int i2;
+                    for (i2 = 0; i2<i; i2++) {
+                        int i3;
+                        for(i3 = 0; i3<=n[i2*2+1]; i3++) printf(" ");
+                        printf(" ");
+                    }
+                    
+                    printf("%s => ", sbb_to_str[tmp[i]]);
+                    for(m1 = 0; m1 <= n[i*2]; m1++) {
+                        for(m2 = 0; m2 <= n[i*2+1]; m2++) {
+                            int count = counts[i][m1][m2];
+                            if (count > 0) {
+                                printf("[%d:%d]; ", m1, m2);
+                            }
+                        }
+                    }
+                    printf("\n");
+                }
+                m1 = 0;
+                while(1) {
+                    int lastrow=1;
+                    printf("result ");
+                    for (i=0; i<size; i++) {
+                        if (m1 < n[i*2]) lastrow = 0;
+                        for(m2 = 0; m2 <= n[i*2+1]; m2++) {
+                            if (m1 <= n[i*2]) {
+                                int count = counts[i][m1][m2];
+                                if (count > 0) {
+                                    if (count<10)
+                                        printf("%d", count);
+                                    else
+                                        printf("*");
+                                } else printf(".");
+                            } else printf(" ");
+                        }
+                        printf(" ");
+                    }
+                    printf("\n");
+                    if (lastrow) break;
+                    m1++;
+                }
+                double s = (double)solved / total;
+                printf("result in %d ratio = %llu/%llu solvability %f ", k, solved, total, s);
+                printSb(tmp, size);
+                printf("\n");
+                return;
+            }
+            j--;
+        }
+        m[j]--;
+//        printf("l1 j = %d mj = %d\n", j, m[j]);
+        for(i=0;i<size;i++) {
+            sb0[i] = getSbb(m[i*2], m[i*2+1]);
+            sb2[i] = getSbb(n[i*2] - m[i*2], n[i*2+1] - m[i*2+1]);
+            sb1[i*2] = getSbb(m[i*2], n[i*2+1] - m[i*2+1]);
+            sb1[i*2 + 1] = getSbb(n[i*2] - m[i*2], m[i*2+1]);
+        }
+        
+        if (j == size*2 - 1) {
+            total++;
+            if (canSolveB(sb0, size, k-1, CACHE_ONLY) != FALSE &&
+                canSolveB(sb2, size, k-1, CACHE_ONLY) != FALSE &&
+                canSolveB(sb1, size*2, k-1, CACHE_ONLY) != FALSE &&
+                canSolveB(sb0, size, k-1, 2) == TRUE &&
+                canSolveB(sb2, size, k-1, 2) == TRUE &&
+                canSolveB(sb1, size*2, k-1, 2) == TRUE) {
+                solved++;
+                printf("result in %d can solve ", k);
+                printSb(tmp, size);
+                printf(" with [");
+                for (i = 0; i<size; i++) {
+                    if (i>0) printf(",");
+                    printf("%d:%d", m[i*2], m[i*2+1]);
+                    counts[i][m[i*2]][m[i*2+1]]++;
+                }
+                printf("] => ");
+                printSb(sb0, size);
+                printSb(sb1, size*2);
+                printSb(sb2, size);
+                printf("\n");
+            }
+        } else {
+            j++;
+            m[j] = n[j] + 1;
+        }
+    }
 }
 
 void init(){
