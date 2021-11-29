@@ -7,9 +7,9 @@ int main(int argc, char **argv){
     int sb[1];
     int k, n1, n2;
     k=8;
-    n1=140;
-    n2=18;
-    while (n2>9) {
+    n1=103;
+    n2=28;
+    while (n2>0) {
         sb[0]=getSbb(n1,n2);
         if (canSolveB(sb,1,k,NO_DEADLINE)) {
             printf("result   can solve ");

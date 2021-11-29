@@ -556,18 +556,19 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         if(pass==1) {
             fast_solve = TRUE
 //                && size <= 8
-//                && size > 2
+                && size > 2
 //                && (sb_pairs[tmp[0]] + sb_pairs[tmp[0]]) * 4 < pairs * 3  // if the tail is at least 1/4 pairts of the total
                 ;
         }
         
-        int no_deadline = (fast_solve && size <= 4) || parent_deadline == NO_DEADLINE;
+        int no_deadline = size <=2 || (fast_solve && size <= 4) || parent_deadline == NO_DEADLINE;
         
         skipped_some = 0;
         totalsplits=0;
         skiptop = 0;
         cont=1;
-        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP1 : BY_MAGIC3);
+        splitincr[0] = size<=3 ? BY_SP1 : BY_MAGIC3;
+//        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP1 : BY_MAGIC3);
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP2_DESC : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_SP2_DESC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
@@ -594,12 +595,17 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
         fflush(stdout);
 #endif
+        
+        
+        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
+        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size <=3)? NO_DEADLINE : deadline;
+
 //
 //        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
 //        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
 //
-        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
-        clock_t middle_child_deadline = deadline;
+//        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
+//        clock_t middle_child_deadline = deadline;
 
 //        clock_t child_deadline = NO_DEADLINE;
         //    fflush(stdout);
@@ -725,7 +731,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 clock_t t = clock();
                                 // if we just fulfilled min progress, give it a bit more time
                                 if (cant_solve_count == cant_solve_count_min) {
-                                    clock_t new_deadline = t + CLOCKS_PER_SEC * 1;
+                                    clock_t new_deadline = t + CLOCKS_PER_SEC * 100;
                                     if (new_deadline>deadline) deadline = new_deadline;
                                 }
                                 if (t>deadline){
@@ -734,7 +740,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                         // double deadline
 //                                        deadline+= (deadline - start);
                                         // bump deadline
-                                        deadline = t + 10 * CLOCKS_PER_SEC;
+                                        deadline = t + 100 * CLOCKS_PER_SEC;
 //                                        cont=0;
 //                                        break;
                                     } else {
@@ -1106,6 +1112,16 @@ int magic3(int sbb, int spl[]) {
     return distance(spl, magicm1, magicm2, n1, n2);
 }
 
+int canSolveAll4(int n1, int n2, int m1, int m2, int k) {
+    int sbb = getSbb(m1,m2);
+    if (!canSolveB(&sbb, 1, k, CACHE_ONLY)) return FALSE;
+    sbb = getSbb(n1-m1,n2-m2);
+    if (!canSolveB(&sbb, 1, k, CACHE_ONLY)) return FALSE;
+    sbb = getSbb(m1,n2-m2);
+    if (!canSolveB(&sbb, 1, k, CACHE_ONLY)) return FALSE;
+    sbb = getSbb(n1-m1,m2);
+    return canSolveB(&sbb, 1, k, CACHE_ONLY);
+}
 
 void all_solutions(int sb[], int size, int k) {
     int tmp[size];
@@ -1181,7 +1197,11 @@ void all_solutions(int sb[], int size, int k) {
                                         printf("%d", count);
                                     else
                                         printf("*");
-                                } else printf(".");
+                                } else if (canSolveAll4(n[i*2],n[i*2+1], m1, m2, k-1)) {
+                                    printf(".");
+                                } else {
+                                    printf("-");
+                                }
                             } else printf(" ");
                         }
                         printf(" ");
