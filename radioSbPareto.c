@@ -7,8 +7,8 @@ int main(int argc, char **argv){
     int sb[1];
     int k, n1, n2;
     k=8;
-    n1=103;
-    n2=28;
+    n1=131;
+    n2=20;
     while (n2>0) {
         sb[0]=getSbb(n1,n2);
         if (canSolveB(sb,1,k,NO_DEADLINE)) {

@@ -561,7 +561,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                 ;
         }
         
-        int no_deadline = size <=2 || (fast_solve && size <= 4) || parent_deadline == NO_DEADLINE;
+        int no_deadline = /*size <=2 || */(pass==1 && size <= 4) || parent_deadline == NO_DEADLINE;
+        
+//        int no_deadline = (pass==1);
         
         skipped_some = 0;
         totalsplits=0;
@@ -597,8 +599,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
         
         
-        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
-        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size <=3)? NO_DEADLINE : deadline;
+        clock_t child_deadline = deadline;
+        clock_t middle_child_deadline = deadline;
+
+        
+//        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
+//        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size <=3)? NO_DEADLINE : deadline;
 
 //
 //        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
@@ -626,12 +632,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                        cache(tmp, size, MAYBE_SLOW, k, pairs);
 //                        return MAYBE;
                     } else {
-                        if (no_deadline) {
+                        if (parent_deadline == NO_DEADLINE) {
                             // double deadline
                             deadline += (deadline - start);
                         } else {
                             // do not bail out until you make at least some progress
-                            if (!fast_solve && cant_solve_count>=cant_solve_count_min) return MAYBE;
+//                            if (clock()>deadline && cant_solve_count>=cant_solve_count_min) return MAYBE;
                         }
                     }
                     break;
@@ -731,7 +737,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 clock_t t = clock();
                                 // if we just fulfilled min progress, give it a bit more time
                                 if (cant_solve_count == cant_solve_count_min) {
-                                    clock_t new_deadline = t + CLOCKS_PER_SEC * 100;
+                                    clock_t new_deadline = t + CLOCKS_PER_SEC * 1;
                                     if (new_deadline>deadline) deadline = new_deadline;
                                 }
                                 if (t>deadline){
@@ -740,7 +746,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                         // double deadline
 //                                        deadline+= (deadline - start);
                                         // bump deadline
-                                        deadline = t + 100 * CLOCKS_PER_SEC;
+                                        deadline = t + 10 * CLOCKS_PER_SEC;
 //                                        cont=0;
 //                                        break;
                                     } else {
