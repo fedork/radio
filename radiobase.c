@@ -278,11 +278,15 @@ int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, i
         n->next = cant_solve_marker;
         return 1;
     }
-    if (n->next == NULL || n->next == can_solve_marker) {
+    struct node *oldnext = n->next;
+    if (oldnext == NULL || oldnext == can_solve_marker) {
         //            printf("arrsize=%d\n",arrsize);
         debug_printf("before alloc\n");
         alloc_next(n, max_sbb+1);
         debug_printf("after alloc\n");
+        if (oldnext == can_solve_marker) {
+            n->next[0].next = can_solve_marker; // if it was solvable, don't lose that
+        }
     }
     int updated = 0;
     int tmp;
