@@ -665,26 +665,19 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             while (s[4]<k) {
                 debug_printf("checking split solvability for %s -> [%d, %d], before: s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
                 int kk = s[4];
-                if (size > 1) {
-                    if (canSolveB(s, 1, kk, NO_DEADLINE) != FALSE && canSolveB(s+3, 1, kk, NO_DEADLINE) != FALSE && canSolveB(s+1, 2, kk, NO_DEADLINE) != FALSE)
-                        s[4] = MAX_K;
-                    else
-                        s[5] = ++s[4];
-                    debug_printf("after: s[4]=%d s[5]=%d\n", s[4], s[5]);
-                } else {
-                    int ttt = canSolveB(s, 1, kk, CACHE_ONLY);
+                int dd = size > 1 ? deadline : CACHE_ONLY;
+                int ttt = canSolveB(s, 1, kk, dd);
+                if (ttt==TRUE) {
+                    ttt = canSolveB(s+3, 1, kk, dd);
                     if (ttt==TRUE) {
-                        ttt = canSolveB(s+3, 1, kk, CACHE_ONLY);
-                        if (ttt==TRUE) {
-                            ttt = canSolveB(s+1, 2, kk, CACHE_ONLY);
-                        }
+                        ttt = canSolveB(s+1, 2, kk, dd);
                     }
-                    if (ttt == TRUE)
-                        s[4] = MAX_K;
-                    else if (ttt == FALSE)
-                        s[5] = ++s[4];
-                    else break;
                 }
+                if (ttt == TRUE)
+                    s[4] = MAX_K;
+                else if (ttt == FALSE)
+                    s[5] = ++s[4];
+                else break;
             }
             if (s[5]>=k) {
                 debug_printf("skipping for split solvablility %s -> [%d, %d], s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
@@ -737,7 +730,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 clock_t t = clock();
                                 // if we just fulfilled min progress, give it a bit more time
                                 if (cant_solve_count == cant_solve_count_min) {
-                                    clock_t new_deadline = t + CLOCKS_PER_SEC * 1;
+                                    // give half of the time it took to get here to avoid wasting time too much for laggards
+                                    clock_t new_deadline = t + (t - start)/2;
                                     if (new_deadline>deadline) deadline = new_deadline;
                                 }
                                 if (t>deadline){
