@@ -15,10 +15,12 @@
 
 #undef VERIFY_FAST
 
+#ifndef MAX_K
 #define MAX_K 10
+#endif
 
 #ifndef MAX_N
-#define MAX_N 196
+#define MAX_N 194
 #endif
 
 #define MAX_SBB MAX_N*MAX_N/4
@@ -119,6 +121,17 @@ void printSb(int *sb, int size){
     printf(")[%d,%d]",pairs,n);
 }
 
+
+#ifdef DEBUG_CACHE
+#ifndef DEBUG
+#define DEBUG 1
+#undef debug_printf
+#define debug_printf(...) do{ printf( __VA_ARGS__ ); fflush(stdout);} while( 0 )
+#undef OPT
+#define DEBUG_CACHE_ONLY 1
+#endif
+#endif
+
 typedef struct node {
     struct node *next;
 #ifndef OPT
@@ -152,11 +165,17 @@ void alloc_next(struct node* n, int arrsize){
 #endif
 }
 
-void free_children(struct node *n, int arrsize, int pairs_remaining) {
+int clamp_sbb(int sbb, int pairs_remaining, int n_remaining) {
+    int sbb2 = min(sbb, max_sbb_for_pairs[min(MAX_PROD, pairs_remaining)]);
+    while (sbb2 > 0 && sbb_to_n1[sbb2] + sbb_to_n2[sbb2] > n_remaining) sbb2--;
+    return sbb2;
+}
+
+void free_children(struct node *n, int arrsize, int pairs_remaining, int n_remaining) {
     if (n->next == NULL || n->next == can_solve_marker || n->next == cant_solve_marker) return;
 //    debug_printf("can't marker %p\n", cant_solve_marker);
 //    debug_printf("can marker %p\n", can_solve_marker);
-    debug_printf("in free n=%p arrsize=%d pairs_remaining=%d\n", n, arrsize, pairs_remaining);
+    debug_printf("in free n=%p arrsize=%d pairs_remaining=%d n_remaining=%d\n", n, arrsize, pairs_remaining, n_remaining);
 #ifndef OPT
     if (n->size != arrsize) {
         printf("size difference, allocated: %d, wanted to free %d\n", n->size, arrsize);
@@ -168,16 +187,17 @@ void free_children(struct node *n, int arrsize, int pairs_remaining) {
         debug_printf("in free_children sbb=%d(%s)\n", sbb, sbb_to_str[sbb]);
         struct node *child = &(n->next[sbb]);
         int new_pairs_remaining = pairs_remaining - sb_pairs[sbb];
-        int sbb2 = min(sbb, max_sbb_for_pairs[min(MAX_PROD, new_pairs_remaining)]);
+        int new_n_remaining = n_remaining - sbb_to_n1[sbb] - sbb_to_n2[sbb];
+        int sbb2 = clamp_sbb(sbb, new_pairs_remaining, new_n_remaining);
         debug_printf("in free_children sbb2=%d(%s)\n", sbb2, sbb_to_str[sbb2]);
-        if (sbb2 > 1) free_children(child, sbb2+1, new_pairs_remaining);
+        if (sbb2 > 1) free_children(child, sbb2+1, new_pairs_remaining, new_n_remaining);
     }
     alloc_count--;
     alloc_size-=arrsize;
     free(n->next);
 }
 
-int cacheCanSolve(struct node *n, int* sb, int size, int k, int max_sbb, int pairs_remaining){
+int cacheCanSolve(struct node *n, int* sb, int size, int k, int max_sbb, int pairs_remaining, int n_remaining){
     //	printf("size = %d\n",size);
 #ifdef DEBUG
     printf("in cacheCanSolve n=%p n->next=%p max_sbb=%d pairs_remaining=%d ", n, n->next, max_sbb, pairs_remaining);
@@ -210,7 +230,7 @@ int cacheCanSolve(struct node *n, int* sb, int size, int k, int max_sbb, int pai
         return 1;
     }
     int updated =0;
-    max_sbb=min(max_sbb, max_sbb_for_pairs[min(MAX_PROD, pairs_remaining)]);
+    max_sbb=clamp_sbb(max_sbb, pairs_remaining, n_remaining);
 #ifdef DEBUG
     printf("in cacheCanSolve size=%d max_sbb=%d after ", size, max_sbb);
     printSb(&max_sbb, 1);
@@ -240,14 +260,14 @@ int cacheCanSolve(struct node *n, int* sb, int size, int k, int max_sbb, int pai
             exit(12);
         }
 #endif
-        updated+=cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2, pairs_remaining - sb_pairs[sbb2]);
+        updated+=cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2, pairs_remaining - sb_pairs[sbb2], n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2]);
         lesser++;
     }
     debug_printf("updated=%d\n", updated);
     return updated;
 }
 
-int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, int pairs, int pairs_remaining){
+int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, int pairs, int pairs_remaining, int n_remaining){
     
     debug_printf("in cache n=%p n->next=%p can't solve size=%d max_sbb=%d before pairs=%d, pairs_remaining=%d ", n, n->next, size, max_sbb, pairs, pairs_remaining);
     
@@ -261,7 +281,7 @@ int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, i
         debug_printf("already cached, returning 0\n");
         return 0;
     }
-    max_sbb = min(max_sbb, max_sbb_for_pairs[min(MAX_PROD, pairs_remaining)]);
+    max_sbb = clamp_sbb(max_sbb, pairs_remaining, n_remaining);
     debug_printf("in can't solve size=%d max_sbb=%d(%s) after\n", size, max_sbb, sbb_to_str[max_sbb]);
     if (size < 1) {
 #ifndef OPT
@@ -272,7 +292,7 @@ int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, i
 #endif
         if (n->next != NULL) {
             debug_printf("before free\n");
-            free_children(n, max_sbb+1, pairs_remaining);
+            free_children(n, max_sbb+1, pairs_remaining, n_remaining);
             debug_printf("after free\n");
         }
         n->next = cant_solve_marker;
@@ -317,13 +337,16 @@ int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, i
                 if (pairs_new>max_pairs) break;
                 int next_pairs_remaining = pairs_remaining - pairs_new;
                 debug_printf("sbb2 = %d(%s)\n", sbb2, sbb_to_str[sbb2]);
+                int next_n_remaining = n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2];
+                if (next_n_remaining > 2) {
 #ifndef OPT
-                if (sbb2 >= n->size) {
-                    printf("FAIL: sbb2 = %d but n->size = %d\n", sbb2, n->size);
-                    exit(13);
-                }
+                    if (sbb2 >= n->size) {
+                        printf("FAIL: sbb2 = %d but n->size = %d\n", sbb2, n->size);
+                        exit(13);
+                    }
 #endif
-                updated+=cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new, next_pairs_remaining);
+                    updated+=cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new, next_pairs_remaining, next_n_remaining);
+                }
             }
             greater++;
         }
@@ -346,9 +369,9 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
     
     int updated;
     if (canSolve) {
-        updated = cacheCanSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, power3[k]);
+        updated = cacheCanSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, power3[k], MAX_N);
     } else {
-        updated = cacheCantSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, pairs, power3[k]);
+        updated = cacheCantSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, pairs, power3[k], MAX_N);
     }
     printf(" cache=%lld/%lld(%+lld/%+lld)", alloc_count, alloc_size, alloc_count-alloc_count_before, alloc_size-alloc_size_before);
     
@@ -394,6 +417,12 @@ int checkCache(int *sb, int size, int k) {
     //	printf("checkcache n->next is null, return 2");
     return MAYBE;
 }
+
+#ifdef DEBUG_CACHE_ONLY
+#undef DEBUG
+#undef debug_printf
+#define debug_printf(...) /* Nothing */
+#endif
 
 int minK(int);
 
@@ -890,9 +919,10 @@ int minK(int sbb) {
     if (kk<0) {
         debug_printf("computing min_k for %s...\n", sbb_to_str[sbb]);
         kk=1;
-        while (!canSolveB(&sbb, 1, kk, NO_DEADLINE)) kk++;
+        int rr;
+        while ((rr = canSolveB(&sbb, 1, kk, 1000)) == TRUE) kk++;
         debug_printf("min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
-        sbb_to_min_k[sbb]=kk;
+        if (rr == FALSE) sbb_to_min_k[sbb]=kk; // if we got maybe, assume false, but do not memorize
         debug_printf("cached min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
     }
     return kk;
@@ -1314,6 +1344,10 @@ void init(){
                 sb_pairs[sbb]=n1*n2;
                 max_sbb_for_pairs[prod] = sbb;
                 sprintf(sbb_to_str[sbb],"%d:%d",n1,n2);
+                
+#ifndef OPT
+                printf("sbb=%d (%s) pairs=%d\n", sbb, sbb_to_str[sbb], sb_pairs[sbb]);
+#endif
                 int c=0;
                 int k1,k2;
                 for (k1=n1; k1>0; k1--) {
