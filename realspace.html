@@ -1,0 +1,465 @@
+<head>
+    <title>Real space solution</title>
+</head>
+<body style="font-family: sans-serif; font-size: 8pt">
+<!--<div>-->
+<!--    <canvas id="canvas1" width=1500 height=3000 style="border: 1px solid #cccccc;">-->
+<!--        HTML5 canvas not supported-->
+<!--    </canvas>-->
+<!--</div>-->
+<script>
+
+    var scale = 100;
+    var base = 20;
+    var y = 30;
+    var margin = 30;
+    var textX = 5;
+    var textY = 15;
+
+    var S3 = Math.sqrt(3);
+
+    var color = {
+        "a": "green",
+        "b": "yellow",
+        "c": "red",
+        "d": "magenta",
+        "e": "cyan",
+        "E": "blue",
+        "f": "purple",
+        "g": "orange",
+        "h": "grey",
+        "i": "green",
+    };
+
+    var color2 = [
+        "green",
+        "yellow",
+        "red",
+        "magenta",
+        "cyan",
+        "blue",
+        "purple",
+        "orange",
+        "grey",
+    ];
+
+    <!--    context.font="10pt arial";-->
+
+    window.onload = function () {
+        draw3();
+    }
+
+    function State(repeat, groups) {
+        this.repeat = repeat;
+        this.groups = groups;
+        this.draw = function () {
+            let div = document.createElement("div");
+            // div.setAttribute("border", "1px");
+            // div.style = "border: 1px solid #cccccc;";
+            // div.style = "border: 1px solid #cccccc; display: inline-block; max-width:5000px; white-space: normal;";
+            div.style = "border: 1px solid #cccccc; display: inline-block; white-space: normal;";
+            let txt = document.createElement("div");
+            div.appendChild(txt);
+            let totalArea = 0.0;
+            let totalArea2 = 0.0;
+            let totalArea1 = 0.0;
+            let totalArea0 = 0.0;
+
+            // for (let i = 0; i < repeat; i++) {
+            for (let g of this.groups) {
+                div.appendChild(g.draw());
+                totalArea += g.area;
+                totalArea2 += g.area2;
+                totalArea1 += g.area1;
+                totalArea0 += g.area0;
+            }
+            if (repeat > 1) {
+                div.appendChild(document.createTextNode("x" + repeat));
+            }
+            // }
+
+            txt.innerHTML = "total area = " + (totalArea * repeat).toFixed(4) + "(" + (100 * totalArea2 / totalArea).toFixed(1) +
+                ":" + (100 * totalArea1 / totalArea).toFixed(1) + ":" + (100 * totalArea0 / totalArea).toFixed(1) + ")";
+            return div;
+        }
+    }
+
+    function Group(side, split) {
+        this.side = side;
+        this.split2 = split;
+        this.split0 = side - split;
+        this.split1 = Math.sqrt((side - split) * split);
+        this.area = side * side;
+        this.area2 = split * split;
+        this.area0 = (side - split) * (side - split);
+        this.area1 = 2 * (side - split) * split;
+        this.draw = function () {
+            let div = document.createElement("div");
+            // div.setAttribute("border", "1px");
+            div.style = "display: inline-block; padding: 5px;";
+            let ratio = this.split2 * 100 / this.side;
+            let desc = "side = " + this.side.toFixed(4) + "(" + ratio.toFixed(1) + ":" + (100 - ratio).toFixed(1) +
+                ")\narea = " + this.area.toFixed(4) + "(" + (this.area2 * 100 / this.area).toFixed(1) + ":" +
+                (this.area1 * 100 / this.area).toFixed(1) + ":" + (this.area0 * 100 / this.area).toFixed(1) + ")";
+            // div.innerHTML = desc;
+
+            let sq = createSq(this.side, this.split2);
+            div.appendChild(sq);
+            sq.title = desc;
+            return div;
+        }
+    }
+
+    function drawRow3(states) {
+        var rowdiv = document.createElement("div");
+        rowdiv.style = "white-space: nowrap;"
+        document.body.appendChild(rowdiv);
+        for (let s in states) {
+            rowdiv.appendChild(states[s].draw());
+        }
+    }
+
+    function draw3() {
+        let states = [];
+        let split = 1.0 / S3;
+        states[0] = [new State(1, [new Group(1.0, split)])];
+        drawRow3(states[0]);
+
+        let prevrow = states[0];
+        let side1 = S3 * prevrow[0].groups[0].split1;
+        let split1 = prevrow[0].groups[0].side / S3;
+        states[1] = [
+            new State(1, [new Group(side1, split1), new Group(side1, side1 - split1)]),
+        ];
+        let side21 = S3 * states[1][0].groups[0].split2;
+        let split21 = prevrow[0].groups[0].split2;
+        let side22 = S3 * states[1][0].groups[1].split2;
+        let split22 = 0;
+        states[1][1] = new State(1, [new Group(side21, split21), new Group(side22, split22)]);
+        drawRow3(states[1]);
+
+        for (let i = 2; i < 7; i++) {
+            let prevrow = states[i - 1];
+            let side1 = S3 * prevrow[0].groups[0].split1;
+            let split1 = prevrow[0].groups[0].side / S3;
+            let repeat = prevrow[0].repeat * 2;
+            states[i] = [
+                new State(repeat, [new Group(side1, split1), new Group(side1, side1 - split1)]),
+            ];
+            for(let j = 1; j<i; j++) {
+                let prevstate = states[i][j-1];
+                repeat/=2;
+                let side21 = S3 * prevstate.groups[0].split2;
+                let split21 = states[i-j][0].groups[0].split2;
+                let side22 = S3 * prevstate.groups[0].split0;
+                states[i][j] = new State(repeat, [
+                    new Group(side21, split21),
+                    new Group(side22, side22),
+
+                ]);
+                for(let k = 1; k<prevstate.groups.length/2; k++) {
+                    states[i][j].groups.push(new Group(S3 * prevstate.groups[k].side, S3 * prevstate.groups[k].side));
+                }
+                states[i][j].groups.push(new Group(side21, side21 - split21));
+                states[i][j].groups.push(new Group(side22, 0));
+                for(let k = 1; k<prevstate.groups.length/2; k++) {
+                    states[i][j].groups.push(new Group(S3 * prevstate.groups[k].side, 0));
+                }
+            }
+            drawRow3(states[i]);
+        }
+
+    }
+
+    function drawRow(row, index) {
+        var rowdiv = document.createElement("div");
+        document.body.appendChild(rowdiv);
+
+        var txt = document.createElement("div");
+
+        var ratio = row[1] * 100 / row[0];
+        var area = row[0] * row[0];
+        var area2 = row[1] * row[1];
+        var area0 = row[2] * row[2];
+        var area1 = area - area2 - area0;
+        txt.innerHTML = "&dArr;<br>side = " + row[0].toFixed(4) + "(" + ratio.toFixed(1) + ":" + (100 - ratio).toFixed(1) + ")<br>" +
+            "area = " + area.toFixed(4) + "(" + (area2 * 100 / area).toFixed(1) + ":" + (area1 * 100 / area).toFixed(1) + ":" + (area0 * 100 / area).toFixed(1) + ")<br>";
+
+        rowdiv.appendChild(txt);
+
+        txt.appendChild(createSq(row[0], row[1]));
+
+        if (index > 0) {
+            txt.appendChild(document.createTextNode(" "));
+            txt.appendChild(createSq(row[0], row[2]));
+
+            txt.appendChild(document.createTextNode(" X " + (2 ** (index - 1)) + " \u21D2"));
+
+            for (ind2 = 0; ind2 < index; ind2++) {
+                txt.appendChild(createSq(row[4 + ind2], ind2 == 0 ? (row[4 + ind2] / S3) : 0));
+                txt.appendChild(document.createTextNode(" "));
+            }
+        }
+
+    }
+
+    function createSq(side, split) {
+        var sq1 = document.createElement("canvas");
+        sq1.width = side * scale;
+        sq1.height = side * scale;
+        sq1.style.backgroundColor = "cyan";
+
+        var context = sq1.getContext("2d");
+
+        context.fillStyle = "green";
+        context.fillRect(0, 0, split * scale, split * scale);
+
+        context.fillStyle = "red";
+        context.fillRect(split * scale, split * scale, scale, scale);
+
+        return sq1;
+    }
+
+    function draw2() {
+        var side = [];
+
+        var ind = 0;
+
+        var row = [];
+        side[ind] = row;
+
+        row[0] = 1.0; // A
+        row[1] = row[0] / S3; //B
+        row[2] = row[0] - row[1]; //C
+        row[3] = Math.sqrt(row[1] * row[2]); //D
+
+        drawRow(row, ind);
+
+        ind++;
+        var prevrow = row;
+        row = [];
+        side[ind] = row;
+
+        row[0] = S3 * prevrow[3]; // A = S3 *D(-1)
+        row[1] = prevrow[0] / S3; // B
+        row[2] = row[0] - row[1]; //C
+        row[3] = Math.sqrt(row[1] * row[2]); //D
+
+        row[4] = S3 * prevrow[2] // E = S3 * C(-1)
+
+        drawRow(row, ind);
+
+        ind++;
+        var prevrow = row;
+        row = [];
+        side[ind] = row;
+
+        row[0] = S3 * prevrow[3]; // A = S3 *D(-1)
+        row[1] = prevrow[0] / S3; // B
+        row[2] = row[0] - row[1]; //C
+        row[3] = Math.sqrt(row[1] * row[2]); //D
+
+        row[4] = S3 * prevrow[1] // E = S3 * B(-1)
+        row[5] = S3 * prevrow[2] // F = S3 * C(-1)
+
+        drawRow(row, ind);
+
+        ind++;
+        var prevrow = row;
+        row = [];
+        side[ind] = row;
+
+        row[0] = S3 * prevrow[3]; // A = S3 *D(-1)
+        row[1] = prevrow[0] / S3; // B
+        row[2] = row[0] - row[1]; //C
+        row[3] = Math.sqrt(row[1] * row[2]); //D
+
+        row[4] = S3 * prevrow[1] // E = S3 * B(-1)
+        row[5] = S3 * prevrow[2] // F = S3 * C(-1)
+
+        drawRow(row, ind);
+    }
+
+    function draw1() {
+
+        //context.strokeStyle = "#0000ff";
+        //context.lineWidth = 5;
+        //context.strokeRect(10,10,100,100);
+        var A = 1.0;
+        var a = Math.sqrt(A * A / 3);
+        squareSplit(A, a, 0, "A", "a", "b", "c");
+        //square("a", a, 2);
+
+        shift(A);
+
+        var c = A - a;
+        var C = c * Math.sqrt(3);
+
+        var b = Math.sqrt(a * c);
+        var B = b * Math.sqrt(3);
+        squareSplit(B, a, 0, "B", "a", "d", "e");
+        squareSplit(B, B - a, 1, "B", "e", "d", "a");
+        //square("b", b, 2);
+        //square("b", b, 3);
+
+        shift(B);
+
+
+        var colorIndex = 3;
+        var squareCount = 4;
+
+        var e = B - a;
+        var E = e * Math.sqrt(3);
+        var d = Math.sqrt(a * e);
+        var D = d * Math.sqrt(3);
+
+        var f = D - b;
+
+        <!--        squareSplit(A, a, 0,"A", "a", "b", "c");-->
+        <!--        square("E", E, 1);-->
+        <!--        square("a", a, 2);-->
+        <!--        square("e", e, 3);-->
+        <!--        -->
+        <!--        shift(A);-->
+
+        for (cntr = 0; cntr < 5; cntr++) {
+            var c1 = color2[colorIndex];
+            var c2 = color2[(colorIndex + 1) % color2.length];
+            var c3 = color2[(colorIndex + 2) % color2.length];
+            squareSplit2(D, b, 0, c1, c2, c3);
+            squareSplit2(D, f, 1, c3, c2, c1);
+            context.fillText("X " + (squareCount / 2) + " = " + squareCount, base + 1.7 * (scale + margin), y + 50);
+
+            var c1 = color2[colorIndex];
+            var c2 = color2[(colorIndex + 1) % color2.length];
+            var c3 = color2[(colorIndex + 2) % color2.length];
+
+            squareSplit2(A, a, 2, c1, c2, c3);
+            squareSplit2(E, 0, 3, c1, c2, c3);
+
+            context.fillText("X " + (squareCount / 4) + " = " + (squareCount / 2), base + 4 * (scale + margin), y + 50);
+
+            shift(A);
+
+            var g = Math.sqrt(b * f);
+            var G = Math.sqrt(3) * g;
+
+            b = d;
+            d = g;
+            D = G;
+            f = D - b;
+            squareCount *= 2;
+            colorIndex += 3;
+            colorIndex %= color2.length;
+        }
+
+        /*
+         var h=G-d;
+         var H=Math.sqrt(3)*h;
+
+         var i=Math.sqrt(d*h);
+         var I=Math.sqrt(3)*h;
+
+         var s1 = 0.6;
+         for(count=0; count<4; count++) {
+         squareSplit(G, d, count * 2 * s1,"G", "d", "i", "h");
+         squareSplit(G, h, (count * 2 + 1) * s1,"G", "h", "i", "d");
+         }
+         shift(G);
+         */
+    }
+
+
+    function squareSplit2(side, split, left, c1, c2, c3) {
+        <!--        context.strokeStyle = "#0000ff";-->
+        <!--        context.lineWidth = 1;-->
+        var x1 = base + left * (scale + margin);
+        var y1 = y;
+
+        context.fillStyle = c2;
+        context.fillRect(x1, y1, side * scale, side * scale);
+
+        context.fillStyle = c1;
+        context.fillRect(x1, y1, split * scale, split * scale);
+
+        context.fillStyle = c3;
+        context.fillRect(x1 + split * scale, y1 + split * scale, side * scale - split * scale, side * scale - split * scale);
+
+        // context.strokeRect(x1,y1,33,33);
+        <!--        context.strokeRect(x1,y1,side*scale,side*scale);-->
+
+        context.fillStyle = "black";
+
+
+        var ratio = (split * 100 / side)
+        context.fillText("side=" + side.toFixed(4) + "(" + ratio.toFixed(1) + ":" + (100 - ratio).toFixed(1) + ") area=" + (side * side).toFixed(4), x1 + textX, y1 - 5);
+        if (split * 2 > side) {
+            context.fillText((split * split).toFixed(4), x1 + textX, y1 + textY);
+            context.fillText(((side - split) * (side - split)).toFixed(4), x1 + split * scale + textX, y1 + split * scale + textY);
+            context.fillText(((side - split) * (split)).toFixed(4), x1 + split * scale + textX, y1 + textY * 2);
+        } else {
+            /*
+             context.fillText((split*split).toFixed(3), x1 + textX, y1 + textY);
+             context.fillText(((side-split)*(side-split)).toFixed(3), x1+split*scale + textX, y1+split*scale + textY);
+             context.fillText(((side-split)*(split)).toFixed(3), x1 + textX, y1+split*scale + textY);
+             */
+        }
+        // context.fillText(label2 + "^2=" + label1 + "*"+label3, x1 + textX, y1+split*scale + textY);
+    }
+
+    function shift(size) {
+        y += Math.floor(size * scale + margin);
+    }
+
+    function square(label, side, left) {
+        context.strokeStyle = "#0000ff";
+        context.lineWidth = 1;
+        var x1 = base + left * (scale + margin);
+        var y1 = y;
+
+        context.fillStyle = color[label];
+        context.fillRect(x1, y1, side * scale, side * scale);
+        // context.strokeRect(x1,y1,33,33);
+        context.strokeRect(x1, y1, side * scale, side * scale);
+
+        context.fillStyle = "black";
+
+        context.fillText(label + "=" + side.toFixed(3) + " " + label + "^2=" + (side * side).toFixed(3), x1 + textX, y1 - 5);
+    }
+
+    function squareSplit(side, split, left, label0, label1, label2, label3) {
+        context.strokeStyle = "#0000ff";
+        context.lineWidth = 1;
+        var x1 = base + left * (scale + margin);
+        var y1 = y;
+
+        context.fillStyle = color[label2];
+        context.fillRect(x1, y1, side * scale, side * scale);
+
+        context.fillStyle = color[label1];
+        context.fillRect(x1, y1, split * scale, split * scale);
+
+        context.fillStyle = color[label3];
+        context.fillRect(x1 + split * scale, y1 + split * scale, side * scale - split * scale, side * scale - split * scale);
+
+        // context.strokeRect(x1,y1,33,33);
+        context.strokeRect(x1, y1, side * scale, side * scale);
+
+        context.fillStyle = "black";
+
+        context.fillText(label0 + "=" + side.toFixed(3) + " " + label0 + "^2=" + (side * side).toFixed(3), x1 + textX, y1 - 5);
+        drawTxt(label1, split, x1 + textX, y1 + textY);
+        drawTxt(label3, side - split, x1 + split * scale + textX, y1 + split * scale + textY);
+        context.fillText(label2, x1 + textX, y1 + split * scale + textY);
+        // context.fillText(label2 + "^2=" + label1 + "*"+label3, x1 + textX, y1+split*scale + textY);
+    }
+
+    function drawTxt(label, size, x, y) {
+        context.fillText(label, x, y);
+        <!--        context.fillText(label + "=" + size.toFixed(3), x, y);-->
+        <!--        context.fillText(label + "^2=" + (size*size).toFixed(3), x, y + textY);-->
+    }
+
+</script>
+</body>
+

@@ -920,7 +920,7 @@ int minK(int sbb) {
         debug_printf("computing min_k for %s...\n", sbb_to_str[sbb]);
         kk=1;
         int rr;
-        while ((rr = canSolveB(&sbb, 1, kk, 1000)) == TRUE) kk++;
+        while ((rr = canSolveB(&sbb, 1, kk, clock() + CLOCKS_PER_SEC * 1000)) == TRUE) kk++;
         debug_printf("min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
         if (rr == FALSE) sbb_to_min_k[sbb]=kk; // if we got maybe, assume false, but do not memorize
         debug_printf("cached min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
