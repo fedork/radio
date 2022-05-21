@@ -338,7 +338,7 @@ int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, i
                 int next_pairs_remaining = pairs_remaining - pairs_new;
                 debug_printf("sbb2 = %d(%s)\n", sbb2, sbb_to_str[sbb2]);
                 int next_n_remaining = n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2];
-                if (next_n_remaining > 2) {
+//                if (next_n_remaining > 2) {
 #ifndef OPT
                     if (sbb2 >= n->size) {
                         printf("FAIL: sbb2 = %d but n->size = %d\n", sbb2, n->size);
@@ -346,7 +346,7 @@ int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, i
                     }
 #endif
                     updated+=cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new, next_pairs_remaining, next_n_remaining);
-                }
+//                }
             }
             greater++;
         }
@@ -375,7 +375,7 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
     }
     printf(" cache=%lld/%lld(%+lld/%+lld)", alloc_count, alloc_size, alloc_count-alloc_count_before, alloc_size-alloc_size_before);
     
-#ifndef OPT
+#ifndef OPT_2
     if (updated == 0) {
         printf("\nupdated == 0 when caching result\n");
         fflush(stdout);
