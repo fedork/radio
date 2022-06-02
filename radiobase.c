@@ -763,8 +763,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 clock_t t = clock();
                                 // if we just fulfilled min progress, give it a bit more time
                                 if (cant_solve_count == cant_solve_count_min) {
-                                    // give half of the time it took to get here to avoid wasting time too much for laggards
-                                    clock_t new_deadline = t + (t - start)/2;
+                                    // give same time it took to get here to avoid wasting time too much for laggards
+                                    clock_t new_deadline = t + (t - start);
                                     if (new_deadline>deadline) deadline = new_deadline;
                                 }
                                 if (t>deadline){
