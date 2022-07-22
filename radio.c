@@ -2,6 +2,7 @@
 
 int main(int argc, char **argv){
     init();
+    if (argc==2) parse_file(argv[1]);
     int k,n;
     int prev_max_n = 1;
     for (k=1, n=2; k<= MAX_K; k++){

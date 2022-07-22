@@ -373,7 +373,7 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
     } else {
         updated = cacheCantSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, pairs, power3[k], MAX_N);
     }
-    printf(" cache=%lld/%lld(%+lld/%+lld)", alloc_count, alloc_size, alloc_count-alloc_count_before, alloc_size-alloc_size_before);
+    debug_printf(" cache=%lld/%lld(%+lld/%+lld)", alloc_count, alloc_size, alloc_count-alloc_count_before, alloc_size-alloc_size_before);
     
 #ifndef OPT_2
     if (updated == 0) {
@@ -928,6 +928,20 @@ int minK(int sbb) {
     return kk;
 }
 
+void cache_a(int canSolve, int n, int k) {
+    if(canSolve){
+        int i;
+        for (i = n; i > 0; i--) {
+            sa_can[i] = min(k, sa_can[i]);
+        }
+    } else {
+        int i;
+        for (i = n; i <=MAX_N; i++) {
+            sa_cant[i]=max(k, sa_cant[i]);
+        }
+    }
+}
+
 int canSolveA(int n, int k) {
     
     int pairs = saPairs(n);
@@ -985,17 +999,9 @@ int canSolveA(int n, int k) {
         fflush(stdout);
         exit(5);
     }
-    if(canSolve){
-        int i;
-        for (i = n; i > 0; i--) {
-            sa_can[i] = min(k, sa_can[i]);
-        }
-    } else {
+    cache_a(canSolve,n,k);
+    if(!canSolve){
         printf("can't solve Sa(%d) in %d",n,k);
-        int i;
-        for (i = n; i <=MAX_N; i++) {
-            sa_cant[i]=max(k, sa_cant[i]);
-        }
     }
     clock_t t = clock()-start;
     clock_t s = t/CLOCKS_PER_SEC;
@@ -1289,6 +1295,111 @@ void all_solutions(int sb[], int size, int k) {
             m[j] = n[j] + 1;
         }
     }
+}
+
+#define BUFSIZE 1000
+
+void parse_file(char *file_name) {
+    FILE *fp = fopen(file_name, "r");
+    
+    if (fp == NULL) {
+        printf("Failed to open file '%s'\n", file_name);
+        exit(14);
+    }
+    printf("\nreading file %s ", file_name);
+    char buff[BUFSIZE];
+    int line_count=0;
+
+    while(fgets(buff, BUFSIZE - 1, fp) != NULL)
+    {
+        line_count++;
+        if (line_count % 10000 == 0) {
+            printf(".");
+            if (line_count % 1000000 == 0) {
+                printf("\n");
+            }
+            fflush(stdout);
+        }
+        debug_printf("\nINPUT: %s\n", buff);
+        char* token = strtok(buff, " ");
+        if (token == NULL) {
+            printf("Unexpected NULL\n");
+            exit(15);
+        }
+        int can_solve = ((*token) == '+');
+        token = strtok(NULL, " ");
+        int is_a = ((*token) == 'a');
+        if (is_a) { // Sa
+            token = strtok(NULL, " ");
+            int n = atoi(token);
+            token = strtok(NULL, " ");
+            int k = atoi(token);
+            debug_printf("\nPARSED: Sa(%d) cs:%d in %d\n", n, can_solve, k);
+            // cache
+            cache_a(can_solve,n,k);
+        } else { // Sb
+            int sb[BUFSIZE];
+            int size = 0;
+            while(1) {
+                token = strtok(NULL, " ");
+                if (*token == 't') break;
+                int n1 = atoi(token);
+                token = strtok(NULL, " ");
+                int n2 = atoi(token);
+                sb[size++] = getSbb(n1,n2);
+            }
+            token = strtok(NULL, " ");
+            int pairs = atoi(token);
+            token = strtok(NULL, " ");
+            int n = atoi(token);
+            token = strtok(NULL, " ");
+            int k = atoi(token);
+#ifdef DEBUG
+            debug_printf("PARSED: ");
+            printSb(sb, size);
+            printf(" pairs=%d n=%d k=%d cs=%d ", pairs, n, k, can_solve);
+#endif
+            cache(sb, size, can_solve, k, pairs);
+            if(can_solve) {
+                int i;
+                for (i=0; i<size; i++) {
+                    token = strtok(NULL, " ");
+                    if (*token == '*') {
+                        token = strtok(NULL, " ");
+                        int m1 = atoi(token);
+                        token = strtok(NULL, " ");
+                        int m2 = atoi(token);
+                        debug_printf("added %s => %d:%d ", sbb_to_str[sb[i]], m1, m2);
+                        splits *s = &sbb_splits[sb[i]];
+                        int c;
+                        int found=0;
+                        for (c=0; c<s->size; c++) {
+                            if (s->splitsl[c][6] == m1 && s->splitsl[c][7] == m2) {
+                                found++;
+                                if (s->splitsl[c][FAST] == 1) {
+                                    printf("\nFAST already ==1!\n");
+                                    exit(16);
+                                }
+                                s->splitsl[c][FAST] = 1;
+                            }
+                        }
+                        if (found != 1) {
+                            printf("\nfound = %d\n", found);
+                            exit(17);
+                        }
+                    } else {
+                        token = strtok(NULL, " ");
+                        debug_printf("x ");
+                    }
+                }
+            }
+        }
+        if (strtok(NULL, " ") != NULL) {
+            printf("\nexpected end of line\n");
+            exit(18);
+        }
+    }
+    fclose(fp);
 }
 
 void init(){
