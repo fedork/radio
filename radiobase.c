@@ -632,8 +632,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
         
         
-        clock_t child_deadline = deadline;
-        clock_t middle_child_deadline = deadline;
+        clock_t child_deadline = pass<3 ? deadline : NO_DEADLINE;
+        clock_t middle_child_deadline = child_deadline;
 
         
 //        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
@@ -1306,7 +1306,7 @@ void parse_file(char *file_name) {
         printf("Failed to open file '%s'\n", file_name);
         exit(14);
     }
-    printf("\nreading file %s ", file_name);
+    printf("\nreading file %s\n", file_name);
     char buff[BUFSIZE];
     int line_count=0;
 
@@ -1360,39 +1360,6 @@ void parse_file(char *file_name) {
             printf(" pairs=%d n=%d k=%d cs=%d ", pairs, n, k, can_solve);
 #endif
             cache(sb, size, can_solve, k, pairs);
-            if(can_solve) {
-                int i;
-                for (i=0; i<size; i++) {
-                    token = strtok(NULL, " ");
-                    if (*token == '*') {
-                        token = strtok(NULL, " ");
-                        int m1 = atoi(token);
-                        token = strtok(NULL, " ");
-                        int m2 = atoi(token);
-                        debug_printf("added %s => %d:%d ", sbb_to_str[sb[i]], m1, m2);
-                        splits *s = &sbb_splits[sb[i]];
-                        int c;
-                        int found=0;
-                        for (c=0; c<s->size; c++) {
-                            if (s->splitsl[c][6] == m1 && s->splitsl[c][7] == m2) {
-                                found++;
-                                if (s->splitsl[c][FAST] == 1) {
-                                    printf("\nFAST already ==1!\n");
-                                    exit(16);
-                                }
-                                s->splitsl[c][FAST] = 1;
-                            }
-                        }
-                        if (found != 1) {
-                            printf("\nfound = %d\n", found);
-                            exit(17);
-                        }
-                    } else {
-                        token = strtok(NULL, " ");
-                        debug_printf("x ");
-                    }
-                }
-            }
         }
         if (strtok(NULL, " ") != NULL) {
             printf("\nexpected end of line\n");
