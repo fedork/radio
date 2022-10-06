@@ -103,7 +103,7 @@ int saPairs(int n) {
 }
 
 void printSa(int n){
-    printf("Sa(%d)", n);
+    printf("Sa(%d)[%d,%d]", n, saPairs(n), n);
 }
 
 void printSb(int *sb, int size){
@@ -1367,6 +1367,7 @@ void parse_file(char *file_name) {
         }
     }
     fclose(fp);
+    printf("done\n");
 }
 
 void init(){
