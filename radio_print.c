@@ -1,4 +1,4 @@
-#define MAX_K 6
+#define MAX_K 8
 #define MAX_N 68
 
 #include "radiobase.c"
@@ -175,8 +175,8 @@ int main(int argc, char **argv){
                 m[j]--;
                 //        printf("l1 j = %d mj = %d\n", j, m[j]);
                 for(i=0;i<size;i++) {
-                    sb[0][i] = getSbb(m[i*2], m[i*2+1]);
-                    sb[2][i] = getSbb(n[i*2] - m[i*2], n[i*2+1] - m[i*2+1]);
+                    sb[2][i] = getSbb(m[i*2], m[i*2+1]);
+                    sb[0][i] = getSbb(n[i*2] - m[i*2], n[i*2+1] - m[i*2+1]);
                     sb[1][i*2] = getSbb(m[i*2], n[i*2+1] - m[i*2+1]);
                     sb[1][i*2 + 1] = getSbb(n[i*2] - m[i*2], m[i*2+1]);
                 }
