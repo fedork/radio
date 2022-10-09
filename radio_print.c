@@ -1,5 +1,5 @@
-#define MAX_K 8
-#define MAX_N 68
+#define MAX_K 10
+#define MAX_N 194
 
 #include "radiobase.c"
 #include <math.h>
@@ -46,7 +46,11 @@ int is_inferior(int sb1[], int size1, int sb2[], int size2) {
 int main(int argc, char **argv){
     
     init();
-    if (argc>1) parse_file(argv[1]);
+    int check_cache_only = FALSE;
+    if (argc>1) {
+        parse_file(argv[1]);
+        check_cache_only = TRUE;
+    }
     //    int k = atoi(argv[offset+1]);
     //    int size = (argc - offset - 2)/2;
     //    int k = 9;
@@ -55,13 +59,13 @@ int main(int argc, char **argv){
     sol *s = &solutions[next_sol++];
     s->k = MAX_K;
     s->size = -1;
-    s->init[0] = 65;
+    s->init[0] = 192;
     
     int next_level_start;
     
     int line = 1;
     while (line < next_sol) {
-//        printf("line=%d\n", line);
+        //        printf("line=%d\n", line);
         s = &solutions[line];
         int k = s->k;
         int k1 = k-1;
@@ -69,11 +73,11 @@ int main(int argc, char **argv){
             // Sa
             int count = s->init[0];
             
-//            printf("DEBUG solving ");
-//            printSa(count);
-//            printf("\n");
-//            fflush(stdout);
-
+            //            printf("DEBUG solving ");
+            //            printSa(count);
+            //            printf("\n");
+            //            fflush(stdout);
+            
             
             int c1 = count;
             while(!canSolveA(c1, k1)) c1--;
@@ -98,10 +102,10 @@ int main(int argc, char **argv){
             s1->size = 1;
             s1->init[0] = s->b[1][0];
             
-//            1. (in 10) Sa(192)[18336,192] take[112] :
-//                2=>Sa(112)[6216,112](line 2)
-//                1=>Sb(112:80)[8960,192](line 3)
-//                0=>Sa(80)[3160,80](line 2)
+            //            1. (in 10) Sa(192)[18336,192] take[112] :
+            //                2=>Sa(112)[6216,112](line 2)
+            //                1=>Sb(112:80)[8960,192](line 3)
+            //                0=>Sa(80)[3160,80](line 2)
             
             
             
@@ -121,22 +125,22 @@ int main(int argc, char **argv){
             } else {
                 printf("(trivial)\n");
             }
-
-//            printf("DEBUG done solving ");
-//            printSa(count);
-//            printf("\n");
+            
+            //            printf("DEBUG done solving ");
+            //            printSa(count);
+            //            printf("\n");
             fflush(stdout);
-
+            
         } else {
             // Sb
             int size = s->size;
             int *tmp = s->init;
-//
-//            printf("DEBUG solving ");
-//            printSb(tmp, size);
-//            printf("\n");
-//            fflush(stdout);
-          
+            //
+            //            printf("DEBUG solving ");
+            //            printSb(tmp, size);
+            //            printf("\n");
+            //            fflush(stdout);
+            
             
             int n[size*2], m[size*2];
             int sb[3][size*2];
@@ -182,24 +186,28 @@ int main(int argc, char **argv){
                 }
                 
                 if (j == size*2 - 1) {
-//                    printf("DEBUG start take[");
-//                    for(i=0;i<size*2;i++) {
-//                        printf("%d,",m[i]);
-//                    }
-//                    printf("]\n");
-//                    fflush(stdout);
-                    if (canSolveB(sb[0], size, k1, CACHE_ONLY) != FALSE &&
-                        canSolveB(sb[2], size, k1, CACHE_ONLY) != FALSE &&
-                        canSolveB(sb[1], size*2, k1, CACHE_ONLY) != FALSE &&
-                        canSolveB(sb[0], size, k1, NO_DEADLINE) == TRUE &&
-                        canSolveB(sb[2], size, k1, NO_DEADLINE) == TRUE &&
-                        canSolveB(sb[1], size*2, k1, NO_DEADLINE) == TRUE) {
+                    //                    printf("DEBUG start take[");
+                    //                    for(i=0;i<size*2;i++) {
+                    //                        printf("%d,",m[i]);
+                    //                    }
+                    //                    printf("]\n");
+                    //                    fflush(stdout);
+                    if (check_cache_only ?
+                        (canSolveB(sb[0], size, k1, CACHE_ONLY) == TRUE &&
+                         canSolveB(sb[2], size, k1, CACHE_ONLY) == TRUE &&
+                         canSolveB(sb[1], size*2, k1, CACHE_ONLY) == TRUE):
+                        (canSolveB(sb[0], size, k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[2], size, k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[1], size*2, k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[0], size, k1, NO_DEADLINE) == TRUE &&
+                         canSolveB(sb[2], size, k1, NO_DEADLINE) == TRUE &&
+                         canSolveB(sb[1], size*2, k1, NO_DEADLINE) == TRUE)) {
                         
-//                        printf("DEBUG WORKS! take[");
-//                        for(i=0;i<size*2;i++) {
-//                            printf("%d,",m[i]);
-//                        }
-//                        printf("]\n");
+                        //                        printf("DEBUG WORKS! take[");
+                        //                        for(i=0;i<size*2;i++) {
+                        //                            printf("%d,",m[i]);
+                        //                        }
+                        //                        printf("]\n");
                         
                         int add_lines = 0;
                         for (i=0; i<3; i++) {
@@ -234,11 +242,11 @@ int main(int argc, char **argv){
                                 int i3;
                                 for (i3 = 0; i3 < i; i3++) {
                                     if (sbnline[i3] <=NEW_LINE && (
-                                        is_inferior(sbn[i], sbnsize[i],sbn[i3], sbnsize[i3]) ||
-                                        is_inferior(sbn[i3], sbnsize[i3],sbn[i], sbnsize[i]))) {
-                                            sbnline[i] = sbnline[i3];
-                                            break;
-                                    }
+                                                                   is_inferior(sbn[i], sbnsize[i],sbn[i3], sbnsize[i3]) ||
+                                                                   is_inferior(sbn[i3], sbnsize[i3],sbn[i], sbnsize[i]))) {
+                                                                       sbnline[i] = sbnline[i3];
+                                                                       break;
+                                                                   }
                                 }
                             }
                             if (sbnline[i] == NEW_LINE-i) {
@@ -256,11 +264,11 @@ int main(int argc, char **argv){
                             
                             if (add_lines == 0) break; // does not get any better;
                         }
-//                        printf("DEBUG done take[");
-//                        for(i=0;i<size*2;i++) {
-//                            printf("%d,",m[i]);
-//                        }
-//                        printf("]\n");
+                        //                        printf("DEBUG done take[");
+                        //                        for(i=0;i<size*2;i++) {
+                        //                            printf("%d,",m[i]);
+                        //                        }
+                        //                        printf("]\n");
                         
                     }
                 } else {
@@ -269,47 +277,47 @@ int main(int argc, char **argv){
                 }
             }
             
-//            printf("DEBUG done solving ");
-//            printSb(tmp, size);
-//            printf("\n");
-//            fflush(stdout);
-//            int op[80];
-//            int b[3][80];
-//            int l[3];
+            //            printf("DEBUG done solving ");
+            //            printSb(tmp, size);
+            //            printf("\n");
+            //            fflush(stdout);
+            //            int op[80];
+            //            int b[3][80];
+            //            int l[3];
             memcpy(s->op, bestop, sizeof(bestop));
-//            printf("DEBUG 123\n");            fflush(stdout);
-
+            //            printf("DEBUG 123\n");            fflush(stdout);
+            
             for (i=0; i<3; i++) {
-//                printf("DEBUG foo i=%d\n", i);            fflush(stdout);
+                //                printf("DEBUG foo i=%d\n", i);            fflush(stdout);
                 memcpy(s->b[i], bestsb[i], sizeof(bestsb[i]));
-//                printf("DEBUG foo i=%d\n", i);            fflush(stdout);
-
+                //                printf("DEBUG foo i=%d\n", i);            fflush(stdout);
+                
                 int l = bestsbnline[i];
                 
-//                printf("DEBUG l=%d\n", l);            fflush(stdout);
+                //                printf("DEBUG l=%d\n", l);            fflush(stdout);
                 if (l != TRIVIAL) {
                     if (l == NEW_LINE - i) {
                         sol *snew = &solutions[l = next_sol++];
                         snew->k = k1;
                         snew->size = bestsbnsize[i];
-//                        printf("DEBUG bestsbnsize[i]=%d\n", bestsbnsize[i]);            fflush(stdout);
+                        //                        printf("DEBUG bestsbnsize[i]=%d\n", bestsbnsize[i]);            fflush(stdout);
                         memcpy(snew->init, bestsbn[i], bestsbnsize[i] * sizeof(int));
                         bestsbnline[i] = l;
-//                        printf("DEBUG l=%d\n", l);            fflush(stdout);
+                        //                        printf("DEBUG l=%d\n", l);            fflush(stdout);
                     } else {
                         if (l <= NEW_LINE) {
-
+                            
                             l = bestsbnline[NEW_LINE - l]; // reuse
-//                            printf("DEBUG reuse l=%d\n", l);            fflush(stdout);
+                            //                            printf("DEBUG reuse l=%d\n", l);            fflush(stdout);
                         }
                         sol *sused = &solutions[l];
                         if (is_inferior(sused->init, sused->size, bestsbn[i], bestsbnsize[i])) {
                             //replace
-//                            printf("DEBUG before replace \n");            fflush(stdout);
+                            //                            printf("DEBUG before replace \n");            fflush(stdout);
                             sused->size = bestsbnsize[i];
                             memcpy(sused->init, bestsbn[i], bestsbnsize[i] * sizeof(int));
-//                            printf("DEBUG after replace \n");            fflush(stdout);
-
+                            //                            printf("DEBUG after replace \n");            fflush(stdout);
+                            
                         } else {
                             // assert that we are inferior to the line we are using
                             if (!is_inferior(bestsbn[i], bestsbnsize[i], sused->init, sused->size)) {
@@ -344,7 +352,7 @@ int main(int argc, char **argv){
             }
             
             fflush(stdout);
-
+            
         }
         line++;
     }
