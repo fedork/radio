@@ -178,13 +178,13 @@ int main(int argc, char **argv){
                 if (!cont) break;
                 m[j]--;
                 //        printf("l1 j = %d mj = %d\n", j, m[j]);
-                for(i=0;i<size;i++) {
+                if ( (j % 2) == 1) {
+                    i=j/2;
                     sb[2][i] = getSbb(m[i*2], m[i*2+1]);
                     sb[0][i] = getSbb(n[i*2] - m[i*2], n[i*2+1] - m[i*2+1]);
                     sb[1][i*2] = getSbb(m[i*2], n[i*2+1] - m[i*2+1]);
                     sb[1][i*2 + 1] = getSbb(n[i*2] - m[i*2], m[i*2+1]);
                 }
-                
                 if (j == size*2 - 1) {
                     //                    printf("DEBUG start take[");
                     //                    for(i=0;i<size*2;i++) {
@@ -272,8 +272,19 @@ int main(int argc, char **argv){
                         
                     }
                 } else {
-                    j++;
-                    m[j] = n[j] + 1;
+                    if (((j%2)==0) || check_cache_only ?
+                        (canSolveB(sb[0], i, k1, CACHE_ONLY) == TRUE &&
+                         canSolveB(sb[2], i, k1, CACHE_ONLY) == TRUE &&
+                         canSolveB(sb[1], i*2, k1, CACHE_ONLY) == TRUE):
+                        (canSolveB(sb[0], i, k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[2], i, k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[1], i*2, k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[0], i, k1, NO_DEADLINE) == TRUE &&
+                         canSolveB(sb[2], i, k1, NO_DEADLINE) == TRUE &&
+                         canSolveB(sb[1], i*2, k1, NO_DEADLINE) == TRUE)) {
+                        j++;
+                        m[j] = n[j] + 1;
+                    }
                 }
             }
             
