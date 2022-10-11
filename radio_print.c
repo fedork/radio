@@ -282,7 +282,6 @@ int main(int argc, char **argv){
                          canSolveB(sb[0], (i+1), k1, NO_DEADLINE) == TRUE &&
                          canSolveB(sb[2], (i+1), k1, NO_DEADLINE) == TRUE &&
                          canSolveB(sb[1], (i+1)*2, k1, NO_DEADLINE) == TRUE))) {
-
                         j++;
                         m[j] = n[j] + 1;
                     }
