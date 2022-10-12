@@ -272,16 +272,10 @@ int main(int argc, char **argv){
                         
                     }
                 } else {
-                    if (((j%2)==0) || (check_cache_only ?
-                        (canSolveB(sb[0], (i+1), k1, CACHE_ONLY) == TRUE &&
-                         canSolveB(sb[2], (i+1), k1, CACHE_ONLY) == TRUE &&
-                         canSolveB(sb[1], (i+1)*2, k1, CACHE_ONLY) == TRUE):
+                    if (((j%2)==0) ||
                         (canSolveB(sb[0], (i+1), k1, CACHE_ONLY) != FALSE &&
                          canSolveB(sb[2], (i+1), k1, CACHE_ONLY) != FALSE &&
-                         canSolveB(sb[1], (i+1)*2, k1, CACHE_ONLY) != FALSE &&
-                         canSolveB(sb[0], (i+1), k1, NO_DEADLINE) == TRUE &&
-                         canSolveB(sb[2], (i+1), k1, NO_DEADLINE) == TRUE &&
-                         canSolveB(sb[1], (i+1)*2, k1, NO_DEADLINE) == TRUE))) {
+                         canSolveB(sb[1], (i+1)*2, k1, CACHE_ONLY) != FALSE)) {
                         j++;
                         m[j] = n[j] + 1;
                     }
