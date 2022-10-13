@@ -114,7 +114,11 @@ int main(int argc, char **argv){
             printf(" take[%d] :\n", c1);
             printf("resultprint  2=>");
             printSa(c1);
-            printf("(line %d)\n", s->l[2]);
+            if (s->l[2] > 0){
+                printf("(line %d)\n", s->l[2]);
+            } else {
+                printf("(trivial)\n");
+            }
             printf("resultprint  1=>");
             printSb(s->b[1], 1);
             printf("(line %d)\n", s->l[1]);
