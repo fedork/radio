@@ -11,6 +11,7 @@
 typedef struct {
     int k;
     int size;
+    int refs;
     int init[40];
     int op[80];
     int b[3][80];
@@ -58,6 +59,7 @@ int main(int argc, char **argv){
     
     sol *s = &solutions[next_sol++];
     s->k = MAX_K;
+    s->refs=0;
     s->size = -1;
     s->init[0] = 192;
     
@@ -91,15 +93,18 @@ int main(int argc, char **argv){
                 sol *s2 = &solutions[s->l[2] = next_sol++];
                 s2->k=k1;
                 s2->size = -1;
+                s2->refs = 1;
                 s2->init[0] = c1;
                 if (count - c1 > 2) {
                     s->l[0] = s->l[2];
+                    s2->refs = 2;
                 }
             }
             
             sol *s1 = &solutions[next_level_start = s->l[1] = next_sol++];
             s1->k=k1;
             s1->size = 1;
+            s1->refs = 1;
             s1->init[0] = s->b[1][0];
             
             //            1. (in 10) Sa(192)[18336,192] take[112] :
@@ -108,8 +113,8 @@ int main(int argc, char **argv){
             //                0=>Sa(80)[3160,80](line 2)
             
             
-            
-            printf("resultprint %d. (in %d) ", line, s->k);
+            printf("resultprint======================\n");
+            printf("resultprint %d. (in %d) (used %d) ", line, s->k, s->refs);
             printSa(count);
             printf(" take[%d] :\n", c1);
             printf("resultprint  2=>");
@@ -171,6 +176,9 @@ int main(int argc, char **argv){
             m[0] = (n[0] + 1)/2 + 1; // start from the middle
             int j = 0;
             int cont = TRUE;
+            clock_t start = clock();
+            clock_t progress = start + PROGRESS_INTERVAL;
+            long scount=0;
             while(cont) {
                 while(m[j] == 0) {
                     if (j==0) {
@@ -196,6 +204,17 @@ int main(int argc, char **argv){
                     //                    }
                     //                    printf("]\n");
                     //                    fflush(stdout);
+                    if (clock()>progress) {
+                        printf("still searching solutions for ");
+                        printSb(tmp, size);
+                        printf(" in %d found=%ld elapsed=%lu trying [", k, scount, (clock() - start)/CLOCKS_PER_SEC);
+                        for(i=0; i<size*2; i++) {
+                            if (i>0) printf(",");
+                            printf("%d", m[i]);
+                        }
+                        printf("]\n");
+                        progress = clock() + PROGRESS_INTERVAL;
+                    }
                     if (check_cache_only ?
                         (canSolveB(sb[0], size, k1, CACHE_ONLY) == TRUE &&
                          canSolveB(sb[2], size, k1, CACHE_ONLY) == TRUE &&
@@ -212,7 +231,7 @@ int main(int argc, char **argv){
                         //                            printf("%d,",m[i]);
                         //                        }
                         //                        printf("]\n");
-                        
+                        scount++;
                         int add_lines = 0;
                         for (i=0; i<3; i++) {
                             sbnsize[i]  = normalize(sb[i], size*2, sbn[i]);
@@ -286,6 +305,13 @@ int main(int argc, char **argv){
                 }
             }
             
+            if(scount==0) {
+                printf("found no solutions for ");
+                printSb(tmp, size);
+                exit(27);
+            }
+            
+            
             //            printf("DEBUG done solving ");
             //            printSb(tmp, size);
             //            printf("\n");
@@ -309,6 +335,7 @@ int main(int argc, char **argv){
                         sol *snew = &solutions[l = next_sol++];
                         snew->k = k1;
                         snew->size = bestsbnsize[i];
+                        snew->refs=0;
                         //                        printf("DEBUG bestsbnsize[i]=%d\n", bestsbnsize[i]);            fflush(stdout);
                         memcpy(snew->init, bestsbn[i], bestsbnsize[i] * sizeof(int));
                         bestsbnline[i] = l;
@@ -340,9 +367,10 @@ int main(int argc, char **argv){
                     }
                 }
                 s->l[i] = l;
+                solutions[l].refs++;
             }
             
-            printf("resultprint %d. (in %d) ", line, s->k);
+            printf("resultprint %d. (in %d) (used %d) ", line, s->k, s->refs);
             printSb(s->init, s->size);
             printf(" take[");
             for(i=0;i<size*2;i++) {
@@ -360,6 +388,41 @@ int main(int argc, char **argv){
                 }
             }
             
+            printf("resultgraph\n");
+            int height =0;
+            for(i=0; i<size; i++){
+                if (height<n[i*2]) height=n[i*2];
+            }
+            int line_num;
+            for(line_num=0; line_num<height; line_num++) {
+                printf("resultgraph ");
+                for(i=0; i<size; i++){
+                    int col;
+                    for(col=0; col<n[i*2+1]; col++){
+                        if (line_num>=n[i*2]) {
+                            printf(" ");
+                        } else {
+                            if (line_num<s->op[i*2]) {
+                                if (col<s->op[i*2+1]) {
+                                    printf("*");
+                                } else {
+                                    printf("-");
+                                }
+                            } else {
+                                if (col<s->op[i*2+1]) {
+                                    printf("-");
+                                } else {
+                                    printf(".");
+                                }
+                            }
+                        }
+                    }
+                    printf(" ");
+                }
+                printf("\n");
+            }
+            
+            printf("resultprint\n");
             fflush(stdout);
             
         }
