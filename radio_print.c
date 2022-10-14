@@ -213,6 +213,7 @@ int main(int argc, char **argv){
                             printf("%d", m[i]);
                         }
                         printf("]\n");
+                        fflush(stdout);
                         progress = clock() + PROGRESS_INTERVAL;
                     }
                     if (check_cache_only ?
@@ -421,11 +422,9 @@ int main(int argc, char **argv){
                 }
                 printf("\n");
             }
-            
-            printf("resultprint\n");
-            fflush(stdout);
-            
         }
+        printf("resultprint\n");
+        fflush(stdout);
         line++;
     }
 }
