@@ -67,7 +67,8 @@ int main(int argc, char **argv){
     
     int line = 1;
     while (line < next_sol) {
-        //        printf("line=%d\n", line);
+//        printf("line=%d\n", line);
+//        fflush(stdout);
         s = &solutions[line];
         int k = s->k;
         int k1 = k-1;
@@ -149,9 +150,7 @@ int main(int argc, char **argv){
             //            printSb(tmp, size);
             //            printf("\n");
             //            fflush(stdout);
-            
-            
-            int n[size*2], m[size*2];
+
             int sb[3][size*2];
             int sbn[3][size*2];
             int sbnsize[3];
@@ -164,23 +163,62 @@ int main(int argc, char **argv){
             int bestsbnline[3];
             int best_add_lines = 5;
             
+            
             int i;
-            for(i=0;i<size;i++) {
-                n[i*2] = sbb_to_n1[tmp[i]];
-                n[i*2+1] = sbb_to_n2[tmp[i]];
-                m[i*2] = 0;
-                m[i*2+1] = 0;
-                sb[0][i*2] = sb[0][i*2+1] = sb[1][i*2] = sb[1][i*2+1] = sb[2][i*2] = sb[2][i*2+1] = 0;
+            
+            int size_1 = size-1;
+            int size2 = size*2;
+            int max_pairs_1 = power3[k1];
+            int skiptop;
+            int splitindex[size];
+            splits *splitsarr[size];
+            int spi;
+            
+            int sb0p[size],sb2p[size],sb1p[size];
+            
+            for(i=0;i<size;i++){
+                splitsarr[i] = &sbb_splits[tmp[i]];
+                if (size>1) {
+                    for (spi = 0; spi<splitsarr[i]->size; spi++) {
+                        int *s = splitsarr[i]->splitsl[spi];
+                        while (s[4]<k) {
+                            debug_printf("checking split solvability for %s -> [%d, %d], before: s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
+                            int kk = s[4];
+                            int dd = NO_DEADLINE;
+                            int ttt = canSolveB(s, 1, kk, dd);
+                            if (ttt==TRUE) {
+                                ttt = canSolveB(s+3, 1, kk, dd);
+                                if (ttt==TRUE) {
+                                    ttt = canSolveB(s+1, 2, kk, dd);
+                                }
+                            }
+                            if (ttt == TRUE)
+                                s[4] = MAX_K;
+                            else if (ttt == FALSE)
+                                s[5] = ++s[4];
+                            else break;
+                        }
+                    }
+                }
             }
             
-            m[0] = (n[0] + 1)/2 + 1; // start from the middle
+            memset(splitindex, 0, size * sizeof(int));
+            splitindex[0] = splitsarr[0]->size;
+            
+            memset(sb, 0, sizeof(sb));
+            sb[1][0] = -1; // to prevent skipping first due to skiptop
+            
+            int ck0,ck1,ck2;
+            
             int j = 0;
             int cont = TRUE;
             clock_t start = clock();
             clock_t progress = start + PROGRESS_INTERVAL;
             long scount=0;
+            long long totalsplits=0;
+            long long progress_splits = 100000;
             while(cont) {
-                while(m[j] == 0) {
+                while(splitindex[j] == 0) {
                     if (j==0) {
                         cont= FALSE;
                         break;
@@ -188,34 +226,57 @@ int main(int argc, char **argv){
                     j--;
                 }
                 if (!cont) break;
-                m[j]--;
-                //        printf("l1 j = %d mj = %d\n", j, m[j]);
-                if ( (j % 2) == 1) {
-                    i=j/2;
-                    sb[2][i] = getSbb(m[i*2], m[i*2+1]);
-                    sb[0][i] = getSbb(n[i*2] - m[i*2], n[i*2+1] - m[i*2+1]);
-                    sb[1][i*2] = getSbb(m[i*2], n[i*2+1] - m[i*2+1]);
-                    sb[1][i*2 + 1] = getSbb(n[i*2] - m[i*2], m[i*2+1]);
+                int spi = --splitindex[j];
+                
+                // for identical groups avoid trying redundant permutations
+                // do not do this for i==1 because it conflicts with skiptop
+                if (j>1 && tmp[j] == tmp[j-1] && spi > splitindex[j-1]) {
+                    continue;
                 }
-                if (j == size*2 - 1) {
+                
+                int *s = splitsarr[j]->splitsl[spi];
+                
+                //skip for split solvability
+                if (s[5]>=k) continue;
+                
+                //skiptop
+                if (j==0 &&
+                    sb[1][0] == s[1] &&
+                    max(sb[0][0],sb[2][0]) == max(s[0], s[3]) &&
+                    min(sb[0][0],sb[2][0]) == min(s[0], s[3])) {
+                    continue;
+                }
+                
+                int p0 = sb0p[j] = sb_pairs[sb[0][j] = s[3]] + (j>0?sb0p[j-1]:0);
+                int p1 = sb1p[j] = sb_pairs[sb[1][j*2] = s[1]] + sb_pairs[sb[1][j*2+1] = s[2]] + (j>0?sb1p[j-1]:0);
+                int p2 = sb2p[j] = sb_pairs[sb[2][j] = s[0]] + (j>0?sb2p[j-1]:0);
+                
+                if (p0 > max_pairs_1 || p2 > max_pairs_1 || p1 > max_pairs_1) continue;
+                
+                if (j == size_1) {
                     //                    printf("DEBUG start take[");
                     //                    for(i=0;i<size*2;i++) {
                     //                        printf("%d,",m[i]);
                     //                    }
                     //                    printf("]\n");
                     //                    fflush(stdout);
-                    if (clock()>progress) {
-                        printf("still searching solutions for ");
-                        printSb(tmp, size);
-                        printf(" in %d found=%ld elapsed=%lu trying [", k, scount, (clock() - start)/CLOCKS_PER_SEC);
-                        for(i=0; i<size*2; i++) {
-                            if (i>0) printf(",");
-                            printf("%d", m[i]);
+                    totalsplits++;
+//                    if (totalsplits >= progress_splits) {
+//                        progress_splits = totalsplits + 100000;
+                        if (clock()>progress) {
+                            printf("still searching solutions for ");
+                            printSb(tmp, size);
+                            printf(" in %d totalsplits=%lld found=%ld elapsed=%lu trying [", k, totalsplits, scount, (clock() - start)/CLOCKS_PER_SEC);
+                            for(i=0; i<size; i++) {
+                                if (i>0) printf(",");
+                                int *s = splitsarr[i]->splitsl[splitindex[i]];
+                                printf("%d:%d", s[6], s[7]);
+                            }
+                            printf("]\n");
+                            fflush(stdout);
+                            progress = clock() + PROGRESS_INTERVAL;
                         }
-                        printf("]\n");
-                        fflush(stdout);
-                        progress = clock() + PROGRESS_INTERVAL;
-                    }
+//                    }
                     if (check_cache_only ?
                         (canSolveB(sb[0], size, k1, CACHE_ONLY) == TRUE &&
                          canSolveB(sb[2], size, k1, CACHE_ONLY) == TRUE &&
@@ -280,7 +341,11 @@ int main(int argc, char **argv){
                         if (add_lines < best_add_lines) {
                             best_add_lines = add_lines;
                             
-                            memcpy(bestop, m, sizeof(m));
+                            for(i=0; i<size; i++) {
+                                int *s = splitsarr[i]->splitsl[splitindex[i]];
+                                bestop[i*2] = s[6];
+                                bestop[i*2+1] = s[7];
+                            }
                             memcpy(bestsb, sb, sizeof(sb));
                             memcpy(bestsbn, sbn, sizeof(sbn));
                             memcpy(bestsbnsize, sbnsize, sizeof(sbnsize));
@@ -296,12 +361,11 @@ int main(int argc, char **argv){
                         
                     }
                 } else {
-                    if (((j%2)==0) ||
-                        (canSolveB(sb[0], (i+1), k1, CACHE_ONLY) != FALSE &&
-                         canSolveB(sb[2], (i+1), k1, CACHE_ONLY) != FALSE &&
-                         canSolveB(sb[1], (i+1)*2, k1, CACHE_ONLY) != FALSE)) {
+                    if (canSolveB(sb[0], (j+1), k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[2], (j+1), k1, CACHE_ONLY) != FALSE &&
+                         canSolveB(sb[1], (j+1)*2, k1, CACHE_ONLY) != FALSE) {
                         j++;
-                        m[j] = n[j] + 1;
+                        splitindex[j] = splitsarr[j]->size;
                     }
                 }
             }
@@ -310,6 +374,11 @@ int main(int argc, char **argv){
                 printf("found no solutions for ");
                 printSb(tmp, size);
                 exit(27);
+            } else {
+                printf("found %ld solutions for ", scount);
+                printSb(tmp, size);
+                printf("\n");
+                fflush(stdout);
             }
             
             
@@ -392,15 +461,15 @@ int main(int argc, char **argv){
             printf("resultgraph\n");
             int height =0;
             for(i=0; i<size; i++){
-                if (height<n[i*2]) height=n[i*2];
+                if (height<sbb_to_n1[tmp[i]]) height=sbb_to_n1[tmp[i]];
             }
             int line_num;
             for(line_num=0; line_num<height; line_num++) {
                 printf("resultgraph ");
                 for(i=0; i<size; i++){
                     int col;
-                    for(col=0; col<n[i*2+1]; col++){
-                        if (line_num>=n[i*2]) {
+                    for(col=0; col<sbb_to_n2[tmp[i]]; col++){
+                        if (line_num>=sbb_to_n1[tmp[i]]) {
                             printf(" ");
                         } else {
                             if (line_num<s->op[i*2]) {
