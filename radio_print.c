@@ -240,10 +240,7 @@ int main(int argc, char **argv){
                 if (s[5]>=k) continue;
                 
                 //skiptop
-                if (j==0 &&
-                    sb[1][0] == s[1] &&
-                    max(sb[0][0],sb[2][0]) == max(s[0], s[3]) &&
-                    min(sb[0][0],sb[2][0]) == min(s[0], s[3])) {
+                if (j==0 && s[6] > (sbb_to_n1[tmp[0]]+1)/2 ) {
                     continue;
                 }
                 
