@@ -358,10 +358,10 @@ int main(int argc, char **argv){
                         
                     }
                 } else {
-                    if (check_cache_only?
+                    if (/*check_cache_only?
                         (canSolveB(sb[0], (j+1), k1, CACHE_ONLY) == TRUE &&
                          canSolveB(sb[2], (j+1), k1, CACHE_ONLY) == TRUE &&
-                         canSolveB(sb[1], (j+1)*2, k1, CACHE_ONLY) == TRUE):
+                         canSolveB(sb[1], (j+1)*2, k1, CACHE_ONLY) == TRUE):*/
                         (canSolveB(sb[0], (j+1), k1, CACHE_ONLY) != FALSE &&
                          canSolveB(sb[2], (j+1), k1, CACHE_ONLY) != FALSE &&
                          canSolveB(sb[1], (j+1)*2, k1, CACHE_ONLY) != FALSE)) {
