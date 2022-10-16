@@ -850,7 +850,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         
         printf("can solve ");
         printSb(tmp, size);
-        printf(" in %d  with [",k);
+        printf(" in %d with [",k);
         for (i = 0; i<size; i++) {
             spi = splitindex[i];
             spi2 = splitsarr[i]->ind[splitincr[i]][spi];

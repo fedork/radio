@@ -117,7 +117,7 @@ int main(int argc, char **argv){
             printf("resultprint======================\n");
             printf("resultprint %d. (in %d) (used %d) ", line, s->k, s->refs);
             printSa(count);
-            printf(" take[%d] :\n", c1);
+            printf(" take[%d]:\n", c1);
             printf("resultprint  2=>");
             printSa(c1);
             if (s->l[2] > 0){
