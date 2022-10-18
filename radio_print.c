@@ -1,5 +1,6 @@
 #define MAX_K 10
 #define MAX_N 194
+#define START_N 192
 
 #include "radiobase.c"
 #include <math.h>
@@ -61,7 +62,7 @@ int main(int argc, char **argv){
     s->k = MAX_K;
     s->refs=0;
     s->size = -1;
-    s->init[0] = 192;
+    s->init[0] = START_N;
     
     int next_level_start;
     
@@ -203,8 +204,22 @@ int main(int argc, char **argv){
             }
             
             memset(splitindex, 0, size * sizeof(int));
-            splitindex[0] = splitsarr[0]->size;
             
+            splitindex[0] = splitsarr[0]->size;
+            int n1 = sbb_to_n1[tmp[0]];
+            int n2 = sbb_to_n2[tmp[0]];
+            if (n1 != n2) { // leave it alone for square
+                int m1 = n1/2;
+                int m2 = (n1 % 2 == 0)? n2/2 : 0;
+                
+//                printf("skiptop for ");
+//                printSb(tmp, size);
+//                printf(" skipping to %d:%d\n", m1, m2);
+                while (splitsarr[0]->splitsl[splitindex[0]-1][6] != m1 || splitsarr[0]->splitsl[splitindex[0]-1][7] != m2) {
+                    splitindex[0]--;
+//                    printf("skipped %d:%d\n", splitsarr[0]->splitsl[splitindex[0]][6], splitsarr[0]->splitsl[splitindex[0]][7]);
+                }
+            }
             memset(sb, 0, sizeof(sb));
             sb[1][0] = -1; // to prevent skipping first due to skiptop
             
@@ -239,11 +254,6 @@ int main(int argc, char **argv){
                 //skip for split solvability
                 if (s[5]>=k) continue;
                 
-                //skiptop
-                if (j==0 && s[6] > sbb_to_n1[tmp[0]]/2) {
-                    continue;
-                }
-                
                 int p0 = sb0p[j] = sb_pairs[sb[0][j] = s[3]] + (j>0?sb0p[j-1]:0);
                 int p1 = sb1p[j] = sb_pairs[sb[1][j*2] = s[1]] + sb_pairs[sb[1][j*2+1] = s[2]] + (j>0?sb1p[j-1]:0);
                 int p2 = sb2p[j] = sb_pairs[sb[2][j] = s[0]] + (j>0?sb2p[j-1]:0);
@@ -258,8 +268,8 @@ int main(int argc, char **argv){
                     //                    printf("]\n");
                     //                    fflush(stdout);
                     totalsplits++;
-//                    if (totalsplits >= progress_splits) {
-//                        progress_splits = totalsplits + 100000;
+                    if (totalsplits >= progress_splits) {
+                        progress_splits = totalsplits + 1000000;
                         if (clock()>progress) {
                             printf("still searching solutions for ");
                             printSb(tmp, size);
@@ -273,7 +283,7 @@ int main(int argc, char **argv){
                             fflush(stdout);
                             progress = clock() + PROGRESS_INTERVAL;
                         }
-//                    }
+                    }
                     if (check_cache_only ?
                         (canSolveB(sb[0], size, k1, CACHE_ONLY) == TRUE &&
                          canSolveB(sb[2], size, k1, CACHE_ONLY) == TRUE &&
@@ -374,6 +384,7 @@ int main(int argc, char **argv){
             if(scount==0) {
                 printf("found no solutions for ");
                 printSb(tmp, size);
+                printf("\n");
                 exit(27);
             } else {
                 printf("found %ld solutions for ", scount);
