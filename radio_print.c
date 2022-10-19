@@ -210,7 +210,7 @@ int main(int argc, char **argv){
             int n2 = sbb_to_n2[tmp[0]];
             if (n1 != n2) { // leave it alone for square
                 int m1 = n1/2;
-                int m2 = (n1 % 2 == 0)? n2/2 : 0;
+                int m2 = (n1 % 2 == 0)? (n2+1)/2 : 0;
                 
 //                printf("skiptop for ");
 //                printSb(tmp, size);
