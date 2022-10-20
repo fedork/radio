@@ -271,6 +271,10 @@ int main(int argc, char **argv){
                     if (totalsplits >= progress_splits) {
                         progress_splits = totalsplits + 1000000;
                         if (clock()>progress) {
+                            if (scount>0 && clock()>start + 600 * CLOCKS_PER_SEC) {
+                                printf("bailing out after 10 min\n");
+                                break;
+                            }
                             printf("still searching solutions for ");
                             printSb(tmp, size);
                             printf(" in %d totalsplits=%lld found=%ld elapsed=%lu trying [", k, totalsplits, scount, (clock() - start)/CLOCKS_PER_SEC);
