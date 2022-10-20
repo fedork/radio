@@ -68,8 +68,8 @@ int main(int argc, char **argv){
     
     int line = 1;
     while (line < next_sol) {
-//        printf("line=%d\n", line);
-//        fflush(stdout);
+        printf("line=%d\n", line);
+        fflush(stdout);
         s = &solutions[line];
         int k = s->k;
         int k1 = k-1;
@@ -77,10 +77,10 @@ int main(int argc, char **argv){
             // Sa
             int count = s->init[0];
             
-            //            printf("DEBUG solving ");
-            //            printSa(count);
-            //            printf("\n");
-            //            fflush(stdout);
+                        printf("DEBUG solving ");
+                        printSa(count);
+                        printf("\n");
+                        fflush(stdout);
             
             
             int c1 = count;
@@ -146,11 +146,11 @@ int main(int argc, char **argv){
             // Sb
             int size = s->size;
             int *tmp = s->init;
-            //
-            //            printf("DEBUG solving ");
-            //            printSb(tmp, size);
-            //            printf("\n");
-            //            fflush(stdout);
+            
+                        printf("DEBUG solving ");
+                        printSb(tmp, size);
+                        printf("\n");
+                        fflush(stdout);
 
             int sb[3][size*2];
             int sbn[3][size*2];
@@ -299,14 +299,22 @@ int main(int argc, char **argv){
                          canSolveB(sb[2], size, k1, NO_DEADLINE) == TRUE &&
                          canSolveB(sb[1], size*2, k1, NO_DEADLINE) == TRUE)) {
                         
-                        //                        printf("DEBUG WORKS! take[");
-                        //                        for(i=0;i<size*2;i++) {
-                        //                            printf("%d,",m[i]);
-                        //                        }
-                        //                        printf("]\n");
+                        printf("DEBUG WORKS! take[");
+                        for(i=0; i<size; i++) {
+                            if (i>0) printf(",");
+                            int *s = splitsarr[i]->splitsl[splitindex[i]];
+                            printf("%d:%d", s[6], s[7]);
+                        }
+                        printf("]\n");
+                        fflush(stdout);
+ 
                         scount++;
                         int add_lines = 0;
-                        for (i=0; i<3; i++) {
+                        int i4;
+                        for (i4=0; i4<3; i4++) {
+                            i = (i4+1) % 3;
+//                            printf("i4=%d i=%d\n", i4, i);
+//                            fflush(stdout);
                             sbnsize[i]  = normalize(sb[i], size*2, sbn[i]);
                             sbnline[i] = NEW_LINE-i;
                             if (sbnsize[i] == 0) {
@@ -319,8 +327,9 @@ int main(int argc, char **argv){
                                         is_inferior(sbn[i], sbnsize[i], solutions[ii].init, solutions[ii].size)) {
                                         // check if already using and if compatible
                                         int compat = TRUE;
-                                        int i3;
-                                        for (i3 = 0; i3 < i; i3++) {
+                                        int i5;
+                                        for (i5 = 0; i5 < i4; i5++) {
+                                            int i3 = (i5+1) % 3;
                                             if (sbnline[i3] == ii &&
                                                 !is_inferior(sbn[i], sbnsize[i],sbn[i3], sbnsize[i3]) &&
                                                 !is_inferior(sbn[i3], sbnsize[i3],sbn[i], sbnsize[i])) {
@@ -335,8 +344,9 @@ int main(int argc, char **argv){
                                 }
                             }
                             if (sbnline[i] <= NEW_LINE) {
-                                int i3;
-                                for (i3 = 0; i3 < i; i3++) {
+                                int i5;
+                                for (i5 = 0; i5 < i4; i5++) {
+                                    int i3 = (i5 + 1) % 3;
                                     if (sbnline[i3] <=NEW_LINE && (
                                                                    is_inferior(sbn[i], sbnsize[i],sbn[i3], sbnsize[i3]) ||
                                                                    is_inferior(sbn[i3], sbnsize[i3],sbn[i], sbnsize[i]))) {
@@ -408,7 +418,9 @@ int main(int argc, char **argv){
             memcpy(s->op, bestop, sizeof(bestop));
             //            printf("DEBUG 123\n");            fflush(stdout);
             
-            for (i=0; i<3; i++) {
+            int i5;
+            for (i5=0; i5<3; i5++) {
+                i = (i5+1) % 3;
                 //                printf("DEBUG foo i=%d\n", i);            fflush(stdout);
                 memcpy(s->b[i], bestsb[i], sizeof(bestsb[i]));
                 //                printf("DEBUG foo i=%d\n", i);            fflush(stdout);
