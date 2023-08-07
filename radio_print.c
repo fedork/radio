@@ -1,6 +1,6 @@
-#define MAX_K 10
-#define MAX_N 194
-#define START_N 192
+#define MAX_K 7
+#define MAX_N 40
+#define START_N 38
 
 #include "radiobase.c"
 #include <math.h>
@@ -8,14 +8,16 @@
 #define TRIVIAL -1
 #define NEW_LINE -2
 
+#define MAX_SOLUTIONS 10
+#define MAX_LEN 40
 
 typedef struct {
     int k;
     int size;
     int refs;
-    int init[40];
-    int op[80];
-    int b[3][80];
+    int init[MAX_LEN];
+    int op[MAX_LEN*2];
+    int b[3][MAX_LEN*2];
     int l[3];
 } sol;
 

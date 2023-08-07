@@ -632,7 +632,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
         
         
-        clock_t child_deadline = pass<3 ? deadline : NO_DEADLINE;
+        clock_t child_deadline = pass<2 ? deadline : NO_DEADLINE;
         clock_t middle_child_deadline = child_deadline;
 
         
@@ -763,8 +763,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                 clock_t t = clock();
                                 // if we just fulfilled min progress, give it a bit more time
                                 if (cant_solve_count == cant_solve_count_min) {
-                                    // give same time it took to get here to avoid wasting time too much for laggards
-                                    clock_t new_deadline = t + (t - start);
+                                    // give (five times) same time it took to get here to avoid wasting time too much for laggards
+                                    clock_t new_deadline = t + (t - start)*5;
                                     if (new_deadline>deadline) deadline = new_deadline;
                                 }
                                 if (t>deadline){
@@ -792,13 +792,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     progress = t + PROGRESS_INTERVAL;
                                 }
                             }
-                            if ((cs0 = (cs0==MAYBE?canSolveB(sb0, i+1, k_1, child_deadline):cs0)) != TRUE) {
+                            clock_t cd = (/*size<=2 && */ totalsplits<5) ? NO_DEADLINE : child_deadline;
+                            if ((cs0 = (cs0==MAYBE?canSolveB(sb0, i+1, k_1, cd):cs0)) != TRUE) {
                                 if (cs0 != FALSE)
                                     skipped_some = 1;
-                            } else if ((cs2 = (cs2==MAYBE?canSolveB(sb2, i+1, k_1, child_deadline):cs2)) != TRUE) {
+                            } else if ((cs2 = (cs2==MAYBE?canSolveB(sb2, i+1, k_1, cd):cs2)) != TRUE) {
                                 if (cs2 != FALSE)
                                     skipped_some = 1;
-                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, middle_child_deadline):cs1))  != TRUE) {
+                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, cd):cs1))  != TRUE) {
                                 if (cs1!=FALSE)
                                     skipped_some = 1;
                             } else {
@@ -1424,8 +1425,9 @@ void init(){
                 max_sbb_for_pairs[prod] = sbb;
                 sprintf(sbb_to_str[sbb],"%d:%d",n1,n2);
                 
-#ifndef OPT
+#ifdef DEBUG
                 printf("sbb=%d (%s) pairs=%d\n", sbb, sbb_to_str[sbb], sb_pairs[sbb]);
+                fflush(stdout);
 #endif
                 int c=0;
                 int k1,k2;

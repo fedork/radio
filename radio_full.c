@@ -1,3 +1,4 @@
+#define MAX_N 336
 #include "radiobase.c"
 #include <math.h>
 
