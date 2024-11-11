@@ -74,7 +74,7 @@ int sbb_lesser[MAX_SBB+1][MAX_SBB+1];
 int sbb_greater[MAX_SBB+1][MAX_SBB+1];
 int max_sbb_for_pairs[MAX_PROD+1];
 
-splits sbb_splits[MAX_SBB+1];
+splits *sbb_splits;
 
 int min(int a,int b){
     return a<b?a:b;
@@ -1458,7 +1458,17 @@ void init(){
         // terminator
         sbb_greater[i][k++]=MAX_SBB + 1;
     }
-    printf("initializing splits");
+    printf("initializing splits\n");
+   
+    long splits_count = MAX_SBB+1;
+    long splits_size = (splits_count)*sizeof(splits);
+    printf("splits_size = %ld\n", splits_size);
+    sbb_splits = (splits *)malloc(splits_size);
+    if (sbb_splits == NULL){
+        printf("\nout of memory - can't allocate sbb_splits\n");
+        exit(1);
+    }
+    
     int maxsplits = 0;
     for(sbb=1; sbb<=MAX_SBB; sbb++) {
         splits *s = &sbb_splits[sbb];
