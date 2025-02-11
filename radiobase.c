@@ -1369,6 +1369,7 @@ void parse_file(char *file_name) {
     }
     fclose(fp);
     printf("done\n");
+    fflush(stdout);
 }
 
 void init(){
