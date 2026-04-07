@@ -58,8 +58,8 @@
 
 typedef struct {
     int size;
-    int splitsl[MAX_SPLITS][SPLIT_FIELD_COUNT];
-    int ind[INDEX_COUNT][MAX_SPLITS];
+    int (*splitsl)[SPLIT_FIELD_COUNT];
+    int *ind[INDEX_COUNT];
 } splits;
 
 int power3[MAX_K+1];
@@ -70,11 +70,13 @@ char sbb_to_str[MAX_SBB+1][8];
 int sb_pairs[MAX_SBB+1];
 int sa_can[MAX_N+1];
 int sa_cant[MAX_N+1];
-int sbb_lesser[MAX_SBB+1][MAX_SBB+1];
-int sbb_greater[MAX_SBB+1][MAX_SBB+1];
+int **sbb_lesser;
+int **sbb_greater;
 int max_sbb_for_pairs[MAX_PROD+1];
 
 splits *sbb_splits;
+
+void ensure_splits(int sbb);
 
 int min(int a,int b){
     return a<b?a:b;
@@ -526,6 +528,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     int sb0p[size],sb2p[size],sb1p[size];
     
     for(i=0;i<size;i++){
+        ensure_splits(tmp[i]);
         splitsarr[i] = &sbb_splits[tmp[i]];
         if (size>1 && splitsarr[i]->splitsl[0][FAST]<0) {
             int sbb = tmp[i];
@@ -1033,9 +1036,14 @@ int descSpl (const void * a, const void * b) {
 }
 
 void indexSpl(int sbb, splits* s, int indexindex, int (*f)(int, int[])) {
-    srt splitsort[MAX_SPLITS];
+    srt *splitsort;
     int e;
     int c = s->size;
+    splitsort = (srt *)malloc(c * sizeof(srt));
+    if (splitsort == NULL) {
+        printf("\nout of memory - can't allocate split sort buffer for sbb=%d\n", sbb);
+        exit(1);
+    }
     for(e = 0; e<c; e++) {
         splitsort[e].sort = f(sbb, s->splitsl[e]);
         splitsort[e].index = e;
@@ -1045,6 +1053,7 @@ void indexSpl(int sbb, splits* s, int indexindex, int (*f)(int, int[])) {
     for(e = 0; e<c; e++) {
         s->ind[indexindex][e] = splitsort[e].index;
     }
+    free(splitsort);
 }
 
 void indexDesc(splits* s, int indexSource, int indexDest) {
@@ -1151,6 +1160,63 @@ int magic3(int sbb, int spl[]) {
     //int magicm2 = ((n1-n2)<2)?(n2/2-1):(n2/2);
     //    int magicm2 = min(n2/2, magicm1-1);
     return distance(spl, magicm1, magicm2, n1, n2);
+}
+
+void ensure_splits(int sbb) {
+    if (sbb <= 0) return;
+    splits *s = &sbb_splits[sbb];
+    if (s->size >= 0) return;
+
+    int n1 = sbb_to_n1[sbb];
+    int n2 = sbb_to_n2[sbb];
+    int cmax = (n1 + 1) * (n2 + 1);
+    int c = 0;
+    int m1, m2;
+    int ii;
+
+    s->splitsl = (int (*)[SPLIT_FIELD_COUNT])malloc(cmax * sizeof(*s->splitsl));
+    if (s->splitsl == NULL) {
+        printf("\nout of memory - can't allocate splitsl for sbb=%d\n", sbb);
+        exit(1);
+    }
+    for (ii = 0; ii < INDEX_COUNT; ii++) {
+        s->ind[ii] = (int *)malloc(cmax * sizeof(int));
+        if (s->ind[ii] == NULL) {
+            printf("\nout of memory - can't allocate index %d for sbb=%d\n", ii, sbb);
+            exit(1);
+        }
+    }
+
+    for (m1=0; m1<=n1; m1++) {
+        for (m2=(n2==n1?m1:n2); m2>=0; m2--) {
+            s->splitsl[c][0]=getSbb(m1, m2);
+            int sbb1 = getSbb(n1-m1, m2);
+            int sbb2 = getSbb(m1, n2-m2);
+            s->splitsl[c][1]=max(sbb1, sbb2);
+            s->splitsl[c][2]=min(sbb1, sbb2);
+            s->splitsl[c][3]=getSbb(n1-m1, n2-m2);
+            int maxpairs = max(sb_pairs[s->splitsl[c][0]],max(sb_pairs[s->splitsl[c][3]], sb_pairs[s->splitsl[c][1]] + sb_pairs[s->splitsl[c][2]]));
+
+            int k=0;
+            while (k < MAX_K && power3[k]<=maxpairs) k++;
+            s->splitsl[c][4] = s->splitsl[c][5] = k-1;
+            s->splitsl[c][6] = m1;
+            s->splitsl[c][7] = m2;
+            s->splitsl[c][FAST] = -1; // we will init on-demand
+            c++;
+        }
+    }
+    s->size = c;
+    indexSpl(sbb, s, BY_MAX, maxpairs);
+    indexSpl(sbb, s, BY_MAGIC, magic);
+    indexSpl(sbb, s, BY_SP0, pairs0);
+    indexDesc(s, BY_SP0, BY_SP0_DESC);
+    indexSpl(sbb, s, BY_SP1, pairs1);
+    indexDesc(s, BY_SP1, BY_SP1_DESC);
+    indexSpl(sbb, s, BY_SP2, pairs2);
+    indexDesc(s, BY_SP2, BY_SP2_DESC);
+    indexSpl(sbb, s, BY_MAGIC3, magic3);
+    indexSpl(sbb, s, BY_MAGIC2, magic2);
 }
 
 int canSolveAll4(int n1, int n2, int m1, int m2, int k) {
@@ -1385,18 +1451,32 @@ void init(){
     k=0;
     for(i=2;i<=MAX_N;i++) {
         sa_can[i] = MAX_K+1;
-        while(saPairs(i)>=power3[k+1]) k++;
+        while(k < MAX_K && saPairs(i)>=power3[k+1]) k++;
         sa_cant[i] = k;
         //      printf("can't solve %d in %d pairs = %d power3 = %d\n", i,k,saPairs(i),power3[k+1]);
     }
-    for (i=0; i<=k; i++) {
-        sb_cache_root[k].next = NULL;
+    for (i=0; i<=MAX_K; i++) {
+        sb_cache_root[i].next = NULL;
     }
     
     int n1, n2, sbb;
     sbb=0;
     sb_pairs[0]=0;
     sprintf(sbb_to_str[0],"0:0");
+    sbb_lesser = (int **)malloc((MAX_SBB + 1) * sizeof(int *));
+    sbb_greater = (int **)malloc((MAX_SBB + 1) * sizeof(int *));
+    if (sbb_lesser == NULL || sbb_greater == NULL) {
+        printf("\nout of memory - can't allocate sbb relation tables\n");
+        exit(1);
+    }
+    sbb_lesser[0] = (int *)malloc(sizeof(int));
+    sbb_greater[0] = (int *)malloc(sizeof(int));
+    if (sbb_lesser[0] == NULL || sbb_greater[0] == NULL) {
+        printf("\nout of memory - can't allocate sbb relation row 0\n");
+        exit(1);
+    }
+    sbb_lesser[0][0] = 0;
+    sbb_greater[0][0] = MAX_SBB + 1;
     int prod;
     //  printf("maxprod=%d\n", maxprod);
     for (prod =1; prod<=MAX_PROD;prod++) {
@@ -1434,6 +1514,17 @@ void init(){
                 int k1,k2;
                 for (k1=n1; k1>0; k1--) {
                     for (k2=min(k1,n2); k2>0; k2--) {
+                        c++;
+                    }
+                }
+                sbb_lesser[sbb] = (int *)malloc((c + 1) * sizeof(int));
+                if (sbb_lesser[sbb] == NULL) {
+                    printf("\nout of memory - can't allocate sbb_lesser[%d]\n", sbb);
+                    exit(1);
+                }
+                c=0;
+                for (k1=n1; k1>0; k1--) {
+                    for (k2=min(k1,n2); k2>0; k2--) {
                         sbb_lesser[sbb][c++]=getSbb(k1,k2);
                     }
                 }
@@ -1453,81 +1544,43 @@ void init(){
         int k = 0;
         int j;
         for (j=i; j<=MAX_SBB; j++) {
-            if (sbb_to_n1[j]>=sbb_to_n1[i] && sbb_to_n2[j]>=sbb_to_n2[i])
+            if (sbb_to_n1[j]>=sbb_to_n1[i] && sbb_to_n2[j]>=sbb_to_n2[i]) {
+                k++;
+            }
+        }
+        sbb_greater[i] = (int *)malloc((k + 1) * sizeof(int));
+        if (sbb_greater[i] == NULL) {
+            printf("\nout of memory - can't allocate sbb_greater[%d]\n", i);
+            exit(1);
+        }
+        k = 0;
+        for (j=i; j<=MAX_SBB; j++) {
+            if (sbb_to_n1[j]>=sbb_to_n1[i] && sbb_to_n2[j]>=sbb_to_n2[i]) {
                 sbb_greater[i][k++]=j;
+            }
         }
         // terminator
         sbb_greater[i][k++]=MAX_SBB + 1;
     }
-    printf("initializing splits\n");
-   
-    long splits_count = MAX_SBB+1;
-    long splits_size = (splits_count)*sizeof(splits);
-    printf("splits_size = %ld\n", splits_size);
-    sbb_splits = (splits *)malloc(splits_size);
-    if (sbb_splits == NULL){
-        printf("\nout of memory - can't allocate sbb_splits\n");
-        exit(1);
-    }
-    
-    int maxsplits = 0;
-    for(sbb=1; sbb<=MAX_SBB; sbb++) {
-        splits *s = &sbb_splits[sbb];
-        //        printf("initializing splits for ");
-        //        printSb(&sbb, 1);
-        //        printf("\n");
-        if ((sbb & 0xff) == 0) printf(".");
-        fflush(stdout);
-        n1 = sbb_to_n1[sbb];
-        n2 = sbb_to_n2[sbb];
-        int c=0;
-        int e=0;
-        int m1,m2;
-        int bestmaxpairs = sb_pairs[sbb];
-        
-        for (m1=0; m1<=n1; m1++) {
-            int fast_min = max(0, m1 * n2 / n1 - 0) ;
-            int fast_max = min(n2, fast_min + 1);
-            for (m2=(n2==n1?m1:n2); m2>=0; m2--) {
-                s->splitsl[c][0]=getSbb(m1, m2);
-                int sbb1 = getSbb(n1-m1, m2);
-                int sbb2 = getSbb(m1, n2-m2);
-                s->splitsl[c][1]=max(sbb1, sbb2);
-                s->splitsl[c][2]=min(sbb1, sbb2);
-                s->splitsl[c][3]=getSbb(n1-m1, n2-m2);
-                int maxpairs = max(sb_pairs[s->splitsl[c][0]],max(sb_pairs[s->splitsl[c][3]], sb_pairs[s->splitsl[c][1]] + sb_pairs[s->splitsl[c][2]]));
-                
-                int k=0;
-                while (power3[k]<=maxpairs) k++;
-                s->splitsl[c][4] = s->splitsl[c][5] = k-1;
-                s->splitsl[c][6] = m1;
-                s->splitsl[c][7] = m2;
-//                s->splitsl[c][FAST] = ((m2>=fast_min) && (m2<=fast_max));
-                s->splitsl[c][FAST] = -1; // we will init on-demand
-                c++;
+    printf("initializing splits metadata\n");
+    {
+        long splits_count = MAX_SBB + 1;
+        long splits_size = splits_count * sizeof(splits);
+        printf("splits_size = %ld (lazy mode)\n", splits_size);
+        sbb_splits = (splits *)malloc(splits_size);
+        if (sbb_splits == NULL){
+            printf("\nout of memory - can't allocate sbb_splits metadata\n");
+            exit(1);
+        }
+        for (i = 0; i <= MAX_SBB; i++) {
+            int ii;
+            sbb_splits[i].size = -1;
+            sbb_splits[i].splitsl = NULL;
+            for (ii = 0; ii < INDEX_COUNT; ii++) {
+                sbb_splits[i].ind[ii] = NULL;
             }
         }
-        if (c>MAX_SPLITS) {
-            printf("c=%d MAX_SPLITS=%d\n",c,MAX_SPLITS);
-            exit(8);
-        }
-        
-        s->size = c;
-        if (c>maxsplits) maxsplits = c;
-        indexSpl(sbb, s, BY_MAX, maxpairs);
-        indexSpl(sbb, s, BY_MAGIC, magic);
-        indexSpl(sbb, s, BY_SP0, pairs0);
-        indexDesc(s, BY_SP0, BY_SP0_DESC);
-        indexSpl(sbb, s, BY_SP1, pairs1);
-        indexDesc(s, BY_SP1, BY_SP1_DESC);
-        indexSpl(sbb, s, BY_SP2, pairs2);
-        indexDesc(s, BY_SP2, BY_SP2_DESC);
-        indexSpl(sbb, s, BY_MAGIC3, magic3);
-        indexSpl(sbb, s, BY_MAGIC2, magic2);
-    }
-    if (maxsplits != MAX_SPLITS) {
-        printf("expected MAX_SPLITS: %d - actual: %d\n", MAX_SPLITS, maxsplits);
-        exit(9);
+        sbb_splits[0].size = 0;
     }
     printf("\ninit done\n");
     fflush(stdout);
