@@ -73,10 +73,14 @@ int sa_cant[MAX_N+1];
 int **sbb_lesser;
 int **sbb_greater;
 int max_sbb_for_pairs[MAX_PROD+1];
+int singleton_base_len[MAX_K+1];
+int singleton_base_prefix[MAX_K+1][1 << MAX_K];
 
 splits *sbb_splits;
 
 void ensure_splits(int sbb);
+void init_singleton_majorization(void);
+int singleton_majorization_can_solve(int *sb, int size, int k);
 
 int min(int a,int b){
     return a<b?a:b;
@@ -457,6 +461,50 @@ int compare_solvability(int sbb1, int sbb2) {
     }
 }
 
+void init_singleton_majorization(void) {
+    int current[1 << MAX_K];
+    int next[1 << MAX_K];
+    int i;
+    int k;
+    memset(current, 0, sizeof(current));
+    current[0] = 1;
+    singleton_base_len[0] = 1;
+    singleton_base_prefix[0][0] = 1;
+    for (k = 1; k <= MAX_K; k++) {
+        int prev_len = singleton_base_len[k - 1];
+        int len = prev_len * 2;
+        memset(next, 0, len * sizeof(int));
+        for (i = 0; i < prev_len; i++) {
+            int h = current[i];
+            // G_k = sort(L_k + M_k + R_k), using theorem recurrence.
+            next[i] += h;
+            next[i * 2] += h;
+            next[i * 2 + 1] += h;
+        }
+        sort1(next, len);
+        singleton_base_len[k] = len;
+        for (i = 0; i < len; i++) {
+            current[i] = next[i];
+            singleton_base_prefix[k][i] = next[i] + (i > 0 ? singleton_base_prefix[k][i - 1] : 0);
+        }
+    }
+}
+
+int singleton_majorization_can_solve(int *sb, int size, int k) {
+    long long left_prefix = 0;
+    int right_len = singleton_base_len[k];
+    int i;
+    int lim = size < right_len ? size : right_len;
+    for (i = 0; i < lim; i++) {
+        int right_prefix = singleton_base_prefix[k][i];
+        left_prefix += sbb_to_n1[sb[i]];
+        if (left_prefix > right_prefix) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 int get_max_sbb(int n1, int n2, int n3, int n4) {
     int sbb1 = getSbb(n1, n2);
     int sbb2 = getSbb(n3, n4);
@@ -476,11 +524,13 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
     int canSolve=FALSE;
     int tmp[size];
+    int singletons[size];
     //todo: replace with memcpy
     int i;
     int pairs=0;
     int pairs_full=0;
     int newsize=0;
+    int singleton_size=0;
     int sbb;
     for(i=0;i<size;i++) {
         sbb=sb[i];
@@ -489,6 +539,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         if (sbb>1) {
             tmp[newsize++]=sbb;
             pairs+=sb_pairs[sbb];
+            if (sbb_to_n2[sbb] == 1) {
+                singletons[singleton_size++] = sbb;
+            }
         }
     }
     
@@ -504,6 +557,15 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     
     size = newsize;
     if (size>1) sort1(tmp, size);
+    if (singleton_size == size) {
+        // Singleton states are decided exactly by majorization against G_k.
+        return singleton_majorization_can_solve(tmp, size, k);
+    }
+    if (singleton_size > 0) {
+        // If singleton subset already violates majorization, whole state is unsolvable.
+        if (singleton_size > 1) sort1(singletons, singleton_size);
+        if (!singleton_majorization_can_solve(singletons, singleton_size, k)) return FALSE;
+    }
     //check cache
     int ck = checkCache(tmp, size, k);
     //	printf("got from cache %d\n", ck);
@@ -1444,6 +1506,7 @@ void init(){
         power3[i]=pow;
         pow*=3;
     }
+    init_singleton_majorization();
     
     for (i=0; i<=MAX_SBB; i++) {
         sbb_to_min_k[i] = i<=1?0:-1;

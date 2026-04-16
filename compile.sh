@@ -1,2 +1,2 @@
 #!/bin/bash
-clang radioSbPareto.c -mcmodel=large -o radioSbPareto $*
+clang radioSbPareto.c -O3 -mcmodel=large -o radioSbPareto $*
