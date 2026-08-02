@@ -236,3 +236,27 @@ This proof is clean and project-usable provided we accept the Three-Way Majoriza
 
 If later needed, this note can be extended with a standalone proof of that lemma or a precise external citation.
 
+
+---
+
+## Closed form for `G_k`
+
+The recurrence above is equivalent to an explicit formula. Entries of `G_k` come in dyadic
+blocks of sizes 1, 1, 2, 4, 8, ..., and every entry in block `r` (zero-indexed) equals a
+partial sum of binomial coefficients:
+
+```
+G_k[block r] = sum_{i=0}^{k-r} C(k, i)
+```
+
+So block 0 is `2^k`, block 1 is `2^k - 1`, block 2 is `2^k - 1 - k`, block 3 is
+`2^k - 1 - k(k+1)/2`, and so on. Verified against the recurrence for `k <= 12`. This is what
+`make_u_freq` computes in `radio_canon_search_generic.c:121`, and it makes the theorem's
+criterion fully explicit: no recursion is needed to test a candidate singleton state.
+
+## Consequence used throughout this project
+
+If the parts of a singleton state form a **sub-multiset** of `G_k`, its prefix sums are
+dominated termwise by those of `G_k`, so it is weakly majorized by `G_k` and hence solvable
+in `k`. A witness tree all of whose leaves are such states is therefore a complete proof,
+independent of the solver. `tools/check_witness.py` checks exactly this condition.

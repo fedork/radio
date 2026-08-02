@@ -1,0 +1,72 @@
+# Verified witness trees
+
+A witness tree is an explicit strategy proving that a state is solvable in `k` tests. These
+are the durable results of this project: unlike a solver log, a tree can be re-checked from
+first principles by anyone, without trusting `radiobase.c`.
+
+Verify all of them:
+
+```
+tools/check_witness.py witnesses/*.tree
+```
+
+## What is here
+
+| file | claim | strength |
+|---|---|---|
+| `canon_248_3_at8.tree` | `Sb(248:3)` solvable in 8 | proof |
+| `canon_496_4_at9.tree` | `Sb(496:4)` solvable in 9 | proof |
+| `canon_480_5_at9.tree` | `Sb(480:5)` solvable in 9 | proof |
+| `canon_473_6_at9.tree` | `Sb(473:6)` solvable in 9 | proof |
+| `sa192_k10_a.tree` | `Sa(192)` solvable in 10 | proof |
+| `sa192_k10_b.tree` | `Sa(192)` solvable in 10, 149 nodes vs 154 | proof |
+
+All prove *achievability*. None says anything about maximality.
+
+## Two formats
+
+**Canonical** - produced by `radio_canon_search_generic`. Indented, one node per line:
+
+```
+473:6 @9 --[242:4]-->
+  242:4 @8 --[125:2]-->
+    ...
+        32:1,31:1 @5 [canonical U_5]
+```
+
+The three children of a split appear in the order both / mixed / neither. A leaf marked
+`[canonical U_k]` is a singleton state whose parts form a sub-multiset of `G_k`, hence
+solvable in `k` by the Singleton Majorization Theorem. **This is what makes the tree a
+self-contained proof** - the search stops as soon as it reaches a state the theorem decides,
+and no solver claim is relied upon anywhere.
+
+The checker rebuilds these from preorder plus arity rather than from indentation, so a tree
+survives being pasted through a spreadsheet.
+
+**Numbered** - produced by `radio_print.c`. Each distinct state gets a line number and is
+proved once:
+
+```
+1. (in 10) (used 0) Sa(192)[18336,192] take[112]:
+ 2=>Sa(112)[6216,112](line 2)
+ 1=>Sb(112:80)[8960,192](line 3)
+ 0=>Sa(80)[3160,80](line 2)
+```
+
+`(line M)` means the child is solved by the strategy proved at line M. The reference is
+legal when the state at M **dominates** the child after deleting unit groups `(1:1)` -
+domination being an injection from child parts to reference parts that is componentwise
+`>=`. This is the Unit-Group Elimination Theorem doing the work, and it is why line 2, which
+proves `Sa(112)`, can also discharge `Sa(80)`. `(used r)` records how many references point
+at a line.
+
+## Adding a tree
+
+1. Produce it, e.g. `./run_radio_canon_search_generic.sh 4 9 457 7`.
+2. Strip the compile/prompt preamble and prepend a `#` provenance header giving the exact
+   command, the source file, and the format. Copy an existing file's header.
+3. Save as `witnesses/<state>_at<k>.tree` and run the checker.
+4. Record the result in `data/pareto_sb.csv` with `status=witness`, `bound=lower`, and the
+   tree as `source`. Then `tools/check_tables.py`.
+
+A tree that does not pass the checker does not go in.

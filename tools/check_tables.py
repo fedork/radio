@@ -19,8 +19,13 @@ Checks performed:
                   its row at or above its fits_from_k.
   provenance      every row carries a status from the accepted vocabulary, and every
                   status that claims evidence names a source.
+  rendered docs   any markdown block delimited by `<!-- generated:NAME -->` and
+                  `<!-- /generated -->` still matches what the CSVs produce. Docs are meant
+                  to be readable, so the tables do appear in prose - but they are generated,
+                  never hand-copied, which is what keeps a stale copy from surviving.
 
-Usage:  tools/check_tables.py [--data DIR]
+Usage:  tools/check_tables.py [--data DIR] [--render]
+        --render rewrites the generated blocks in place instead of checking them.
 Exit status is nonzero if any check fails. Conjecture violations are warnings, not
 failures, unless the conjecture is contradicted by a proven value.
 """
@@ -28,7 +33,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import glob
 import os
+import re
 import sys
 from typing import Dict, List
 
@@ -56,9 +63,62 @@ def dyadic_letters(k: int) -> Dict[str, int]:
     return {chr(65 + i): (g[s] if s < len(g) else 0) for i, s in enumerate(starts)}
 
 
+MARK = re.compile(r"(<!-- generated:([a-z_]+) -->\n)(.*?)(<!-- /generated -->)", re.S)
+
+
+def render_pareto_sb(sb: List[dict]) -> str:
+    """The Pareto frontier as a readable grid, with lower bounds parenthesised."""
+    cells: Dict[int, Dict[int, dict]] = {}
+    for r in sb:
+        cells.setdefault(int(r["m"]), {})[int(r["k"])] = r
+    ks = sorted({int(r["k"]) for r in sb})
+    out = ["| m\\k | " + " | ".join(str(k) for k in ks) + " |",
+           "|---" * (len(ks) + 1) + "|"]
+    for m in sorted(cells):
+        row = []
+        for k in ks:
+            r = cells[m].get(k)
+            if r is None:
+                row.append("")
+            elif r["bound"] == "max":
+                row.append(r["n1"])
+            else:
+                row.append(f"({r['n1']})")
+        out.append(f"| **{m}** | " + " | ".join(row) + " |")
+    out.append("")
+    out.append("Bare numbers are proven maxima. Parenthesised numbers are lower bounds: a "
+               "solution exists, maximality is open. Per-cell status and evidence are in "
+               "`data/pareto_sb.csv`.")
+    return "\n".join(out) + "\n"
+
+
+def render_pareto_sa(sa: List[dict]) -> str:
+    rows = sorted(sa, key=lambda r: int(r["k"]))
+    out = ["| k | " + " | ".join(r["k"] for r in rows) + " |",
+           "|---" * (len(rows) + 1) + "|",
+           "| max n | " + " | ".join(r["n"] if r["bound"] == "max" else f"({r['n']})"
+                                     for r in rows) + " |",
+           "",
+           "Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`."]
+    return "\n".join(out) + "\n"
+
+
+def render_conjectures(cj: List[dict]) -> str:
+    out = ["| m | closed form | fits from | status |", "|---|---|---|---|"]
+    for r in sorted((r for r in cj if r["model"] == "closed-form"), key=lambda r: int(r["m"])):
+        f = r["formula"].replace("**", "^").replace("//", "/")
+        out.append(f"| {r['m']} | `{f}` | k >= {r['fits_from_k'] or '?'} | {r['status']} |")
+    out.append("")
+    out.append("Formulas are stored executably in `data/conjectures.csv` and checked against "
+               "every proven datum by `tools/check_tables.py`.")
+    return "\n".join(out) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default=os.path.join(os.path.dirname(__file__), "..", "data"))
+    ap.add_argument("--render", action="store_true",
+                    help="rewrite generated doc blocks instead of checking them")
     args = ap.parse_args()
     d = args.data
 
@@ -152,11 +212,45 @@ def main() -> int:
                 errs.append(f"conjectures m={m} [{model}] at k={k}: predicts {got} "
                             f"but the proven maximum is {col[m]}")
 
+    # generated blocks in the docs --------------------------------------------------
+    renderers = {"pareto_sb": lambda: render_pareto_sb(sb),
+                 "pareto_sa": lambda: render_pareto_sa(sa),
+                 "conjectures": lambda: render_conjectures(cj)}
+    root = os.path.normpath(os.path.join(d, ".."))
+    rendered = stale = 0
+    for path in sorted(glob.glob(os.path.join(root, "**", "*.md"), recursive=True)):
+        if os.sep + ".venv" + os.sep in path:
+            continue
+        text = open(path).read()
+        if "<!-- generated:" not in text:
+            continue
+
+        def sub(mo):
+            nonlocal rendered, stale
+            name, body = mo.group(2), mo.group(3)
+            if name not in renderers:
+                errs.append(f"{os.path.relpath(path, root)}: unknown generated block {name!r}")
+                return mo.group(0)
+            fresh = renderers[name]()
+            rendered += 1
+            if fresh != body:
+                stale += 1
+                if not args.render:
+                    errs.append(f"{os.path.relpath(path, root)}: generated block "
+                                f"'{name}' is stale - rerun with --render")
+            return mo.group(1) + fresh + mo.group(4)
+
+        new = MARK.sub(sub, text)
+        if args.render and new != text:
+            open(path, "w").write(new)
+
     # report -----------------------------------------------------------------------
     ncells = sum(len(c) for c in maxv.values())
     print(f"pareto_sb.csv  {len(sb)} rows, {ncells} proven maxima, k={min(maxv)}..{max(maxv)}")
     print(f"pareto_sa.csv  {len(sa)} rows, {len(sa_max)} proven maxima")
     print(f"conjectures    {len(cj)} models, {checked} formula/datum agreements checked")
+    print(f"doc blocks     {rendered} generated, "
+          f"{'%d rewritten' % stale if args.render else '%d stale' % stale}")
     for w in warns:
         print(f"  WARN  {w}")
     for e in errs:
