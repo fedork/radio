@@ -1,0 +1,22 @@
+m,model,formula,fits_from_k,status,source,note
+1,closed-form,2**k,1,proven-theorem,docs/theorems/special-cases.md#lemma-1,lemma-1 (proved)
+2,closed-form,2**k - 1,2,proven-theorem,docs/theorems/special-cases.md#lemma-3,lemma-3 (proved)
+3,closed-form,2**k - k,3,proven-theorem,docs/theorems/special-cases.md#lemma-6,lemma-6 (proved)
+4,closed-form,2**k - 2*k + 2,3,conjecture,data/sheets/wbB_pareto7/formulas.csv,lemma-8 (unproved)
+5,closed-form,2**k - k*(k-3)//2 - 5,4,conjecture,data/sheets/wbB_pareto7/formulas.csv,lemma-9 (unproved)
+6,closed-form,2**k - k*(k-1)//2 - 3,4,conjecture,data/sheets/wbB_pareto7/formulas.csv,"lemma-10, corrected k(k-1)/2 (unproved)"
+7,closed-form,2**k - k*k + 4*k - 10,5,conjecture,data/sheets/wbB_pareto7/formulas.csv,lemma-11 (unproved)
+8,closed-form,2**k - k*k + 2*k - 2,5,conjecture,data/sheets/wbB_pareto7/formulas.csv,"new, derived 2026-08-02"
+9,closed-form,(31*2**k)//32 - k*k + 2*k - 2,5,conjecture,data/sheets/wbB_pareto7/formulas.csv,"sheet wbB/formulas, marked ???"
+10,closed-form,(15*2**k)//16 - k*k + 2*k - 3,5,conjecture,data/sheets/wbB_pareto7/formulas.csv,derived 2026-08-02
+11,closed-form,(33*2**k)//32 - 7*k*k//2 + 51*k//2 - 62,5,refuted,data/sheets/wbB_pareto7/formulas.csv,"REFUTED: predicts n(10,11)=899 > n(10,10)=877, violating monotonicity in m"
+1,dyadic-profile,A@G[k-0],,proven-theorem,docs/theorems/special-cases.md#lemma-1,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+2,dyadic-profile,B@G[k-0],,proven-theorem,docs/theorems/special-cases.md#lemma-3,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+3,dyadic-profile,AC@G[k-1],,proven-theorem,docs/theorems/special-cases.md#lemma-6,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+4,dyadic-profile,AACC@G[k-2],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+5,dyadic-profile,BBBD@G[k-2],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+6,dyadic-profile,BBCD@G[k-2],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+7,dyadic-profile,ABBBBCDD@G[k-3],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+8,dyadic-profile,AAACCCDD@G[k-3],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+9,dyadic-profile,AAAAAABBCCCCCCDE@G[k-4],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+10,dyadic-profile,AAAAABBCCCCCCCEE@G[k-4],,conjecture,docs/journal.md (power-2 dyadic refit),journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)

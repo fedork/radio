@@ -1,0 +1,12 @@
+k,n,bound,status,source,note
+0,2,max,proven-theorem,definition,Sa(2) is a single pair; 0 tests suffice
+1,2,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(2) and can't-solve Sa(3) both logged
+2,3,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(3) and can't-solve Sa(4) both logged
+3,5,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(5) and can't-solve Sa(6) both logged
+4,8,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(8) and can't-solve Sa(9) both logged
+5,13,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(13) and can't-solve Sa(14) both logged
+6,22,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(22) and can't-solve Sa(23) both logged
+7,38,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(38) and can't-solve Sa(39) both logged
+8,65,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(65) and can't-solve Sa(66) both logged
+9,112,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(112) and can't-solve Sa(113) both logged
+10,192,lower,witness,witnesses/sa192_k10_a.tree,Sa(193) in 10 undecided; run killed before verdict

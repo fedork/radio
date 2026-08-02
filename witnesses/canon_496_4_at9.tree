@@ -1,0 +1,68 @@
+# Canonical witness tree, produced by radio_canon_search_generic.
+# command : ./radio_canon_search_generic 3 9 496 4
+# source  : out_canon_496_4.txt  (mtime 2026-04-13)
+# format  : indented '<state> @k --[split]-->' / '<state> @k [canonical U_k]'
+# checked : tools/check_witness.py
+#
+496:4 @9 --[248:3]-->
+  248:3 @8 --[127:2]-->
+    127:2 @7 --[64:1]-->
+      64:1 @6 [canonical U_6]
+      64:1,63:1 @6 [canonical U_6]
+      63:1 @6 [canonical U_6]
+    121:2,127:1 @7 --[57:1,64:1]-->
+      64:1,57:1 @6 [canonical U_6]
+      64:1,63:1,57:1 @6 [canonical U_6]
+      64:1 @6 [canonical U_6]
+    121:1 @7 --[64:1]-->
+      64:1 @6 [canonical U_6]
+      57:1 @6 [canonical U_6]
+      0:0 @6 [canonical U_6]
+  248:3,248:1 @8 --[127:2,120:0]-->
+    127:2 @7 --[64:1]-->
+      64:1 @6 [canonical U_6]
+      64:1,63:1 @6 [canonical U_6]
+      63:1 @6 [canonical U_6]
+    121:2,127:1,120:1 @7 --[57:1,64:1,63:1]-->
+      64:1,63:1,57:1 @6 [canonical U_6]
+      64:1,63:1,57:1,57:1 @6 [canonical U_6]
+      64:1 @6 [canonical U_6]
+    128:1,121:1 @7 --[64:1,57:0]-->
+      64:1 @6 [canonical U_6]
+      64:1,57:1 @6 [canonical U_6]
+      64:1 @6 [canonical U_6]
+  248:1 @8 --[128:1]-->
+    128:1 @7 [canonical U_7]
+    120:1 @7 [canonical U_7]
+    0:0 @7 [canonical U_7]
+496:4 @9 --[249:2]-->
+  249:2 @8 --[128:1]-->
+    128:1 @7 [canonical U_7]
+    128:1,121:1 @7 --[64:1,57:0]-->
+      64:1 @6 [canonical U_6]
+      64:1,57:1 @6 [canonical U_6]
+      64:1 @6 [canonical U_6]
+    121:1 @7 --[64:1]-->
+      64:1 @6 [canonical U_6]
+      57:1 @6 [canonical U_6]
+      0:0 @6 [canonical U_6]
+  249:2,247:2 @8 --[121:1,127:2]-->
+    127:2,121:1 @7 --[63:1,64:1]-->
+      64:1,63:1 @6 [canonical U_6]
+      64:1,63:1,57:1 @6 [canonical U_6]
+      64:1 @6 [canonical U_6]
+    120:2,128:1,121:1 @7 --[63:1,64:1,57:0]-->
+      64:1,63:1 @6 [canonical U_6]
+      64:1,63:1,57:1,57:1 @6 [canonical U_6]
+      64:1,57:1 @6 [canonical U_6]
+    128:1 @7 [canonical U_7]
+  247:2 @8 --[127:2]-->
+    127:2 @7 --[64:1]-->
+      64:1 @6 [canonical U_6]
+      64:1,63:1 @6 [canonical U_6]
+      63:1 @6 [canonical U_6]
+    120:2 @7 --[63:1]-->
+      63:1 @6 [canonical U_6]
+      63:1,57:1 @6 [canonical U_6]
+      57:1 @6 [canonical U_6]
+    0:0 @7 [canonical U_7]

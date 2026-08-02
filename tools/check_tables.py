@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Check the source-of-truth tables in data/ for internal consistency.
+
+Runs in a second and needs nothing but the CSVs, so it is cheap to run on every change.
+It exists because this project has already shipped two errors of exactly the kind it
+catches: a Pareto column that went stale in three of its four copies, and a lemma whose
+`k(k-1)/2` was transcribed as `k(k-5)/2`, which claimed unsolvable states were solvable.
+
+Checks performed:
+
+  monotone in m   n(k,m) >= n(k,m+1). Sb(n:m+1) solvable implies Sb(n:m) solvable, since
+                  the latter is a substate, so the frontier cannot rise with m.
+  monotone in k   n(k,m) <= n(k+1,m). An extra test never hurts.
+  (u1)            n(k,m-1) >= n(k,m) + 1. Conjectured, not proved - reported separately.
+  info bound      n*m <= 3^k. k ternary tests distinguish at most 3^k cases.
+  Sa consistency  Sa(k) = max over n1 <= Sa(k-1) of n1 + (largest n2 with Sb(n1:n2) in k-1),
+                  checked as an upper bound wherever the K=k-1 frontier is known.
+  formulas        every closed form in conjectures.csv reproduces every known max value of
+                  its row at or above its fits_from_k.
+  provenance      every row carries a status from the accepted vocabulary, and every
+                  status that claims evidence names a source.
+
+Usage:  tools/check_tables.py [--data DIR]
+Exit status is nonzero if any check fails. Conjecture violations are warnings, not
+failures, unless the conjecture is contradicted by a proven value.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import os
+import sys
+from typing import Dict, List
+
+STATUSES = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower",
+            "legacy", "conjecture", "refuted"}
+NEEDS_SOURCE = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower"}
+
+
+def singleton_base(k: int) -> List[int]:
+    cur = [1]
+    for _ in range(k):
+        nxt = [0] * (2 * len(cur))
+        for i, h in enumerate(cur):
+            nxt[i] += h
+            nxt[2 * i] += h
+            nxt[2 * i + 1] += h
+        cur = sorted(nxt, reverse=True)
+    return cur
+
+
+def dyadic_letters(k: int) -> Dict[str, int]:
+    """Letter -> value of the leading atom of each dyadic block of G_k (A, B, C, DDDD...)."""
+    g = singleton_base(k) if k >= 0 else []
+    starts = [0, 1, 2, 4, 8, 16, 32, 64, 128]
+    return {chr(65 + i): (g[s] if s < len(g) else 0) for i, s in enumerate(starts)}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", default=os.path.join(os.path.dirname(__file__), "..", "data"))
+    args = ap.parse_args()
+    d = args.data
+
+    sb = list(csv.DictReader(open(os.path.join(d, "pareto_sb.csv"))))
+    sa = list(csv.DictReader(open(os.path.join(d, "pareto_sa.csv"))))
+    cj = list(csv.DictReader(open(os.path.join(d, "conjectures.csv"))))
+
+    errs: List[str] = []
+    warns: List[str] = []
+
+    # provenance -----------------------------------------------------------------
+    for name, rows, keyf in (("pareto_sb", sb, lambda r: f"k={r['k']} m={r['m']}"),
+                             ("pareto_sa", sa, lambda r: f"k={r['k']}"),
+                             ("conjectures", cj, lambda r: f"m={r['m']} {r['model']}")):
+        for r in rows:
+            if r["status"] not in STATUSES:
+                errs.append(f"{name} {keyf(r)}: unknown status {r['status']!r}")
+            if r["status"] in NEEDS_SOURCE and not r.get("source", "").strip():
+                errs.append(f"{name} {keyf(r)}: status {r['status']} claims evidence "
+                            f"but names no source")
+
+    # the proven Sb frontier -----------------------------------------------------
+    maxv: Dict[int, Dict[int, int]] = {}
+    for r in sb:
+        if r["bound"] == "max":
+            maxv.setdefault(int(r["k"]), {})[int(r["m"])] = int(r["n1"])
+    lower: Dict[int, Dict[int, int]] = {}
+    for r in sb:
+        lower.setdefault(int(r["k"]), {})[int(r["m"])] = int(r["n1"])
+
+    for k, col in sorted(maxv.items()):
+        for m, n in sorted(col.items()):
+            if n * m > 3 ** k:
+                errs.append(f"k={k} m={m}: n*m = {n * m} exceeds 3^{k} = {3 ** k}")
+            if m + 1 in col and col[m + 1] > n:
+                errs.append(f"k={k}: n({m + 1})={col[m + 1]} > n({m})={n}, "
+                            f"violates monotonicity in m")
+            if k + 1 in maxv and m in maxv[k + 1] and maxv[k + 1][m] < n:
+                errs.append(f"m={m}: n(k={k + 1})={maxv[k + 1][m]} < n(k={k})={n}, "
+                            f"violates monotonicity in k")
+            if m - 1 in col and col[m - 1] < n + 1:
+                warns.append(f"k={k} m={m}: (u1) would need n({m - 1}) >= {n + 1}, "
+                             f"table has {col[m - 1]}")
+
+    # conjectured rows must also respect monotonicity against proven neighbours ----
+    for k, col in sorted(lower.items()):
+        for m, n in sorted(col.items()):
+            if m + 1 in col and col[m + 1] > n:
+                errs.append(f"k={k}: recorded n({m + 1})={col[m + 1]} > n({m})={n}")
+
+    # Sa upper bound from the Sb frontier -----------------------------------------
+    sa_max = {int(r["k"]): int(r["n"]) for r in sa if r["bound"] == "max"}
+    for r in sa:
+        k, n = int(r["k"]), int(r["n"])
+        if k - 1 not in maxv or k - 1 not in sa_max:
+            continue
+        # Sa(n) in k splits into n1 taken / n-n1 not, needing Sa(n1) in k-1 and
+        # Sb(n1 : n-n1) in k-1. So n <= max over feasible n1 of n1 + n2max(n1).
+        col = maxv[k - 1]
+        best = 0
+        for n1 in range(1, sa_max[k - 1] + 1):
+            n2 = max((m for m, v in col.items() if v >= n1), default=0)
+            best = max(best, n1 + n2)
+        if best and n > best and r["bound"] == "max":
+            errs.append(f"Sa k={k}: claimed {n} exceeds the bound {best} implied by the "
+                        f"K={k - 1} Sb frontier")
+
+    # formulas --------------------------------------------------------------------
+    checked = 0
+    for r in cj:
+        m, model, formula, status = int(r["m"]), r["model"], r["formula"], r["status"]
+        if status == "refuted":
+            continue
+        for k, col in sorted(maxv.items()):
+            if m not in col:
+                continue
+            if r["fits_from_k"] and k < int(r["fits_from_k"]):
+                continue
+            if model == "closed-form":
+                got = eval(formula, {"__builtins__": {}}, {"k": k})
+            elif model == "dyadic-profile":
+                prof, q = formula.split("@")
+                q = int(q.split("-")[1].rstrip("]"))
+                letters = dyadic_letters(k - q)
+                got = sum(letters[c] for c in prof)
+            else:
+                errs.append(f"conjectures m={m}: unknown model {model!r}")
+                break
+            checked += 1
+            if got != col[m]:
+                errs.append(f"conjectures m={m} [{model}] at k={k}: predicts {got} "
+                            f"but the proven maximum is {col[m]}")
+
+    # report -----------------------------------------------------------------------
+    ncells = sum(len(c) for c in maxv.values())
+    print(f"pareto_sb.csv  {len(sb)} rows, {ncells} proven maxima, k={min(maxv)}..{max(maxv)}")
+    print(f"pareto_sa.csv  {len(sa)} rows, {len(sa_max)} proven maxima")
+    print(f"conjectures    {len(cj)} models, {checked} formula/datum agreements checked")
+    for w in warns:
+        print(f"  WARN  {w}")
+    for e in errs:
+        print(f"  FAIL  {e}")
+    print("\n" + ("all checks passed" if not errs else f"{len(errs)} FAILURE(S)"))
+    return 0 if not errs else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
