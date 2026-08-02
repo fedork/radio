@@ -1,6 +1,8 @@
 # Canonical witness tree, produced by radio_canon_search_generic.
 # command : ./radio_canon_search_generic 3 8 248 3
 # source  : out_canon_248_3  (mtime 2026-04-13)
+# note    : predates the 2026-04-16 change to radio_canon_search_generic.c; rerunning
+#           that command today yields a different, also-valid tree
 # format  : indented '<state> @k --[split]-->' / '<state> @k [canonical U_k]'
 # checked : tools/check_witness.py
 #

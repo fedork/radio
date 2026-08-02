@@ -63,10 +63,21 @@ Both derive `MAX_K` / `MAX_N` and compile before running. `run_radio_full.sh` wi
 a cache file to size the build. `target_k` in the canonical search is the depth at which the
 search stops and demands a canonical `U_k` state; 3 or 4 works well at `k = 9`.
 
-Example - reproduce a committed witness:
+Example - smoke test the toolchain:
 
 ```
-./run_radio_canon_search_generic.sh 3 8 248 3     # matches witnesses/canon_248_3_at8.tree
+./run_radio_canon_search_generic.sh 3 8 248 3     # proves Sb(248:3) in 8
+```
+
+The search is deterministic for a given binary, but the output is **not** byte-comparable
+against a committed tree: `radio_canon_search_generic.c` changed on 2026-04-16, and the
+current version finds 7 top-level trees for this state (307 nodes) where the version that
+produced `witnesses/canon_248_3_at8.tree` found 2 (23 nodes). Both are valid proofs of the
+same claim. The right check is that the output *verifies*, not that it matches:
+
+```
+./radio_canon_search_generic 3 8 248 3 | grep -E '@[0-9]+ (\[canonical|--\[)' > /tmp/t.tree
+tools/check_witness.py /tmp/t.tree
 ```
 
 ## Cache files
