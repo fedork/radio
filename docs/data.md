@@ -10,21 +10,35 @@ Compression is `zstd -19`, lossless, about **9%** of raw. Nothing is distilled o
 `with [...]` split witnesses that `parse_out.sh` discards are exactly what witness-tree
 reconstruction needs later.
 
-## Status: the store is not yet stood up
+## Credentials
 
-> `gh` and SSH on this machine authenticate as **`fedorkar`**, but `fedork/radio`
-> belongs to the account **`fedork`**, where `fedorkar` has `pull` only and no `push`.
-> The store repo therefore has not been created, and **local commits cannot be pushed to
-> origin either**. Resolve by authenticating as `fedork`, or by adding `fedorkar` as a
-> collaborator. See [research-plan.md](research-plan.md) item P1.
+This repo is owned by the GitHub account **`fedork`**, which is not the machine's default
+GitHub login (`fedorkar`). Both tools are pointed at `fedork` **per repo**, leaving global
+settings alone:
 
-Once credentials are sorted:
+- **git** - already configured: `core.sshCommand` in `.git/config` selects
+  `~/.ssh/id_ed25519_personal`, which authenticates as `fedork`. Nothing to do.
+- **gh** - uses an isolated config directory at `.gh/` (gitignored). Populate it once:
+
+  ```
+  GH_CONFIG_DIR="$PWD/.gh" gh auth login
+  ```
+
+  `tools/artifacts.sh` sets `GH_CONFIG_DIR` automatically when `.gh/` exists, and refuses to
+  run with a clear message when it does not. For ad-hoc `gh` commands in this repo, set the
+  variable yourself; the global `gh` login stays on `fedorkar`.
+
+Note that `gh auth switch` would have changed the *global* active account, which is why the
+config-directory approach is used instead.
+
+Then:
 
 ```
-gh repo create <owner>/radio-data --private
-export RADIO_DATA_REPO=<owner>/radio-data      # tools/artifacts.sh defaults to fedork/radio-data
+gh repo create fedork/radio-data --private
 tools/artifacts.sh push k8-2026-05-12 out_k8.txt
 ```
+
+Override the store location with `RADIO_DATA_REPO` if it should live elsewhere.
 
 ## Inventory
 

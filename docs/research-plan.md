@@ -32,11 +32,12 @@ green, and every artifact cited by `data/*.csv` is fetchable by tag.
 
 Outstanding:
 
-- **Credentials.** `gh`/SSH authenticate as `fedorkar`; `fedork/radio` grants that account
-  pull only. Nothing can be pushed - not the reorganisation branch, not the artifact store.
-  Resolve before anything else, since until then all this work exists on one disk.
-- Create the artifact store and upload the 2.1 GB corpus. See [data.md](data.md).
-- Import and correct the paper draft.
+- **`gh` credentials.** `git` already pushes as `fedork` via the repo-local
+  `core.sshCommand`. `gh` still needs a one-off `GH_CONFIG_DIR="$PWD/.gh" gh auth login`
+  before the artifact store can be created. See [data.md](data.md).
+- Create the artifact store and upload the 2.1 GB corpus.
+- Push the branch. Until then this work exists on one disk, which is how the K=9 walk was
+  lost.
 
 ### P2 - Extend the K=9 column constructively
 

@@ -14,6 +14,9 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# Repo-local gh credentials (see tools/artifacts.sh). Never commit.
+.gh/
+
 # Small artifacts that ARE tracked (these are proofs and source-of-truth data,
 # listed explicitly so the *.txt rule above can never swallow them again).
 !witnesses/*.tree

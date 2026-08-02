@@ -97,9 +97,11 @@ under `zstd -19`.
 - Archive raw output, not `parse_out.sh` output. The distilled form drops the `with [...]`
   witnesses, which are what witness-tree reconstruction needs later.
 
-Known blocker: `gh`/SSH here authenticate as `fedorkar`, which has pull-only access to
-`fedork/radio`. Nothing can be pushed until that is resolved. See
-[docs/data.md](docs/data.md).
+This repo is owned by the GitHub account `fedork`, not the machine's default login. Both
+git and `gh` are pointed there per repo, without touching global settings: `git` via
+`core.sshCommand` in `.git/config`, and `gh` via an isolated `GH_CONFIG_DIR` at `.gh/`.
+`tools/artifacts.sh` handles the latter itself. Details in [docs/data.md](docs/data.md).
+Do not run `gh auth switch` - it changes the global active account.
 
 ## Git
 

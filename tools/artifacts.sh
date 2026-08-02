@@ -21,6 +21,19 @@
 
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# This repo belongs to the GitHub account `fedork`, which is not the machine's default gh
+# login. Rather than switch the global active account, keep an isolated gh config inside the
+# repo. `git` is already handled the same way, by the repo-local core.sshCommand.
+#
+#   GH_CONFIG_DIR="$PWD/.gh" gh auth login      # once, interactive
+#
+# .gh/ is gitignored. Anything here picks it up automatically.
+if [ -d "$REPO_ROOT/.gh" ] && [ -z "${GH_CONFIG_DIR:-}" ]; then
+    export GH_CONFIG_DIR="$REPO_ROOT/.gh"
+fi
+
 REPO="${RADIO_DATA_REPO:-fedork/radio-data}"
 LEVEL="${RADIO_ZSTD_LEVEL:-19}"
 
@@ -28,6 +41,10 @@ die() { echo "artifacts: $*" >&2; exit 1; }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 not found on PATH"; }
 need gh; need zstd; need shasum
+
+gh auth status >/dev/null 2>&1 || die "gh is not authenticated for this repo.
+  Run once:  GH_CONFIG_DIR=\"$REPO_ROOT/.gh\" gh auth login
+  That keeps the credential local to this repo; the global gh login is untouched."
 
 ensure_release() {
     local tag="$1"
