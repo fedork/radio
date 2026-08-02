@@ -30,8 +30,22 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 #   GH_CONFIG_DIR="$PWD/.gh" gh auth login      # once, interactive
 #
 # .gh/ is gitignored. Anything here picks it up automatically.
-if [ -d "$REPO_ROOT/.gh" ] && [ -z "${GH_CONFIG_DIR:-}" ]; then
-    export GH_CONFIG_DIR="$REPO_ROOT/.gh"
+if [ -z "${GH_CONFIG_DIR:-}" ]; then
+    if [ -d "$REPO_ROOT/.gh" ]; then
+        export GH_CONFIG_DIR="$REPO_ROOT/.gh"
+    elif [ "${RADIO_ALLOW_GLOBAL_GH:-}" != "1" ]; then
+        # Refuse rather than fall through to the machine's default login. That account has
+        # no write access here, and silently archiving under the wrong owner is worse than
+        # failing: the artifacts would be somewhere nobody thinks to look.
+        cat >&2 <<MSG
+artifacts: no repo-local gh credential.
+  Run once:  GH_CONFIG_DIR="$REPO_ROOT/.gh" gh auth login
+  This repo is owned by 'fedork'; the machine's default gh login is a different
+  account with no write access. The global login is left untouched.
+  To deliberately use the global login anyway, set RADIO_ALLOW_GLOBAL_GH=1.
+MSG
+        exit 1
+    fi
 fi
 
 REPO="${RADIO_DATA_REPO:-fedork/radio-data}"
@@ -42,9 +56,12 @@ die() { echo "artifacts: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 not found on PATH"; }
 need gh; need zstd; need shasum
 
-gh auth status >/dev/null 2>&1 || die "gh is not authenticated for this repo.
-  Run once:  GH_CONFIG_DIR=\"$REPO_ROOT/.gh\" gh auth login
-  That keeps the credential local to this repo; the global gh login is untouched."
+gh auth status >/dev/null 2>&1 \
+    || die "gh is not authenticated (GH_CONFIG_DIR=${GH_CONFIG_DIR:-default}). Run: gh auth login"
+
+WHO="$(gh api user --jq .login 2>/dev/null || true)"
+[ -n "$WHO" ] || die "could not determine the authenticated gh account"
+echo "artifacts: acting as $WHO, store $REPO" >&2
 
 ensure_release() {
     local tag="$1"
