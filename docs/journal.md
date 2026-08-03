@@ -601,3 +601,92 @@ First warning: exact shortest arithmetic profiles become non-structural quickly.
 Artifact: symbolic_profile_refit_k1_8.md contains the full m=1..32 arithmetic-fit table.
 
 - Correction/refinement: redo profile fitting with two structural constraints: profile length must be a power of two, and the alphabet for m is restricted to letters appearing in the first m dyadic slots A B CC DDDD EEEEEEEE ... . Under this corrected model, the clean prefix m=1..6 is unchanged. m=7 gives ABBBBCDD (length 8, q=3); m=8 gives AAACCCDD (length 8, q=3); m=9 gives AAAAAABBCCCCCCDE (length 16, q=4); m=10 gives AAAAABBCCCCCCCEE (length 16, q=4), using only A..E as expected. m=11 has the first large jump, with shortest exact fit found at length 64, q=5. Artifact: symbolic_profile_refit_power2_dyadic_prefix.md.
+
+---
+
+## 2026-08-02/03 — repo reorganisation, corpus recovery, and two retractions
+
+Long session. The durable outcome is less the new results than the discovery that a large
+part of the existing record could not be trusted, and the machinery to tell which part.
+
+### Retracted
+
+- **`Sa(10) = 192` is not proven maximal.** I recorded it as `proven-exhaustive` on finding
+  the 2023 log, then withdrew it. See below.
+- **The paper does not understate its result.** I claimed it should say `k ≤ 10`; it says
+  `k ≤ 9`, which is exactly right. Do not change it.
+- **`409?` for `n(9,11)` is not baseless.** I said it had no support. It is not *derivable*,
+  but it is *consistent* with the length-64 profile model (`c_3 = 4`), which bounds
+  `n(9,11)` to 405..410.
+
+### The 2023 corpus emits false negatives
+
+`tools/extract_evidence.py audit` over the ~18 GB inside `radio.zip` found **37 single-part
+negatives that are provably false** against the 2026 artifacts — ~0.27% of that corpus's
+negatives. Several are the `K=8, m=10..17` band that the 2026-05-12 recomputation already
+corrected, so this independently rediscovers a known error rather than a new one. Recorded in
+`evidence/refuted_2023_negatives.txt`.
+
+**There is no syntactic marker.** `Sb(143:17)` in 8 was declared unsolvable after 10 passes
+and 4 days; `Sb(154:15)` after 14 hours. Both wrong. Cheap `fast_solve=1, totalsplits=0` lines
+are mostly the bad ones, but 569 such lines are correct, so that signature is useless as a
+filter. By contrast the same audit over the 2026 artifacts found **0 contradictions in 2,723**
+verdicts. Reliability is a function of *era*, not of apparent expense.
+
+Consequence: the `Sa(193)` refutation, which shares that profile, is `legacy`. `Sa(192)`
+achievability is unaffected — it rests on verified witness trees, and a tree re-verifies from
+first principles whatever build produced it. That asymmetry between positives and negatives is
+the single most useful structural fact about this project's evidence.
+
+### Recovered from `~/radio_old`
+
+- The `Sa(193)` run: `out26_2.txt` (Sb(112:81) alone, **1,725,456 s**, 12 passes) and
+  `out26_3.txt` (the other 15 states plus the verdict, **2,353,729 s**). ~47 days of solve
+  time in ~90 GB of virtual memory. `Sb(112:81)` was absent from `out26_3` because that run
+  loaded a warm cache — which is why a first pass found only 15 of the 16.
+- `parsed_260.txt`, 19.5 M entries — audits clean on every internal test. Unbreaks
+  `run_pareto9.sh`.
+- The unbroken `pareto9_36..116` chain. What it actually achieved: the near-diagonal walk
+  moved from `m = 96` to about `m = 81` in **14 months** of wall clock. The band `m = 18..64`
+  was never touched. A frontier walk downward will not reach it on any useful timescale.
+- 7 new witness trees (`Sa(38)`, `Sa(65)` ×3, `Sa(112)` ×3) and 16 exhaustive multi-part
+  enumerations.
+
+### H4: the profile structure
+
+- Refinement (`A→aa, B→ab, C→bc, D→cd`) reproduces the spreadsheet's own columns exactly,
+  preserves the value function, and doubles length. So a profile is an equivalence *class*,
+  `q` is not intrinsic, and choosing a larger `q` buys no expressive power — it only drops
+  low-`k` constraints.
+- **`length = 2^q` is therefore a refinement invariant**, not an artifact of picking the
+  shortest form. Holds for m ≤ 13.
+- Under that constraint the profile is unique for m ≤ 9 and m = 11..13, forcing the `n(9,m)`
+  predictions in [status.md](status.md).
+- The journal's earlier "m=11 first large jump to length 64" dissolves if `Sb(11:11)` — the
+  only exactly-diagonal cell in the data — is pre-stabilised. Then m=11 fits at length 16.
+  Weak point: m=4 includes its own diagonal cell and fits anyway.
+- **Dead end worth recording:** the non-adaptive reformulation. A test returns
+  `[x∈S] + [y∈S]`, so non-adaptive solvability is the Sidon condition
+  `(U−U) ∩ (V−V) = {0}`. Exact for m ≤ 2 — it gives one-line proofs of `n(k,1) = 2^k` both
+  directions and the `2^k − 1` construction for m=2 — but strictly weaker from m=3 onward
+  (computed: k=4, m=5 gives 6 against the true 9). Adaptivity is essential. Do not invest in
+  the non-adaptive picture as a reduction.
+- Still unexplained, and the actual obstruction: `q(m)` and the coefficient vectors.
+
+### Infrastructure
+
+Source-of-truth CSVs with `bound`/`status`/`source` per cell; `check_tables.py` (invariants,
+formulas, generated doc blocks, source resolvability); `check_witness.py` (re-derives trees
+from first principles, three input formats); `extract_evidence.py` (`certify` locates the
+evidence for every proven row, `audit` hunts contradictions); `artifacts.sh` (store, with
+`check-index`). Artifact store stood up: 7 tags, 367 MB, round-trip verified.
+
+Both historical errors — the stale K=8 column and the `k(k-1)/2 → k(k-5)/2` lemma typo — are
+now caught mechanically. Mutation-tested.
+
+### Process lesson
+
+Three separate documents were left asserting things this same session had disproved, despite
+"supersede in place" being written down before any of them. Recording a rule does not
+implement it. The session-end protocol in `AGENTS.md` now makes re-reading your own changes an
+explicit step, and `tools/check_docs.py` catches the mechanical part.
