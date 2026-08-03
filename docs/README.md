@@ -21,6 +21,7 @@ The files under `data/` are the single source of truth. Everything else referenc
 
 - `data/pareto_sb.csv` - the `Sb` Pareto frontier: `k, m, n1, bound, status, source, note`
 - `data/pareto_sa.csv` - the `Sa` sequence
+- `data/pareto_2part.csv` - the two-part frontier `g_k(s,t; p)`: `k, s, t, p, q, ...`
 - `data/conjectures.csv` - closed forms and dyadic profiles, stored executably
 - `data/exhaustive_multipart.csv` - complete `all_solutions` enumerations of multi-part states
 - `data/artifacts.csv` - the archive: `tag, asset, contains, era, audited, note`
@@ -48,6 +49,7 @@ Every row carries a **bound** and a **status**:
 | `proven-theorem` | follows from a proved theorem or lemma, which `source` names |
 | `witness` | a machine-checked witness tree exists; lower bound only |
 | `solver-lower` | the solver reported a solution, not independently recheckable |
+| `solver-frontier` | both the can-solve at the value and the can't-solve above it come from a current-build run that was **not** retained; `source` names the driver, which regenerates it in minutes |
 | `legacy` | asserted by an earlier run whose artifact was not retained |
 | `conjecture` | model prediction, no proof |
 | `refuted` | tested and false; kept so it is not re-derived |

@@ -23,8 +23,12 @@ Usage:
     tools/refsolve.py check-c [K]           conjecture C, exhaustive
     tools/refsolve.py check-c-multipart [K] the multi-part generalisation (has a counterexample)
     tools/refsolve.py check-extremal [K]    the Extremal Split Lemma
+    tools/refsolve.py two-part K s t        the staircase g(p) = max q, Sb(p:s, q:t) in K
+    tools/refsolve.py check-2part [K]       the (2,1) and (2,2) closed forms, exhaustive
+    tools/refsolve.py check-reduction [K]   the Two-Part Reduction Identity
 
-See docs/conjectures.md#the-antidiagonal-conjecture-c for what these mean.
+See docs/conjectures.md#the-antidiagonal-conjecture-c and
+docs/theorems/two-part-reduction.md for what these mean.
 """
 from __future__ import annotations
 
@@ -217,8 +221,109 @@ def cmd_check_extremal(argv) -> int:
     return rc
 
 
+# ------------------------------------------------------- the two-part frontier
+
+def two_part_row(k: int, s: int, t: int) -> dict:
+    """g(p) = max q with Sb(p:s, q:t) solvable in k, for every p >= 1 with g(p) > 0.
+
+    Non-increasing in p by Subgraph Monotonicity, so q only ever walks downward."""
+    row = {}
+    q = frontier_row(k, t).get(t, 0) if t else 0
+    p = 1
+    while q > 0:
+        if not solvable([(p, s)], k):
+            break
+        while q > 0 and not solvable([(p, s), (q, t)], k):
+            q -= 1
+        if q == 0:
+            break
+        row[p] = q
+        p += 1
+    return row
+
+
+def claim_21(p: int, q: int, k: int) -> bool:
+    """Sb(p:2, q:1) in k -- Two-Part Frontier Theorem, docs/theorems/two-part-reduction.md."""
+    return p <= 2 ** k - 1 and q <= 2 ** k and p + q <= 2 ** (k + 1) - k - 1
+
+
+def claim_22(p: int, q: int, k: int) -> bool:
+    """Sb(p:2, q:2) in k -- conjectured, docs/conjectures.md."""
+    if p > 2 ** k - 1 or q > 2 ** k - 1:
+        return False
+    cap = 2 ** (k + 1) - 2 * k - (1 if max(p, q) >= 2 ** k - 2 else 0)
+    return p + q <= cap
+
+
+def cmd_two_part(argv) -> int:
+    k, s, t = (int(x) for x in argv[:3])
+    row = two_part_row(k, s, t)
+    print(f"k={k} s={s} t={t}: " + " ".join(f"{p}->{q}" for p, q in sorted(row.items())))
+    if row:
+        best = max(p + q for p, q in row.items())
+        print(f"   max p+q = {best}")
+    return 0
+
+
+def cmd_check_2part(argv) -> int:
+    kmax = int(argv[0]) if argv else 5
+    rc = 0
+    for k in range(1, kmax + 1):
+        for t, claim, name in ((1, claim_21, "(2,1)"), (2, claim_22, "(2,2)")):
+            bad, n = [], 0
+            lim = 2 ** k + 2
+            for p in range(0, lim + 1):
+                for q in range(0, lim + 1):
+                    if p and q and 2 * p + t * q > POW3[k]:
+                        continue
+                    n += 1
+                    if solvable([(p, 2), (q, t)], k) != claim(p, q, k):
+                        bad.append((p, q))
+            print(f"k={k} {name}: {n} pairs, {len(bad)} disagreements "
+                  f"{bad[:5] if bad else ''}")
+            rc |= bool(bad)
+            sys.stdout.flush()
+    return rc
+
+
+def cmd_check_reduction(argv) -> int:
+    """n(k+1,m) = max over top splits of the capped two-part maximum.
+
+    An identity, not a conjecture: it just says a strategy is a first test plus
+    three sub-strategies, with the outcome-2 and outcome-0 children single parts.
+    Checking it cross-validates the one-part and two-part tables against each other."""
+    kmax = int(argv[0]) if argv else 4
+    rc = 0
+    for k in range(1, kmax + 1):
+        nk = frontier_row(k)
+        nk1 = frontier_row(k + 1)
+        rows = {}
+        for m in sorted(nk1):
+            if m < 2:
+                continue
+            best = 2 * nk.get(m, 0)                      # b = 0 or m: m-side left whole
+            for b in range(1, m):
+                s, t = m - b, b
+                if (s, t) not in rows:
+                    rows[(s, t)] = two_part_row(k, s, t)
+                row = rows[(s, t)]
+                cap_p, cap_q = nk.get(b, 0), nk.get(m - b, 0)   # outcome 2 / outcome 0
+                for p in range(0, min(cap_p, nk.get(s, 0)) + 1):
+                    q = min(cap_q, row.get(p, nk.get(t, 0) if p == 0 else 0))
+                    best = max(best, p + q)
+            ok = best == nk1[m]
+            rc |= not ok
+            print(f"k={k}->{k+1} m={m}: predicted {best}, actual n({k+1},{m})={nk1[m]}"
+                  f"  {'OK' if ok else 'MISMATCH'}")
+            sys.stdout.flush()
+    return rc
+
+
 COMMANDS = {
     "frontier": cmd_frontier,
+    "two-part": cmd_two_part,
+    "check-2part": cmd_check_2part,
+    "check-reduction": cmd_check_reduction,
     "solve": cmd_solve,
     "check-c": cmd_check_c,
     "check-c-multipart": cmd_check_c_multipart,

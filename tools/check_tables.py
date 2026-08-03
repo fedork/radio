@@ -40,9 +40,10 @@ import sys
 from typing import Dict, List
 
 STATUSES = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower",
-            "legacy", "conjecture", "refuted"}
+            "solver-frontier", "legacy", "conjecture", "refuted"}
 BOUNDS = {"max", "lower", "upper"}
-NEEDS_SOURCE = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower"}
+NEEDS_SOURCE = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower",
+                "solver-frontier"}
 
 
 def singleton_base(k: int) -> List[int]:
@@ -140,6 +141,8 @@ def main() -> int:
     apath = os.path.join(d, "artifacts.csv")
     arts = list(csv.DictReader(open(apath))) if os.path.exists(apath) else []
     tags = {r["tag"] for r in arts}
+    p2path = os.path.join(d, "pareto_2part.csv")
+    p2 = list(csv.DictReader(open(p2path))) if os.path.exists(p2path) else []
 
     errs: List[str] = []
     warns: List[str] = []
@@ -147,6 +150,8 @@ def main() -> int:
     # provenance -----------------------------------------------------------------
     for name, rows, keyf in (("pareto_sb", sb, lambda r: f"k={r['k']} m={r['m']}"),
                              ("pareto_sa", sa, lambda r: f"k={r['k']}"),
+                             ("pareto_2part", p2,
+                              lambda r: f"k={r['k']} ({r['s']},{r['t']}) p={r['p']}"),
                              ("conjectures", cj, lambda r: f"m={r['m']} {r['model']}")):
         for r in rows:
             if r["status"] not in STATUSES:
@@ -256,6 +261,67 @@ def main() -> int:
             errs.append(f"Sa k={k}: claimed {n} exceeds the bound {best} implied by the "
                         f"K={k - 1} Sb frontier")
 
+    # the two-part frontier -------------------------------------------------------
+    # g[k][(s,t)][p] = largest q with Sb(p:s, q:t) solvable in k.
+    g: Dict[int, Dict[tuple, Dict[int, int]]] = {}
+    for r in p2:
+        g.setdefault(int(r["k"]), {}).setdefault((int(r["s"]), int(r["t"])), {}
+                                                 )[int(r["p"])] = int(r["q"])
+    identities = 0
+    for k, pairs in sorted(g.items()):
+        for (s, t), row in sorted(pairs.items()):
+            ps = sorted(row)
+            # Subgraph Monotonicity: deleting an n-side coin leaves a subgraph, so the
+            # frontier cannot rise with p.
+            for a, b in zip(ps, ps[1:]):
+                if row[b] > row[a]:
+                    errs.append(f"pareto_2part k={k} ({s},{t}): g({b})={row[b]} exceeds "
+                                f"g({a})={row[a]}, but the frontier is non-increasing in p")
+            # a two-part state contains each part as a subgraph
+            for p in ps:
+                if maxv.get(k, {}).get(s) is not None and p > maxv[k][s]:
+                    errs.append(f"pareto_2part k={k} ({s},{t}): p={p} exceeds "
+                                f"n({k},{s})={maxv[k][s]}")
+                if maxv.get(k, {}).get(t) is not None and row[p] > maxv[k][t]:
+                    errs.append(f"pareto_2part k={k} ({s},{t}) p={p}: q={row[p]} exceeds "
+                                f"n({k},{t})={maxv[k][t]}")
+
+        # Two-Part Reduction Identity (docs/theorems/two-part-reduction.md): a strategy for
+        # Sb(n:m) is a first test [a:b] plus three sub-strategies, and the outcome-2 and
+        # outcome-0 children are single parts.  So n(k+1,m) is the largest p+q over the
+        # two-part frontier subject to the two cross-caps.  Check it wherever the row is
+        # complete: every b in 1..m-1 present, and n(k,.) / n(k+1,m) proven.
+        col, nxt = maxv.get(k, {}), maxv.get(k + 1, {})
+        for m in sorted(nxt):
+            if m < 2:
+                continue
+            need = [(m - b, b) for b in range(1, m)]
+            if any((x, y) not in pairs and (y, x) not in pairs for x, y in need):
+                continue
+            if any(col.get(b) is None for b in range(1, m)):
+                continue
+
+            def gq(s: int, t: int, p: int) -> int:
+                if (s, t) in pairs:
+                    row = pairs[(s, t)]
+                    if p in row:
+                        return row[p]
+                    return max(row.values()) if p < min(row) else 0
+                row = pairs[(t, s)]           # stored mirrored: invert the staircase
+                return 0 if p > max(row.values()) else \
+                    max((pp for pp, qq in row.items() if qq >= p), default=0)
+
+            best = 2 * col.get(m, 0)          # b = 0 or m: the m-side is left whole
+            for b in range(1, m):
+                s, t = m - b, b
+                for p in range(0, min(col[b], col.get(s, 0)) + 1):
+                    q = col.get(t, 0) if p == 0 else gq(s, t, p)
+                    best = max(best, p + min(col[m - b], q))
+            identities += 1
+            if best != nxt[m]:
+                errs.append(f"two-part reduction k={k}->{k+1} m={m}: the two-part frontier "
+                            f"implies n({k+1},{m})={best}, table says {nxt[m]}")
+
     # formulas --------------------------------------------------------------------
     checked = 0
     for r in cj:
@@ -318,6 +384,8 @@ def main() -> int:
     ncells = sum(len(c) for c in maxv.values())
     print(f"pareto_sb.csv  {len(sb)} rows, {ncells} proven maxima, k={min(maxv)}..{max(maxv)}")
     print(f"pareto_sa.csv  {len(sa)} rows, {len(sa_max)} proven maxima")
+    print(f"pareto_2part   {len(p2)} rows, {sum(len(v) for v in g.values())} staircases, "
+          f"{identities} reduction identities checked")
     print(f"conjectures    {len(cj)} models, {checked} formula/datum agreements checked")
     print(f"doc blocks     {rendered} generated, "
           f"{'%d rewritten' % stale if args.render else '%d stale' % stale}")
