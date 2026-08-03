@@ -40,7 +40,7 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
 - **Two theorems** — Singleton Majorization and Unit-Group Elimination, both proved.
-- **14 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
+- **15 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
   `Sb(480:5)@9`. All pass
   `tools/check_witness.py`, which re-derives every step without consulting the solver.
@@ -89,7 +89,12 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   symmetric one exists is open.
 - **Reframed obstruction:** `q(m)` is not arbitrary, since `q = k - t`. The real question is
   how deep a solution must go before every leaf is a singleton.
-- **n-side splits — UNRESOLVED (2026-08-03).** Zero working splits leave the n-side whole in
+- **n-side splits — ANSWERED (2026-08-03): one-sided is not necessary.** Two-sided-only
+  canonical trees exist for both `Sb(480:5)@9` (5 trees) and `Sb(473:6)@9` (1 tree), verified.
+  The latter is decisive: the unrestricted witness uses 5 one-sided splits and all are
+  avoidable, and the two-sided tree wastes 2 paths against 7. Excluding one-sided n-splits looks
+  safe *and* beneficial, on two states at one k. Earlier notes below are superseded.
+- *(superseded)* **n-side splits — unresolved.** Zero working splits leave the n-side whole in
   full enumerations of six frontier states (m=5,6 at k=5,6,7) or in the mixed child one level
   down. The 34 instances in the unrestricted `Sa` trees are **genuine** but avoidable: every
   state tested exhaustively also admits a fully two-sided split, though those are rare (76 of

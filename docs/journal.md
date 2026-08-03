@@ -832,3 +832,29 @@ Two-sided splits are rare where they exist: 76 of 5440, 42 of 3324. So the restr
 hard. And local availability at every node does **not** imply a complete two-sided tree, because
 taking the two-sided split changes the children and hence the subproblems. That compositional
 question is the real one and needs a search constrained to two-sided splits, which does not exist.
+
+## 2026-08-03 — one-sided n-splits are not necessary
+
+`radio_canon_twosided.c`, the canonical search with `TWO_SIDED_ONLY=1` forbidding any split that
+leaves a non-nil part's n-side whole, finds verified trees for both `Sb(480:5)@9` (5 of them) and
+`Sb(473:6)@9` (1). The second settles it: the unrestricted `473:6` witness uses 5 one-sided splits
+and every one is avoidable. The two-sided tree is also tighter — 2 empty paths of 384 against 7 —
+so the restriction costs nothing and buys something.
+
+A prediction of mine failed, usefully. `Sb(7:1)@4` really does have no two-sided decomposition at
+`target_k=3`: a singleton `Sb(x:1)@d` must be an atom of `G_d` or split into two members of
+`R(d-1)`, and `R(3) = {1,4,7,8}` yields sums `{2,5,8,9,11,12,14,15,16}`, missing 7, while `G_4` is
+`{16,15,11,5,1}`, also missing 7. Same for `Sb(4:1)@4`. From that I predicted the two-sided search
+must fail. It did not — the tree it found never generates `Sb(7:1)@4`. The obstruction is real but
+local; a different route sidesteps the state. Reasoning from "the one tree we have needs X" to "X
+is unavoidable" was the error.
+
+Two cautions from the same session. Small-k states are not cheap proxies: the canonical search
+returns `NO_CANONICAL_TREE` for `Sb(46:6)@6` and `Sb(104:6)@7` even *unrestricted*, though
+`radio_full` finds four working splits for the former — so a negative there means "no atomic-leaf
+solution", not "no solution". And `ulimit -v` is unsupported on macOS, silently; memory must be
+bounded at compile time via `MAX_TREE_NODES` and `MAX_STATE_SIZE`.
+
+Still open: the two-sided `473:6` tree remains asymmetric and carries no m=6 profile. Waste fell
+from 7 to 2, nearer the profile condition (zero waste, census divisible by m) but not at it. The
+run was stopped by its CPU cap mid-enumeration, so better trees may exist.

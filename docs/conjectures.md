@@ -295,9 +295,38 @@ shape are invisible to it. So conclusions about tree *interiors* drawn from cano
 conditional on that hypothesis, and the "0 of 425" figure should not be read as evidence about
 optimal solutions in general.
 
-**Status: unresolved.** Excluding one-sided n-splits costs nothing at any node examined, but the
-open question is compositional — whether local two-sidedness can be maintained all the way down —
-and that needs a search constrained to two-sided splits, which does not exist yet.
+### Answered (2026-08-03): one-sided n-splits are not necessary
+
+`radio_canon_twosided.c` is the same search with `TWO_SIDED_ONLY=1` rejecting any split that
+leaves a non-nil part's n-side whole. Under that restriction:
+
+| state | result |
+|---|---|
+| `Sb(480:5)@9` | 5 verified trees, `witnesses/canon_480_5_at9_twosided.tree` |
+| `Sb(473:6)@9` | 1 verified tree, `witnesses/canon_473_6_at9_twosided.tree` |
+
+`473:6` is the decisive one: the unrestricted witness uses **5** one-sided splits, and they are
+all avoidable. The two-sided tree is also **less wasteful** — 2 empty paths of 384 against 7:
+
+| | nodes | splits | leaves | one-sided | wasted paths |
+|---|---|---|---|---|---|
+| `canon_473_6_at9` (unrestricted) | 154 | 51 | 103 | 5 | 7 |
+| `canon_473_6_at9_twosided` | 172 | 57 | 115 | **0** | **2** |
+
+So excluding one-sided n-splits appears **safe and beneficial** — it costs no solutions on
+anything tested and buys a tighter tree. Still not a theorem: two states at one value of k.
+
+A prediction of mine failed here and the failure is instructive. `Sb(7:1)@4` genuinely has no
+two-sided decomposition: with `target_k=3` a singleton `Sb(x:1)@d` must be an atom of `G_d` or
+split into two members of `R(d-1)`, and `R(3) = {1,4,7,8}` gives sums `{2,5,8,9,11,12,14,15,16}` —
+7 is absent, and 7 is not an atom of `G_4 = {16,15,11,5,1}`. Likewise `Sb(4:1)@4`. I concluded the
+two-sided search must fail. It did not: the tree it found simply never produces `Sb(7:1)@4`. The
+arithmetic obstruction is real but local, and a different route avoids the state entirely.
+
+**Still open:** the two-sided `473:6` tree is asymmetric, so it carries no m=6 profile. Waste is
+down from 7 paths to 2, which is closer to the profile condition (`0` waste and census divisible
+by `m`) but not there. The run was cut off by its CPU cap while enumerating further top splits, so
+better trees may exist.
 
 ## What is actually invariant across the k=9 trees (2026-08-03)
 
