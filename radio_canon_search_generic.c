@@ -13,12 +13,18 @@ static int solver_printf(const char *fmt, ...) { return 0; }
 #include "radiobase.c"
 #undef printf
 
+#ifndef MAX_STATE_SIZE
 #define MAX_STATE_SIZE 5120
+#endif
+#ifndef MAX_TREE_NODES
 #define MAX_TREE_NODES 4000000
+#endif
 #define POOL_CHUNK_NODES 20480
 #define MAX_POOL_CHUNKS ((MAX_TREE_NODES + POOL_CHUNK_NODES - 1) / POOL_CHUNK_NODES)
 #define HASH_SIZE 262144
+#ifndef MAX_MEMO
 #define MAX_MEMO 8000000
+#endif
 
 typedef struct TreeNode {
     int k, size, canonical, stopk, child_count;

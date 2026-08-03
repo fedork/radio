@@ -44,8 +44,24 @@ heavy swap.
 **Always cap it.** Run under a memory limit and a wall-clock limit, one at a time:
 
 ```
-( ulimit -v 8000000; timeout 900 ./radio_canon_search_generic 3 9 473 6 )
+clang -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 radio_canon_search_generic.c -o canon
+( ulimit -v 6000000; ulimit -t 900; ./canon 3 9 473 6 )
 ```
+
+`MAX_STATE_SIZE`, `MAX_TREE_NODES` and `MAX_MEMO` are now `-D`-overridable. A state at depth
+`d` has at most `2^(k-d)` parts, so 1024 is generous for `k <= 9` and cuts a node from 61 KB to
+12 KB. Note `timeout` is not installed here; `ulimit -t` is the portable CPU-seconds bound.
+
+### The canonical search does not always work, even unrestricted
+
+It is a *hypothesis* about solution shape, and the hypothesis fails at small k. `Sb(46:6)` in 6
+is a proven frontier point with four working splits from `radio_full`, yet
+`radio_canon_search_generic` returns `NO_CANONICAL_TREE` for it at `target_k` 3 and 2, with no
+restriction applied. Same for `Sb(104:6)` in 7 at `target_k=3`.
+
+So small-k states are **not** valid cheap proxies for testing structural hypotheses with this
+tool: a negative there says the state has no atomic-leaf solution, not that it has no solution.
+Use `radio_full` when the question is about solutions in general.
 
 and check for strays with `pgrep -f radio_canon` before starting another.
 

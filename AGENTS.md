@@ -107,8 +107,13 @@ allocates 1.26 GB per pool chunk and never frees one (see [docs/tools.md](docs/t
 exhausting search grows without bound. Run it as
 
 ```
-( ulimit -v 8000000; timeout 900 ./radio_canon_search_generic ... )
+( ulimit -v 6000000; ulimit -t 900; ./radio_canon_search_generic ... )
 ```
+
+`timeout` is **not installed on this machine** — use the shell builtin `ulimit -t` (CPU
+seconds), which is portable and arguably the better bound here. Also compile with
+`-DMAX_STATE_SIZE=1024`: the default 5120 makes a tree node 61 KB where 12 KB suffices for
+`k <= 9`, a 5x memory saving.
 
 one at a time, and `pgrep -f radio_canon` before launching another. On 2026-08-03 three
 concurrent runs reached 28+21+12 GB and pushed the machine into heavy swap, because two of them
