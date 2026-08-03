@@ -61,10 +61,11 @@ divide by roughly 11 for the archived size.
 | `pareto9_short_2.txt` | 158 M | 2026-03-15 | 19 frontier points: `Sb(320..338 : 17)` solvable in 9 | `pareto9-2026-03` |
 | `pareto9_short_3.txt` | 97 M | 2026-03-16 | `Sb(339:17)` in 9, still undecided after 11+ hours | `pareto9-2026-03` |
 
-The rest of the K=9 walk - everything with `m >= 18`, produced by `radioSbPareto.c` from the
-diagonal downward - **is gone**. `run_pareto9.sh` chains through `parsed_260.txt` and a
-`pareto9_N.txt` sequence, all matched by the `*.txt` ignore rule and since deleted. The
-script cannot restart until that cache is rebuilt.
+The rest of the K=9 walk was **recovered on 2026-08-02** from `~/radio_old` - see below.
+`parsed_260.txt` and the unbroken `pareto9_36..116` chain both survive, so `run_pareto9.sh`
+can restart. What the walk actually reached is narrower than the file count suggests: the
+near-diagonal climb got from `m = 96` down to about `m = 81` over 14 months, and the band
+`m = 18..64` was never touched.
 
 ### Full-solve outputs (`radio_full`, every top-level split)
 
@@ -89,22 +90,27 @@ tool. See [tools.md](tools.md).
 
 ### `~/radio_old` — recovered 2026-08-02, **not yet archived**
 
-4.1 GB on disk, ~26 GB logical. Audited clean: `tools/extract_evidence.py audit` found zero
-contradictions against the proven tables and zero self-contradictions across 19.5 M cache
-entries.
+4.1 GB on disk, ~26 GB logical. **Audit result is mixed and matters:** `parsed_260.txt` is
+clean (0 contradictions, 0 information-bound violations, 0 header mismatches across 19.5 M
+entries), but the `out*`/`pareto*` logs inside `radio.zip` contain **37 provably false
+negatives** — see [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt)
+and the era-reliability note in [`../CLAUDE.md`](../CLAUDE.md). Treat every 2023-era negative
+as `legacy`.
 
 | file | size | dates | what it is | priority |
 |---|---|---|---|---|
-| `radio.zip` | 3.56 G → **23 G** | 2023-10-18 | Repo snapshot, 1156 files. Contains **`out26_2.txt` and `out26_3.txt`, the only evidence for `Sa(10) = 192`**, the 26 `print*` witness-tree files, 18 `full*` exhaustive enumerations, and ~18 GB of `out*` logs from a solver generation predating the K=8 correction | **critical (two entries)**, low (the rest) |
+| `radio.zip` | 3.56 G → **23 G** | 2023-10-18 | Repo snapshot, 1156 files. Contains `out26_2.txt` and `out26_3.txt`, the only record of the `Sa(193)` refutation (now `legacy`, not accepted); the 26 `print*` witness-tree files; 18 `full*` exhaustive enumerations; and ~18 GB of `out*` from the build that emits false negatives | **critical (two entries)**, low (the rest) |
 | `parsed_260.txt` | 800 M → 123 M | 2025-02-09 | The accumulated cache, 19.5 M entries. Unbreaks `run_pareto9.sh`; the operational input that makes K=9 work tractable. **Read the warm-start warning below before reusing it.** | **high** |
 | `pareto9_36..116.txt` | 51 M → 6 M | 2023-12 – 2025-02 | 81 chained frontier runs, no gaps. Near-diagonal K=9 walk, `m = 96` down to ~81 | medium |
 
 Already extracted into git, so the bulk is no longer load-bearing for these facts:
 
-- `evidence/sa193_unsolvable_in_10.txt` — the `Sa(10) = 192` proof, 40 lines
-- `witnesses/sa38_k7.tree`, `sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}` — 7 verified trees
+- `evidence/sa193_unsolvable_in_10.txt` — the `Sa(193)` refutation, 40 lines, `legacy`
+- `evidence/refuted_2023_negatives.txt` — the 31 verdicts this corpus got wrong
+- `witnesses/sa38_k7.tree`, `sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}` — 7 verified trees. Being
+  witness trees these are proofs regardless of era, so they are unaffected by the audit.
 - `data/exhaustive_multipart.csv` — the 16 `full*` results
-- `data/pareto_sb.csv` — 46 K=9 bound rows, 16 of them exhaustively proven ceilings
+- `data/pareto_sb.csv` — 46 K=9 bound rows, all `legacy`
 
 What is still only in `radio_old`: `parsed_260.txt` as a *usable cache* (the extract records
 verdicts, not the full closure), the raw `print*` and `full*` logs behind the extracts, and
