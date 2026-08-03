@@ -728,3 +728,23 @@ Also note the earlier mechanism guess in this journal — "q tests separate the 
 classes" — is **wrong**: at depth 7 the 480:5 tree still holds `120:3`, multiplicity 3. The
 m-side decrements one per level along a chain; it does not split into classes. The `2^q` counts
 paths of a single coin, not classes of coins.
+
+## 2026-08-03 — n-side splits
+
+Question: for an optimal solution, is every n-side split into two non-nil parts, or must
+left-only / right-only be allowed?
+
+Answer: for a **single-part** state, both non-nil — 0 counterexamples across all 13 committed
+trees, and there is a dominance argument. Among one-side-whole splits both routes have exactly
+achievable bounds, since the surviving children are single parts: leaving the *narrow* side
+whole reaches `n = 2·n(k-1,m)`, leaving the *wide* side whole reaches only
+`n = n(k-1,⌈m/2⌉)`. The former is larger on all 76 checkable `(k,m)` pairs. Verified, not
+proved — the margin falls from 2.00 at `m=1` to 1.09 at `k=6,m=10`, so a crossing beyond the
+table is not excluded.
+
+In **multi-part** states it does occur: 34 of 2226 split entries, every one of them inside a
+multi-part state and every one near-square (median `n/m` = 1.12, max 2.0, largest part 20:10;
+the ambient population has median 2.0). In the canonical/atomic trees it never occurs at all,
+0 of 425 — so the journal's provisional exclusion of left/right-column-only supports holds for
+the atomic Pareto matrices it was stated about, and fails only in the near-square corner that
+the stabilisation doctrine already sets aside. Same corner as the `Sb(11:11)` anomaly.

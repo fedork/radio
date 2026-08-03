@@ -80,6 +80,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   symmetric one exists is open.
 - **Reframed obstruction:** `q(m)` is not arbitrary, since `q = k - t`. The real question is
   how deep a solution must go before every leaf is a singleton.
+- **n-side splits (2026-08-03):** for a **single-part** state the wide side always splits into
+  two non-nil parts — 0 counterexamples in 13 trees, and leaving it whole is strictly dominated
+  (`2·n(k-1,m)` vs `n(k-1,⌈m/2⌉)`, verified on all 76 checkable pairs). In **multi-part** states
+  it does occur, 34 times of 2226, all near-square (median `n/m` 1.12). Atomic trees: 0 of 425.
+  See [conjectures.md](conjectures.md#n-side-splits-must-both-parts-be-non-nil-settled-2026-08-03).
 - **Ruled out:** the non-adaptive reformulation. Each test returns
   `[x∈S] + [y∈S]`, so non-adaptive solving is a Sidon condition
   `(U−U) ∩ (V−V) = {0}` — exact for m ≤ 2, but strictly weaker from m = 3 (k=4, m=5: 6 vs 9).

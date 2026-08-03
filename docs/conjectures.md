@@ -167,6 +167,58 @@ symmetric solutions coexisting for the same state.
 **how deep must a solution go before every leaf is a singleton?** That is a property of the
 tree, and a far more tractable target than an integer pulled out of a curve fit.
 
+## n-side splits: must both parts be non-nil? (settled 2026-08-03)
+
+Splitting a part `n:m` by `[a:b]` yields `a:b` / `(n-a):(m-b)` / `a:(m-b)` + `(n-a):b`. The
+question is whether an optimal solution ever leaves the **wide** side whole — `a = 0` or
+`a = n`, the journal's *left-column-only / right-column-only* support, which it provisionally
+excluded.
+
+### For a single-part state: no, and there is a reason
+
+Among splits that leave one side whole, both routes have an **exactly achievable** bound,
+because in each case the surviving children are single parts:
+
+| route | children (outcome 2 / 1) | best n |
+|---|---|---|
+| narrow whole, `b = m` | `a:m` and `(n-a):m` | `n = 2 · n(k-1, m)` |
+| wide whole, `a = n` | `n:b` and `n:(m-b)` | `n = n(k-1, ⌈m/2⌉)` |
+
+Since both are tight, comparing them is conclusive. `2·n(k-1,m) > n(k-1,⌈m/2⌉)` on **all 76
+checkable `(k,m)` pairs**, so leaving the wide side whole is strictly dominated — it caps `n`
+at roughly `2^(k-1)` where the other route reaches nearly `2^k`.
+
+The margin is not uniform. It is `2.00` at `m=1` and falls to `1.09` at `k=6, m=10`, i.e. it
+degrades toward the diagonal. So this is *verified*, not proved: a crossing at larger `m`
+than the table reaches is not excluded.
+
+### Empirically
+
+| source | entries | wide side left whole |
+|---|---|---|
+| canonical / atomic trees (frontier states) | 425 | **0** |
+| numbered `Sa` witnesses | 2226 | 34 (1.5%) |
+| …of those, in a **single-part** state | — | **0** |
+
+All 34 sit inside multi-part states, and all are near-square: median ratio `n/m = 1.12`,
+none above `2.0`, the largest part being `20:10`. Against a population whose median ratio is
+`2.0` and only 29% of which is below `1.5` — so they are 91% concentrated in the corner where
+"wide" and "narrow" barely differ.
+
+### Answer
+
+- **Single-part states:** you may assume both n-side parts are non-nil. Never observed
+  otherwise, and dominated by the argument above.
+- **Atomic Pareto matrices:** likewise — 0 of 425. The journal's exclusion of
+  left/right-column-only supports is confirmed for exactly the objects it is stated about.
+- **Multi-part states in general:** no, you cannot assume it. It happens, rarely, and only for
+  near-square parts — where routing across the other parts changes the trade-off. The
+  degenerate corner is the same one the stabilisation doctrine already sets aside, and the same
+  one that produced the `Sb(11:11)` anomaly in the m=11 profile.
+
+Reproduce with the classification in [journal.md](journal.md#2026-08-03--n-side-splits); the
+comparison uses only `data/pareto_sb.csv`.
+
 ## Structural threads (from the journal)
 
 Carried over from [journal.md](journal.md), unresolved:
