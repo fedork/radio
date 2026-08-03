@@ -80,6 +80,9 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   invariant selects "the" solution — the space splits into genuinely inequivalent classes, which
   reframes the canonicalisation programme: the profile is an invariant of the
   *symmetric, non-wasteful* class, not of the state.
+- **m=6's extra depth is forced.** `target_k=4` on `Sb(473:6)@9` returns `NO_CANONICAL_TREE`:
+  no solution has all leaves canonical above depth 3, against depth 5 for m=5 and 6 for m=3,4.
+  So `q` jumps 4 -> 6 (profile length 16 -> 64), skipping 32 — the same gap seen at m=11.
 - **`Sb(473:6)@9` does not exhibit the profile** — asymmetric, and it wastes 7 paths. This
   answers the journal's headline open question negatively *for that witness*; whether a
   symmetric one exists is open.

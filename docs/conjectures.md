@@ -340,10 +340,20 @@ child `Sb(a:4, (n-a):2)` closes it to **two** values at `k=5,6,7`, and at `k=9` 
 **one**: `a = 231`, appearing as its mirror `[242:4]`.
 
 That is why `canon_473_6_at9` is the *only* tree the canonical search returns, and why there is no
-symmetric alternative to find — at the root there is nothing to choose. It also explains the
-required descent depth: `m=6` must reach depth 3 before its states become atoms of `G_t`, against
-depth 5 for `m=5` and 6 for `m=3,4`. Required canonical depth grows with `m`, and `q = k - t` is
-measuring exactly that.
+symmetric alternative to find — at the root there is nothing to choose.
+
+**The descent depth is forced, not incidental.** Running the search with `target_k = 4`, which
+requires every leaf to be canonical at depth 4 or deeper, returns `NO_CANONICAL_TREE`. So no
+solution of `Sb(473:6)@9` has all its leaves canonical above depth 3 — within the canonical
+hypothesis, m=6 *must* grind two levels deeper than m=5. Required depth by m:
+
+| m | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|
+| min leaf depth `t` at k=9 (k=8 for m=3) | 6 | 6 | 5 | **3** |
+| `q = k - t`, profile length `2^q` | 2 / 4 | 3 / 8 | 4 / 16 | **6 / 64** |
+
+The jump from `q=4` to `q=6` skips 32 entirely — the same gap that appears in the m=11 profile
+length. Whatever forces that skip is probably one phenomenon, not two.
 
 ## Structural threads (from the journal)
 
