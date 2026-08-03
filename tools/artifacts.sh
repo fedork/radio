@@ -63,9 +63,20 @@ WHO="$(gh api user --jq .login 2>/dev/null || true)"
 [ -n "$WHO" ] || die "could not determine the authenticated gh account"
 echo "artifacts: acting as $WHO, store $REPO" >&2
 
+ensure_repo_nonempty() {
+    # A release needs a commit to tag, and `gh repo create` leaves the repo empty.
+    gh api "repos/$REPO/commits?per_page=1" >/dev/null 2>&1 && return 0
+    echo "initialising $REPO with a README (releases need a commit to tag)"
+    local body
+    body=$(printf '# radio-data\n\nBulk solver output for fedork/radio, attached to tagged releases.\n\nThe index, provenance and reliability notes live in `docs/data.md` of the main repo, not\nhere. Fetch with `tools/artifacts.sh pull <tag>`.\n' | base64)
+    gh api -X PUT "repos/$REPO/contents/README.md" \
+        -f message="Initialise artifact store" -f content="$body" >/dev/null
+}
+
 ensure_release() {
     local tag="$1"
     if ! gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
+        ensure_repo_nonempty
         echo "creating release $tag in $REPO"
         gh release create "$tag" -R "$REPO" \
             --title "$tag" \

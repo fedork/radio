@@ -42,12 +42,12 @@ green, and every artifact cited by `data/*.csv` is fetchable by tag.
 
 Outstanding:
 
-- **`gh` credentials.** `git` already pushes as `fedork` via the repo-local
-  `core.sshCommand`. `gh` still needs a one-off `GH_CONFIG_DIR="$PWD/.gh" gh auth login`
-  before the artifact store can be created. See [data.md](data.md).
-- Create the artifact store and upload the 2.1 GB corpus.
-- Push the branch. Until then this work exists on one disk, which is how the K=9 walk was
-  lost.
+- Push the branch. Until then the reorganisation exists on one disk.
+
+Done: credentials (repo-local `core.sshCommand` for git, `GH_CONFIG_DIR=.gh` for `gh`, both
+as `fedork`); the artifact store `fedork/radio-data` with seven tags, round-trip verified;
+the archiving decision recorded in [data.md](data.md) including what was deliberately not
+kept.
 
 ### P2 - Extend the K=9 column constructively
 

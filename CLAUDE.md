@@ -87,15 +87,21 @@ search that finds nothing is a result worth recording in
 
 ## Artifacts
 
-Solver output is large and is **never committed**. The corpus is ~2.1 GB raw, ~9% of that
-under `zstd -19`.
+Solver output is large and is **never committed**. The store is the private repo
+`fedork/radio-data`, as tagged releases; the index is [docs/data.md](docs/data.md).
 
-- Over ~1 MB: archive with `tools/artifacts.sh push <tag> <file>` and add a row to
-  [docs/data.md](docs/data.md).
-- **Archive before deleting.** The K=9 Pareto walk was lost exactly this way, and
-  `run_pareto9.sh` cannot restart without it.
+```
+tools/artifacts.sh list | show <tag> | push <tag> <file>... | pull <tag> [dest] | verify <tag>
+```
+
+- Over ~1 MB: `push` it and add a row to [docs/data.md](docs/data.md). A tag cited as a
+  `source` in `data/*.csv` must exist.
+- **Archive before deleting.** The K=9 Pareto walk was lost exactly this way.
 - Archive raw output, not `parse_out.sh` output. The distilled form drops the `with [...]`
   witnesses, which are what witness-tree reconstruction needs later.
+- **Not everything deserves archiving.** Logs from a build known to emit false negatives are
+  not evidence; extract what is verifiable and let the bulk sit on local storage. See the
+  archiving decision in [docs/data.md](docs/data.md).
 
 This repo is owned by the GitHub account `fedork`, not the machine's default login. Both
 git and `gh` are pointed there per repo, without touching global settings: `git` via
