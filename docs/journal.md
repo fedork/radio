@@ -781,3 +781,24 @@ It is not evidence about optimal solutions in general.
 **Where it stands:** excluding one-sided n-splits costs nothing on anything examined, for m <= 6,
 at every k with data. Not proven safe. Both constructions bottom out in 2-part mixed states whose
 frontier is uncharacterised, and that is the gap.
+
+## 2026-08-03 — invariants across the k=9 trees
+
+Measured on the 9 alternative solutions of `Sb(480:5)@9`. Invariant: total mass (2400, forced)
+and the atom count at the normalisation level (80 = m·2^(k-t), i.e. none of the nine wastes a
+path). Not invariant: root split (9 distinct), leaf count (34..42), leaf-depth profile (9
+distinct), and — the important one — the **atom census, which takes 3 distinct values**.
+
+So there is no invariant that picks out "the" solution of a state. The space splits into
+inequivalent classes. This is the same phenomenon as the two `496:4` witnesses having disjoint
+orbits and different branch-signature multisets: the generator family is not too weak, the objects
+are genuinely different. The defensible statement is that **the profile is an invariant of the
+symmetric non-wasteful class** (7 of the 9), defined by two conditions — atom count `= m·2^(k-t)`
+and census divisible by `m`.
+
+Why m=6 offers no alternatives: the `b=2` split window for `Sb(n(k,6):6)` is 7/10/14/19/25 wide at
+k=5..9 from the single-part constraints, but the mixed child `Sb(a:4,(n-a):2)` closes it to two
+values at k=5,6,7 and to one at k=9 (`a=231`, seen as the mirror `[242:4]`). The canonical search
+therefore returns exactly one tree and there is nothing to choose from at the root. Related: the
+depth at which states become atoms grows with m — 6 for m=3,4, 5 for m=5, 3 for m=6 — and `q = k-t`
+is measuring that.

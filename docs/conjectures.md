@@ -273,6 +273,52 @@ n-splits costs nothing on any state examined so far, at any k, for m <= 6. What 
 the 2-part frontier — until that is characterised, "safe" is unproven rather than supported by
 the near-square exceptions I previously cited, which are now explained away.
 
+## What is actually invariant across the k=9 trees (2026-08-03)
+
+Measured across the **9 alternative solutions** of `Sb(480:5)@9`:
+
+| quantity | across the 9 solutions |
+|---|---|
+| total mass `n·m` | **invariant** (2400) — forced, every candidate pair reaches one leaf |
+| atom count at the normalisation level | **invariant** (80 `= m·2^(k-t)`) — i.e. all nine waste no paths |
+| root split | varies, 9 distinct (`a` from 240 to 248, `b` in {2,3,4}) |
+| leaf count | varies, 34 to 42 |
+| leaf-depth profile | varies, 9 distinct |
+| **atom census** | **varies — 3 distinct values** |
+
+So the census takes **three** different values among nine solutions of the *same state*:
+`{32:45, 31:20, 26:10, 16:5}` for seven of them, and two one-off asymmetric censuses. The two
+outliers are the root `240:4` solution (the only `b=4` one) and the root `243:2` solution.
+
+### Consequence for the canonicalisation programme
+
+There is **no invariant that picks out "the" solution**, because the solution space genuinely
+splits into classes with different atom content. This matches the journal's finding that the two
+`496:4` witnesses have different final branch-signature multisets and disjoint orbits — it is not
+that the generator family is too weak, it is that the objects are inequivalent.
+
+The right statement is narrower and it holds:
+
+> The profile is an invariant of the **symmetric, non-wasteful** class of solutions, not of the
+> state. Seven of the nine `480:5` solutions lie in that class; two do not.
+
+So canonicalise *within* that class and treat the rest as a separate family. What makes the class
+well defined is the two conditions: no empty paths (`atom count = m·2^(k-t)`) and census divisible
+by `m`.
+
+### Why m=6 has no alternatives to compare
+
+The split window for `Sb(n(k,6):6)` at `b=2` is bounded below by `n(k,6) - n(k-1,4)` and above by
+`n(k-1,2)`. Those give a window of 7, 10, 14, 19, 25 values for `k = 5..9` — wide. But the mixed
+child `Sb(a:4, (n-a):2)` closes it to **two** values at `k=5,6,7`, and at `k=9` to essentially
+**one**: `a = 231`, appearing as its mirror `[242:4]`.
+
+That is why `canon_473_6_at9` is the *only* tree the canonical search returns, and why there is no
+symmetric alternative to find — at the root there is nothing to choose. It also explains the
+required descent depth: `m=6` must reach depth 3 before its states become atoms of `G_t`, against
+depth 5 for `m=5` and 6 for `m=3,4`. Required canonical depth grows with `m`, and `q = k - t` is
+measuring exactly that.
+
 ## Structural threads (from the journal)
 
 Carried over from [journal.md](journal.md), unresolved:

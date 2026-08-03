@@ -75,6 +75,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   invariance is automatic, and the whole-tree census is `m` copies of it. Verified on 11 of
   14 committed solutions; `tools/profile_from_tree.py`. Full argument in
   [conjectures.md](conjectures.md#the-profile-has-a-mechanism-derived-2026-08-03).
+- **Invariants (2026-08-03):** across the 9 solutions of `Sb(480:5)@9` only total mass and the
+  atom count `m·2^(k-t)` are invariant; the atom census takes **3 distinct values**. So no
+  invariant selects "the" solution — the space splits into genuinely inequivalent classes, which
+  reframes the canonicalisation programme: the profile is an invariant of the
+  *symmetric, non-wasteful* class, not of the state.
 - **`Sb(473:6)@9` does not exhibit the profile** — asymmetric, and it wastes 7 paths. This
   answers the journal's headline open question negatively *for that witness*; whether a
   symmetric one exists is open.
