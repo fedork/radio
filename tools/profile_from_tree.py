@@ -57,10 +57,21 @@ def block_of(value: int, j: int):
     return None
 
 
-def refine(coeffs, steps: int):
-    """Refine a block-multiplicity vector `steps` levels down. A -> aa, X_i -> x_{i-1} x_i."""
+def refine(coeffs, steps: int, level: int = None):
+    """Refine a block-multiplicity vector `steps` levels down. A -> aa, X_i -> x_{i-1} x_i.
+
+    Only valid while every occupied block r satisfies r < level: block `level` of G_level is
+    the atom of value 1, which cannot split into two positive atoms. Refining past that
+    silently produces blocks that do not exist and atoms of value 0. Raises instead.
+    """
     c = list(coeffs)
     for _ in range(steps):
+        if level is not None:
+            top = max((r for r, n in enumerate(c) if n), default=0)
+            if top >= level:
+                raise ValueError(f"cannot refine block {top} at level {level}: "
+                                 f"it is the unit atom and does not split")
+            level -= 1
         o = Counter()
         for r, n in enumerate(c):
             if not n:
@@ -132,7 +143,12 @@ def analyse(tree):
             r = block_of(a, d)
             if r is None:
                 return None                      # not an atom of G_d
-            for rr, n in enumerate(refine([0] * r + [1], d - t)):
+            try:
+                sub = refine([0] * r + [1], d - t, level=d)
+            except ValueError:
+                return dict(error=f"leaf atom at block {r} of G_{d} cannot be normalised "
+                                  f"to level {t}; the tree has no common refinement level")
+            for rr, n in enumerate(sub):
                 if n:
                     census[atom(rr, t)] += n
                     count += n
@@ -155,6 +171,10 @@ def main() -> int:
         print(f"\n{path}")
         for i, tree in enumerate(load(path), 1):
             a = analyse(tree)
+            if a and a.get("error"):
+                print(f"  solution {i}: {a['error']}")
+                bad += 1
+                continue
             if a is None:
                 print(f"  solution {i}: not a canonical singleton-leaf tree")
                 bad += 1
@@ -175,7 +195,7 @@ def main() -> int:
                 lvl = a["k"] - args.q
                 coeffs = [args.expect.count(chr(65 + r)) for r in range(8)]
                 want = Counter()
-                for rr, n in enumerate(refine(coeffs, lvl - a["t"])):
+                for rr, n in enumerate(refine(coeffs, lvl - a["t"], level=lvl)):
                     if n:
                         want[atom(rr, a["t"])] += n
                 ok = Counter(per) == want
