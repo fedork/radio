@@ -20,7 +20,11 @@ refuted all 16 states `Sb(n1 : 193-n1)` in 9 over ~47 days, and that log was rec
 2026-08-02 - but the same corpus contains 37 provably false negatives with no syntactic
 marker distinguishing them, so the verdict cannot be accepted. See
 [results.md](results.md#sa10-192-achievable-maximality-not-established). Settling it means
-re-running those 16 states on a current build, warm-started from `parsed_260.txt`.
+re-running those 16 states on a current build — and note that a warm start from
+`parsed_260.txt` is **not** a shortcut: the cache contains the 16 verdicts under suspicion, so
+loading it would confirm them circularly, and it cannot be filtered by build era. See the
+warm-start warning in [data.md](data.md#warm-starting-from-parsed_260txt-two-traps). A sound
+negative needs a cold run, which is why this stays expensive.
 
 **H4 - Structural theory.** Prove the closed-form family rather than fitting it. Resolve the
 canonical decomposition matrix questions: the missing second generator, and whether

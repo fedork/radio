@@ -96,7 +96,7 @@ entries.
 | file | size | dates | what it is | priority |
 |---|---|---|---|---|
 | `radio.zip` | 3.56 G → **23 G** | 2023-10-18 | Repo snapshot, 1156 files. Contains **`out26_2.txt` and `out26_3.txt`, the only evidence for `Sa(10) = 192`**, the 26 `print*` witness-tree files, 18 `full*` exhaustive enumerations, and ~18 GB of `out*` logs from a solver generation predating the K=8 correction | **critical (two entries)**, low (the rest) |
-| `parsed_260.txt` | 800 M → 123 M | 2025-02-09 | The accumulated cache, 19.5 M entries. Unbreaks `run_pareto9.sh`; the operational input that makes K=9 work tractable | **high** |
+| `parsed_260.txt` | 800 M → 123 M | 2025-02-09 | The accumulated cache, 19.5 M entries. Unbreaks `run_pareto9.sh`; the operational input that makes K=9 work tractable. **Read the warm-start warning below before reusing it.** | **high** |
 | `pareto9_36..116.txt` | 51 M → 6 M | 2023-12 – 2025-02 | 81 chained frontier runs, no gaps. Near-diagonal K=9 walk, `m = 96` down to ~81 | medium |
 
 Already extracted into git, so the bulk is no longer load-bearing for these facts:
@@ -109,6 +109,28 @@ Already extracted into git, so the bulk is no longer load-bearing for these fact
 What is still only in `radio_old`: `parsed_260.txt` as a *usable cache* (the extract records
 verdicts, not the full closure), the raw `print*` and `full*` logs behind the extracts, and
 the ~18 GB of `out*`.
+
+### Warm-starting from `parsed_260.txt`: two traps
+
+The cache audits clean — 0 contradictions, 0 information-bound violations, 0 header
+mismatches across 19,507,378 entries, and it carries **none** of the 31 known-bad verdicts in
+[`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). So a warm
+start will not reintroduce any *identified* error. But:
+
+1. **It contains the 16 suspect `Sa(193)` verdicts.** Re-running those states with this cache
+   loaded would read the old answers straight back and "confirm" them. Any attempt to settle
+   H3 must strip those 16 lines first, or it is circular.
+
+2. **Absence of known errors is not absence of errors.** Only 1,023 of 19.5 M entries are
+   checkable against the proven tables at all; the rest are multi-part states or `k = 9`,
+   where there is nothing to check against. The cache was accumulated from runs spanning
+   2023–2025 and does **not** record which build produced each line, so 2023-era negatives
+   cannot be filtered out. A warm-started result is only as sound as the cache beneath it.
+
+The practical consequence: `parsed_260.txt` is excellent for *finding* solutions — a positive
+result can always be re-verified as a witness tree, so a poisoned negative can only slow the
+search, never corrupt the answer. It is **not** a safe basis for a new negative result. Cold
+runs are the only sound route to those, which is why H3 is expensive.
 
 ### Elsewhere
 
