@@ -2,15 +2,20 @@
 #
 # Push and pull bulk solver output to a GitHub release store.
 #
-# Raw solver logs are far too large for this repo (the corpus is ~2.1 GB) but they are the
-# evidence behind every "proven-exhaustive" row in data/pareto_sb.csv, so losing them means
-# losing the provenance. They are compressed with zstd -19 (about 9% of raw, losslessly)
-# and attached to tagged releases on a separate private repo. The *index* of what exists
-# stays in docs/data.md, in this public repo, so the knowledge survives even if the bytes
-# are not to hand.
+# Raw solver logs are far too large for this repo (~3.2 GB archived, ~26 GB in total across
+# machines) but they are the evidence behind the "proven-exhaustive" rows in
+# data/pareto_sb.csv, so losing them means losing the provenance. The valuable subset is
+# compressed with zstd -19 (about 10% of raw, losslessly) and attached to tagged releases on
+# a separate private repo.
+#
+# Two indexes live in this public repo, so the knowledge survives even when the bytes are not
+# to hand: docs/data.md for humans (including what was deliberately NOT archived and why),
+# and data/artifacts.csv for machines, which is what makes a `tag:path` source in data/*.csv
+# checkable offline. `check-index` confirms the two still agree with the store.
 #
 # Usage:
 #   tools/artifacts.sh list                        list tags in the store
+#   tools/artifacts.sh check-index                 confirm data/artifacts.csv matches the store
 #   tools/artifacts.sh show <tag>                  print a tag's manifest
 #   tools/artifacts.sh push <tag> <file>...        compress, upload, record
 #   tools/artifacts.sh pull <tag> [dest]           download, verify sha256, decompress
@@ -170,8 +175,35 @@ cmd_verify() {
     cmd_pull "$tag" "$tmp"
 }
 
+cmd_check_index() {
+    # data/artifacts.csv is the offline index that makes `tag:path` sources checkable.
+    # This confirms it still matches the store.
+    local idx="$REPO_ROOT/data/artifacts.csv"
+    [ -f "$idx" ] || die "no $idx"
+    local have rc=0
+    have="$(gh release list -R "$REPO" --limit 100 --json tagName --jq '.[].tagName' | sort -u)"
+    local tag asset rest prev=""
+    while IFS=, read -r tag asset rest; do
+        [ "$tag" = "tag" ] && continue
+        if ! grep -qx "$tag" <<<"$have"; then
+            [ "$tag" = "$prev" ] || echo "MISSING TAG   $tag"
+            prev="$tag"; rc=1; continue
+        fi
+        if ! gh release view "$tag" -R "$REPO" --json assets \
+                --jq '.assets[].name' 2>/dev/null | grep -qx "$asset"; then
+            echo "MISSING ASSET $tag / $asset"; rc=1
+        fi
+    done < "$idx"
+    local extra
+    extra="$(comm -13 <(awk -F, 'NR>1{print $1}' "$idx" | sort -u) <(echo "$have"))"
+    [ -n "$extra" ] && echo "IN STORE BUT NOT INDEXED: $extra" && rc=1
+    [ $rc -eq 0 ] && echo "index matches the store"
+    return $rc
+}
+
 case "${1:-}" in
     list)   shift; cmd_list "$@" ;;
+    check-index) shift; cmd_check_index "$@" ;;
     show)   shift; cmd_show "$@" ;;
     push)   shift; cmd_push "$@" ;;
     pull)   shift; cmd_pull "$@" ;;
