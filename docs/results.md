@@ -15,19 +15,20 @@ Largest `n` such that `Sa(n)` is solvable in `k` tests.
 <!-- generated:pareto_sa -->
 | k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
+| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | (192) |
 
 Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
 <!-- /generated -->
 
-**The whole row is proven maximal, k = 0..10.** For `k = 1..9`, `out_radio_1.txt` contains
-both a `can solve Sa(n)` line and a `can't solve Sa(n+1)` line; this was re-confirmed
-mechanically rather than taken from the older write-up. For `k = 10` see below.
+`k = 1..9` are proven maximal: `out_radio_1.txt` contains both a `can solve Sa(n)` line and a
+`can't solve Sa(n+1)` line for each, re-confirmed mechanically rather than taken from the
+older write-up. `k = 10` is a **lower bound** — see below.
 
-Achievability additionally has verified witness trees at every k from 7 up:
-`witnesses/sa38_k7.tree`, `sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}`, `sa192_k10_{a,b}`.
+Achievability has verified witness trees at every k from 7 up: `witnesses/sa38_k7.tree`,
+`sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}`, `sa192_k10_{a,b}`. These are proofs independent of the
+solver, so `Sa(192)` in 10 is not in doubt.
 
-### Sa(10) = 192 is maximal
+### Sa(10): 192 achievable, maximality NOT established
 
 `Sa(n)` in `k` splits into a taken group of `n1` and the rest, requiring `Sa(n1)` solvable
 in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA`, `radiobase.c:1041`). Since
@@ -37,16 +38,28 @@ in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA`, `radiobase.c:10
 Sb(n1 : 193 - n1)  in 9,   for n1 = 97 .. 112
 ```
 
-**All sixteen were exhaustively refuted.** `Sb(112:81)` alone took ~20 days over 12 passes;
-the other fifteen plus the `Sa(193)` verdict took a further ~27 days. Roughly 47 days of
-solve time in about 90 GB of virtual memory, so this is not a fact anyone will re-derive
-casually. The log lines are preserved in
-[`evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt); the sixteen
-`Sb` verdicts also appear as `bound=upper` rows in `data/pareto_sb.csv`, where they pin the
-K=9 frontier for `m = 81..96`.
+A 2023 run refuted all sixteen and concluded `can't solve Sa(193) in 10` after ~47 days of
+solve time in about 90 GB of virtual memory. The log lines are preserved in
+[`evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt), and the
+sixteen `Sb` verdicts appear as `bound=upper`, `status=legacy` rows in `data/pareto_sb.csv`.
 
-Recovered 2026-08-02 from `radio.zip` in `~/radio_old` (2023-10-18 snapshot). Until then
-this result was, as far as the repo was concerned, lost.
+**That evidence is not sufficient.** Auditing the 2023 corpus turned up **37 single-part
+negatives that are provably false** — about 0.27% of its negatives — recorded in
+[`evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). Among them
+are the `K=8, m=10..17` verdicts that the 2026-05-12 recomputation had already corrected, so
+the failure is real and independently rediscovered. Crucially it has **no reliable syntactic
+marker**: `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days of exhaustive
+search, and is wrong.
+
+The `Sa(193)` verdicts carry exactly that profile — long, multi-pass, `fast_solve=0` — so
+they cannot be distinguished from the known-bad ones on their face. By contrast the same
+audit over the 2026 artifacts finds **0 contradictions in 2,723** single-part verdicts.
+
+What would settle it: re-running the 16 states on a current build, warm-started from
+`parsed_260.txt`. That is expensive but far cheaper than the original 47 days, and it is the
+only route — the original claim cannot be rehabilitated by inspection.
+
+Recovered 2026-08-02 from `radio.zip` in `~/radio_old` (2023-10-18 snapshot).
 
 ## Sb: the Pareto frontier
 
@@ -159,10 +172,10 @@ The `k=8` column for `m = 10..17` was corrected in the 2026-05-12 recomputation
 circulate with the superseded values `182, 176, 170, 165, 159, 153, 148, 142`; they are
 wrong. `data/pareto_sb.csv` is the only copy that should be consulted.
 
-The K=9 column now has three kinds of entry. Small `m` has lower bounds from constructions
-and witness trees; `m = 65..96` has bounds recovered from the `Sa(192)` / `Sa(193)`
-computations, including sixteen exhaustively proven ceilings. Everything between - the whole
-band `m = 7..64` - is still blank.
+The K=9 column has three kinds of entry. Small `m` has lower bounds from constructions and
+verified witness trees. `m = 65..96` has bounds recovered from the `Sa(192)` / `Sa(193)`
+computations - but those come from the 2023 build and are `status=legacy`, including all
+sixteen ceilings; treat the `≤` values as unconfirmed. The whole band `m = 7..64` is blank.
 
 `k = 9`, small `m`: six established entries, all **lower bounds** except `m=1`:
 

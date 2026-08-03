@@ -6,18 +6,21 @@ entries. Last revised 2026-08-02.
 ## High-level goals
 
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
-proven optimal for **`k <= 10`**, the `Sb` Pareto frontier proven for `k <= 8`, and the two
-theorems. The draft in `paper/` is close; the mathematics is further along than the write-up,
-and further along than the draft's own claim of `k <= 9`.
+proven optimal for `k <= 9` with `Sa(192)` in 10 as a verified construction, the `Sb` Pareto
+frontier proven for `k <= 8`, and the two theorems. The draft in `paper/` is close. Its claim
+of optimality through `k <= 9` is exactly right - do not "upgrade" it to 10 without redoing
+the `Sa(193)` computation.
 
-**H2 - The K=9 Sb column.** Six lower bounds at small `m`, plus bounds at `m = 65..96`
-recovered from the Sa work (16 of them exhaustively proven ceilings). The band `m = 7..64` is
-entirely blank. This is now the main open front.
+**H2 - The K=9 Sb column.** Six lower bounds at small `m`, plus `legacy` bounds at
+`m = 65..96` recovered from the Sa work. The band `m = 7..64` is entirely blank. This is the
+main open front.
 
-**H3 - CLOSED 2026-08-02.** `Sa(10) = 192` is maximal. All 16 states `Sb(n1 : 193-n1)` in 9
-were exhaustively refuted in a ~47-day run recovered from `radio.zip`; see
-[results.md](results.md#sa10--192-is-maximal). The `Sa` row is now complete and proven for
-k = 0..10.
+**H3 - Is `Sa = 192` maximal at k=10?** Still open, and now better understood. A 2023 run
+refuted all 16 states `Sb(n1 : 193-n1)` in 9 over ~47 days, and that log was recovered on
+2026-08-02 - but the same corpus contains 37 provably false negatives with no syntactic
+marker distinguishing them, so the verdict cannot be accepted. See
+[results.md](results.md#sa10-192-achievable-maximality-not-established). Settling it means
+re-running those 16 states on a current build, warm-started from `parsed_260.txt`.
 
 **H4 - Structural theory.** Prove the closed-form family rather than fitting it. Resolve the
 canonical decomposition matrix questions: the missing second generator, and whether
@@ -88,6 +91,8 @@ pursue it at all.
   [theorems/unit-group-elimination.md](theorems/unit-group-elimination.md)), Insights,
   Refuted lemmas.
 - Add lemma (12) for `m = 8`, and the `G_k = sum of binomials` closed form.
+- Present `Sa(192)` in 10 as a construction with a verified witness tree, and say plainly that
+  maximality at k=10 is open. Do not repeat the 2023 `Sa(193)` verdict as established.
 - Fix the numbering collision: `(7)` is currently a duplicate of `(5)`, and the sentence
   "(7) holds true k up to 8" plainly refers to `(u1)`.
 - State the `k <= 9` / `k = 10` distinction in the `Sa` table itself, not only in prose.
@@ -97,11 +102,14 @@ contains no number absent from `data/*.csv`.
 
 ## Ordering
 
-P1 first and quickly. The `Sa(10) = 192` proof spent ~47 days of compute and, until
-2026-08-02, existed in exactly one place: a zip on one disk. Archiving is not housekeeping
-here.
+P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed
+in exactly one place: a zip on one disk. It is unreliable but not worthless - it is the only
+record of what has been attempted, and re-deriving from scratch is what costs months.
 
-Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not contend. P5 has
-grown more valuable now that `k <= 10` is fully proven: the draft understates its own result.
-P3 follows P2, reusing the same tooling and the same feel for which `target_k` values work.
-P4 is now more a costing exercise than a plan.
+Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not contend. P3 follows
+P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
+more a costing exercise than a plan.
+
+H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
+"probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is
+blocked - so re-running the 16 states is worth doing when spare compute exists, not before.

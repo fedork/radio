@@ -1,3 +1,8 @@
+# WARNING: the verdicts below are NOT established. The 2023 build that produced them is now
+# known to emit false negatives - 37 of them, including from multi-day exhaustive passes.
+# See evidence/refuted_2023_negatives.txt. Sa(192) achievability is separately PROVEN by
+# verified witness trees; only Sa(193) unsolvability, and hence maximality, is in doubt.
+#
 # Certification: Sa(193) is NOT solvable in 10 tests, hence Sa(10) = 192 is maximal.
 #
 # Sa(n) in k splits into a taken group of n1 and the rest, requiring Sa(n1) solvable in

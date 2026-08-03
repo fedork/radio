@@ -125,3 +125,24 @@ This file is maintained the same way as the research record.
 
 Changes to this file are part of the work, not overhead: an instruction that would have
 prevented a mistake is worth more than the fix for that mistake.
+
+## Log-era reliability (added 2026-08-02)
+
+Solver output is not uniformly trustworthy, and the difference is by *era*, not by how
+expensive the run looks.
+
+- **2026 artifacts** (`out_k7.txt`, `out_radio_1.txt`, `out_k8.txt`): audited clean, 0
+  contradictions in 2,723 single-part verdicts. These back the K<=8 table.
+- **2023 corpus** (everything in `radio.zip`): **37 provably false negatives**, ~0.27% of its
+  single-part negatives. Recorded in `evidence/refuted_2023_negatives.txt`. It includes the
+  `K=8, m=10..17` band that the 2026-05-12 recomputation corrected.
+
+There is **no syntactic marker** separating good from bad. `Sb(143:17)` in 8 was declared
+unsolvable after 10 passes and 4 days of exhaustive search, and is wrong. Cheap
+`fast_solve=1, totalsplits=0` lines are *mostly* the bad ones but 569 such lines are correct,
+so the signature is useless as a filter.
+
+Practical consequence: **run `tools/extract_evidence.py audit <file>` before trusting any
+unfamiliar log**, and never promote a 2023-era negative above `legacy`. Positive results are
+different - a witness tree can be re-verified from first principles, so achievability claims
+stand on their own regardless of era.

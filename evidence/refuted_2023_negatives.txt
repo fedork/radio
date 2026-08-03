@@ -1,0 +1,56 @@
+# REFUTED verdicts: single-part negatives from the 2023-era solver that are provably wrong.
+#
+# Found 2026-08-02 by `tools/extract_evidence.py audit` over the ~18 GB of out*/pareto* logs
+# inside radio.zip. Each line below claims a state is UNSOLVABLE in k, where the 2026
+# artifacts prove a solution exists at or above that size. They are false negatives.
+#
+# Rate: 37 wrong out of 13,554 single-part negatives, about 0.27%. For comparison, the same
+# audit over the 2026 artifacts (out_k7.txt, out_radio_1.txt, out_k8.txt) finds 0 wrong out
+# of 2,723.
+#
+# Several of these are the K=8 m=10..17 band that the 2026-05-12 recomputation corrected -
+# e.g. Sb(154:15), Sb(149:16), Sb(143:17) against old maxima of 153, 148, 142 and corrected
+# maxima of 155, 150, 144. So this audit independently rediscovers that known error.
+#
+# What matters is that the failure has NO reliable syntactic marker. Many are cheap
+# fast_solve=1 passes with totalsplits near zero, but some are long multi-pass exhaustive
+# runs that look entirely authoritative:
+#
+#     Sb(143:17) in 8  pass=10 fast_solve=0  took 347105   <- 4 days, and wrong
+#     Sb(154:15) in 8  pass=8  fast_solve=0  took  52230   <- 14 hours, and wrong
+#
+# CONSEQUENCE: no negative result from the 2023 corpus can be trusted on its own, however
+# expensive it looks. This is why Sa(193) is recorded as `legacy` rather than
+# `proven-exhaustive` - see evidence/sa193_unsolvable_in_10.txt.
+#
+can't solve Sb(29:1)[29,30] in 5 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451924/43640018(-46/-2582)
+can't solve Sb(63:2)[126,65] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451473/43606822(-5/-3245)
+can't solve Sb(62:2)[124,64] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451468/43603605(-5/-3217)
+can't solve Sb(61:2)[122,63] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451463/43600408(-5/-3197)
+can't solve Sb(60:2)[120,62] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451458/43597249(-5/-3159)
+can't solve Sb(59:2)[118,61] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451453/43594152(-5/-3097)
+can't solve Sb(58:2)[116,60] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451448/43591106(-5/-3046)
+can't solve Sb(57:2)[114,59] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451443/43588110(-5/-2996)
+can't solve Sb(54:4)[216,58] in 6 took 0.001 totalsplits=2 pass=1 fast_solve=1 cache=451429/43583276(-19/-8539)
+can't solve Sb(53:4)[212,57] in 6 took 0.001 totalsplits=2 pass=1 fast_solve=1 cache=451405/43576558(-12/-5267)
+can't solve Sb(50:5)[250,55] in 6 took 0.000 totalsplits=3 pass=1 fast_solve=1 cache=451270/43567503(-14/-6861)
+can't solve Sb(49:5)[245,54] in 6 took 0.001 totalsplits=4 pass=1 fast_solve=1 cache=451242/43558925(-14/-7165)
+can't solve Sb(56:3)[168,59] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451241/43558473(-1/-452)
+can't solve Sb(55:3)[165,58] in 6 took 0.000 totalsplits=2 pass=1 fast_solve=1 cache=451241/43558473(+0/+0)
+can't solve Sb(46:6)[276,52] in 6 took 0.001 totalsplits=7 pass=1 fast_solve=1 cache=451197/43633501(-16/-8998)
+can't solve Sb(59:1)[59,60] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=547109/64341414(+0/+0)
+can't solve Sb(82:10)[820,92] in 7 took 0.572 totalsplits=144 pass=1 fast_solve=1 cache=2466305/123138905(+0/+0)
+can't solve Sb(57:1)[57,58] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=4536132/218597748(-69/-33392)
+can't solve Sb(86:9)[774,95] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=22946056/1060611766(-103/-220423)
+can't solve Sb(143:17)[2431,160] in 8 took 347105 totalsplits=586 pass=10 fast_solve=0 cache=27223782/1369561939(+0/+0)
+can't solve Sb(90:8)[720,98] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=27624460/1421402761(-125/-263942)
+can't solve Sb(149:16)[2384,165] in 8 took 0.379 totalsplits=503 pass=1 fast_solve=1 cache=27992505/1440806738(+0/+0)
+can't solve Sb(154:15)[2310,169] in 8 took 52230 totalsplits=517 pass=8 fast_solve=0 cache=27685071/1457577218(+0/+0)
+can't solve Sb(95:7)[665,102] in 7 took 0.001 totalsplits=0 pass=1 fast_solve=1 cache=27481698/1470160499(-152/-317491)
+can't solve Sb(160:14)[2240,174] in 8 took 15155 totalsplits=458 pass=6 fast_solve=0 cache=27455979/1471634724(+0/+0)
+can't solve Sb(166:13)[2158,179] in 8 took 2988 totalsplits=462 pass=3 fast_solve=0 cache=27242593/1477657889(+0/+0)
+can't solve Sb(100:6)[600,106] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=27294670/1507473597(-155/-338497)
+can't solve Sb(171:12)[2052,183] in 8 took 929 totalsplits=364 pass=2 fast_solve=0 cache=27306319/1510828990(+0/+0)
+can't solve Sb(177:11)[1947,188] in 8 took 271 totalsplits=426 pass=1 fast_solve=1 cache=27386462/1535901302(+0/+0)
+can't solve Sb(103:5)[515,108] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=27441414/1549826798(-153/-330589)
+can't solve Sb(183:10)[1830,193] in 8 took 6 totalsplits=347 pass=1 fast_solve=1 cache=27440628/1549484634(+0/+0)
