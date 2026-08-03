@@ -107,13 +107,18 @@ allocates 1.26 GB per pool chunk and never frees one (see [docs/tools.md](docs/t
 exhausting search grows without bound. Run it as
 
 ```
-( ulimit -v 6000000; ulimit -t 900; ./radio_canon_search_generic ... )
+clang -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 -DMAX_TREE_NODES=400000 \
+      -DMAX_MEMO=4000000 radio_canon_search_generic.c -o canon
+( ulimit -t 900; ./canon 3 9 473 6 )
 ```
 
-`timeout` is **not installed on this machine** — use the shell builtin `ulimit -t` (CPU
-seconds), which is portable and arguably the better bound here. Also compile with
-`-DMAX_STATE_SIZE=1024`: the default 5120 makes a tree node 61 KB where 12 KB suffices for
-`k <= 9`, a 5x memory saving.
+Bound memory at **compile time**, not with `ulimit`: `ulimit -v` is unsupported on macOS and
+fails silently, and `timeout` is not installed either — `ulimit -t` (CPU seconds) is the one
+portable runtime bound. `MAX_TREE_NODES x sizeof(TreeNode) + MAX_MEMO x 192` is the real
+ceiling; the numbers above give about 5.7 GB.
+
+When the pool is exhausted the search prints `out of nodes` and exits 2. **That is an abort,
+not a proof of absence** — do not read it as `NO_CANONICAL_TREE`.
 
 one at a time, and `pgrep -f radio_canon` before launching another. On 2026-08-03 three
 concurrent runs reached 28+21+12 GB and pushed the machine into heavy swap, because two of them
