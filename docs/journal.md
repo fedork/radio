@@ -877,3 +877,19 @@ solutions all stand.
 
 Lesson: the m-side is not intrinsic. `Sb(a:b) = Sb(b:a)`, and any model that privileges one side
 has to detect when the solver's normalisation swaps them.
+
+## 2026-08-03 — the 473:6 two-sided enumeration completed; what "1 tree" means
+
+Normal exit, not a timeout: the two-sided search over every top-level split of `Sb(473:6)@9`
+returns **exactly one tree**, identical to the committed one. The unrestricted search also returns
+exactly one. Both share the root `[242:4]`.
+
+This is not evidence that no symmetric tree exists, and the reason matters. `search_state` returns
+on the *first* successful subtree and memoises it, so `print_all_top_level_trees` emits one tree
+per **top-level split**, not all trees. `Sb(473:6)@9` has exactly one working top split, hence one
+tree per mode — while we already know at least two distinct subtrees exist beneath it, since the
+restricted and unrestricted searches return different ones.
+
+So "1 tree" is a count of top splits. Settling whether `473:6` admits a symmetric tree needs a
+search that enumerates subtrees, or one that optimises the census directly. Neither exists yet,
+and building one is the obvious next step for the H4 thread.

@@ -338,10 +338,20 @@ split into two members of `R(d-1)`, and `R(3) = {1,4,7,8}` gives sums `{2,5,8,9,
 two-sided search must fail. It did not: the tree it found simply never produces `Sb(7:1)@4`. The
 arithmetic obstruction is real but local, and a different route avoids the state entirely.
 
-**Still open:** the two-sided `473:6` tree is asymmetric, so it carries no m=6 profile. Waste is
-down from 7 paths to 2, which is closer to the profile condition (`0` waste and census divisible
-by `m`) but not there. The run was cut off by its CPU cap while enumerating further top splits, so
-better trees may exist.
+**Full enumeration completed** (2026-08-03, normal exit, not a timeout): the two-sided search
+over *every* top-level split of `Sb(473:6)@9` yields **exactly one tree**, the one committed.
+The unrestricted search likewise yields exactly one. Both have the same root, `[242:4]`.
+
+That does **not** show a symmetric tree is impossible, and the reason is a property of the search
+worth stating plainly: `search_state` returns on the **first** successful subtree and memoises it,
+so the enumeration produces one tree *per top-level split*, not all trees. Only one top split
+works for `473:6@9`, so we see one tree per restriction mode — and we know at least two distinct
+subtrees exist beneath that single root, because the restricted and unrestricted searches return
+different ones.
+
+So the count "1 tree" measures top splits, not solutions. Deciding whether `Sb(473:6)@9` admits a
+symmetric tree needs a search that enumerates *subtrees*, or one that optimises the census
+directly. Neither exists.
 
 ## What is actually invariant across the k=9 trees (2026-08-03)
 

@@ -81,6 +81,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   invariant selects "the" solution — the space splits into genuinely inequivalent classes, which
   reframes the canonicalisation programme: the profile is an invariant of the
   *symmetric, non-wasteful* class, not of the state.
+- **The canonical searches report one tree per *top split*, not all trees.** `search_state`
+  returns on the first successful subtree and memoises it. `Sb(473:6)@9` has exactly one working
+  top split (`[242:4]`), so each mode returns exactly one tree — yet restricted and unrestricted
+  return *different* subtrees under it, proving several exist. Do not read "1 tree" as "one
+  solution", and do not read it as evidence that no symmetric tree exists.
 - **m=6's extra depth is forced.** `target_k=4` on `Sb(473:6)@9` returns `NO_CANONICAL_TREE`:
   no solution has all leaves canonical above depth 3, against depth 5 for m=5 and 6 for m=3,4.
   So `q` jumps 4 -> 6 (profile length 16 -> 64), skipping 32 — the same gap seen at m=11.
