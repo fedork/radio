@@ -18,6 +18,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
+| **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 
 ## Goals
 
@@ -25,7 +26,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 |---|---|---|
 | **H1** | Publish | Draft in `paper/`. K≤8 table and both theorems are solid; `<TODO>` sections and the stale K=8 column remain. See P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Six lower bounds at small m; `legacy` bounds at m=65..96; the band **m = 7..64 is entirely blank**. |
-| **H3** | Is `Sa = 192` maximal at k=10? | **Open.** A 2023 run says yes over ~47 days, but that corpus is unreliable. Needs a cold re-run of 16 states. |
+| **H3** | Is `Sa = 192` maximal at k=10? | **Open.** A 2023 run says yes over ~47 days, but that corpus is unreliable. Needs a cold re-run of **all 16** states — conjecture (u1) would collapse them to one, but it is unproved and 2026-08-03 closed the two obvious routes to it. |
 | **H4** | Structural theory | Active and promising — see below. |
 
 ## What is established
@@ -39,7 +40,10 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   [`../evidence/pareto_certification_k1_8.txt`](../evidence/pareto_certification_k1_8.txt),
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
-- **Two theorems** — Singleton Majorization and Unit-Group Elimination, both proved.
+- **Three theorems** — Singleton Majorization, Unit-Group Elimination and Subgraph
+  Monotonicity, all proved. The third is elementary but was load-bearing and unwritten: it is
+  what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
+  on, and what lets a negative certificate store antichains instead of closures.
 - **15 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
   `Sb(480:5)@9`. All pass
@@ -125,12 +129,24 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   `[x∈S] + [y∈S]`, so non-adaptive solving is a Sidon condition
   `(U−U) ∩ (V−V) = {0}` — exact for m ≤ 2, but strictly weaker from m = 3 (k=4, m=5: 6 vs 9).
   Adaptivity is essential; the Sidon picture is an intuition device, not a reduction.
+- **Conjecture (u1) — mapped, not proved (2026-08-03).** `Sb(n1:n2)` solvable in k, n1 ≥ n2,
+  implies `Sb((n1+1):(n2-1))`; equivalently the frontier decreases *strictly* in m. Now
+  exhaustive over every one-part state at k ≤ 5, on top of the 130 proven cells. Two routes are
+  **refuted**: the multi-part generalisation is false (`Sb(15:2,5:4)` solvable in 4,
+  `Sb(15:2,6:3)` not), which kills every induction that rewrites a strategy part by part; and no
+  mass-based coin-move lemma exists (`Sb(8:1,2:1)` solvable in 3, `Sb(9:1)` not, at strictly
+  lower mass — by Singleton Majorization, not by solver). What remains is one lemma: *the winning
+  split minimising `p−q` survives the coin move*, 187/187 at k ≤ 5 plus 28 at k = 6.
+  [conjectures.md](conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
+- **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
+  no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
+  k ≤ 6 only — but auditable, which is what settles structural questions.
 
 ## Infrastructure
 
 Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 `tools/extract_evidence.py` (`certify` / `audit`), `tools/artifacts.sh`
-(`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`.
+(`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`.
 
 Artifact store `fedork/radio-data` (private): 7 tags, 12 assets plus a manifest per tag,
 367 MB stored, `check-index` green.
@@ -147,3 +163,7 @@ Do not run `gh auth switch`.
 2. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
    invariant from a fit into a derivation, and needs no new compute.
 3. `... 432 9` — discriminates the profile model (432) from the closed form (431).
+4. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
+   here needing no compute at all. An exchange argument is the natural shape; the surviving
+   obligations are listed in
+   [conjectures.md](conjectures.md#where-the-proof-gets-stuck).

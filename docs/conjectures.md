@@ -87,10 +87,136 @@ Both are natural canonical-search targets and would extend the artifact-backed p
 ./run_radio_canon_search_generic.sh 4 9 447 8
 ```
 
-## Conjecture (u1)
+## Conjecture (u1) - the antidiagonal conjecture
 
-`n(k, m-1) >= n(k, m) + 1`. Holds on all 130 proven cells. Stated in
-[theorems/special-cases.md](theorems/special-cases.md#conjecture-u1). Unproved.
+> If `Sb(n1 : n2)` is solvable in `k` for `n1 >= n2`, then so is `Sb((n1+1) : (n2-1))`.
+
+Equivalently `n(k, m-1) >= n(k, m) + 1`: the frontier decreases **strictly** in `m`. Formal
+statement in [theorems/special-cases.md](theorems/special-cases.md#conjecture-u1). Still
+unproved, but 2026-08-03 mapped it out: the evidence is much stronger than the 130 cells,
+two natural proof routes are now **refuted**, and what is left is a single crisp lemma.
+
+### Why it is worth proving
+
+`Sa(193)` in 10 reduces to sixteen states `Sb(n1 : 193-n1)`, `n1 = 97..112`
+([results.md](results.md#sa10-192-achievable-maximality-not-established)). They are pairwise
+incomparable under subgraph monotonicity, so all sixteen need refuting - about 47 days of
+2023 compute, of which the fifteen easier ones were 58%. Under (u1) they chain: refuting the
+most lopsided `Sb(112:81)` refutes the other fifteen, and the negative certificate shrinks
+16-fold.
+
+### Evidence
+
+- All 130 proven cells, `k = 1..8`, no violations - checked by `tools/check_tables.py`.
+- Exhaustive over **every** one-part state, not just frontier cells, for `k <= 5`:
+  `tools/refsolve.py check-c 5`.
+- `tools/refsolve.py` is an independent second implementation written from
+  [problem.md](problem.md) alone; it reproduces the proven columns for `k = 1..6` exactly.
+
+### It is not an instance of subgraph monotonicity
+
+In the graph reformulation
+([theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md)) both states live on
+the same `n1 + n2` vertices: moving one coin `z` from the small side to the large side
+deletes the `n1` edges from `z` to the large side and adds `n1_new - 1 = n2 - 1` edges from
+`z` to the rest of the small side. Since `n1 >= n2`, mass strictly drops - but neither graph
+contains the other, so the theorem does not apply and no amount of dominance bookkeeping
+will produce (u1).
+
+### Refuted: the multi-part generalisation (2026-08-03)
+
+The obvious induction needs (u1) to hold for a part *inside* a larger state, because the
+mixed child of any test has two parts. It does not.
+
+```
+Sb(15:2, 5:4)  mass 50   can solve   in 4   (split [8:1, 1:1])
+Sb(15:2, 6:3)  mass 48   can't solve in 4
+```
+
+The move is intra-part with `n >= m`, and mass *decreases*. Confirmed by two independent
+solvers; reproduce in under a second with either:
+
+```
+tools/refsolve.py solve 4 15 2 5 4        # can solve
+tools/refsolve.py solve 4 15 2 6 3        # can't solve
+clang -O3 -DMAX_K=4 -DMAX_N=40 radio_one.c -o /tmp/r4 && /tmp/r4 4 15 2 6 3
+```
+
+**Consequence, and the main structural finding:** no induction on `k` that rewrites a
+strategy part by part can prove (u1). Whatever proof exists must treat the one-part state as
+a whole. This also makes the pair a good regression case for the solver.
+
+### Refuted: any mass-based move lemma
+
+The natural framework - "moving one coin between parts preserves solvability whenever mass
+does not increase" - is false even with *strict* decrease:
+
+```
+Sb(8:1, 2:1)  mass 10   solvable in 3
+Sb(9:1)       mass  9   not solvable in 3
+```
+
+obtained by moving a coin off the `1`-side of `(2:1)` (losing 2 edges) onto the `8`-side of
+`(8:1)` (gaining 1). Both states are singleton states, so this rests on the **Singleton
+Majorization Theorem**, not on a solver run: `(8,2)` has prefix sums `8, 10` against
+`G_3 = (8,7,4,4,1,1,1,1)` and passes; `(9)` fails at `9 > 8`. So there is no potential
+function of that shape, and (u1) is not the shadow of a more general monotonicity.
+
+### What remains: the Extremal Split Lemma
+
+Only two edits of a winning split `(p,q)` of `(a:b)` leave one of the outer children
+untouched, according to whether the moved coin `z` was in the test:
+
+| | split of `(a+1 : b-1)` | outcome-0 child | outcome-2 child | mixed child |
+|---|---|---|---|---|
+| **A** (`z` taken) | `(p+1, q-1)` | `= C_0`, free | `(p+1 : q-1)` | `{(p+1 : b-q), (a-p : q-1)}` |
+| **B** (`z` untaken) | `(p, q)` | `(a+1-p : b-1-q)` | `= C_2`, free | `{(p : b-1-q), (a+1-p : q)}` |
+
+These are one statement, not two: edit A on `s` yields the complement, within the target, of
+edit B on the complement of `s`, and complementary splits have the same three children with
+outcomes 0 and 2 swapped. Under complementation `p-q` maps to `(a-b) - (p-q)`.
+
+> **Extremal Split Lemma (conjectured).** Let `a >= b >= 2` and let `Sb(a:b)` be solvable in
+> `k`. Among all winning splits let `(p*, q*)` minimise `p - q`. Then `(p*+1, q*-1)` is a
+> winning split of `Sb(a+1 : b-1)`.
+
+Verified by `tools/refsolve.py check-extremal 5`: **187 of 187** solvable states with
+`b >= 2` at `k = 2..5`, no exceptions, including every awkward diagonal case. A `k=6`
+spot check over the seven states below each of `n(6,2)=63`, `n(6,3)=58`, `n(6,4)=54`,
+`n(6,5)=50` adds **28 more**, also without exception. It has not been tested above `k=6`;
+`radio_full`'s `all_solutions` is the cheap way to push it to `k=7,8`, since that enumerates
+exactly the winning-split set the lemma quantifies over.
+
+Extremality is essential, not cosmetic. At `(10:2)` in 4 the winner `(8,1)` - maximal
+`p - q` - fails: edit A gives mixed child `{(9:1)}`, unsolvable in 3 because `n(3,1) = 8`.
+The minimal winners `(2,1)` and `(3,2)` both survive. Selecting by `min p` scores equally
+well; `min q`, `max p` and the mass-based selectors all fail.
+
+### Where the proof gets stuck
+
+With `(p,q)` minimal, `C_0` is unchanged, leaving two obligations:
+
+1. `(p+1 : q-1)` solvable in `k-1`. This is (u1) at `k-1` **when `p >= q`** - but the
+   minimiser frequently has `p < q`. At `(11:11)` in 5 it is `(4,6)`, so the outcome-2 child
+   goes `(6:4) -> (5:5)` and mass *increases*, 24 to 25.
+2. `{(p+1 : b-q), (a-p : q-1)}` solvable in `k-1`. This is a cross-part coin move, which the
+   refutation above says has no general justification.
+
+So both surviving obligations need the extremality hypothesis in an essential way. The
+natural finish is an exchange argument - assume the minimal winner fails and construct a
+winner with smaller `p - q` - and it has not been found. The one handle available is that
+minimality makes `(p-1, q)` a non-winner, and since `(p-1 : q)` is a subgraph of `(p : q)`
+the failure must lie in its outcome-0 or mixed child.
+
+### A frame that may be the right one
+
+Give each coin `c` a bit at every node, `c_v = [c in S_v]`. The leaf reached by the pair
+`{x,y}` is the string `r` with `r_i = x_{v_i} + y_{v_i}`. Then coin `c`'s reachable subtree
+is **binary** - at node `v` it uses children `c_v` and `c_v + 1` - which gives `n1 <= 2^k` in
+one line, and since leaves used by distinct small-side coins must be disjoint, `n1*n2 <= 3^k`.
+This is the same object as the profile mechanism derived below from the witness trees, found
+independently from the other direction, which is mild evidence it is the right one. In this
+frame (u1) is a relabelling question rather than a tree-surgery question.
 
 ## The Sa growth ratio
 

@@ -108,7 +108,14 @@ leading coefficient moving. See [../conjectures.md](../conjectures.md).
 
 Equivalently the frontier satisfies `n(k, m-1) >= n(k, m) + 1`. Verified against every cell
 of the proven table (`k = 1..8`, 130 cells, no violations) by `tools/check_tables.py`, which
-reports failures as warnings. No proof is known.
+reports failures as warnings, and exhaustively over *every* one-part state for `k <= 5` by
+`tools/refsolve.py check-c 5`. No proof is known.
+
+It is **not** an instance of the Subgraph Monotonicity Theorem - the two states live on the
+same coins and neither graph contains the other. Two natural proof routes were refuted on
+2026-08-03, and the remaining gap is a single lemma about extremal splits; the full analysis,
+with counterexamples and reproduction commands, is in
+[../conjectures.md](../conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
 
 ## On the evidential weight of these fits
 

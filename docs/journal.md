@@ -893,3 +893,51 @@ restricted and unrestricted searches return different ones.
 So "1 tree" is a count of top splits. Settling whether `473:6` admits a symmetric tree needs a
 search that enumerates subtrees, or one that optimises the census directly. Neither exists yet,
 and building one is the obvious next step for the H4 thread.
+
+## 2026-08-03 — conjecture (u1): two proof routes closed, one lemma left
+
+Attacked (u1) — `Sb(n1:n2)` solvable in `k`, `n1 >= n2`, implies `Sb((n1+1):(n2-1))` — because
+it collapses the sixteen `Sa(193)` states to one and shrinks that certificate 16-fold. Not
+proved. But the ground is now mapped, and two routes that look obviously right are dead.
+Full account in [conjectures.md](conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
+
+**A second solver.** `tools/refsolve.py`, written from [problem.md](problem.md) alone, shares no
+code with `radiobase.c`, and reproduces the proven columns for `k = 1..6` exactly. Slow — `k=6`
+only, and only near the frontier — but short enough to audit, which is what a structural
+question needs. Every claim below is confirmed by both implementations or by a proved theorem.
+
+**The graph reformulation, and a lemma that was load-bearing but unwritten.** A state is a graph
+on the coins; a test is a vertex subset `S` returning `|e ∩ S|`; the children are `G[S]`,
+`G[V\S]` and the crossing subgraph. `Sb` states are exactly the disjoint unions of complete
+bipartite graphs, and the class is closed under this. In that language *solvability is monotone
+under edge-subgraph* — run the same tree, fewer candidates can only help. One paragraph, and it
+is what `cacheCanSolve`/`cacheCantSolve` and the whole `sbb_greater` relation have always rested
+on without a written proof. Now [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md).
+A negative certificate needs exactly this to store antichains instead of closures.
+
+**Refuted: the multi-part generalisation of (u1).** `Sb(15:2, 5:4)` is solvable in 4 (split
+`[8:1,1:1]`), `Sb(15:2, 6:3)` is not — an intra-part move with `n >= m`, mass falling 50 to 48.
+Since the mixed child of any test has two parts, **no induction on `k` that rewrites a strategy
+part by part can prove (u1)**. This is the finding worth the session: it is the first thing
+anyone tries, and it cannot work.
+
+**Refuted: any mass-based move lemma.** `Sb(8:1, 2:1)` solvable in 3, `Sb(9:1)` not, and the
+second is obtained from the first by a single coin move that *strictly decreases* mass. Both are
+singleton states, so this follows from the Singleton Majorization Theorem rather than from a
+solver: prefix sums `8, 10` pass against `G_3 = (8,7,4,4,1,1,1,1)`, `9 > 8` fails.
+
+**What is left.** Exactly two edits of a winning split survive the coin move, and they are the
+same statement under complementation. The gap reduces to the **Extremal Split Lemma**: the
+winning split minimising `p - q` survives. 187 of 187 solvable states with `b >= 2` at `k <= 5`,
+plus 21 at `k = 6`. Extremality is not decoration — at `(10:2)` in 4 the winner `(8,1)` fails,
+its mixed child being `{(9:1)}` with `n(3,1) = 8`. Both remaining obligations need extremality
+essentially: the outcome-2 one is not (u1) at `k-1` because the minimiser often has `p < q`, and
+the mixed one is a cross-part move, which the paragraph above kills in general. An exchange
+argument is the natural finish and I did not find it.
+
+**Cost.** About three hours, all of it Python at `k <= 6`; no C-solver time beyond seconds of
+confirmation. Cheap relative to what it rules out.
+
+**Consequence for H3.** (u1) is not available as a proven reduction, so all sixteen `Sa(193)`
+states still need refuting independently. The 58% saving is off the table until the Extremal
+Split Lemma is settled.
