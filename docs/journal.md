@@ -748,3 +748,36 @@ the ambient population has median 2.0). In the canonical/atomic trees it never o
 0 of 425 — so the journal's provisional exclusion of left/right-column-only supports holds for
 the atomic Pareto matrices it was stated about, and fails only in the near-square corner that
 the stabilisation doctrine already sets aside. Same corner as the `Sb(11:11)` anomaly.
+
+## 2026-08-03 — m=5 and m=6 scalable constructions; the one-sided evidence reconsidered
+
+Full `radio_full` split enumerations of the frontier states, m=5 and m=6 at k=5,6,7. Two
+recursions, exact on every available k:
+
+    n(k,5) = n(k-1,2) + n(k-1,6)      numerical identity only, not realised by a split
+    n(k,6) = n(k-1,4) + n(k-1,5)      realised: b=2, a=n(k-1,5), outcome-0 saturated
+
+For m=5 the working windows are exactly `b in {2,3}`, `a in [n - n(k-1,3), n(k-1,3)]`, so the m=3
+child is the binding single-part constraint and the window is nonempty because
+`n(k,5) <= 2·n(k-1,3)`. For m=6 the window is only two wide, pinned at `a = n(k-1,5)`.
+
+The m=5 identity cannot be structural: `m=6 > 5` cannot be a child of an m=5 part, and the split
+that would saturate it (`a = n(k-1,2)`) is absent from the working set.
+
+**Retracted:** my previous claim that the one-sided n-split exceptions were genuine but confined
+to near-square parts. They are not genuine. Across all six frontier enumerations there are zero,
+and the mixed child `Sb(50:4,54:2)@6` also has all four of its working splits two-sided. The five
+instances in the canonical trees are all in `canon_473_6_at9` and all are **no-ops**: `Sb(7:1)`
+split `[7:1]` leaves the state unchanged one level deeper, because 7 is not an atom of `G_4` but
+is one of `G_3`, so burning a level lets the canonical search terminate. Artifact of the search's
+stopping rule. The same tree fails the profile test and wastes 7 paths — one cause, three
+symptoms.
+
+Also retracted: the dominance argument comparing `2·n(k-1,m)` against `n(k-1,⌈m/2⌉)`. It is
+correct as far as it goes but it only compares *one-side-whole* strategies against each other,
+and the near-square margin narrowing that I read as meaningful is in the low-k degenerate regime.
+It is not evidence about optimal solutions in general.
+
+**Where it stands:** excluding one-sided n-splits costs nothing on anything examined, for m <= 6,
+at every k with data. Not proven safe. Both constructions bottom out in 2-part mixed states whose
+frontier is uncharacterised, and that is the gap.

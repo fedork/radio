@@ -219,6 +219,60 @@ none above `2.0`, the largest part being `20:10`. Against a population whose med
 Reproduce with the classification in [journal.md](journal.md#2026-08-03--n-side-splits); the
 comparison uses only `data/pareto_sb.csv`.
 
+## Scalable constructions for m=5 and m=6 (2026-08-03)
+
+Full split enumerations of the frontier states, from `radio_full`:
+
+| state | k | working splits |
+|---|---|---|
+| `Sb(22:5)` | 5 | `b in {2,3}`, `a in [10,12]` |
+| `Sb(50:5)` | 6 | `b in {2,3}`, `a in [23,27]` |
+| `Sb(109:5)` | 7 | `b in {2,3}`, `a in [51,58]` |
+| `Sb(19:6)` | 5 | `b in {2,3,4}`, `a in [7,12]` |
+| `Sb(46:6)` | 6 | `b in {2,4}`, `a in [22,24]` |
+| `Sb(104:6)` | 7 | `b in {2,4}`, `a in [50,54]` |
+
+The `a`-windows are exactly `[n - n(k-1,3), n(k-1,3)]` for m=5, so the m=3 child is the
+binding single-part constraint, and the window is nonempty because `n(k,5) <= 2·n(k-1,3)`.
+
+**Two recursions, exact on every available k (5..9):**
+
+    n(k,5) = n(k-1,2) + n(k-1,6)
+    n(k,6) = n(k-1,4) + n(k-1,5)
+
+The second is realised directly by a split: `b = 2`, `a = n(k-1,5)`, giving
+`n(k-1,5):2` on outcome 2 and `n(k-1,4):4` **saturated** on outcome 0. The `473:6@9` witness
+uses the mirror form `[242:4]`, i.e. `a = n(8,4) = 242`, `n-a = n(8,5) = 231`.
+
+The first is a numerical identity only — `m=6 > 5` cannot appear as a child of an m=5 part, and
+the split that would saturate it (`a = n(k-1,2)`) is *not* in the working set, so it is not
+realised structurally.
+
+Both constructions bottom out in a 2-part mixed state whose frontier is uncharacterised. That
+is where the work now is.
+
+## One-sided n-splits: every observed instance is explained, none is necessary
+
+Revising the earlier empirical claim. Across the frontier enumerations above — six states,
+three values of k, for both m=5 and m=6 — there are **zero** working splits with the n-side left
+whole. Descending one level into `Sb(50:4, 54:2)@6`, the mixed child of `Sb(104:6)@7`, all four
+of its working splits are two-sided as well.
+
+The five instances in the committed canonical trees are **all in `canon_473_6_at9`**, and all are
+no-ops. `Sb(7:1)` split `[7:1]` sends the whole part to outcome 2 and leaves the other two
+branches empty — the state is unchanged, one level deeper. The reason is the search's
+termination rule, not the problem: `7` is not an atom of `G_4` but is an atom of `G_3`, so
+burning a level makes the state canonical and lets `radio_canon_search_generic` stop. A real
+split such as `[4:1]` yields `Sb(4:1)@3` and `Sb(3:1)@3` with no level wasted.
+
+So the same tree that fails the profile test and wastes 7 paths is also the only one using
+one-sided splits, and for the same underlying reason: it is a valid but wasteful witness.
+
+**Status: not safe to assume, but no counterexample survives inspection.** Excluding one-sided
+n-splits costs nothing on any state examined so far, at any k, for m <= 6. What is missing is
+the 2-part frontier — until that is characterised, "safe" is unproven rather than supported by
+the near-square exceptions I previously cited, which are now explained away.
+
 ## Structural threads (from the journal)
 
 Carried over from [journal.md](journal.md), unresolved:

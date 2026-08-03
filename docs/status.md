@@ -80,11 +80,15 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   symmetric one exists is open.
 - **Reframed obstruction:** `q(m)` is not arbitrary, since `q = k - t`. The real question is
   how deep a solution must go before every leaf is a singleton.
-- **n-side splits (2026-08-03):** for a **single-part** state the wide side always splits into
-  two non-nil parts — 0 counterexamples in 13 trees, and leaving it whole is strictly dominated
-  (`2·n(k-1,m)` vs `n(k-1,⌈m/2⌉)`, verified on all 76 checkable pairs). In **multi-part** states
-  it does occur, 34 times of 2226, all near-square (median `n/m` 1.12). Atomic trees: 0 of 425.
-  See [conjectures.md](conjectures.md#n-side-splits-must-both-parts-be-non-nil-settled-2026-08-03).
+- **n-side splits (2026-08-03, revised):** zero working splits leave the n-side whole across
+  full enumerations of six frontier states (m=5 and m=6, k=5,6,7) or in the mixed child one
+  level down. The five instances in the canonical trees are all in `canon_473_6_at9` and are
+  **no-ops** — an artifact of that search stopping only at atoms of `G_k`. Excluding one-sided
+  n-splits costs nothing observed, but is **not proven safe**: the 2-part frontier the
+  constructions bottom out in is uncharacterised.
+- **Scalable recursions:** `n(k,5) = n(k-1,2) + n(k-1,6)` (numerical only) and
+  `n(k,6) = n(k-1,4) + n(k-1,5)` (realised by a split, outcome-0 saturated). Exact for k=5..9.
+  See [conjectures.md](conjectures.md#scalable-constructions-for-m5-and-m6-2026-08-03).
 - **Ruled out:** the non-adaptive reformulation. Each test returns
   `[x∈S] + [y∈S]`, so non-adaptive solving is a Sidon condition
   `(U−U) ∩ (V−V) = {0}` — exact for m ≤ 2, but strictly weaker from m = 3 (k=4, m=5: 6 vs 9).
