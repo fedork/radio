@@ -32,7 +32,7 @@ canonical decomposition matrix questions: the missing second generator, and whet
 
 ## Proximate goals
 
-### P1 - Make the record trustworthy *(in progress)*
+### P1 - Make the record trustworthy *(done 2026-08-03)*
 
 The repo reorganisation: source-of-truth tables with per-cell provenance, verified witness
 trees, mechanical invariant checks, agent instructions, artifact archival.
@@ -40,14 +40,14 @@ trees, mechanical invariant checks, agent instructions, artifact archival.
 **Done when** all witness trees pass `tools/check_witness.py`, `tools/check_tables.py` is
 green, and every artifact cited by `data/*.csv` is fetchable by tag.
 
-Outstanding:
+Delivered: source-of-truth CSVs with per-cell `bound`/`status`/`source`; 13 verified witness
+trees; four checking tools; the artifact store `fedork/radio-data` (7 tags, round-trip
+verified) with the archiving decision recorded in [data.md](data.md) including what was
+deliberately not kept; the vendor-neutral `AGENTS.md` brief with a session-end protocol;
+[status.md](status.md) as the cold-start snapshot. Merged to `main` and pushed 2026-08-03.
 
-- Push the branch. Until then the reorganisation exists on one disk.
-
-Done: credentials (repo-local `core.sshCommand` for git, `GH_CONFIG_DIR=.gh` for `gh`, both
-as `fedork`); the artifact store `fedork/radio-data` with seven tags, round-trip verified;
-the archiving decision recorded in [data.md](data.md) including what was deliberately not
-kept.
+Credentials are per-repo and leave global config alone: `core.sshCommand` for git,
+`GH_CONFIG_DIR=.gh` for `gh`, both as `fedork`.
 
 ### P2 - Extend the K=9 column constructively
 
