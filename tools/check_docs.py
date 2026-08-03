@@ -123,6 +123,35 @@ def main() -> int:
     elif tm.group(1).count("|") < 12:
         errs.append("status.md trap table looks empty")
 
+    # --- status.md's counts must match the machine-readable sources ---------------
+    # Freshness alone is too weak: bumping the date without updating the content would
+    # pass. These are the numbers most likely to drift.
+    import csv
+    ntrees = len([f for f in os.listdir(os.path.join(ROOT, "witnesses"))
+                  if f.endswith(".tree")])
+    m = re.search(r"\*\*(\d+) verified witness trees\*\*", status)
+    if not m:
+        warns.append("status.md does not state a verified-witness-tree count")
+    elif int(m.group(1)) != ntrees:
+        errs.append(f"status.md says {m.group(1)} witness trees, witnesses/ has {ntrees}")
+
+    apath = os.path.join(ROOT, "data", "artifacts.csv")
+    if os.path.exists(apath):
+        rows = list(csv.DictReader(open(apath)))
+        ntags, nassets = len({r["tag"] for r in rows}), len(rows)
+        m = re.search(r"(\d+) tags, (\d+) assets", status)
+        if not m:
+            warns.append("status.md does not state the store's tag/asset counts")
+        elif (int(m.group(1)), int(m.group(2))) != (ntags, nassets):
+            errs.append(f"status.md says {m.group(1)} tags / {m.group(2)} assets; "
+                        f"data/artifacts.csv has {ntags} / {nassets}")
+
+    npos = len([r for r in csv.DictReader(open(os.path.join(ROOT, "data", "exhaustive_multipart.csv")))])
+    m = re.search(r"\*\*(\d+) exhaustive multi-part enumerations\*\*", status)
+    if m and int(m.group(1)) != npos:
+        errs.append(f"status.md says {m.group(1)} multi-part enumerations, "
+                    f"data/exhaustive_multipart.csv has {npos}")
+
     # --- tools referenced actually exist -----------------------------------------
     for doc in ["AGENTS.md"] + [os.path.join("docs", f) for f in os.listdir(os.path.join(ROOT, "docs"))
                                 if f.endswith(".md")]:

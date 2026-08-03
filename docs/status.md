@@ -81,7 +81,8 @@ Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 `tools/extract_evidence.py` (`certify` / `audit`), `tools/artifacts.sh`
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`.
 
-Artifact store `fedork/radio-data` (private): 7 tags, 19 assets, 367 MB, `check-index` green.
+Artifact store `fedork/radio-data` (private): 7 tags, 12 assets plus a manifest per tag,
+367 MB stored, `check-index` green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
