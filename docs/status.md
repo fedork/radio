@@ -40,8 +40,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
 - **Two theorems** — Singleton Majorization and Unit-Group Elimination, both proved.
-- **13 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
-  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`. All pass
+- **14 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
+  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
+  `Sb(480:5)@9`. All pass
   `tools/check_witness.py`, which re-derives every step without consulting the solver.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
@@ -94,8 +95,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   state tested exhaustively also admits a fully two-sided split, though those are rare (76 of
   5440 in one case). The 5 in the canonical trees are no-ops. **The open question is
   compositional** — local two-sidedness at every node does not imply a complete two-sided tree,
-  since taking the two-sided split changes the children. Needs a search constrained to
-  two-sided splits; none exists yet.
+  since taking the two-sided split changes the children. `radio_canon_twosided.c` now exists
+  for this: `TWO_SIDED_ONLY=1` rejects any split leaving a non-nil part's n-side whole.
+  **First result: m=5 at k=9 survives the restriction** — 5 verified trees in
+  `witnesses/canon_480_5_at9_twosided.tree`, 0 one-sided splits in 474 entries. The m=6 run
+  was killed for memory before finishing, so m=6 is still open.
 - **Caveat on `canon_*.tree` evidence.** `radio_canon_search_generic` does *not* prohibit
   one-sided splits (verified in source: n-side spans `[0,n]`, m-side enumeration is a bijection,
   the mirror filter is top-level dedup only). But it *does* require every leaf to be a
