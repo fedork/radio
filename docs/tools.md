@@ -29,6 +29,26 @@ preferred entry points.
 | Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` `:1295` |
 | Warm the cache from a previous run's parsed output | `parse_file` `:1431` |
 
+### Memory: `radio_canon_search_generic` will eat your machine
+
+`TreeNode` embeds `int sb[5120]` and `int split_m[10240]`, so **one node is 61,488 bytes**. The
+pool allocates 20480-node chunks — **1.26 GB each** — and `pool_used = snap` only rewinds the
+counter, it never frees a chunk. With `MAX_TREE_NODES` at 4,000,000 the ceiling is ~246 GB, plus
+a 1.54 GB static memo array.
+
+A search that finds its tree quickly is cheap. One that has to *exhaust* — proving no tree exists,
+or grinding through top-level splits after the first success — grows without bound. Three
+concurrent runs on `473:6@9` reached 28 GB, 21 GB and 12 GB resident and drove the machine into
+heavy swap.
+
+**Always cap it.** Run under a memory limit and a wall-clock limit, one at a time:
+
+```
+( ulimit -v 8000000; timeout 900 ./radio_canon_search_generic 3 9 473 6 )
+```
+
+and check for strays with `pgrep -f radio_canon` before starting another.
+
 Two behaviours to be aware of:
 
 - **`MAYBE` is a real answer.** Deadlines cause `canSolveB` to give up and return `MAYBE`

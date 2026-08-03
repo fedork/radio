@@ -102,6 +102,19 @@ what happened, including cost and where it stalled. Anything longer, check in fi
 search that finds nothing is a result worth recording in
 [docs/journal.md](docs/journal.md) along with its cost - otherwise it gets attempted again.
 
+**Cap memory, not just time, and keep a live inventory.** `radio_canon_search_generic`
+allocates 1.26 GB per pool chunk and never frees one (see [docs/tools.md](docs/tools.md)); an
+exhausting search grows without bound. Run it as
+
+```
+( ulimit -v 8000000; timeout 900 ./radio_canon_search_generic ... )
+```
+
+one at a time, and `pgrep -f radio_canon` before launching another. On 2026-08-03 three
+concurrent runs reached 28+21+12 GB and pushed the machine into heavy swap, because two of them
+were leftovers I had stopped tracking. **Before launching anything, list what is already
+running; before finishing a turn, account for every process you started.**
+
 ## Artifacts
 
 Solver output is large and is **never committed**. The store is the private repo
