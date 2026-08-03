@@ -941,3 +941,71 @@ confirmation. Cheap relative to what it rules out.
 **Consequence for H3.** (u1) is not available as a proven reduction, so all sixteen `Sa(193)`
 states still need refuting independently. The 58% saving is off the table until the Extremal
 Split Lemma is settled.
+
+## 2026-08-03 — benchmark: the whole Sa ladder to Sa(113) in 25 minutes
+
+Ran the Sa ladder end to end on the current build as a combined **performance and correctness
+reference**, before touching any of the planned cache/parallelism work. There was no such
+reference; every cost estimate in the Sa(193) discussion was extrapolated from 2023 figures on
+unknown hardware.
+
+```
+clang -O3 -DMAX_K=9 -DMAX_N=113 radio.c -o radio_k9
+tools/capped_run.sh --seconds 5400 --rss-gb 16 --poll 2 -- ./radio_k9 > bench_sa113_k9.txt
+```
+
+Apple M4 Pro (10 performance cores, 24 GB), Apple clang 21.0.0, single-threaded, machine
+otherwise idle.
+
+**Result: wall 1521 s (25m21s), peak RSS 0.24 GB, log 32 MB / 315,278 lines, exit 0.**
+
+**Correctness — all nine rungs reproduce `data/pareto_sa.csv` exactly**, both directions
+(largest solvable and first unsolvable): 2, 3, 5, 8, 13, 22, 38, 65, 112. No `MAYBE` lines, no
+anomalies, max `pass=2`. 315,184 Sb verdicts, 11,079 positive and 304,105 negative.
+
+### Where the time goes
+
+| state | time | share |
+|---|---|---|
+| `Sa(111)` | 912 s | 60.0% |
+| `Sa(113)` (the refutation) | 489 s | 32.1% |
+| `Sa(112)` | 111 s | 7.3% |
+| everything else, `k = 1..9` | ~9 s | 0.6% |
+
+`Sa(103..110)` are each under a second. The cliff is explained by the witness: all of them solve
+as `Sa(65) + Sa(n-65) + Sb(65 : n-65)`, so the cost is the `Sb` child's distance from the k=8
+frontier. `n(8,45) = 68` leaves `Sb(65:45)` slack — 0.001 s. `n(8,46) = 66` leaves `Sb(65:46)`
+nearly tight — 912 s.
+
+A prediction failed and the failure is informative. I expected `Sa(112)` to cost at least as much
+as `Sa(111)`, since `n(8,47) = 65` puts `Sb(65:47)` *exactly* on the frontier. It took 111 s, an
+eighth as long — because `Sa(111)`'s 912 s had already populated the k≤8 memo it needed. Memo
+reuse dominates intrinsic difficulty, which is the same effect that collapsed the 2023 `Sa(193)`
+tail 1300-fold, now measured on a clean run.
+
+### Verdicts by depth, and what it implies
+
+| k | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|
+| distinct states decided | 9 | 1,223 | 224,769 | 18,146 | 70,430 | 588 | 19 |
+
+**71% of all state decisions are at k=4**, 77% at k≤5. That is the measured case for a
+precomputed tablebase: a persistent k≤4 (or k≤5) decision table, computed once and reused, would
+let every future run skip roughly three quarters of its state decisions and would be shared
+across all sixteen `Sa(193)` states and the K=9 band work. Note the argument is about *reuse
+across runs*, not size — the memo already caches these within a run.
+
+**The log is already the fact set.** 315,184 verdicts, 315,184 distinct `(state, k)` pairs —
+exactly equal, no duplicates. The solver emits each decided state once, so a negative certificate
+is a canonicalised filter over existing output rather than a new artifact to design from scratch.
+That materially de-risks the certification work.
+
+**Memory is not the problem at this scale.** 0.24 GB, against the ~90 GB of the 2023 `Sa(193)`
+run. So the trie is not inherently wasteful; the blowup is specific to `MAX_N=194` and k=10
+(dense child arrays scale as `MAX_SBB = MAX_N^2/4`, and depth 10 multiplies the reachable set).
+I had proposed the compact-memo rewrite as the single biggest engineering win — on this evidence
+that is unproven, and the next measurement should be one real `Sb(n1 : 193-n1)` state at k=9 with
+RSS instrumented, before any rewrite is justified.
+
+Artifact `bench_sa113_k9.txt` is 32 MB; ~106 bytes per verdict, so log volume tracks verdicts,
+not wall time — the expensive states are the quiet ones.
