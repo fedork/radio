@@ -92,8 +92,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 - **n-side splits — ANSWERED (2026-08-03): one-sided is not necessary.** Two-sided-only
   canonical trees exist for both `Sb(480:5)@9` (5 trees) and `Sb(473:6)@9` (1 tree), verified.
   The latter is decisive: the unrestricted witness uses 5 one-sided splits and all are
-  avoidable, and the two-sided tree wastes 2 paths against 7. Excluding one-sided n-splits looks
-  safe *and* beneficial, on two states at one k. Earlier notes below are superseded.
+  avoidable, on two states at one k. Earlier notes below are superseded.
+- **Caveat: orientation flips.** A part is stored `n >= m` and a child can invert that, at which
+  point the fixed-m-side path model miscounts. The two-sided `473:6` tree has 1 flip, so its
+  waste and symmetry figures are not meaningful. Trees with 0 flips — the unrestricted `473:6`
+  and all nine `480:5` — are unaffected. `profile_from_tree.py` now detects and refuses.
 - *(superseded)* **n-side splits — unresolved.** Zero working splits leave the n-side whole in
   full enumerations of six frontier states (m=5,6 at k=5,6,7) or in the mixed child one level
   down. The 34 instances in the unrestricted `Sa` trees are **genuine** but avoidable: every

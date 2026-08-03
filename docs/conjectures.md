@@ -311,10 +311,25 @@ all avoidable. The two-sided tree is also **less wasteful** — 2 empty paths of
 | | nodes | splits | leaves | one-sided | wasted paths |
 |---|---|---|---|---|---|
 | `canon_473_6_at9` (unrestricted) | 154 | 51 | 103 | 5 | 7 |
-| `canon_473_6_at9_twosided` | 172 | 57 | 115 | **0** | **2** |
+| `canon_473_6_at9_twosided` | 172 | 57 | 115 | **0** | see below |
 
-So excluding one-sided n-splits appears **safe and beneficial** — it costs no solutions on
-anything tested and buys a tighter tree. Still not a theorem: two states at one value of k.
+So excluding one-sided n-splits appears **safe** — it costs no solutions on anything tested.
+Still not a theorem: two states at one value of k.
+
+#### Orientation flips break the waste and symmetry metrics
+
+A part `n:m` is stored oriented `n >= m`, and a child can invert that: `Sb(10:2)` split `[9:2]`
+has mixed child `(1,2)`, which `getSbb` stores as `Sb(2:1)`. The path model assumes a **fixed**
+m-side, so after a flip the coin count reads wrong — here it loses `(2-1) * 2^(4-3) = 2` atoms,
+exactly the apparent 384 - 382 deficit.
+
+The two-sided tree has **1 flip in 272 non-nil children**, so its "2 wasted paths" was an
+artifact and its asymmetry verdict is not meaningful either. `tools/profile_from_tree.py` now
+counts flips and refuses to interpret waste or symmetry when any are present.
+
+Unaffected, because they contain **zero** flips: the unrestricted `473:6` tree (7 genuinely
+wasted paths, genuinely asymmetric) and all nine `480:5` solutions (80 of 80, seven carrying the
+profile). Every earlier conclusion drawn from those stands.
 
 A prediction of mine failed here and the failure is instructive. `Sb(7:1)@4` genuinely has no
 two-sided decomposition: with `target_k=3` a singleton `Sb(x:1)@d` must be an atom of `G_d` or

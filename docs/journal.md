@@ -858,3 +858,22 @@ bounded at compile time via `MAX_TREE_NODES` and `MAX_STATE_SIZE`.
 Still open: the two-sided `473:6` tree remains asymmetric and carries no m=6 profile. Waste fell
 from 7 to 2, nearer the profile condition (zero waste, census divisible by m) but not at it. The
 run was stopped by its CPU cap mid-enumeration, so better trees may exist.
+
+## 2026-08-03 — orientation flips invalidate the waste metric on one tree
+
+Chasing the two-sided `473:6` tree's apparent "2 empty paths" found a flaw in my own accounting
+rather than a fact about the tree. A part is stored oriented `n >= m`, and a child can invert
+that: `Sb(10:2)` split `[9:2]` yields mixed child `(1,2)`, stored as `Sb(2:1)`. The path model
+assumes a fixed m-side, so after a flip the coin count is wrong — losing `(2-1)*2^(4-3) = 2`
+atoms, precisely the 384-382 gap.
+
+So the two-sided tree wastes nothing, and its "asymmetric" verdict is equally meaningless. It has
+1 flip in 272 non-nil children. `profile_from_tree.py` now counts flips and declines to interpret
+waste or symmetry when any are present.
+
+Everything else is unaffected: the unrestricted `473:6` tree and all nine `480:5` solutions have
+**zero** flips, so the 7 wasted paths, the 80-of-80 counts and the seven profile-carrying
+solutions all stand.
+
+Lesson: the m-side is not intrinsic. `Sb(a:b) = Sb(b:a)`, and any model that privileges one side
+has to detect when the solver's normalisation swaps them.

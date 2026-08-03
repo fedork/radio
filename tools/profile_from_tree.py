@@ -103,14 +103,16 @@ def load(path: str):
             continue
         m = NODE.match(line.rstrip())
         if m:
-            seq.append((parse_parts(m.group(1)), int(m.group(2)), m.group(3) is not None))
+            sp = [tuple(int(x) for x in q.strip().split(":"))
+                  for q in m.group(4).split(",") if q.strip()] if m.group(4) else None
+            seq.append((parse_parts(m.group(1)), int(m.group(2)), m.group(3) is not None, sp))
     pos, out = 0, []
 
     def build():
         nonlocal pos
-        st, k, canon = seq[pos]
+        st, k, canon, sp = seq[pos]
         pos += 1
-        return (st, k, canon, [] if canon else [build() for _ in range(3)])
+        return (st, k, canon, sp, [] if canon else [build() for _ in range(3)])
 
     while pos < len(seq):
         out.append(build())
@@ -121,7 +123,7 @@ def leaves_of(node):
     acc = []
 
     def walk(n):
-        st, k, canon, kids = n
+        st, k, canon, sp, kids = n
         if canon and st:
             acc.append((st, k))
         for c in kids:
@@ -131,9 +133,37 @@ def leaves_of(node):
     return acc
 
 
+def orientation_flips(node):
+    """Count children whose m-side outgrows their n-side, so getSbb stores them swapped.
+
+    The path model assumes a fixed m-side. After a flip the coin count reads wrong, so both
+    the m*2^(k-t) waste figure and the divisible-by-m symmetry test stop being meaningful.
+    """
+    n = 0
+
+    def walk(x):
+        nonlocal n
+        st, k, canon, sp, kids = x
+        if sp:
+            for (nn, mm), (a, b) in zip(st, sp):
+                if not nn or not mm:
+                    continue
+                if a > nn or b > mm:
+                    a, b = b, a
+                for cx, cy in ((a, b), (nn - a, mm - b), (a, mm - b), (nn - a, b)):
+                    if cx and cy and cy > cx:
+                        n += 1
+        for c in kids:
+            walk(c)
+
+    walk(node)
+    return n
+
+
 def analyse(tree):
     leaves = leaves_of(tree)
     k = tree[1]
+    flips = orientation_flips(tree)
     t = min(d for _, d in leaves)
     census, count = Counter(), 0
     for state, d in leaves:
@@ -154,7 +184,7 @@ def analyse(tree):
                     count += n
     m = min(mult for state, _ in leaves for _, mult in state) if leaves else 0
     m = max(sum(mult for _, mult in tree[0]), 0)  # multiplicity of the root's m-side
-    return dict(k=k, t=t, m=m, census=census, count=count,
+    return dict(k=k, t=t, m=m, census=census, count=count, flips=flips,
                 expected_count=m * 2 ** (k - t),
                 symmetric=all(v % m == 0 for v in census.values()) if m else False)
 
@@ -184,8 +214,13 @@ def main() -> int:
                 if a["symmetric"] else None
             print(f"  solution {i}: m={a['m']} k={a['k']} normalised to level {a['t']}")
             print(f"    census   {dict(sorted(a['census'].items(), reverse=True))}")
-            print(f"    atoms    {a['count']} of m*2^(k-t) = {a['expected_count']}"
-                  + (f"   {waste} EMPTY PATHS" if waste else "   no waste"))
+            if a["flips"]:
+                print(f"    atoms    {a['count']} of nominal {a['expected_count']}"
+                      f"   -- {a['flips']} ORIENTATION FLIP(S): the m-side swaps, so the waste"
+                      f" and symmetry verdicts below are NOT meaningful for this tree")
+            else:
+                print(f"    atoms    {a['count']} of m*2^(k-t) = {a['expected_count']}"
+                      + (f"   {waste} EMPTY PATHS" if waste else "   no waste"))
             if per:
                 print(f"    profile  {per}  (length {sum(per.values())} = 2^{a['k']-a['t']})")
             else:
