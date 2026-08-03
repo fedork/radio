@@ -1,0 +1,214 @@
+# Numbered witness tree -- Sa(65) in 8, 40 nodes.
+# produced by radio_print.c (older build; see the format notes below)
+# source  : radio.zip!radio/print65_2_clean.txt  (2023-10-18), recovered 2026-08-02 from ~/radio_old
+# format  : 'N. (in k) [(used r)] <state> take[...]:' then '<digit>=><child>(line M|trivial)'
+#           older builds omit (used r) and write (line -1) for trivial.
+# checked : tools/check_witness.py
+#
+resultprint======================
+resultprint 1. (in 8) (used 0) Sa(65)[2080,65] take[38] :
+resultprint  2=>Sa(38)[703,38](line 2)
+resultprint  1=>Sb(38:27)[1026,65](line 3)
+resultprint  0=>Sa(27)[351,27](line 2)
+resultprint
+resultprint======================
+resultprint 2. (in 7) (used 2) Sa(38)[703,38] take[22] :
+resultprint  2=>Sa(22)[231,22](line 4)
+resultprint  1=>Sb(22:16)[352,38](line 5)
+resultprint  0=>Sa(16)[120,16](line 4)
+resultprint
+resultprint 3. (in 7) (used 1) Sb(38:27)[1026,65] take[22,14] :
+resultprint  2=>Sb(22:14)[308,36](line 5)
+resultprint  1=>Sb(22:13,16:14)[510,65](line 6)
+resultprint  0=>Sb(16:13)[208,29](line 5)
+resultprint
+resultprint======================
+resultprint 4. (in 6) (used 2) Sa(22)[231,22] take[13] :
+resultprint  2=>Sa(13)[78,13](line 7)
+resultprint  1=>Sb(13:9)[117,22](line 8)
+resultprint  0=>Sa(9)[36,9](line 7)
+resultprint
+resultprint 5. (in 6) (used 3) Sb(22:16)[352,38] take[15,8] :
+resultprint  2=>Sb(15:8)[120,23](line 9)
+resultprint  1=>Sb(15:8,8:7)[176,38](line 9)
+resultprint  0=>Sb(8:7)[56,15](line 8)
+resultprint
+resultprint 6. (in 6) (used 1) Sb(22:13,16:14)[510,65] take[15,8,5,3] :
+resultprint  2=>Sb(15:8,5:3)[135,31](line 9)
+resultprint  1=>Sb(15:5,8:7,11:5,11:3)[219,65](line 11)
+resultprint  0=>Sb(7:5,11:11)[156,34](line 10)
+resultprint
+resultprint======================
+resultprint 7. (in 5) (used 2) Sa(13)[78,13] take[8] :
+resultprint  2=>Sa(8)[28,8](line 12)
+resultprint  1=>Sb(8:5)[40,13](line 13)
+resultprint  0=>Sa(5)[10,5](line 12)
+resultprint
+resultprint 8. (in 5) (used 2) Sb(13:9)[117,22] take[9,5] :
+resultprint  2=>Sb(9:5)[45,14](line 13)
+resultprint  1=>Sb(9:4,5:4)[56,22](line 14)
+resultprint  0=>Sb(4:4)[16,8](line 13)
+resultprint
+resultprint 9. (in 5) (used 3) Sb(15:8,8:7)[176,38] take[9,5,1,1] :
+resultprint  2=>Sb(9:5,1:1)[46,16](line 13)
+resultprint  1=>Sb(6:5,9:3,7:1,6:1)[70,38](line 16)
+resultprint  0=>Sb(6:3,7:6)[60,22](line 15)
+resultprint
+resultprint 10. (in 5) (used 1) Sb(11:11,7:5)[156,34] take[7,6,6,3] :
+resultprint  2=>Sb(7:6,6:3)[60,22](line 15)
+resultprint  1=>Sb(7:5,6:4,6:2,3:1)[74,34](line 17)
+resultprint  0=>Sb(5:4,2:1)[22,12](line 14)
+resultprint
+resultprint 11. (in 5) (used 1) Sb(15:5,8:7,11:5,11:3)[219,65] take[9,3,5,3,2,0,9,3] :
+resultprint  2=>Sb(9:3,5:3,0:0,9:3)[69,32](line 19)
+resultprint  1=>Sb(9:2,6:3,5:4,3:3,5:2,0:0,3:2,0:0)[81,47](line 18)
+resultprint  0=>Sb(6:2,4:3,9:5,0:0)[69,29](line 13)
+resultprint
+resultprint======================
+resultprint 12. (in 4) (used 2) Sa(8)[28,8] take[5] :
+resultprint  2=>Sa(5)[10,5](line 20)
+resultprint  1=>Sb(5:3)[15,8](line 21)
+resultprint  0=>Sa(3)[3,3](line 20)
+resultprint
+resultprint 13. (in 4) (used 5) Sb(9:5,6:2,4:3)[69,29] take[5,2,1,0,4,3] :
+resultprint  2=>Sb(5:2,0:0,4:3)[22,14](line 22)
+resultprint  1=>Sb(5:3,4:2,2:1,0:0,0:0,0:0)[25,17](line 21)
+resultprint  0=>Sb(4:3,5:2,0:0)[22,14](line 22)
+resultprint
+resultprint 14. (in 4) (used 2) Sb(9:4,5:4)[56,22] take[7,2,1,1] :
+resultprint  2=>Sb(7:2,1:1)[15,11](line 23)
+resultprint  1=>Sb(7:2,2:2,4:1,3:1)[25,22](line 23)
+resultprint  0=>Sb(2:2,4:3)[16,11](line 21)
+resultprint
+resultprint 15. (in 4) (used 2) Sb(7:6,6:3)[60,22] take[5,3,1,0] :
+resultprint  2=>Sb(5:3,0:0)[15,8](line 21)
+resultprint  1=>Sb(5:3,3:2,3:1,0:0)[24,17](line 24)
+resultprint  0=>Sb(3:2,5:3)[21,13](line 21)
+resultprint
+resultprint 16. (in 4) (used 1) Sb(6:5,9:3,7:1,6:1)[70,38] take[5,3,2,1,6,1,2,0] :
+resultprint  2=>Sb(5:3,2:1,6:1,0:0)[23,18](line 26)
+resultprint  1=>Sb(5:2,3:1,7:1,2:2,1:1,0:0,2:1,0:0)[27,28](line 25)
+resultprint  0=>Sb(2:1,7:2,0:0,4:1)[20,17](line 23)
+resultprint
+resultprint 17. (in 4) (used 1) Sb(7:5,6:4,6:2,3:1)[74,34] take[4,3,1,1,5,2,0,0] :
+resultprint  2=>Sb(4:3,1:1,5:2,0:0)[23,16](line 22)
+resultprint  1=>Sb(3:3,4:2,5:1,3:1,2:1,0:0,0:0,0:0)[27,25](line 27)
+resultprint  0=>Sb(3:2,5:3,0:0,3:1)[24,17](line 24)
+resultprint
+resultprint 18. (in 4) (used 1) Sb(5:4,9:2,6:3,5:2,3:3,3:2)[81,47] take[4,3,4,0,4,2,0,0,1,1,3,2] :
+resultprint  2=>Sb(4:3,0:0,4:2,0:0,1:1,3:2)[27,20](line 30)
+resultprint  1=>Sb(4:1,3:1,4:2,0:0,4:1,2:2,0:0,0:0,2:1,2:1,0:0,0:0)[27,30](line 29)
+resultprint  0=>Sb(1:1,5:2,2:1,5:2,2:2,0:0)[27,23](line 28)
+resultprint
+resultprint 19. (in 4) (used 1) Sb(9:3,9:3,5:3)[69,32] take[7,2,5,1,0,0] :
+resultprint  2=>Sb(7:2,5:1,0:0)[19,15](line 32)
+resultprint  1=>Sb(7:1,2:2,5:2,4:1,0:0,0:0)[25,24](line 31)
+resultprint  0=>Sb(2:1,4:2,5:3)[25,17](line 21)
+resultprint
+resultprint======================
+resultprint 20. (in 3) (used 2) Sa(5)[10,5] take[3] :
+resultprint  2=>Sa(3)[3,3](line 33)
+resultprint  1=>Sb(3:2)[6,5](line 34)
+resultprint  0=>Sa(2)[1,2](trivial)
+resultprint
+resultprint 21. (in 3) (used 6) Sb(5:3,4:2,2:1)[25,17] take[3,2,1,0,2,1] :
+resultprint  2=>Sb(3:2,0:0,2:1)[8,8](line 34)
+resultprint  1=>Sb(2:2,3:1,2:1,0:0,0:0,0:0)[9,11](line 35)
+resultprint  0=>Sb(2:1,3:2,0:0)[8,8](line 34)
+resultprint
+resultprint 22. (in 3) (used 3) Sb(4:3,5:2)[22,14] take[3,2,2,0] :
+resultprint  2=>Sb(3:2,0:0)[6,5](line 34)
+resultprint  1=>Sb(3:1,2:1,2:2,0:0)[9,11](line 35)
+resultprint  0=>Sb(1:1,3:2)[7,7](line 34)
+resultprint
+resultprint 23. (in 3) (used 3) Sb(7:2,4:1,2:2,3:1)[25,22] take[4,1,3,1,0,0,1,0] :
+resultprint  2=>Sb(4:1,3:1,0:0,0:0)[7,9](line 36)
+resultprint  1=>Sb(4:1,3:1,1:1,0:0,0:0,0:0,1:1,0:0)[9,13](line 36)
+resultprint  0=>Sb(3:1,0:0,2:2,2:1)[9,11](line 35)
+resultprint
+resultprint 24. (in 3) (used 2) Sb(5:3,3:2,3:1)[24,17] take[3,2,1,0,0,0] :
+resultprint  2=>Sb(3:2,0:0,0:0)[6,5](line 34)
+resultprint  1=>Sb(2:2,3:1,2:1,0:0,0:0,0:0)[9,11](line 35)
+resultprint  0=>Sb(2:1,2:2,3:1)[9,11](line 35)
+resultprint
+resultprint 25. (in 3) (used 1) Sb(5:2,7:1,2:2,3:1,2:1)[26,26] take[3,2,3,0,1,1,0,0,2,1] :
+resultprint  2=>Sb(3:2,0:0,1:1,0:0,2:1)[9,10](line 34)
+resultprint  1=>Sb(2:2,0:0,3:1,0:0,1:1,1:1,0:0,0:0,0:0,0:0)[9,12](line 35)
+resultprint  0=>Sb(0:0,4:1,1:1,3:1,0:0)[8,11](line 36)
+resultprint
+resultprint 26. (in 3) (used 1) Sb(5:3,6:1,2:1)[23,18] take[3,2,2,0,2,1] :
+resultprint  2=>Sb(3:2,0:0,2:1)[8,8](line 34)
+resultprint  1=>Sb(2:2,3:1,2:1,0:0,0:0,0:0)[9,11](line 35)
+resultprint  0=>Sb(2:1,4:1,0:0)[6,8](line 36)
+resultprint
+resultprint 27. (in 3) (used 1) Sb(3:3,4:2,5:1,3:1,2:1)[27,25] take[2,2,3,1,1,0,0,0,2,1] :
+resultprint  2=>Sb(2:2,3:1,0:0,0:0,2:1)[9,11](line 35)
+resultprint  1=>Sb(2:1,2:1,3:1,1:1,1:1,0:0,0:0,0:0,0:0,0:0)[9,14](line 37)
+resultprint  0=>Sb(1:1,1:1,4:1,3:1,0:0)[9,13](line 36)
+resultprint
+resultprint 28. (in 3) (used 1) Sb(5:2,5:2,2:2,2:1)[26,21] take[3,1,2,0,2,2,2,1] :
+resultprint  2=>Sb(3:1,0:0,2:2,2:1)[9,11](line 35)
+resultprint  1=>Sb(3:1,2:1,2:2,0:0,0:0,0:0,0:0,0:0)[9,11](line 35)
+resultprint  0=>Sb(2:1,3:2,0:0,0:0)[8,8](line 34)
+resultprint
+resultprint 29. (in 3) (used 1) Sb(4:2,4:1,4:1,2:2,3:1,2:1,2:1)[27,30] take[4,1,3,0,0,0,1,1,0,0,2,1,2,1] :
+resultprint  2=>Sb(4:1,0:0,0:0,1:1,0:0,2:1,2:1)[9,13](line 37)
+resultprint  1=>Sb(4:1,0:0,3:1,0:0,0:0,0:0,1:1,1:1,0:0,0:0,0:0,0:0,0:0,0:0)[9,13](line 36)
+resultprint  0=>Sb(0:0,1:1,4:1,1:1,3:1,0:0,0:0)[9,13](line 36)
+resultprint
+resultprint 30. (in 3) (used 1) Sb(4:3,4:2,3:2)[26,18] take[3,2,2,1,0,0] :
+resultprint  2=>Sb(3:2,2:1,0:0)[8,8](line 34)
+resultprint  1=>Sb(3:1,2:1,2:1,2:1,0:0,0:0)[9,13](line 38)
+resultprint  0=>Sb(1:1,2:1,3:2)[9,10](line 34)
+resultprint
+resultprint 31. (in 3) (used 1) Sb(5:2,7:1,4:1,2:2)[25,24] take[3,1,4,1,1,0,0,0] :
+resultprint  2=>Sb(3:1,4:1,0:0,0:0)[7,9](line 36)
+resultprint  1=>Sb(3:1,2:1,3:1,0:0,1:1,0:0,0:0,0:0)[9,13](line 39)
+resultprint  0=>Sb(2:1,0:0,3:1,2:2)[9,11](line 35)
+resultprint
+resultprint 32. (in 3) (used 1) Sb(7:2,5:1)[19,15] take[4,1,1,0] :
+resultprint  2=>Sb(4:1,0:0)[4,5](line 36)
+resultprint  1=>Sb(4:1,3:1,1:1,0:0)[8,11](line 36)
+resultprint  0=>Sb(3:1,4:1)[7,9](line 36)
+resultprint
+resultprint======================
+resultprint 33. (in 2) (used 1) Sa(3)[3,3] take[2] :
+resultprint  2=>Sa(2)[1,2](trivial)
+resultprint  1=>Sb(2:1)[2,3](line 40)
+resultprint  0=>Sa(1)[0,1](trivial)
+resultprint
+resultprint 34. (in 2) (used 11) Sb(3:2,2:1)[8,8] take[2,1,0,0] :
+resultprint  2=>Sb(2:1,0:0)[2,3](line 40)
+resultprint  1=>Sb(2:1,1:1,0:0,0:0)[3,5](line 40)
+resultprint  0=>Sb(1:1,2:1)[3,5](line 40)
+resultprint
+resultprint 35. (in 2) (used 11) Sb(2:2,3:1,2:1)[9,11] take[1,1,2,1,0,0] :
+resultprint  2=>Sb(1:1,2:1,0:0)[3,5](line 40)
+resultprint  1=>Sb(1:1,1:1,1:1,0:0,0:0,0:0)[3,6](trivial)
+resultprint  0=>Sb(1:1,0:0,2:1)[3,5](line 40)
+resultprint
+resultprint 36. (in 2) (used 11) Sb(4:1,3:1)[7,9] take[2,0,2,1] :
+resultprint  2=>Sb(0:0,2:1)[2,3](line 40)
+resultprint  1=>Sb(2:1,0:0,1:1,0:0)[3,5](line 40)
+resultprint  0=>Sb(2:1,0:0)[2,3](line 40)
+resultprint
+resultprint 37. (in 2) (used 2) Sb(4:1,2:1,2:1)[8,11] take[2,0,2,1,1,0] :
+resultprint  2=>Sb(0:0,2:1,0:0)[2,3](line 40)
+resultprint  1=>Sb(2:1,0:0,0:0,0:0,1:1,0:0)[3,5](line 40)
+resultprint  0=>Sb(2:1,0:0,1:1)[3,5](line 40)
+resultprint
+resultprint 38. (in 2) (used 1) Sb(3:1,2:1,2:1,2:1)[9,13] take[2,0,2,1,1,1,0,0] :
+resultprint  2=>Sb(0:0,2:1,1:1,0:0)[3,5](line 40)
+resultprint  1=>Sb(2:1,0:0,0:0,0:0,1:1,0:0,0:0,0:0)[3,5](line 40)
+resultprint  0=>Sb(1:1,0:0,0:0,2:1)[3,5](line 40)
+resultprint
+resultprint 39. (in 2) (used 1) Sb(3:1,3:1,2:1)[8,11] take[2,0,2,1,0,0] :
+resultprint  2=>Sb(0:0,2:1,0:0)[2,3](line 40)
+resultprint  1=>Sb(2:1,0:0,1:1,0:0,0:0,0:0)[3,5](line 40)
+resultprint  0=>Sb(1:1,0:0,2:1)[3,5](line 40)
+resultprint
+resultprint 40. (in 1) (used 18) Sb(2:1)[2,3] take[1,0] :
+resultprint  2=>Sb(0:0)[0,0](trivial)
+resultprint  1=>Sb(1:1,0:0)[1,2](trivial)
+resultprint  0=>Sb(1:1)[1,2](trivial)
+resultprint

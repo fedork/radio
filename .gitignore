@@ -14,6 +14,9 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# Certification excerpts - the log lines that back the tables. Small and load-bearing.
+!evidence/*.txt
+
 # Repo-local gh credentials (see tools/artifacts.sh). Never commit.
 .gh/
 

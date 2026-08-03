@@ -1,0 +1,17 @@
+k,state,pairs,solvable,splits_ok,splits_total,status,source,note
+3,"6:1,4:1,4:1,4:1,4:1,3:1",25,yes,3104,1120000,proven-exhaustive,radio.zip!radio/full_6_1_4_1_4_1_4_1_4_1_3_1.txt,all top-level splits enumerated by radio_full/all_solutions
+3,"7:1,7:1,3:1,3:1,3:1,2:1",25,yes,264,786432,proven-exhaustive,radio.zip!radio/full_7_1_7_1_3_1_3_1_3_1_2_1.txt,all top-level splits enumerated by radio_full/all_solutions
+4,"9:3,5:4,4:3,5:2,5:2",79,yes,4,7776000,proven-exhaustive,radio.zip!radio/full_9_3_5_4_5_2_5_2_4_3.txt,all top-level splits enumerated by radio_full/all_solutions
+4,"11:1,11:1,11:1,10:1,10:1,10:1",63,yes,11280,147197952,proven-exhaustive,radio.zip!radio/full_11_1_11_1_11_1_10_1_10_1_10_1.txt,all top-level splits enumerated by radio_full/all_solutions
+5,"8:7,8:5,12:3,17:2,8:4,13:2,6:2",236,yes,40,433315733760,proven-exhaustive,radio.zip!radio/full_8_7_8_5_12_3_17_2_8_4_13_2_6_2.txt,all top-level splits enumerated by radio_full/all_solutions
+5,"14:5,14:4,9:5,9:5",216,yes,176,24300000,proven-exhaustive,radio.zip!radio/full_14_5_14_4_9_5_9_5.txt,all top-level splits enumerated by radio_full/all_solutions
+5,"19:6,8:7,12:2,5:2",204,yes,2,7076160,proven-exhaustive,radio.zip!radio/full_19_6_8_7_12_2_5_2.txt,all top-level splits enumerated by radio_full/all_solutions
+5,"13:8,17:3,8:5",195,yes,4,489888,proven-exhaustive,"radio.zip!radio/full_8:5,13:8,17:3.txt",all top-level splits enumerated by radio_full/all_solutions
+5,"22:2,27:1,26:1,25:1,25:1",147,yes,72,564205824,proven-exhaustive,radio.zip!radio/full_22_2_27_1_26_1_25_1_25_1.txt,all top-level splits enumerated by radio_full/all_solutions
+5,"25:2,22:2,26:1,26:1",146,yes,22,15693912,proven-exhaustive,radio.zip!radio/full_25_2_22_2_26_1_26_1.txt,all top-level splits enumerated by radio_full/all_solutions
+6,"16:12,17:10,29:5,21:6",633,yes,2,1212971760,proven-exhaustive,"radio.zip!radio/full_16:12,17:10,29:5,21:6.txt",all top-level splits enumerated by radio_full/all_solutions
+6,"53:2,52:2,57:1,57:1",324,yes,12,346599648,proven-exhaustive,radio.zip!radio/full_53_2_52_2_57_1_57_1.txt,all top-level splits enumerated by radio_full/all_solutions
+6,"51:3,53:2,58:1",317,yes,6,3976128,proven-exhaustive,radio.zip!radio/full_51_3_53_2_58_1.txt,all top-level splits enumerated by radio_full/all_solutions
+7,"45:17,31:23",1478,yes,2,635904,proven-exhaustive,radio.zip!radio/full_31_23_45_17.txt,all top-level splits enumerated by radio_full/all_solutions
+7,"111:3,115:2,121:1",684,no,0,38040576,proven-exhaustive,radio.zip!radio/full_111_3_115_2_121_1.txt,all top-level splits enumerated by radio_full/all_solutions
+7,"110:3,115:2,121:1",681,yes,2,37700928,proven-exhaustive,radio.zip!radio/full_110_3_115_2_121_1.txt,all top-level splits enumerated by radio_full/all_solutions

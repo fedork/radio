@@ -9,4 +9,4 @@ k,n,bound,status,source,note
 7,38,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(38) and can't-solve Sa(39) both logged
 8,65,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(65) and can't-solve Sa(66) both logged
 9,112,max,proven-exhaustive,out_radio_1.txt,can-solve Sa(112) and can't-solve Sa(113) both logged
-10,192,lower,witness,witnesses/sa192_k10_a.tree,Sa(193) in 10 undecided; run killed before verdict
+10,192,max,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,"Sa(192) by two verified witness trees; Sa(193) refuted via all 16 states Sb(n1:193-n1) in 9, n1=97..112. ~47 days of solve time, ~90 GB VM."

@@ -15,32 +15,38 @@ Largest `n` such that `Sa(n)` is solvable in `k` tests.
 <!-- generated:pareto_sa -->
 | k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | (192) |
+| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
 
 Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
 <!-- /generated -->
 
-`k = 1..9` are proven maximal: `out_radio_1.txt` contains both a `can solve Sa(n)` line and
-a `can't solve Sa(n+1)` line for each. This was re-confirmed mechanically, not taken from
-the older write-up.
+**The whole row is proven maximal, k = 0..10.** For `k = 1..9`, `out_radio_1.txt` contains
+both a `can solve Sa(n)` line and a `can't solve Sa(n+1)` line; this was re-confirmed
+mechanically rather than taken from the older write-up. For `k = 10` see below.
 
-`k = 10` is a **lower bound**. `Sa(192)` in 10 has two independent verified witness trees
-(`witnesses/sa192_k10_a.tree`, `witnesses/sa192_k10_b.tree`). Whether `Sa(193)` is solvable
-in 10 is open: the run that would have decided it was killed before reaching a verdict, and
-`out_radio_1.txt` contains no `Sa(193)` line at all.
+Achievability additionally has verified witness trees at every k from 7 up:
+`witnesses/sa38_k7.tree`, `sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}`, `sa192_k10_{a,b}`.
 
-### Why Sa(193) is a small question
+### Sa(10) = 192 is maximal
 
 `Sa(n)` in `k` splits into a taken group of `n1` and the rest, requiring `Sa(n1)` solvable
 in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA`, `radiobase.c:1041`). Since
-`Sa(n1)` in 9 forces `n1 <= 112`, deciding `Sa(193)` in 10 reduces to **16 specific states**:
+`Sa(n1)` in 9 forces `n1 <= 112`, `Sa(193)` in 10 comes down to **16 states**:
 
 ```
 Sb(n1 : 193 - n1)  in 9,   for n1 = 97 .. 112
 ```
 
-All sixteen sit near the diagonal at roughly 47% of the `3^9` capacity - the expensive
-region, but a far smaller target than the full K=9 frontier.
+**All sixteen were exhaustively refuted.** `Sb(112:81)` alone took ~20 days over 12 passes;
+the other fifteen plus the `Sa(193)` verdict took a further ~27 days. Roughly 47 days of
+solve time in about 90 GB of virtual memory, so this is not a fact anyone will re-derive
+casually. The log lines are preserved in
+[`evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt); the sixteen
+`Sb` verdicts also appear as `bound=upper` rows in `data/pareto_sb.csv`, where they pin the
+K=9 frontier for `m = 81..96`.
+
+Recovered 2026-08-02 from `radio.zip` in `~/radio_old` (2023-10-18 snapshot). Until then
+this result was, as far as the repo was concerned, lost.
 
 ## Sb: the Pareto frontier
 
@@ -50,11 +56,11 @@ Largest `n1` such that `Sb(n1 : m)` is solvable in `k` tests.
 | m\k | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|
 | **1** | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 |
-| **2** |  | 3 | 7 | 15 | 31 | 63 | 127 | 255 | (511) |
-| **3** |  |  | 5 | 12 | 27 | 58 | 121 | 248 | (503) |
-| **4** |  |  | 4 | 10 | 24 | 54 | 116 | 242 | (496) |
-| **5** |  |  |  | 9 | 22 | 50 | 109 | 231 | (480) |
-| **6** |  |  |  | 7 | 19 | 46 | 104 | 225 | (473) |
+| **2** |  | 3 | 7 | 15 | 31 | 63 | 127 | 255 | ≥511 |
+| **3** |  |  | 5 | 12 | 27 | 58 | 121 | 248 | ≥503 |
+| **4** |  |  | 4 | 10 | 24 | 54 | 116 | 242 | ≥496 |
+| **5** |  |  |  | 9 | 22 | 50 | 109 | 231 | ≥480 |
+| **6** |  |  |  | 7 | 19 | 46 | 104 | 225 | ≥473 |
 | **7** |  |  |  |  | 17 | 42 | 97 | 214 |  |
 | **8** |  |  |  |  | 15 | 38 | 91 | 206 |  |
 | **9** |  |  |  |  | 14 | 36 | 87 | 198 |  |
@@ -104,8 +110,40 @@ Largest `n1` such that `Sb(n1 : m)` is solvable in `k` tests.
 | **53** |  |  |  |  |  |  |  | 58 |  |
 | **54** |  |  |  |  |  |  |  | 57 |  |
 | **55** |  |  |  |  |  |  |  | 56 |  |
+| **65** |  |  |  |  |  |  |  |  | ≥112 |
+| **66** |  |  |  |  |  |  |  |  | ≥112 |
+| **67** |  |  |  |  |  |  |  |  | ≥112 |
+| **68** |  |  |  |  |  |  |  |  | ≥112 |
+| **69** |  |  |  |  |  |  |  |  | ≥112 |
+| **70** |  |  |  |  |  |  |  |  | ≥112 |
+| **71** |  |  |  |  |  |  |  |  | ≥112 |
+| **72** |  |  |  |  |  |  |  |  | ≥112 |
+| **73** |  |  |  |  |  |  |  |  | ≥112 |
+| **74** |  |  |  |  |  |  |  |  | ≥112 |
+| **75** |  |  |  |  |  |  |  |  | ≥112 |
+| **76** |  |  |  |  |  |  |  |  | ≥112 |
+| **77** |  |  |  |  |  |  |  |  | ≥112 |
+| **78** |  |  |  |  |  |  |  |  | ≥112 |
+| **79** |  |  |  |  |  |  |  |  | ≥112 |
+| **80** |  |  |  |  |  |  |  |  | ≥112 |
+| **81** |  |  |  |  |  |  |  |  | 82–111 |
+| **82** |  |  |  |  |  |  |  |  | 83–110 |
+| **83** |  |  |  |  |  |  |  |  | 84–109 |
+| **84** |  |  |  |  |  |  |  |  | 85–108 |
+| **85** |  |  |  |  |  |  |  |  | 86–107 |
+| **86** |  |  |  |  |  |  |  |  | 87–106 |
+| **87** |  |  |  |  |  |  |  |  | 88–105 |
+| **88** |  |  |  |  |  |  |  |  | 89–104 |
+| **89** |  |  |  |  |  |  |  |  | 90–103 |
+| **90** |  |  |  |  |  |  |  |  | 91–102 |
+| **91** |  |  |  |  |  |  |  |  | 92–101 |
+| **92** |  |  |  |  |  |  |  |  | 93–100 |
+| **93** |  |  |  |  |  |  |  |  | 94–99 |
+| **94** |  |  |  |  |  |  |  |  | 95–98 |
+| **95** |  |  |  |  |  |  |  |  | ≤97 |
+| **96** |  |  |  |  |  |  |  |  | ≤96 |
 
-Bare numbers are proven maxima. Parenthesised numbers are lower bounds: a solution exists, maximality is open. Per-cell status and evidence are in `data/pareto_sb.csv`.
+A bare number is a proven maximum. `≥n` is a lower bound (a solution exists, maximality open), `≤n` an upper bound (exhaustively refuted above), `a–b` a two-sided bracket. Per-cell status and evidence are in `data/pareto_sb.csv`.
 <!-- /generated -->
 
 ### Provenance
@@ -121,7 +159,12 @@ The `k=8` column for `m = 10..17` was corrected in the 2026-05-12 recomputation
 circulate with the superseded values `182, 176, 170, 165, 159, 153, 148, 142`; they are
 wrong. `data/pareto_sb.csv` is the only copy that should be consulted.
 
-`k = 9` has six established entries, all **lower bounds** except `m=1`:
+The K=9 column now has three kinds of entry. Small `m` has lower bounds from constructions
+and witness trees; `m = 65..96` has bounds recovered from the `Sa(192)` / `Sa(193)`
+computations, including sixteen exhaustively proven ceilings. Everything between - the whole
+band `m = 7..64` - is still blank.
+
+`k = 9`, small `m`: six established entries, all **lower bounds** except `m=1`:
 
 | m | value | how |
 |---|---|---|
@@ -159,10 +202,25 @@ The special-case constructions (lemmas 1-11) are in
 | `canon_496_4_at9.tree` | `Sb(496:4)` in 9 | 2 trees, 20 splits, 42 leaves |
 | `canon_480_5_at9.tree` | `Sb(480:5)` in 9 | 9 trees, 182 splits, 373 leaves |
 | `canon_473_6_at9.tree` | `Sb(473:6)` in 9 | 154 nodes, 51 splits, 103 leaves |
+| `sa38_k7.tree` | `Sa(38)` in 7 | 24 numbered nodes |
+| `sa65_k8_{a,b,c}.tree` | `Sa(65)` in 8 | 46 / 40 / 35 nodes |
+| `sa112_k9_{a,b,c}.tree` | `Sa(112)` in 9 | 78 / 72 / 74 nodes |
 | `sa192_k10_a.tree` | `Sa(192)` in 10 | 154 numbered nodes |
 | `sa192_k10_b.tree` | `Sa(192)` in 10 | 149 numbered nodes (tighter) |
 
-All six pass `tools/check_witness.py`.
+All thirteen pass `tools/check_witness.py`. The seven `Sa(38)` / `Sa(65)` / `Sa(112)` trees
+were recovered from `radio.zip` on 2026-08-02.
+
+## Exhaustively enumerated multi-part states
+
+`data/exhaustive_multipart.csv` records 16 complete `all_solutions` runs, where every
+top-level split of a multi-part state was enumerated. These are not Pareto cells, but they
+are hard facts and they are the input the decomposition-matrix work consumes.
+
+The solvable ones sit on a knife edge - `Sb(16:12,17:10,29:5,21:6)` in 6 has exactly **2**
+working splits out of 1,212,971,760, and `Sb(8:7,8:5,12:3,17:2,8:4,13:2,6:2)` in 5 has 40 out
+of 433,315,733,760. One is a proven negative: `Sb(111:3,115:2,121:1)` is **not** solvable in
+7, with all 38,040,576 splits refuted, against `Sb(110:3,115:2,121:1)` which is.
 
 Note on `473:6 @9`: this settles the tree/state level only. Whether it lifts to a valid
 scalable compact atomic decomposition matrix - the question the journal flags as open -

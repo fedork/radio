@@ -87,10 +87,34 @@ hand-guessed value of `409?` for `n(9,11)`. That guess has no support - see
 `radio_full`, which is far more expensive than needed; the canonical search is the right
 tool. See [tools.md](tools.md).
 
+### `~/radio_old` — recovered 2026-08-02, **not yet archived**
+
+4.1 GB on disk, ~26 GB logical. Audited clean: `tools/extract_evidence.py audit` found zero
+contradictions against the proven tables and zero self-contradictions across 19.5 M cache
+entries.
+
+| file | size | dates | what it is | priority |
+|---|---|---|---|---|
+| `radio.zip` | 3.56 G → **23 G** | 2023-10-18 | Repo snapshot, 1156 files. Contains **`out26_2.txt` and `out26_3.txt`, the only evidence for `Sa(10) = 192`**, the 26 `print*` witness-tree files, 18 `full*` exhaustive enumerations, and ~18 GB of `out*` logs from a solver generation predating the K=8 correction | **critical (two entries)**, low (the rest) |
+| `parsed_260.txt` | 800 M → 123 M | 2025-02-09 | The accumulated cache, 19.5 M entries. Unbreaks `run_pareto9.sh`; the operational input that makes K=9 work tractable | **high** |
+| `pareto9_36..116.txt` | 51 M → 6 M | 2023-12 – 2025-02 | 81 chained frontier runs, no gaps. Near-diagonal K=9 walk, `m = 96` down to ~81 | medium |
+
+Already extracted into git, so the bulk is no longer load-bearing for these facts:
+
+- `evidence/sa193_unsolvable_in_10.txt` — the `Sa(10) = 192` proof, 40 lines
+- `witnesses/sa38_k7.tree`, `sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}` — 7 verified trees
+- `data/exhaustive_multipart.csv` — the 16 `full*` results
+- `data/pareto_sb.csv` — 46 K=9 bound rows, 16 of them exhaustively proven ceilings
+
+What is still only in `radio_old`: `parsed_260.txt` as a *usable cache* (the extract records
+verdicts, not the full closure), the raw `print*` and `full*` logs behind the extracts, and
+the ~18 GB of `out*`.
+
 ### Elsewhere
 
-There are further run outputs on other machines that have never been collected. Add them
-to a tag and list them here when they surface.
+There may be further run outputs on other machines. Run
+`tools/extract_evidence.py audit` over anything that surfaces before trusting it, then add a
+row here.
 
 ## Committed instead of archived
 

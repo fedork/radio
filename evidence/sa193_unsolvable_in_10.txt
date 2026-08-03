@@ -1,0 +1,40 @@
+# Certification: Sa(193) is NOT solvable in 10 tests, hence Sa(10) = 192 is maximal.
+#
+# Sa(n) in k splits into a taken group of n1 and the rest, requiring Sa(n1) solvable in
+# k-1 and Sb(n1 : n-n1) solvable in k-1 (canSolveA, radiobase.c:1041). Sa(n1) in 9 forces
+# n1 <= 112, so Sa(193) in 10 requires Sb(n1 : 193-n1) solvable in 9 for some
+# n1 in 97..112 -- sixteen states. All sixteen were exhaustively refuted.
+#
+# Provenance, recovered 2026-08-02 from ~/radio_old/radio/radio.zip (Oct 2023):
+#   radio/out26_2.txt   Sb(112:81)  -- cached into out_26_1_2_parsed.txt and so not
+#                       reprinted by the later run
+#   radio/out26_3.txt   the other fifteen, plus the Sa(193) verdict
+#
+# Solve time: 1,725,456 s for Sb(112:81) alone (12 passes) plus 2,353,729 s for the
+# remainder = 4,079,185 s, about 47 days of compute.
+#
+# Reproduction is impractical: the original run needed roughly 90 GB of virtual memory
+# and months of wall clock. These lines are the record.
+#
+# --- radio/out26_2.txt ---
+can't solve Sb(112:81)[9072,193] in 9 took 1725456 totalsplits=1439 pass=12 fast_solve=0
+#
+# --- radio/out26_3.txt ---
+result can solve Sa(192) in 10
+can't solve Sb(111:82)[9102,193] in 9 took 460861 totalsplits=1413 pass=2 fast_solve=0
+can't solve Sb(110:83)[9130,193] in 9 took 588724 totalsplits=1387 pass=2 fast_solve=0
+can't solve Sb(109:84)[9156,193] in 9 took 409269 totalsplits=1570 pass=1 fast_solve=0
+can't solve Sb(108:85)[9180,193] in 9 took 268936 totalsplits=1530 pass=1 fast_solve=0
+can't solve Sb(107:86)[9202,193] in 9 took 182921 totalsplits=1492 pass=1 fast_solve=0
+can't solve Sb(106:87)[9222,193] in 9 took 128533 totalsplits=1456 pass=1 fast_solve=0
+can't solve Sb(105:88)[9240,193] in 9 took 93113 totalsplits=1424 pass=1 fast_solve=0
+can't solve Sb(104:89)[9256,193] in 9 took 70244 totalsplits=1393 pass=1 fast_solve=0
+can't solve Sb(103:90)[9270,193] in 9 took 53633 totalsplits=1366 pass=1 fast_solve=0
+can't solve Sb(102:91)[9282,193] in 9 took 35556 totalsplits=1339 pass=1 fast_solve=0
+can't solve Sb(101:92)[9292,193] in 9 took 28977 totalsplits=1315 pass=1 fast_solve=0
+can't solve Sb(100:93)[9300,193] in 9 took 17241 totalsplits=1293 pass=1 fast_solve=0
+can't solve Sb(99:94)[9306,193] in 9 took 9768 totalsplits=1273 pass=1 fast_solve=0
+can't solve Sb(98:95)[9310,193] in 9 took 4656 totalsplits=1254 pass=1 fast_solve=0
+can't solve Sb(97:96)[9312,193] in 9 took 1290 totalsplits=1237 pass=1 fast_solve=0
+can't solve Sa(193) in 10 took 2353729
+result can't solve Sa(193) in 10

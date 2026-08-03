@@ -6,15 +6,18 @@ entries. Last revised 2026-08-02.
 ## High-level goals
 
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
-proven optimal for `k <= 9`, the `Sb` Pareto frontier proven for `k <= 8`, the `Sa(192)`
-in 10 construction, and the two theorems. The draft in `paper/` is close; the mathematics is
-further along than the write-up.
+proven optimal for **`k <= 10`**, the `Sb` Pareto frontier proven for `k <= 8`, and the two
+theorems. The draft in `paper/` is close; the mathematics is further along than the write-up,
+and further along than the draft's own claim of `k <= 9`.
 
-**H2 - The K=9 Sb column.** Currently six entries, all but one a lower bound. This is the
-gateway to almost everything else, including H3.
+**H2 - The K=9 Sb column.** Six lower bounds at small `m`, plus bounds at `m = 65..96`
+recovered from the Sa work (16 of them exhaustively proven ceilings). The band `m = 7..64` is
+entirely blank. This is now the main open front.
 
-**H3 - Is `Sa = 192` optimal at k=10?** Reduces to 16 near-diagonal K=9 states. A positive
-answer (193 achievable) would be a better headline; a negative answer completes the table.
+**H3 - CLOSED 2026-08-02.** `Sa(10) = 192` is maximal. All 16 states `Sb(n1 : 193-n1)` in 9
+were exhaustively refuted in a ~47-day run recovered from `radio.zip`; see
+[results.md](results.md#sa10--192-is-maximal). The `Sa` row is now complete and proven for
+k = 0..10.
 
 **H4 - Structural theory.** Prove the closed-form family rather than fitting it. Resolve the
 canonical decomposition matrix questions: the missing second generator, and whether
@@ -62,17 +65,20 @@ asymmetry of the test in [conjectures.md](conjectures.md#the-discriminating-expe
 their cost. Also worth recovering: the length-64 `m = 11` profile string, which the journal
 mentions but never wrote down, and which would let `n(9,11)` be predicted at all.
 
-### P4 - Rebuild the K=9 frontier, aimed at Sa(193)
+### P4 - Fill the K=9 band m = 7..64
 
-The 16 states `Sb(n1 : 193-n1)` in 9 for `n1 = 97..112`. Any one of them solvable settles
-`Sa(193)` affirmatively; all sixteen unsolvable proves `Sa(10) = 192`.
+Superseded in part: the 16 `Sa(193)` states are decided, and `parsed_260.txt` has been
+recovered, so `run_pareto9.sh` can restart. What remains is the blank band.
 
-Prerequisite: `run_pareto9.sh` cannot restart, because `parsed_260.txt` and its
-`pareto9_N.txt` chain were deleted. Rebuild that cache from the surviving
-`pareto9_short_*.txt` and `out_k8.txt` via `parse_out.sh` before resuming any frontier walk.
+Note what the recovered data shows about cost: the near-diagonal walk moved from `m = 96`
+down to about `m = 81` over 14 months of wall clock across 81 chained runs, and single states
+in that region took weeks each. A frontier walk downward from the diagonal will not reach
+`m = 64` on any useful timescale. Approaching the band from small `m` upward with the
+canonical search (P2/P3) is the only cheap direction, and P2 should be read as the first step
+of P4 rather than as separate work.
 
-**Done when** each of the 16 is decided, or the undecided remainder is scoped with measured
-cost estimates.
+**Done when** there is a measured cost model for the band and a decision about whether to
+pursue it at all.
 
 ### P5 - Correct and finish the paper
 
@@ -91,8 +97,11 @@ contains no number absent from `data/*.csv`.
 
 ## Ordering
 
-P1 first and quickly - until credentials are fixed, everything is one disk failure from
-gone. Then P2 and P5 in parallel: P2 is compute-bound and P5 is writing, so they do not
-contend. P3 follows P2 because it reuses the same tooling and the same intuition about what
-`target_k` values work. P4 is the largest compute commitment and should not start until the
-cheaper K=9 results have calibrated how expensive that regime really is.
+P1 first and quickly. The `Sa(10) = 192` proof spent ~47 days of compute and, until
+2026-08-02, existed in exactly one place: a zip on one disk. Archiving is not housekeeping
+here.
+
+Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not contend. P5 has
+grown more valuable now that `k <= 10` is fully proven: the draft understates its own result.
+P3 follows P2, reusing the same tooling and the same feel for which `target_k` values work.
+P4 is now more a costing exercise than a plan.

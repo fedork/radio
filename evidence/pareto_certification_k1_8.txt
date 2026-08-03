@@ -1,0 +1,323 @@
+# Certification of the proven Pareto frontier, K = 1..8, and the Sa sequence, k = 1..9.
+#
+# One line per obligation. A cell n(k,m) is proven maximal when BOTH the can-solve line at
+# n and the can't-solve line at n+1 are present. Sa(k) likewise. Located mechanically in the
+# retained artifacts on 2026-08-02; every claim in data/pareto_sb.csv and data/pareto_sa.csv
+# with status=proven-exhaustive is backed by two lines below.
+#
+# This file exists so the provenance survives the raw logs. The three source files total
+# 1.8 GB; this extract is the part that matters.
+#
+# Sources: out_k7.txt (2026-03-24), out_radio_1.txt (2026-04-27), out_k8.txt (2026-05-12)
+# Regenerate: tools/extract_evidence.py
+#
+#
+# ---- sa k=1 ----
+result can solve Sa(2) in 1
+result can't solve Sa(3) in 1
+#
+# ---- sa k=2 ----
+result can solve Sa(3) in 2
+result can't solve Sa(4) in 2
+#
+# ---- sa k=3 ----
+result can solve Sa(5) in 3
+result can't solve Sa(6) in 3
+#
+# ---- sa k=4 ----
+result can solve Sa(8) in 4
+result can't solve Sa(9) in 4
+#
+# ---- sa k=5 ----
+result can solve Sa(13) in 5
+result can't solve Sa(14) in 5
+#
+# ---- sa k=6 ----
+result can solve Sa(22) in 6
+result can't solve Sa(23) in 6
+#
+# ---- sa k=7 ----
+result can solve Sa(38) in 7
+result can't solve Sa(39) in 7
+#
+# ---- sa k=8 ----
+result can solve Sa(65) in 8
+result can't solve Sa(66) in 8
+#
+# ---- sa k=9 ----
+result can solve Sa(112) in 9
+result can't solve Sa(113) in 9
+#
+# ---- sb k=1 ----
+can solve Sb(2:1)[2,3] in 1 with [1:0] Sb(0:0)[0,0]Sb(1:1,0:0)[1,2]Sb(1:1)[1,2] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(3:1)[3,4] in 1 took 0.000 totalsplits=0 pass=1 fast_solve=0
+#
+# ---- sb k=2 ----
+can solve Sb(4:1)[4,5] in 2 with [2:0] Sb(0:0)[0,0]Sb(2:1,0:0)[2,3]Sb(2:1)[2,3] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(5:1)[5,6] in 2 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(3:2)[6,5] in 2 with [1:1] Sb(1:1)[1,2]Sb(2:1,1:1)[3,5]Sb(2:1)[2,3] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(4:2)[8,6] in 2 took 0.000 totalsplits=0 pass=1 fast_solve=0
+#
+# ---- sb k=3 ----
+can solve Sb(8:1)[8,9] in 3 with [4:0] Sb(0:0)[0,0]Sb(4:1,0:0)[4,5]Sb(4:1)[4,5] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(9:1)[9,10] in 3 took 0.000 totalsplits=3 pass=1 fast_solve=0
+can solve Sb(7:2)[14,9] in 3 with [3:1] Sb(3:1)[3,4]Sb(4:1,3:1)[7,9]Sb(4:1)[4,5] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(8:2)[16,10] in 3 took 0.000 totalsplits=3 pass=1 fast_solve=0
+can solve Sb(5:3)[15,8] in 3 with [2:1] Sb(2:1)[2,3]Sb(2:2,3:1)[7,8]Sb(3:2)[6,5] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(6:3)[18,9] in 3 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(4:4)[16,8] in 3 with [2:1] Sb(2:1)[2,3]Sb(3:2,2:1)[8,8]Sb(3:2)[6,5] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(5:4)[20,9] in 3 took 0.000 totalsplits=0 pass=1 fast_solve=0
+#
+# ---- sb k=4 ----
+can solve Sb(16:1)[16,17] in 4 with [8:0] Sb(0:0)[0,0]Sb(8:1,0:0)[8,9]Sb(8:1)[8,9] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(17:1)[17,18] in 4 took 0.000 totalsplits=7 pass=1 fast_solve=0
+can solve Sb(15:2)[30,17] in 4 with [8:1] Sb(8:1)[8,9]Sb(8:1,7:1)[15,17]Sb(7:1)[7,8] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(16:2)[32,18] in 4 took 0.000 totalsplits=7 pass=1 fast_solve=0
+can solve Sb(12:3)[36,15] in 4 with [7:2] Sb(7:2)[14,9]Sb(5:2,7:1)[17,15]Sb(5:1)[5,6] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(13:3)[39,16] in 4 took 0.000 totalsplits=4 pass=1 fast_solve=0
+can solve Sb(10:4)[40,14] in 4 with [5:2] Sb(5:2)[10,7]Sb(5:2,5:2)[20,14]Sb(5:2)[10,7] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(11:4)[44,15] in 4 took 0.000 totalsplits=2 pass=1 fast_solve=0
+can solve Sb(9:5)[45,14] in 4 with [4:2] Sb(4:2)[8,6]Sb(4:3,5:2)[22,14]Sb(5:3)[15,8] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(10:5)[50,15] in 4 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(7:6)[42,13] in 4 with [3:2] Sb(3:2)[6,5]Sb(4:3,4:2)[20,13]Sb(4:4)[16,8] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(8:6)[48,14] in 4 took 0.000 totalsplits=3 pass=1 fast_solve=0
+#
+# ---- sb k=5 ----
+can solve Sb(32:1)[32,33] in 5 with [16:0] Sb(0:0)[0,0]Sb(16:1,0:0)[16,17]Sb(16:1)[16,17] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(33:1)[33,34] in 5 took 0.000 totalsplits=15 pass=1 fast_solve=0
+can solve Sb(31:2)[62,33] in 5 with [15:1] Sb(15:1)[15,16]Sb(16:1,15:1)[31,33]Sb(16:1)[16,17] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(32:2)[64,34] in 5 took 0.000 totalsplits=15 pass=1 fast_solve=0
+can solve Sb(27:3)[81,30] in 5 with [15:2] Sb(15:2)[30,17]Sb(12:2,15:1)[39,30]Sb(12:1)[12,13] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(28:3)[84,31] in 5 took 0.000 totalsplits=12 pass=1 fast_solve=0
+can solve Sb(24:4)[96,28] in 5 with [12:2] Sb(12:2)[24,14]Sb(12:2,12:2)[48,28]Sb(12:2)[24,14] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(25:4)[100,29] in 5 took 0.000 totalsplits=9 pass=1 fast_solve=0
+can solve Sb(22:5)[110,27] in 5 with [12:3] Sb(12:3)[36,15]Sb(10:3,12:2)[54,27]Sb(10:2)[20,12] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(23:5)[115,28] in 5 took 0.000 totalsplits=6 pass=1 fast_solve=0
+can solve Sb(19:6)[114,25] in 5 with [10:4] Sb(10:4)[40,14]Sb(9:4,10:2)[56,25]Sb(9:2)[18,11] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(20:6)[120,26] in 5 took 0.000 totalsplits=4 pass=1 fast_solve=0
+can solve Sb(17:7)[119,24] in 5 with [10:4] Sb(10:4)[40,14]Sb(10:3,7:4)[58,24]Sb(7:3)[21,10] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(18:7)[126,25] in 5 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(15:8)[120,23] in 5 with [6:3] Sb(6:3)[18,9]Sb(6:5,9:3)[57,23]Sb(9:5)[45,14] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(16:8)[128,24] in 5 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(14:9)[126,23] in 5 with [9:5] Sb(9:5)[45,14]Sb(9:4,5:5)[61,23]Sb(5:4)[20,9] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(15:9)[135,24] in 5 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(12:10)[120,22] in 5 with [7:6] Sb(7:6)[42,13]Sb(6:5,7:4)[58,22]Sb(5:4)[20,9] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(13:10)[130,23] in 5 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(11:11)[121,22] in 5 with [7:6] Sb(7:6)[42,13]Sb(7:5,6:4)[59,22]Sb(5:4)[20,9] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(12:11)[132,23] in 5 took 0.000 totalsplits=2 pass=1 fast_solve=0
+#
+# ---- sb k=6 ----
+can solve Sb(64:1)[64,65] in 6 with [32:0] Sb(0:0)[0,0]Sb(32:1,0:0)[32,33]Sb(32:1)[32,33] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(65:1)[65,66] in 6 took 0.000 totalsplits=31 pass=1 fast_solve=0
+can solve Sb(63:2)[126,65] in 6 with [31:1] Sb(31:1)[31,32]Sb(32:1,31:1)[63,65]Sb(32:1)[32,33] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(64:2)[128,66] in 6 took 0.000 totalsplits=32 pass=1 fast_solve=0
+can solve Sb(58:3)[174,61] in 6 with [31:2] Sb(31:2)[62,33]Sb(27:2,31:1)[85,61]Sb(27:1)[27,28] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(59:3)[177,62] in 6 took 0.000 totalsplits=28 pass=1 fast_solve=0
+can solve Sb(54:4)[216,58] in 6 with [27:2] Sb(27:2)[54,29]Sb(27:2,27:2)[108,58]Sb(27:2)[54,29] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(55:4)[220,59] in 6 took 0.000 totalsplits=52 pass=1 fast_solve=0
+can solve Sb(50:5)[250,55] in 6 with [23:2] Sb(23:2)[46,25]Sb(23:3,27:2)[123,55]Sb(27:3)[81,30] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(51:5)[255,56] in 6 took 0.000 totalsplits=20 pass=1 fast_solve=0
+can solve Sb(46:6)[276,52] in 6 with [22:2] Sb(22:2)[44,24]Sb(22:4,24:2)[136,52]Sb(24:4)[96,28] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(47:6)[282,53] in 6 took 0.000 totalsplits=17 pass=1 fast_solve=0
+can solve Sb(42:7)[294,49] in 6 with [24:4] Sb(24:4)[96,28]Sb(24:3,18:4)[144,49]Sb(18:3)[54,21] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(43:7)[301,50] in 6 took 0.000 totalsplits=13 pass=1 fast_solve=0
+can solve Sb(38:8)[304,46] in 6 with [22:5] Sb(22:5)[110,27]Sb(16:5,22:3)[146,46]Sb(16:3)[48,19] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(39:8)[312,47] in 6 took 0.000 totalsplits=12 pass=1 fast_solve=0
+can solve Sb(36:9)[324,45] in 6 with [17:3] Sb(17:3)[51,20]Sb(17:6,19:3)[159,45]Sb(19:6)[114,25] took 0.000 totalsplits=3 pass=1 fast_solve=0
+can't solve Sb(37:9)[333,46] in 6 took 0.000 totalsplits=7 pass=1 fast_solve=0
+can solve Sb(33:10)[330,43] in 6 with [14:4] Sb(14:4)[56,18]Sb(14:6,19:4)[160,43]Sb(19:6)[114,25] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(34:10)[340,44] in 6 took 0.000 totalsplits=6 pass=1 fast_solve=0
+can solve Sb(31:11)[341,42] in 6 with [14:4] Sb(14:4)[56,18]Sb(14:7,17:4)[166,42]Sb(17:7)[119,24] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(32:11)[352,43] in 6 took 0.000 totalsplits=5 pass=1 fast_solve=0
+can solve Sb(29:12)[348,41] in 6 with [12:5] Sb(12:5)[60,17]Sb(17:5,12:7)[169,41]Sb(17:7)[119,24] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(30:12)[360,42] in 6 took 0.000 totalsplits=4 pass=1 fast_solve=0
+can solve Sb(27:13)[351,40] in 6 with [15:8] Sb(15:8)[120,23]Sb(12:8,15:5)[171,40]Sb(12:5)[60,17] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(28:13)[364,41] in 6 took 0.000 totalsplits=3 pass=1 fast_solve=0
+can solve Sb(25:14)[350,39] in 6 with [14:9] Sb(14:9)[126,23]Sb(11:9,14:5)[169,39]Sb(11:5)[55,16] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(26:14)[364,40] in 6 took 0.001 totalsplits=4 pass=1 fast_solve=0
+can solve Sb(24:15)[360,39] in 6 with [10:6] Sb(10:6)[60,16]Sb(10:9,14:6)[174,39]Sb(14:9)[126,23] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(25:15)[375,40] in 6 took 0.000 totalsplits=6 pass=1 fast_solve=0
+can solve Sb(22:16)[352,38] in 6 with [8:7] Sb(8:7)[56,15]Sb(14:7,9:8)[170,38]Sb(14:9)[126,23] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(23:16)[368,39] in 6 took 0.001 totalsplits=8 pass=1 fast_solve=0
+can solve Sb(21:17)[357,38] in 6 with [9:7] Sb(9:7)[63,16]Sb(10:9,12:7)[174,38]Sb(12:10)[120,22] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(22:17)[374,39] in 6 took 0.000 totalsplits=3 pass=1 fast_solve=0
+can solve Sb(20:18)[360,38] in 6 with [12:10] Sb(12:10)[120,22]Sb(12:8,10:8)[176,38]Sb(8:8)[64,16] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(21:18)[378,39] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(19:19)[361,38] in 6 with [8:8] Sb(8:8)[64,16]Sb(11:8,11:8)[176,38]Sb(11:11)[121,22] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(20:19)[380,39] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=0
+#
+# ---- sb k=7 ----
+can solve Sb(128:1)[128,129] in 7 with [64:1] Sb(64:1)[64,65]Sb(64:1,0:0)[64,65]Sb(0:0)[0,0] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(129:1)[129,130] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(127:2)[254,129] in 7 with [64:1] Sb(64:1)[64,65]Sb(64:1,63:1)[127,129]Sb(63:1)[63,64] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(128:2)[256,130] in 7 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(121:3)[363,124] in 7 with [58:1] Sb(58:1)[58,59]Sb(58:2,63:1)[179,124]Sb(63:2)[126,65] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(122:3)[366,125] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(116:4)[464,120] in 7 with [58:2] Sb(58:2)[116,60]Sb(58:2,58:2)[232,120]Sb(58:2)[116,60] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(117:4)[468,121] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(109:5)[545,114] in 7 with [51:2] Sb(51:2)[102,53]Sb(51:3,58:2)[269,114]Sb(58:3)[174,61] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(110:5)[550,115] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(104:6)[624,110] in 7 with [54:4] Sb(54:4)[216,58]Sb(50:4,54:2)[308,110]Sb(50:2)[100,52] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(105:6)[630,111] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(97:7)[679,104] in 7 with [43:3] Sb(43:3)[129,46]Sb(43:4,54:3)[334,104]Sb(54:4)[216,58] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(98:7)[686,105] in 7 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(91:8)[728,99] in 7 with [41:3] Sb(41:3)[123,44]Sb(41:5,50:3)[355,99]Sb(50:5)[250,55] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(92:8)[736,100] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(87:9)[783,96] in 7 with [41:3] Sb(41:3)[123,44]Sb(41:6,46:3)[384,96]Sb(46:6)[276,52] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(88:9)[792,97] in 7 took 0.000 totalsplits=0 pass=1 fast_solve=0
+can solve Sb(82:10)[820,92] in 7 with [36:4] Sb(36:4)[144,40]Sb(36:6,46:4)[400,92]Sb(46:6)[276,52] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(83:10)[830,93] in 7 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(77:11)[847,88] in 7 with [35:4] Sb(35:4)[140,39]Sb(35:7,42:4)[413,88]Sb(42:7)[294,49] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(78:11)[858,89] in 7 took 0.000 totalsplits=1 pass=1 fast_solve=0
+can solve Sb(73:12)[876,85] in 7 with [31:5] Sb(31:5)[155,36]Sb(31:7,42:5)[427,85]Sb(42:7)[294,49] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(74:12)[888,86] in 7 took 0.024 totalsplits=4 pass=1 fast_solve=0
+can solve Sb(69:13)[897,82] in 7 with [38:8] Sb(38:8)[304,46]Sb(31:8,38:5)[438,82]Sb(31:5)[155,36] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(70:13)[910,83] in 7 took 0.137 totalsplits=5 pass=1 fast_solve=0
+can solve Sb(66:14)[924,80] in 7 with [36:9] Sb(36:9)[324,45]Sb(30:9,36:5)[450,80]Sb(30:5)[150,35] took 0.001 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(67:14)[938,81] in 7 took 0.166 totalsplits=23 pass=1 fast_solve=0
+can solve Sb(63:15)[945,78] in 7 with [27:6] Sb(27:6)[162,33]Sb(27:9,36:6)[459,78]Sb(36:9)[324,45] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(64:15)[960,79] in 7 took 0.176 totalsplits=37 pass=1 fast_solve=0
+can solve Sb(60:16)[960,76] in 7 with [24:7] Sb(24:7)[168,31]Sb(36:7,24:9)[468,76]Sb(36:9)[324,45] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(61:16)[976,77] in 7 took 0.416 totalsplits=19 pass=1 fast_solve=0
+can solve Sb(58:17)[986,75] in 7 with [33:10] Sb(33:10)[330,43]Sb(25:10,33:7)[481,75]Sb(25:7)[175,32] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(59:17)[1003,76] in 7 took 0.308 totalsplits=30 pass=1 fast_solve=0
+can solve Sb(55:18)[990,73] in 7 with [24:7] Sb(24:7)[168,31]Sb(24:11,31:7)[481,73]Sb(31:11)[341,42] took 0.056 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(56:18)[1008,74] in 7 took 0.359 totalsplits=33 pass=1 fast_solve=0
+can solve Sb(53:19)[1007,72] in 7 with [22:8] Sb(22:8)[176,30]Sb(31:8,22:11)[490,72]Sb(31:11)[341,42] took 0.289 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(54:19)[1026,73] in 7 took 0.140 totalsplits=31 pass=1 fast_solve=0
+can solve Sb(51:20)[1020,71] in 7 with [29:12] Sb(29:12)[348,41]Sb(22:12,29:8)[496,71]Sb(22:8)[176,30] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(52:20)[1040,72] in 7 took 0.078 totalsplits=40 pass=1 fast_solve=0
+can solve Sb(49:21)[1029,70] in 7 with [20:9] Sb(20:9)[180,29]Sb(29:9,20:12)[501,70]Sb(29:12)[348,41] took 0.819 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(50:21)[1050,71] in 7 took 0.045 totalsplits=38 pass=1 fast_solve=0
+can solve Sb(47:22)[1034,69] in 7 with [18:10] Sb(18:10)[180,28]Sb(29:10,18:12)[506,69]Sb(29:12)[348,41] took 0.858 totalsplits=2 pass=1 fast_solve=0
+can't solve Sb(48:22)[1056,70] in 7 took 0.054 totalsplits=52 pass=1 fast_solve=0
+can solve Sb(45:23)[1035,68] in 7 with [18:10] Sb(18:10)[180,28]Sb(27:10,18:13)[504,68]Sb(27:13)[351,40] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(46:23)[1058,69] in 7 took 0.138 totalsplits=165 pass=1 fast_solve=0
+can solve Sb(43:24)[1032,67] in 7 with [24:15] Sb(24:15)[360,39]Sb(19:15,24:9)[501,67]Sb(19:9)[171,28] took 0.085 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(44:24)[1056,68] in 7 took 0.280 totalsplits=149 pass=1 fast_solve=0
+can solve Sb(41:25)[1025,66] in 7 with [17:10] Sb(17:10)[170,27]Sb(17:15,24:10)[495,66]Sb(24:15)[360,39] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(42:25)[1050,67] in 7 took 0.533 totalsplits=132 pass=1 fast_solve=0
+can solve Sb(40:26)[1040,66] in 7 with [24:15] Sb(24:15)[360,39]Sb(24:11,16:15)[504,66]Sb(16:11)[176,27] took 0.197 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(41:26)[1066,67] in 7 took 0.240 totalsplits=121 pass=1 fast_solve=0
+can solve Sb(38:27)[1026,65] in 7 with [22:16] Sb(22:16)[352,38]Sb(16:16,22:11)[498,65]Sb(16:11)[176,27] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(39:27)[1053,66] in 7 took 0.556 totalsplits=97 pass=1 fast_solve=0
+can solve Sb(37:28)[1036,65] in 7 with [16:11] Sb(16:11)[176,27]Sb(17:16,21:11)[503,65]Sb(21:17)[357,38] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(38:28)[1064,66] in 7 took 0.446 totalsplits=206 pass=1 fast_solve=0
+can solve Sb(36:29)[1044,65] in 7 with [15:12] Sb(15:12)[180,27]Sb(17:15,21:12)[507,65]Sb(21:17)[357,38] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(37:29)[1073,66] in 7 took 0.139 totalsplits=190 pass=1 fast_solve=0
+can solve Sb(35:30)[1050,65] in 7 with [15:12] Sb(15:12)[180,27]Sb(18:15,20:12)[510,65]Sb(20:18)[360,38] took 0.039 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(36:30)[1080,66] in 7 took 0.045 totalsplits=178 pass=1 fast_solve=0
+can solve Sb(34:31)[1054,65] in 7 with [20:18] Sb(20:18)[360,38]Sb(20:13,18:14)[512,65]Sb(14:13)[182,27] took 0.117 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(35:31)[1085,66] in 7 took 0.013 totalsplits=166 pass=1 fast_solve=0
+can solve Sb(33:32)[1056,65] in 7 with [14:13] Sb(14:13)[182,27]Sb(19:14,19:13)[513,65]Sb(19:19)[361,38] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(34:32)[1088,66] in 7 took 0.007 totalsplits=158 pass=1 fast_solve=0
+#
+# ---- sb k=8 ----
+can solve Sb(255:2)[510,257] in 8 with [128:1] Sb(128:1)[128,129]Sb(128:1,127:1)[255,257]Sb(127:1)[127,128] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(256:2)[512,258] in 8 took 0.004 totalsplits=2 pass=1 fast_solve=0
+can solve Sb(248:3)[744,251] in 8 with [127:2] Sb(127:2)[254,129]Sb(121:2,127:1)[369,251]Sb(121:1)[121,122] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(249:3)[747,252] in 8 took 0.000 totalsplits=128 pass=1 fast_solve=0
+can solve Sb(242:4)[968,246] in 8 with [121:2] Sb(121:2)[242,123]Sb(121:2,121:2)[484,246]Sb(121:2)[242,123] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(243:4)[972,247] in 8 took 0.012 totalsplits=123 pass=1 fast_solve=0
+can solve Sb(231:5)[1155,236] in 8 with [121:3] Sb(121:3)[363,124]Sb(110:3,121:2)[572,236]Sb(110:2)[220,112] took 0.002 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(232:5)[1160,237] in 8 took 0.625 totalsplits=234 pass=1 fast_solve=0
+can solve Sb(225:6)[1350,231] in 8 with [109:2] Sb(109:2)[218,111]Sb(109:4,116:2)[668,231]Sb(116:4)[464,120] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(226:6)[1356,232] in 8 took 0.776 totalsplits=227 pass=1 fast_solve=0
+can solve Sb(214:7)[1498,221] in 8 with [105:2] Sb(105:2)[210,107]Sb(105:5,109:2)[743,221]Sb(109:5)[545,114] took 0.732 totalsplits=2 pass=1 fast_solve=0
+can't solve Sb(215:7)[1505,222] in 8 took 1 totalsplits=315 pass=1 fast_solve=0
+can solve Sb(206:8)[1648,214] in 8 with [104:6] Sb(104:6)[624,110]Sb(102:6,104:2)[820,214]Sb(102:2)[204,104] took 6 totalsplits=6 pass=1 fast_solve=0
+can't solve Sb(207:8)[1656,215] in 8 took 2 totalsplits=296 pass=1 fast_solve=0
+can solve Sb(198:9)[1782,207] in 8 with [96:3] Sb(96:3)[288,99]Sb(96:6,102:3)[882,207]Sb(102:6)[612,108] took 4 totalsplits=5 pass=1 fast_solve=0
+can't solve Sb(199:9)[1791,208] in 8 took 5 totalsplits=386 pass=1 fast_solve=0
+can solve Sb(189:10)[1890,199] in 8 with [104:6] Sb(104:6)[624,110]Sb(85:6,104:4)[926,199]Sb(85:4)[340,89] took 0.001 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(190:10)[1900,200] in 8 took 44 totalsplits=364 pass=1 fast_solve=0
+can solve Sb(182:11)[2002,193] in 8 with [97:7] Sb(97:7)[679,104]Sb(85:7,97:4)[983,193]Sb(85:4)[340,89] took 0.068 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(183:11)[2013,194] in 8 took 204 totalsplits=433 pass=1 fast_solve=0
+can solve Sb(174:12)[2088,186] in 8 with [97:7] Sb(97:7)[679,104]Sb(77:7,97:5)[1024,186]Sb(77:5)[385,82] took 28 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(175:12)[2100,187] in 8 took 2284 totalsplits=359 pass=2 fast_solve=0
+can solve Sb(168:13)[2184,181] in 8 with [91:8] Sb(91:8)[728,99]Sb(77:8,91:5)[1071,181]Sb(77:5)[385,82] took 87 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(169:13)[2197,182] in 8 took 2892 totalsplits=436 pass=2 fast_solve=0
+can solve Sb(161:14)[2254,175] in 8 with [87:9] Sb(87:9)[783,96]Sb(74:9,87:5)[1101,175]Sb(74:5)[370,79] took 419 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(162:14)[2268,176] in 8 took 15591 totalsplits=400 pass=2 fast_solve=0
+can solve Sb(155:15)[2325,170] in 8 with [87:9] Sb(87:9)[783,96]Sb(68:9,87:6)[1134,170]Sb(68:6)[408,74] took 79 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(156:15)[2340,171] in 8 took 29419 totalsplits=475 pass=2 fast_solve=0
+can solve Sb(150:16)[2400,166] in 8 with [82:10] Sb(82:10)[820,92]Sb(68:10,82:6)[1172,166]Sb(68:6)[408,74] took 95 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(151:16)[2416,167] in 8 took 14793 totalsplits=436 pass=2 fast_solve=0
+can solve Sb(144:17)[2448,161] in 8 with [82:10] Sb(82:10)[820,92]Sb(62:10,82:7)[1194,161]Sb(62:7)[434,69] took 5714 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(145:17)[2465,162] in 8 took 102118 totalsplits=492 pass=2 fast_solve=0
+can solve Sb(139:18)[2502,157] in 8 with [77:11] Sb(77:11)[847,88]Sb(62:11,77:7)[1221,157]Sb(62:7)[434,69] took 361 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(140:18)[2520,158] in 8 took 82104 totalsplits=452 pass=2 fast_solve=0
+can solve Sb(135:19)[2565,154] in 8 with [62:7] Sb(62:7)[434,69]Sb(62:12,73:7)[1255,154]Sb(73:12)[876,85] took 44703 totalsplits=2 pass=1 fast_solve=0
+can't solve Sb(136:19)[2584,155] in 8 took 17169 totalsplits=501 pass=2 fast_solve=0
+can solve Sb(130:20)[2600,150] in 8 with [73:12] Sb(73:12)[876,85]Sb(57:12,73:8)[1268,150]Sb(57:8)[456,65] took 6 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(131:20)[2620,151] in 8 took 119383 totalsplits=464 pass=2 fast_solve=0
+can solve Sb(126:21)[2646,147] in 8 with [53:9] Sb(53:9)[477,62]Sb(73:9,53:12)[1293,147]Sb(73:12)[876,85] took 215 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(127:21)[2667,148] in 8 took 95791 totalsplits=519 pass=2 fast_solve=0
+can solve Sb(122:22)[2684,144] in 8 with [69:13] Sb(69:13)[897,82]Sb(53:13,69:9)[1310,144]Sb(53:9)[477,62] took 2507 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(123:22)[2706,145] in 8 took 65115 totalsplits=474 pass=2 fast_solve=0
+can solve Sb(118:23)[2714,141] in 8 with [52:9] Sb(52:9)[468,61]Sb(52:14,66:9)[1322,141]Sb(66:14)[924,80] took 178 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(119:23)[2737,142] in 8 took 112153 totalsplits=523 pass=2 fast_solve=0
+can solve Sb(115:24)[2760,139] in 8 with [49:10] Sb(49:10)[490,59]Sb(49:14,66:10)[1346,139]Sb(66:14)[924,80] took 106 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(116:24)[2784,140] in 8 took 16160 totalsplits=479 pass=2 fast_solve=0
+can solve Sb(111:25)[2775,136] in 8 with [48:10] Sb(48:10)[480,58]Sb(48:15,63:10)[1350,136]Sb(63:15)[945,78] took 40 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(112:25)[2800,137] in 8 took 57789 totalsplits=523 pass=2 fast_solve=0
+can solve Sb(108:26)[2808,134] in 8 with [63:15] Sb(63:15)[945,78]Sb(63:11,45:15)[1368,134]Sb(45:11)[495,56] took 4117 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(109:26)[2834,135] in 8 took 13033 totalsplits=483 pass=2 fast_solve=0
+can solve Sb(105:27)[2835,132] in 8 with [47:10] Sb(47:10)[470,57]Sb(47:17,58:10)[1379,132]Sb(58:17)[986,75] took 47 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(106:27)[2862,133] in 8 took 11847 totalsplits=524 pass=2 fast_solve=0
+can solve Sb(102:28)[2856,130] in 8 with [44:11] Sb(44:11)[484,55]Sb(44:17,58:11)[1386,130]Sb(58:17)[986,75] took 442 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(103:28)[2884,131] in 8 took 23606 totalsplits=485 pass=2 fast_solve=0
+can solve Sb(100:29)[2900,129] in 8 with [42:12] Sb(42:12)[504,54]Sb(42:17,58:12)[1410,129]Sb(58:17)[986,75] took 5235 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(101:29)[2929,130] in 8 took 760 totalsplits=612 pass=1 fast_solve=0
+can solve Sb(97:30)[2910,127] in 8 with [42:12] Sb(42:12)[504,54]Sb(42:18,55:12)[1416,127]Sb(55:18)[990,73] took 15864 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(98:30)[2940,128] in 8 took 2352 totalsplits=576 pass=1 fast_solve=0
+can solve Sb(94:31)[2914,125] in 8 with [53:19] Sb(53:19)[1007,72]Sb(41:19,53:12)[1415,125]Sb(41:12)[492,53] took 51 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(95:31)[2945,126] in 8 took 13448 totalsplits=528 pass=2 fast_solve=0
+can solve Sb(92:32)[2944,124] in 8 with [51:20] Sb(51:20)[1020,71]Sb(41:20,51:12)[1432,124]Sb(41:12)[492,53] took 38132 totalsplits=2 pass=1 fast_solve=0
+can't solve Sb(93:32)[2976,125] in 8 took 227 totalsplits=583 pass=1 fast_solve=0
+can solve Sb(89:33)[2937,122] in 8 with [51:20] Sb(51:20)[1020,71]Sb(38:20,51:13)[1423,122]Sb(38:13)[494,51] took 0.322 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(90:33)[2970,123] in 8 took 7881 totalsplits=513 pass=2 fast_solve=0
+can solve Sb(87:34)[2958,121] in 8 with [36:14] Sb(36:14)[504,50]Sb(36:20,51:14)[1434,121]Sb(51:20)[1020,71] took 391 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(88:34)[2992,122] in 8 took 1653 totalsplits=574 pass=1 fast_solve=0
+can solve Sb(85:35)[2975,120] in 8 with [49:21] Sb(49:21)[1029,70]Sb(36:21,49:14)[1442,120]Sb(36:14)[504,50] took 1 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(86:35)[3010,121] in 8 took 714 totalsplits=618 pass=1 fast_solve=0
+can solve Sb(83:36)[2988,119] in 8 with [34:15] Sb(34:15)[510,49]Sb(49:15,34:21)[1449,119]Sb(49:21)[1029,70] took 0.037 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(84:36)[3024,120] in 8 took 589 totalsplits=586 pass=1 fast_solve=0
+can solve Sb(81:37)[2997,118] in 8 with [47:22] Sb(47:22)[1034,69]Sb(34:22,47:15)[1453,118]Sb(34:15)[510,49] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(82:37)[3034,119] in 8 took 876 totalsplits=613 pass=1 fast_solve=0
+can solve Sb(79:38)[3002,117] in 8 with [47:22] Sb(47:22)[1034,69]Sb(47:16,32:22)[1456,117]Sb(32:16)[512,48] took 25 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(80:38)[3040,118] in 8 took 661 totalsplits=580 pass=1 fast_solve=0
+can solve Sb(77:39)[3003,116] in 8 with [32:16] Sb(32:16)[512,48]Sb(32:23,45:16)[1456,116]Sb(45:23)[1035,68] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(78:39)[3042,117] in 8 took 717 totalsplits=606 pass=1 fast_solve=0
+can solve Sb(76:40)[3040,116] in 8 with [45:23] Sb(45:23)[1035,68]Sb(45:17,31:23)[1478,116]Sb(31:17)[527,48] took 175 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(77:40)[3080,117] in 8 took 50 totalsplits=582 pass=1 fast_solve=0
+can solve Sb(74:41)[3034,115] in 8 with [43:24] Sb(43:24)[1032,67]Sb(31:24,43:17)[1475,115]Sb(31:17)[527,48] took 1765 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(75:41)[3075,116] in 8 took 150 totalsplits=408 pass=1 fast_solve=0
+can solve Sb(72:42)[3024,114] in 8 with [43:24] Sb(43:24)[1032,67]Sb(43:18,29:24)[1470,114]Sb(29:18)[522,47] took 305 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(73:42)[3066,115] in 8 took 341 totalsplits=379 pass=1 fast_solve=0
+can solve Sb(71:43)[3053,114] in 8 with [28:19] Sb(28:19)[532,47]Sb(43:19,28:24)[1489,114]Sb(43:24)[1032,67] took 10810 totalsplits=3 pass=1 fast_solve=0
+can't solve Sb(72:43)[3096,115] in 8 took 165 totalsplits=358 pass=1 fast_solve=0
+can solve Sb(69:44)[3036,113] in 8 with [40:26] Sb(40:26)[1040,66]Sb(29:26,40:18)[1474,113]Sb(29:18)[522,47] took 4 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(70:44)[3080,114] in 8 took 264 totalsplits=331 pass=1 fast_solve=0
+can solve Sb(68:45)[3060,113] in 8 with [40:26] Sb(40:26)[1040,66]Sb(40:19,28:26)[1488,113]Sb(28:19)[532,47] took 72 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(69:45)[3105,114] in 8 took 214 totalsplits=310 pass=1 fast_solve=0
+can solve Sb(66:46)[3036,112] in 8 with [26:20] Sb(26:20)[520,46]Sb(40:20,26:26)[1476,112]Sb(40:26)[1040,66] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(67:46)[3082,113] in 8 took 425 totalsplits=270 pass=1 fast_solve=0
+can solve Sb(65:47)[3055,112] in 8 with [28:19] Sb(28:19)[532,47]Sb(28:28,37:19)[1487,112]Sb(37:28)[1036,65] took 111 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(66:47)[3102,113] in 8 took 190 totalsplits=244 pass=1 fast_solve=0
+can solve Sb(64:48)[3072,112] in 8 with [27:20] Sb(27:20)[540,47]Sb(28:27,37:20)[1496,112]Sb(37:28)[1036,65] took 50 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(65:48)[3120,113] in 8 took 246 totalsplits=576 pass=1 fast_solve=0
+can solve Sb(62:49)[3038,111] in 8 with [36:29] Sb(36:29)[1044,65]Sb(29:26,36:20)[1474,111]Sb(26:20)[520,46] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(63:49)[3087,112] in 8 took 795 totalsplits=29 pass=1 fast_solve=0
+can solve Sb(61:50)[3050,111] in 8 with [26:20] Sb(26:20)[520,46]Sb(30:26,35:20)[1480,111]Sb(35:30)[1050,65] took 0.000 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(62:50)[3100,112] in 8 took 60 totalsplits=19 pass=1 fast_solve=0
+can solve Sb(60:51)[3060,111] in 8 with [35:30] Sb(35:30)[1050,65]Sb(30:25,35:21)[1485,111]Sb(25:21)[525,46] took 218 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(61:51)[3111,112] in 8 took 31 totalsplits=9 pass=1 fast_solve=0
+can solve Sb(59:52)[3068,111] in 8 with [34:31] Sb(34:31)[1054,65]Sb(31:25,34:21)[1489,111]Sb(25:21)[525,46] took 195 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(60:52)[3120,112] in 8 took 116 totalsplits=650 pass=1 fast_solve=0
+can solve Sb(58:53)[3074,111] in 8 with [34:31] Sb(34:31)[1054,65]Sb(34:22,31:24)[1492,111]Sb(24:22)[528,46] took 607 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(59:53)[3127,112] in 8 took 108 totalsplits=722 pass=1 fast_solve=0
+can solve Sb(57:54)[3078,111] in 8 with [33:32] Sb(33:32)[1056,65]Sb(32:24,33:22)[1494,111]Sb(24:22)[528,46] took 55 totalsplits=1 pass=1 fast_solve=0
+can't solve Sb(58:54)[3132,112] in 8 took 140 totalsplits=728 pass=1 fast_solve=0
+can solve Sb(56:55)[3080,111] in 8 with [33:32] Sb(33:32)[1056,65]Sb(33:23,32:23)[1495,111]Sb(23:23)[529,46] took 560 totalsplits=650 pass=1 fast_solve=0
+can't solve Sb(57:55)[3135,112] in 8 took 205 totalsplits=822 pass=1 fast_solve=0

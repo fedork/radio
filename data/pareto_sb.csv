@@ -135,3 +135,49 @@ k,m,n1,bound,status,source,note
 9,4,496,lower,witness,witnesses/canon_496_4_at9.tree,matches unproven lemma-8 (2^k-2k+2)
 9,5,480,lower,witness,witnesses/canon_480_5_at9.tree,matches unproven lemma-9
 9,6,473,lower,witness,witnesses/canon_473_6_at9.tree,matches unproven lemma-10 (corrected)
+9,65,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,66,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,67,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,68,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,69,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,70,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,71,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,72,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,73,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,74,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,75,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,76,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,77,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,78,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,79,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,80,112,lower,legacy,radio_old/parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
+9,81,82,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,81,111,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(112:81) exhaustively unsolvable in 9
+9,82,83,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,82,110,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(111:82) exhaustively unsolvable in 9
+9,83,84,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,83,109,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(110:83) exhaustively unsolvable in 9
+9,84,85,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,84,108,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(109:84) exhaustively unsolvable in 9
+9,85,86,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,85,107,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(108:85) exhaustively unsolvable in 9
+9,86,87,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,86,106,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(107:86) exhaustively unsolvable in 9
+9,87,88,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,87,105,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(106:87) exhaustively unsolvable in 9
+9,88,89,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,88,104,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(105:88) exhaustively unsolvable in 9
+9,89,90,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,89,103,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(104:89) exhaustively unsolvable in 9
+9,90,91,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,90,102,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(103:90) exhaustively unsolvable in 9
+9,91,92,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,91,101,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(102:91) exhaustively unsolvable in 9
+9,92,93,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,92,100,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(101:92) exhaustively unsolvable in 9
+9,93,94,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,93,99,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(100:93) exhaustively unsolvable in 9
+9,94,95,lower,legacy,radio_old/parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
+9,94,98,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(99:94) exhaustively unsolvable in 9
+9,95,97,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(98:95) exhaustively unsolvable in 9
+9,96,96,upper,proven-exhaustive,evidence/sa193_unsolvable_in_10.txt,Sb(97:96) exhaustively unsolvable in 9

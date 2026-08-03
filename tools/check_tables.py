@@ -41,6 +41,7 @@ from typing import Dict, List
 
 STATUSES = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower",
             "legacy", "conjecture", "refuted"}
+BOUNDS = {"max", "lower", "upper"}
 NEEDS_SOURCE = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower"}
 
 
@@ -67,28 +68,39 @@ MARK = re.compile(r"(<!-- generated:([a-z_]+) -->\n)(.*?)(<!-- /generated -->)",
 
 
 def render_pareto_sb(sb: List[dict]) -> str:
-    """The Pareto frontier as a readable grid, with lower bounds parenthesised."""
-    cells: Dict[int, Dict[int, dict]] = {}
+    """The Pareto frontier as a readable grid, showing what is actually known per cell."""
+    cells: Dict[int, Dict[int, Dict[str, int]]] = {}
     for r in sb:
-        cells.setdefault(int(r["m"]), {})[int(r["k"])] = r
+        c = cells.setdefault(int(r["m"]), {}).setdefault(int(r["k"]), {})
+        n, b = int(r["n1"]), r["bound"]
+        if b == "max":
+            c["max"] = n
+        elif b == "lower":
+            c["lower"] = max(n, c.get("lower", 0))
+        elif b == "upper":
+            c["upper"] = min(n, c.get("upper", 10 ** 9))
     ks = sorted({int(r["k"]) for r in sb})
     out = ["| m\\k | " + " | ".join(str(k) for k in ks) + " |",
            "|---" * (len(ks) + 1) + "|"]
     for m in sorted(cells):
         row = []
         for k in ks:
-            r = cells[m].get(k)
-            if r is None:
+            c = cells[m].get(k)
+            if not c:
                 row.append("")
-            elif r["bound"] == "max":
-                row.append(r["n1"])
+            elif "max" in c:
+                row.append(str(c["max"]))
+            elif "lower" in c and "upper" in c:
+                row.append(f"{c['lower']}–{c['upper']}")
+            elif "lower" in c:
+                row.append(f"≥{c['lower']}")
             else:
-                row.append(f"({r['n1']})")
+                row.append(f"≤{c['upper']}")
         out.append(f"| **{m}** | " + " | ".join(row) + " |")
     out.append("")
-    out.append("Bare numbers are proven maxima. Parenthesised numbers are lower bounds: a "
-               "solution exists, maximality is open. Per-cell status and evidence are in "
-               "`data/pareto_sb.csv`.")
+    out.append("A bare number is a proven maximum. `≥n` is a lower bound (a solution exists, "
+               "maximality open), `≤n` an upper bound (exhaustively refuted above), `a–b` a "
+               "two-sided bracket. Per-cell status and evidence are in `data/pareto_sb.csv`.")
     return "\n".join(out) + "\n"
 
 
@@ -139,6 +151,8 @@ def main() -> int:
             if r["status"] in NEEDS_SOURCE and not r.get("source", "").strip():
                 errs.append(f"{name} {keyf(r)}: status {r['status']} claims evidence "
                             f"but names no source")
+            if "bound" in r and r["bound"] not in BOUNDS:
+                errs.append(f"{name} {keyf(r)}: unknown bound {r['bound']!r}")
 
     # the proven Sb frontier -----------------------------------------------------
     maxv: Dict[int, Dict[int, int]] = {}
@@ -146,8 +160,26 @@ def main() -> int:
         if r["bound"] == "max":
             maxv.setdefault(int(r["k"]), {})[int(r["m"])] = int(r["n1"])
     lower: Dict[int, Dict[int, int]] = {}
+    upper: Dict[int, Dict[int, int]] = {}
     for r in sb:
-        lower.setdefault(int(r["k"]), {})[int(r["m"])] = int(r["n1"])
+        k, m, n = int(r["k"]), int(r["m"]), int(r["n1"])
+        if r["bound"] == "upper":
+            cur = upper.setdefault(k, {})
+            if m not in cur or n < cur[m]:      # keep the tightest upper bound
+                cur[m] = n
+        else:
+            cur = lower.setdefault(k, {})
+            if m not in cur or n > cur[m]:      # keep the strongest lower bound
+                cur[m] = n
+
+    # a lower bound may never exceed an upper bound for the same cell
+    for k, col in sorted(upper.items()):
+        for m, hi in sorted(col.items()):
+            lo = lower.get(k, {}).get(m)
+            if lo is not None and lo > hi:
+                errs.append(f"k={k} m={m}: lower bound {lo} exceeds upper bound {hi}")
+            if m in maxv.get(k, {}) and maxv[k][m] > hi:
+                errs.append(f"k={k} m={m}: proven maximum {maxv[k][m]} exceeds upper bound {hi}")
 
     for k, col in sorted(maxv.items()):
         for m, n in sorted(col.items()):
@@ -163,17 +195,33 @@ def main() -> int:
                 warns.append(f"k={k} m={m}: (u1) would need n({m - 1}) >= {n + 1}, "
                              f"table has {col[m - 1]}")
 
-    # conjectured rows must also respect monotonicity against proven neighbours ----
+    # Cross-constraints between bounds. Note that two lower bounds say nothing about each
+    # other - n(k,87) >= 88 and n(k,88) >= 89 are perfectly compatible, because the true
+    # values may both be far higher. The real constraint is that a lower bound at m+1 cannot
+    # exceed a ceiling at m, since n(k,m+1) <= n(k,m).
     for k, col in sorted(lower.items()):
-        for m, n in sorted(col.items()):
-            if m + 1 in col and col[m + 1] > n:
-                errs.append(f"k={k}: recorded n({m + 1})={col[m + 1]} > n({m})={n}")
+        for m, lo in sorted(col.items()):
+            ceil_prev = None
+            if m - 1 in upper.get(k, {}):
+                ceil_prev = ("upper bound", upper[k][m - 1])
+            elif m - 1 in maxv.get(k, {}):
+                ceil_prev = ("proven maximum", maxv[k][m - 1])
+            if ceil_prev and lo > ceil_prev[1]:
+                errs.append(f"k={k}: lower bound n({m})>={lo} exceeds the {ceil_prev[0]} "
+                            f"n({m - 1})<={ceil_prev[1]}, but n is non-increasing in m")
+            if lo * m > 3 ** k:
+                errs.append(f"k={k} m={m}: lower bound {lo} needs mass {lo * m} > 3^{k}")
 
     # Sa upper bound from the Sb frontier -----------------------------------------
     sa_max = {int(r["k"]): int(r["n"]) for r in sa if r["bound"] == "max"}
     for r in sa:
         k, n = int(r["k"]), int(r["n"])
         if k - 1 not in maxv or k - 1 not in sa_max:
+            continue
+        # Only meaningful when the K=k-1 Sb column is complete over the reachable range.
+        # For k=10 it is not (K=9 has proven maxima only up to m=1), and applying it anyway
+        # produces a nonsense ceiling.
+        if not all(m in maxv[k - 1] for m in range(1, sa_max[k - 1] + 1)):
             continue
         # Sa(n) in k splits into n1 taken / n-n1 not, needing Sa(n1) in k-1 and
         # Sb(n1 : n-n1) in k-1. So n <= max over feasible n1 of n1 + n2max(n1).
