@@ -251,12 +251,25 @@ realised structurally.
 Both constructions bottom out in a 2-part mixed state whose frontier is uncharacterised. That
 is where the work now is.
 
-## One-sided n-splits: every observed instance is explained, none is necessary
+## One-sided n-splits: avoidable at every node tested, but not proven excludable
 
-Revising the earlier empirical claim. Across the frontier enumerations above — six states,
-three values of k, for both m=5 and m=6 — there are **zero** working splits with the n-side left
-whole. Descending one level into `Sb(50:4, 54:2)@6`, the mixed child of `Sb(104:6)@7`, all four
-of its working splits are two-sided as well.
+Across the frontier enumerations above — six states, three values of k, for both m=5 and m=6 —
+there are **zero** working splits with the n-side left whole. Descending one level into
+`Sb(50:4, 54:2)@6`, the mixed child of `Sb(104:6)@7`, all four of its working splits are
+two-sided as well.
+
+The 34 one-sided splits in the numbered `Sa` trees, which come from the *unrestricted* solver,
+**are genuine occurrences** — an earlier draft of this section wrongly implied otherwise. What is
+true is weaker and still useful: in all five states tested exhaustively, a fully two-sided split
+also exists at that node, so the one-sided choice was *taken*, not *forced*. For example
+`Sb(4:3,3:3)@3` has 10 working splits of which 6 are fully two-sided; the witness happened to pick
+`[2:1,3:2]`, but `[2:1,2:3]` works and is two-sided.
+
+Two-sided splits are however **rare**: 76 of 5440 for `Sb(3:2,3:2,4:1,4:1,3:1,3:1)@3`, 42 of 3324
+for `Sb(4:2,3:2,4:1,3:1,3:1,2:1)@3`. So the restriction prunes hard — good for tractability if it
+is safe, but it is a tight constraint, and local availability at every node does **not** imply a
+complete two-sided tree exists: choosing the two-sided split changes the children, hence the
+subproblems.
 
 The five instances in the committed canonical trees are **all in `canon_473_6_at9`**, and all are
 no-ops. `Sb(7:1)` split `[7:1]` sends the whole part to outcome 2 and leaves the other two
@@ -268,10 +281,23 @@ split such as `[4:1]` yields `Sb(4:1)@3` and `Sb(3:1)@3` with no level wasted.
 So the same tree that fails the profile test and wastes 7 paths is also the only one using
 one-sided splits, and for the same underlying reason: it is a valid but wasteful witness.
 
-**Status: not safe to assume, but no counterexample survives inspection.** Excluding one-sided
-n-splits costs nothing on any state examined so far, at any k, for m <= 6. What is missing is
-the 2-part frontier — until that is characterised, "safe" is unproven rather than supported by
-the near-square exceptions I previously cited, which are now explained away.
+### What the canonical search does and does not assume
+
+Checked against the source, because evidence drawn from `canon_*.tree` is only as good as the
+tool. `radio_canon_search_generic` does **not** prohibit one-sided splits: the n-side ranges over
+all of `[0,n]`, `uneven_rank_to_value` is a bijection onto `[0,m]`, and `top_split_canonical_rep`
+is applied only at the top level (line 309) where it discards `a=0` as the mirror of the `a=n` it
+keeps — a deduplication, not an exclusion.
+
+What it *does* assume is stronger and genuinely putative: `is_canonical_state` requires every leaf
+to be a singleton state whose parts form a sub-multiset of the `G_k` atoms. Solutions of any other
+shape are invisible to it. So conclusions about tree *interiors* drawn from canonical trees are
+conditional on that hypothesis, and the "0 of 425" figure should not be read as evidence about
+optimal solutions in general.
+
+**Status: unresolved.** Excluding one-sided n-splits costs nothing at any node examined, but the
+open question is compositional — whether local two-sidedness can be maintained all the way down —
+and that needs a search constrained to two-sided splits, which does not exist yet.
 
 ## What is actually invariant across the k=9 trees (2026-08-03)
 

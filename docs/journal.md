@@ -802,3 +802,33 @@ values at k=5,6,7 and to one at k=9 (`a=231`, seen as the mirror `[242:4]`). The
 therefore returns exactly one tree and there is nothing to choose from at the root. Related: the
 depth at which states become atoms grows with m — 6 for m=3,4, 5 for m=5, 3 for m=6 — and `q = k-t`
 is measuring that.
+
+## 2026-08-03 — correcting the one-sided-split record twice over
+
+Two corrections to my own work in this session.
+
+**First: the canonical search was audited and does not prohibit one-sided splits.** Read from
+source: the n-side enumeration spans all of `[0,n]`, `uneven_rank_to_value` is a bijection onto
+`[0,m]` (checked for total = 1,2,4,5,6,8), and `top_split_canonical_rep` is invoked only at line
+309 inside `print_all_top_level_trees`, where it drops `a=0` as the mirror of the `a=n` it keeps.
+A deduplication, not an exclusion. So the concern was well aimed but lands elsewhere: the tool's
+real assumption is `is_canonical_state`, which demands every leaf be a singleton state whose parts
+are a sub-multiset of the `G_k` atoms. Solutions of any other shape are invisible to it, so the
+"0 of 425 one-sided splits in canonical trees" figure is conditional on that hypothesis and is not
+evidence about optimal solutions in general.
+
+**Second: I over-retracted the previous entry.** The 34 one-sided splits in the numbered `Sa`
+trees come from the unrestricted solver and **are genuine occurrences**; saying "they are not
+genuine" was wrong. What is true is that they are locally avoidable. Exhaustive enumeration of the
+five smallest containing states shows a fully two-sided split always also exists — e.g.
+`Sb(4:3,3:3)@3` has 10 working splits, 6 of them fully two-sided; the witness took `[2:1,3:2]` but
+`[2:1,2:3]` works and is two-sided.
+
+I also briefly concluded the opposite from an empty `radio_full` result that turned out to be
+spurious — the same command re-run produced 10 splits. Do not trust a zero-result from that
+pipeline without re-running it.
+
+Two-sided splits are rare where they exist: 76 of 5440, 42 of 3324. So the restriction prunes
+hard. And local availability at every node does **not** imply a complete two-sided tree, because
+taking the two-sided split changes the children and hence the subproblems. That compositional
+question is the real one and needs a search constrained to two-sided splits, which does not exist.

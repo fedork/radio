@@ -85,12 +85,19 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   symmetric one exists is open.
 - **Reframed obstruction:** `q(m)` is not arbitrary, since `q = k - t`. The real question is
   how deep a solution must go before every leaf is a singleton.
-- **n-side splits (2026-08-03, revised):** zero working splits leave the n-side whole across
-  full enumerations of six frontier states (m=5 and m=6, k=5,6,7) or in the mixed child one
-  level down. The five instances in the canonical trees are all in `canon_473_6_at9` and are
-  **no-ops** — an artifact of that search stopping only at atoms of `G_k`. Excluding one-sided
-  n-splits costs nothing observed, but is **not proven safe**: the 2-part frontier the
-  constructions bottom out in is uncharacterised.
+- **n-side splits — UNRESOLVED (2026-08-03).** Zero working splits leave the n-side whole in
+  full enumerations of six frontier states (m=5,6 at k=5,6,7) or in the mixed child one level
+  down. The 34 instances in the unrestricted `Sa` trees are **genuine** but avoidable: every
+  state tested exhaustively also admits a fully two-sided split, though those are rare (76 of
+  5440 in one case). The 5 in the canonical trees are no-ops. **The open question is
+  compositional** — local two-sidedness at every node does not imply a complete two-sided tree,
+  since taking the two-sided split changes the children. Needs a search constrained to
+  two-sided splits; none exists yet.
+- **Caveat on `canon_*.tree` evidence.** `radio_canon_search_generic` does *not* prohibit
+  one-sided splits (verified in source: n-side spans `[0,n]`, m-side enumeration is a bijection,
+  the mirror filter is top-level dedup only). But it *does* require every leaf to be a
+  `G_k`-atom singleton state, so conclusions about tree interiors from those trees are
+  conditional on that hypothesis.
 - **Scalable recursions:** `n(k,5) = n(k-1,2) + n(k-1,6)` (numerical only) and
   `n(k,6) = n(k-1,4) + n(k-1,5)` (realised by a split, outcome-0 saturated). Exact for k=5..9.
   See [conjectures.md](conjectures.md#scalable-constructions-for-m5-and-m6-2026-08-03).
