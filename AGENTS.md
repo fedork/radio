@@ -120,7 +120,17 @@ ceiling; the numbers above give about 5.7 GB.
 When the pool is exhausted the search prints `out of nodes` and exits 2. **That is an abort,
 not a proof of absence** — do not read it as `NO_CANONICAL_TREE`.
 
-one at a time, and `pgrep -f radio_canon` before launching another. On 2026-08-03 three
+Compile-time bounds only exist for `radio_canon_search_generic`. The other drivers grow an
+unbounded result-cache trie, and `ulimit -t` caps CPU, not memory — so for those, wrap the run:
+
+```
+tools/capped_run.sh --seconds 3600 --rss-gb 16 --label sa113 -- ./radio_k9 > out.txt
+```
+
+It enforces both caps, reports peak RSS and wall time, and exits 124 on timeout / 137 on
+memory kill. Use it for anything you would otherwise leave unattended.
+
+Run these one at a time, and `pgrep -f radio_canon` before launching another. On 2026-08-03 three
 concurrent runs reached 28+21+12 GB and pushed the machine into heavy swap, because two of them
 were leftovers I had stopped tracking. **Before launching anything, list what is already
 running; before finishing a turn, account for every process you started.**

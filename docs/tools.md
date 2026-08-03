@@ -52,6 +52,20 @@ clang -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 radio_canon_search_generic
 `d` has at most `2^(k-d)` parts, so 1024 is generous for `k <= 9` and cuts a node from 61 KB to
 12 KB. Note `timeout` is not installed here; `ulimit -t` is the portable CPU-seconds bound.
 
+### Capping the other drivers
+
+Those compile-time bounds exist only in `radio_canon_search_generic`. `radio`, `radio_one`,
+`radio_full` and the Pareto walkers grow an unbounded result-cache trie instead — the 2023
+`Sa(193)` run reached ~90 GB that way — and `ulimit -t` bounds CPU, not memory. For those:
+
+```
+tools/capped_run.sh --seconds 3600 --rss-gb 16 --label sa113 -- ./radio_k9 > out.txt
+```
+
+Enforces a wall-clock cap and an RSS cap, reports peak RSS and wall time on stderr (so it
+survives redirecting the driver's stdout), and exits 124 on timeout / 137 on memory kill.
+Wall time is quantised to `--poll` (default 5s); the drivers' own `took N` lines are exact.
+
 ### The canonical search does not always work, even unrestricted
 
 It is a *hypothesis* about solution shape, and the hypothesis fails at small k. `Sb(46:6)` in 6
