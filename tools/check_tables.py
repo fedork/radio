@@ -137,6 +137,9 @@ def main() -> int:
     sb = list(csv.DictReader(open(os.path.join(d, "pareto_sb.csv"))))
     sa = list(csv.DictReader(open(os.path.join(d, "pareto_sa.csv"))))
     cj = list(csv.DictReader(open(os.path.join(d, "conjectures.csv"))))
+    apath = os.path.join(d, "artifacts.csv")
+    arts = list(csv.DictReader(open(apath))) if os.path.exists(apath) else []
+    tags = {r["tag"] for r in arts}
 
     errs: List[str] = []
     warns: List[str] = []
@@ -153,6 +156,25 @@ def main() -> int:
                             f"but names no source")
             if "bound" in r and r["bound"] not in BOUNDS:
                 errs.append(f"{name} {keyf(r)}: unknown bound {r['bound']!r}")
+            # Every source must be resolvable: a file in the repo, a theorem reference, or
+            # `tag:path` naming an archive tag that data/artifacts.csv knows about. A bare
+            # log filename is not good enough - nobody can find it later.
+            src = (r.get("source") or "").strip()
+            if src and not src.startswith(("lemma", "definition", "docs/")):
+                for piece in src.split("+"):
+                    if ":" in piece and not piece.startswith(("witnesses/", "evidence/", "data/")):
+                        tag = piece.split(":", 1)[0]
+                        if tags and tag not in tags:
+                            errs.append(f"{name} {keyf(r)}: source names unknown archive "
+                                        f"tag {tag!r}")
+                    else:
+                        # resolve repo-relative, from this script's location, so that
+                        # --data can point at a scratch copy for testing
+                        p = os.path.join(os.path.dirname(__file__), "..",
+                                         piece.split("#")[0])
+                        if not os.path.exists(p):
+                            errs.append(f"{name} {keyf(r)}: source {piece!r} is neither a "
+                                        f"file in the repo nor tag:path")
 
     # the proven Sb frontier -----------------------------------------------------
     maxv: Dict[int, Dict[int, int]] = {}

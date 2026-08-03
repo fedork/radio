@@ -23,6 +23,19 @@ them.
 - `data/pareto_sb.csv` - the `Sb` Pareto frontier: `k, m, n1, bound, status, source, note`
 - `data/pareto_sa.csv` - the `Sa` sequence
 - `data/conjectures.csv` - closed forms and dyadic profiles, stored executably
+- `data/exhaustive_multipart.csv` - complete `all_solutions` enumerations of multi-part states
+- `data/artifacts.csv` - the archive: `tag, asset, contains, era, audited, note`
+
+A `source` must be **resolvable**, in one of three forms:
+
+| form | example |
+|---|---|
+| a file in the repo | `witnesses/canon_473_6_at9.tree` |
+| a theorem reference | `lemma-6`, `docs/theorems/special-cases.md#lemma-1` |
+| `tag:path` into the archive | `k8-2026-05-12:out_k8.txt` |
+
+A bare log filename is **not** acceptable - nobody can find it later. `tools/check_tables.py`
+rejects unresolvable sources and unknown tags.
 
 Every row carries a **bound** and a **status**:
 

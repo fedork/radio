@@ -41,6 +41,11 @@ tools/artifacts.sh verify <tag>         # round-trip check without keeping the f
 `pull` and `verify` fail loudly on a sha256 or byte-count mismatch, so a corrupted asset
 cannot be used silently.
 
+`data/artifacts.csv` maps every tag to its assets and their contents, and is what makes a
+`tag:path` source in `data/*.csv` checkable offline. One hazard it records explicitly:
+**`out26_1.txt` / `out26_2.txt` exist twice** - as ~130-byte stubs in `fullsolve-2026`, and as
+the 905 MB / 51 MB files of the same name in `sa193-2023`. Only the latter are evidence.
+
 ## Credentials
 
 This repo is owned by the GitHub account **`fedork`**, which is not the machine's default

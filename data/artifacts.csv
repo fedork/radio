@@ -1,0 +1,13 @@
+tag,asset,contains,era,audited,note
+k8-2026-05-12,out_k8.txt.zst,out_k8.txt,2026,clean,K=8 frontier m=2..55
+sa-2026-04-27,out_radio_1.txt.zst,out_radio_1.txt,2026,clean,"Sa ladder, k=1..9 proven"
+pareto9-2026-03,pareto9_short.txt.zst,pareto9_short.txt,2026,clean,no completed frontier steps
+pareto9-2026-03,pareto9_short_2.txt.zst,pareto9_short_2.txt,2026,clean,19 points Sb(320..338:17) in 9
+pareto9-2026-03,pareto9_short_3.txt.zst,pareto9_short_3.txt,2026,clean,Sb(339:17) in 9 undecided
+fullsolve-2026,fullsolve_2026.tar.zst,out_k7.txt out_77_39.txt out_409_11.txt out_410_11.txt out_225_5_184_6.txt out_231_4_242_2_full.txt out_55_18.txt out_110_3_115_2_121_1_full.txt out_45_23.txt out_53_2_52_2_57_1_57_1_full.txt out_109_5.txt out_54_4.txt out_54_4_can.txt out_53_4.txt out26_1.txt out26_2.txt,2026,clean,"NAME COLLISION: out26_1/out26_2 here are the ~130-byte stubs from ~/radio, NOT the multi-hundred-MB files of the same name in sa193-2023"
+cache-2025,parsed_260.txt.zst,parsed_260.txt,2023-2025,clean,19.5M entries; see the warm-start warning in docs/data.md
+cache-2025,pareto9_chain_2023_2025.tar.zst,pareto9_36.txt..pareto9_116.txt,2023-2025,clean,"81 chained runs, no gaps"
+sa193-2023,out26_2.txt.zst,out26_2.txt,2023,SUSPECT ERA,"Sb(112:81) verdict, 1725456 s"
+sa193-2023,out26_3.txt.zst,out26_3.txt,2023,SUSPECT ERA,the other 15 + the Sa(193) verdict
+trees-2023,print_trees_2023.tar.zst,print38*.txt print65*.txt print112*.txt print192*.txt,2023,positives only,source of 13 verified witness trees
+trees-2023,fullsolve_2023.tar.zst,full_*.txt (18 files),2023,positives only,source of data/exhaustive_multipart.csv
