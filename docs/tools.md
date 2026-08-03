@@ -66,6 +66,24 @@ Enforces a wall-clock cap and an RSS cap, reports peak RSS and wall time on stde
 survives redirecting the driver's stdout), and exits 124 on timeout / 137 on memory kill.
 Wall time is quantised to `--poll` (default 5s); the drivers' own `took N` lines are exact.
 
+### `MAX_N` undersizing is silent (found 2026-08-03)
+
+`MAX_N` is the largest **total coin count** `n1 + n2` summed over all parts, not the largest
+single group, and a test preserves that total exactly: for a part split `[a:b]` the children
+contribute `a + (m-b)`, `(n-a) + b` and `n + m` worth of coins in the three branches, summing
+to the parent's. So the **root** is the worst case, and for a two-part root it is
+`p + s + q + t` — easily double what a one-part intuition suggests.
+
+Undersizing it does not reliably abort. `cacheCanSolve` / `cacheCantSolve` prune on an
+`n_remaining` budget seeded from `MAX_N` (`radiobase.c:378`), so oversized states simply fail
+to cache. Sometimes the internal consistency check fires (`updated == 0 when caching result`,
+`exit(4)`); sometimes the run completes and returns answers. A `k=6` two-part sweep built with
+`MAX_N=90` against a 130-coin root aborted; the `k=5` sweep built with `MAX_N=60` against a
+66-coin root ran to completion, and on re-running with `MAX_N=80` gave **identical** results in
+all 552 cells — so the failure mode is lost caching, not (on that evidence) wrong answers. Do
+not rely on that. `radio_2part.c` now refuses to start when the root exceeds `MAX_N` and prints
+the value to rebuild with; copy that guard into any new driver.
+
 ### The canonical search does not always work, even unrestricted
 
 It is a *hypothesis* about solution shape, and the hypothesis fails at small k. `Sb(46:6)` in 6
@@ -94,6 +112,8 @@ Two behaviours to be aware of:
 |---|---|---|
 | `radio_canon_search_generic.c` | **Prefer this for new `k=9` results.** Finds a tree that terminates in canonical `U_k` singleton states, which is a self-contained proof. Produced the `473:6`, `480:5`, `496:4` trees. | minutes |
 | `radio_one.c` | One question: is this state solvable in `k`? | varies wildly |
+| `radio_2part.c` | Sweep the two-part frontier `g_k(s,t; p)`. Produced `data/pareto_2part.csv`. Optional `pmin pmax qstart` args walk only the interesting tail. | seconds to ~30 min per staircase |
+| `radio_mixed.c` | `one` decides a state; `allsplits` enumerates every working top-level split of a two-part state; `chain` follows the mixed child down. | minutes |
 | `radio_full.c` | Every top-level split plus a solvability matrix. Thorough and **much** more expensive than `radio_one` - the killed `k=9` runs used this. | hours to never |
 | `radio.c` | Walks the `Sa` ladder upward, printing `can/can't solve Sa(n) in k`. Produced `out_radio_1.txt`. | days |
 | `radioR.c` | Same, downward from `MAX_N`. | |

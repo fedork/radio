@@ -90,6 +90,11 @@ Prefer the wrappers, which compute both and compile for you:
 ./run_radio_full.sh [cache] <k> <n1> <m> ...                      # much more expensive
 ```
 
+`MAX_N` is the **total** coin count over all parts, and undersizing it is silent — the result
+cache prunes on it, so you lose caching and may or may not get an abort. For a two-part root
+that is `n1+m1+n2+m2`, roughly double the one-part figure. Guard it at startup the way
+`radio_2part.c` does; details in [docs/tools.md](docs/tools.md#max_n-undersizing-is-silent-found-2026-08-03).
+
 Driver selection, engine internals, and cache files: [docs/tools.md](docs/tools.md). The
 short version - reach for `radio_canon_search_generic` first, because it yields a
 checkable proof and is far cheaper than `radio_full`, which enumerates every top-level
