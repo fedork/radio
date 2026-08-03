@@ -954,8 +954,16 @@ clang -O3 -DMAX_K=9 -DMAX_N=113 radio.c -o radio_k9
 tools/capped_run.sh --seconds 5400 --rss-gb 16 --poll 2 -- ./radio_k9 > bench_sa113_k9.txt
 ```
 
-Apple M4 Pro (10 performance cores, 24 GB), Apple clang 21.0.0, single-threaded, machine
-otherwise idle.
+Apple M4 Pro (10 performance cores, 24 GB), Apple clang 21.0.0, single-threaded.
+
+**Caveat on the timing.** A second session was working in the same checkout during the run —
+it compiled `radio_mixed` at 15:17, inside the 14:57-15:22 window, and was probably also
+running Python experiments. The run is single-threaded on a 10-performance-core machine, so
+there was no core contention, but memory-bandwidth and cache contention could plausibly cost
+a few percent. Treat 1521 s as an upper bound good to about ±10%, not a pristine figure. The
+*shape* of the result — three states at 99.4% of the time, 0.24 GB peak, all nine rungs
+correct — is unaffected. If a precise reference is wanted later, rerun on a quiet machine;
+it is only 25 minutes.
 
 **Result: wall 1521 s (25m21s), peak RSS 0.24 GB, log 32 MB / 315,278 lines, exit 0.**
 
