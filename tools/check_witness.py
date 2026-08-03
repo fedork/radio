@@ -269,9 +269,13 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
 
 # -------------------------------------------------------------------- numbered format
 
-HEAD = re.compile(r"^(\d+)\.\s+\(in (\d+)\)\s+\(used (\d+)\)\s+(Sa|Sb)\(([^)]*)\)"
+# `(used N)` is absent in output from older builds of radio_print.c; when it is missing the
+# reference-count cross-check is simply skipped.
+HEAD = re.compile(r"^(\d+)\.\s+\(in (\d+)\)\s*(?:\(used (\d+)\)\s*)?(Sa|Sb)\(([^)]*)\)"
                   r"\[(\d+),(\d+)\]\s+take\[([^\]]*)\]\s*:?")
-CHILD = re.compile(r"^([012])=>(Sa|Sb)\(([^)]*)\)\[(\d+),(\d+)\]\((?:line (\d+)|trivial)\)")
+# Older builds wrote `(line -1)` where newer ones write `(trivial)`. A negative line number
+# is treated as trivial; the claim is then checked on its own merits, not taken on trust.
+CHILD = re.compile(r"^([012])=>(Sa|Sb)\(([^)]*)\)\[(\d+),(\d+)\]\((?:line (-?\d+)|trivial)\)")
 
 
 def check_numbered(lines: List[str], errs: List[str]) -> str:
@@ -285,7 +289,9 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
             body = m.group(5)
             cur = int(m.group(1))
             nodes[cur] = dict(
-                k=int(m.group(2)), used=int(m.group(3)), kind=kind,
+                k=int(m.group(2)),
+                used=int(m.group(3)) if m.group(3) else None,
+                kind=kind,
                 n=int(body) if kind == "Sa" else None,
                 state=() if kind == "Sa" else parse_state(body),
                 take=[int(x) for x in m.group(8).split(",") if x.strip()],
@@ -299,7 +305,7 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
                 kind=kind,
                 n=int(body) if kind == "Sa" else None,
                 state=() if kind == "Sa" else parse_state(body),
-                ref=int(m.group(6)) if m.group(6) else None)
+                ref=int(m.group(6)) if m.group(6) and int(m.group(6)) >= 0 else None)
     if not nodes:
         errs.append("no parseable nodes")
         return "0 nodes"
@@ -380,7 +386,7 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
             if ch["ref"] is not None:
                 used[ch["ref"]] += 1
     for ln, nd in sorted(nodes.items()):
-        if nd["used"] != used.get(ln, 0):
+        if nd["used"] is not None and nd["used"] != used.get(ln, 0):
             errs.append(f"line {ln}: header says (used {nd['used']}) "
                         f"but {used.get(ln, 0)} references point here")
 
@@ -401,8 +407,14 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
 
 # -------------------------------------------------------------------------------- cli
 
+RESULTPRINT = re.compile(r"^\s*resultprint\s?")
+
+
 def check_file(path: str) -> bool:
-    lines = [l.rstrip("\n") for l in open(path) if not l.lstrip().startswith("#")]
+    # radio_print.c tags its tree lines with a `resultprint` prefix so they can be grepped
+    # out of a noisy log. Accept the raw form as well as the filtered one.
+    lines = [RESULTPRINT.sub("", l.rstrip("\n"))
+             for l in open(path) if not l.lstrip().startswith("#")]
     errs: List[str] = []
     numbered = any(HEAD.match(l.strip()) for l in lines)
     summary = check_numbered(lines, errs) if numbered else check_canonical(lines, errs)
