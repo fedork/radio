@@ -19,6 +19,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
+| **Undersizing `MAX_N` is silent.** | It is the **total** coin count over all parts — for a two-part root `n1+m1+n2+m2`, about double the one-part figure. The result cache prunes on it, so an undersized build loses caching and *may* abort (`updated == 0 when caching result`, exit 4) or may just finish. Guard it at startup as `radio_2part.c` does. Found 2026-08-03; see [tools.md](tools.md#max_n-undersizing-is-silent-found-2026-08-03). |
 
 ## Goals
 
@@ -40,10 +41,15 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   [`../evidence/pareto_certification_k1_8.txt`](../evidence/pareto_certification_k1_8.txt),
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
-- **Three theorems** — Singleton Majorization, Unit-Group Elimination and Subgraph
-  Monotonicity, all proved. The third is elementary but was load-bearing and unwritten: it is
-  what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
-  on, and what lets a negative certificate store antichains instead of closures.
+- **Five theorems** — Singleton Majorization, Unit-Group Elimination, Subgraph Monotonicity,
+  and, new on 2026-08-03, the **Two-Part Reduction Identity** and the **Two-Part Frontier
+  Theorem for `(2,1)`** ([theorems/two-part-reduction.md](theorems/two-part-reduction.md)).
+  The reduction says `n(k+1,m)` is exactly the largest `p+q` over the two-part frontier at `k`
+  under two crossed caps, so the two-part frontier is the *whole* remaining problem; the
+  `(2,1)` theorem characterises `Sb(p:2,q:1)` in closed form and reproves `n(k,3) = 2^k - k`.
+- **The two-part frontier is measured** — 52 staircases at `k = 4,5,6` in
+  `data/pareto_2part.csv`; `tools/check_tables.py` re-derives 20 one-part maxima from them on
+  every run.
 - **15 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
   `Sb(480:5)@9`. All pass
@@ -125,6 +131,17 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 - **Scalable recursions:** `n(k,5) = n(k-1,2) + n(k-1,6)` (numerical only) and
   `n(k,6) = n(k-1,4) + n(k-1,5)` (realised by a split, outcome-0 saturated). Exact for k=5..9.
   See [conjectures.md](conjectures.md#scalable-constructions-for-m5-and-m6-2026-08-03).
+- **The two-part frontier programme (2026-08-03) — the live front of H4.** The stated blocker
+  ("both constructions bottom out in a 2-part mixed state whose frontier is uncharacterised")
+  is now a measured object and, by the reduction identity, the only remaining one. Settled:
+  the `(2,1)` family exactly. Conjectured on four values of `k`: the `(2,2)` family, which
+  would prove Lemma 8. Verified at the single point each construction needs, `k = 4..7`:
+  `g_k(4,2; n(k,5)) = n(k,4)` (the Mixed-Saturation Lemma for `m=6`) and
+  `g_k(3,2; n(k,3)) = n(k+1,5) - n(k,3)`. **New obstacle, replacing the old one:** the `m=6`
+  mixed child has exactly four working splits at each `k = 4,5,6`, all of one rigid shape, and
+  their mixed child has **three** parts — the two-part class is not closed under its own
+  optimal descent. See
+  [conjectures.md](conjectures.md#the-two-part-frontier-programme-2026-08-03).
 - **Ruled out:** the non-adaptive reformulation. Each test returns
   `[x∈S] + [y∈S]`, so non-adaptive solving is a Sidon condition
   `(U−U) ∩ (V−V) = {0}` — exact for m ≤ 2, but strictly weaker from m = 3 (k=4, m=5: 6 vs 9).
@@ -158,12 +175,21 @@ Do not run `gh auth switch`.
 
 ## Immediate next steps
 
-1. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
+1. **Prove the `(2,2)` two-part family.** It is the next case after the `(2,1)` theorem, the
+   proof shape is known to work (case-split on `b` and `d`, singleton children when `b=1`,
+   induction when `b∈{0,2}`), and it would convert Lemma 8, `n(k,4) = 2^k - 2k + 2`, from
+   conjecture to theorem. No compute needed.
+2. **Characterise the three-part family the `m=6` descent lands in**,
+   `Sb(α:3, n(k-1,3):1, (n(k-1,4)-1):2)` with `α = n(k,5) - n(k-1,3)`. This is the obstacle
+   that replaced the two-part one. `radio_mixed allsplits` only handles two parts — extending
+   it to three is a few lines.
+3. Extend `data/pareto_2part.csv` to `k = 7` for `(2,2)`, `(3,2)`, `(4,2)`. Four values of `k`
+   is the minimum this repo trusts and the `(2,2)` window bounds sit exactly at it.
+4. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
-2. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
+5. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
    invariant from a fit into a derivation, and needs no new compute.
-3. `... 432 9` — discriminates the profile model (432) from the closed form (431).
-4. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
-   here needing no compute at all. An exchange argument is the natural shape; the surviving
-   obligations are listed in
+6. `... 432 9` — discriminates the profile model (432) from the closed form (431).
+7. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1). An exchange
+   argument is the natural shape; the surviving obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).

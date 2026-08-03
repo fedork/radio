@@ -1017,3 +1017,93 @@ RSS instrumented, before any rewrite is justified.
 
 Artifact `bench_sa113_k9.txt` is 32 MB; ~106 bytes per verdict, so log volume tracks verdicts,
 not wall time — the expensive states are the quiet ones.
+
+---
+
+## 2026-08-03 — the two-part frontier: the reduction is exact, and one family is closed
+
+Continuation of H4 (scalable base-sequence construction). Conjecture (u1) was out of scope by
+instruction and was not touched.
+
+### Where the session started
+
+`conjectures.md` ended the m=5/m=6 construction section with "Both constructions bottom out in
+a 2-part mixed state whose frontier is uncharacterised. That is where the work now is." This
+session took that literally: measure the two-part frontier, and see what it determines.
+
+### What was found
+
+**1. The reduction is exact, and it is the whole problem.** Define
+`g_k(s,t; p) = max{q : Sb(p:s, q:t) solvable in k}`. Then
+
+```
+n(k+1,m) = max over b of max{ p+q : Sb(p:(m-b), q:b) solvable in k, p <= n(k,b), q <= n(k,m-b) }
+```
+
+The proof is one paragraph — a strategy is a first test plus three sub-strategies, and the
+outcome-2 and outcome-0 children are single parts, so their conditions collapse to the
+one-part table. The content is in the framing: the two caps are **crossed** (`p` is the n-side
+of the `(m-b)` part but is capped by `n(k,b)`), which is why the optimum sits off the corner of
+the staircase, and why the m=6 recursion's binding constraint is outcome-0 while the m=5 one's
+is the mixed child.
+
+Verified 20/20 by recomputing `n(k+1,m)` from the measured staircases against
+`data/pareto_sb.csv` — two independent computations agreeing. Now enforced by
+`tools/check_tables.py`, so it cannot rot.
+
+**2. The `(2,1)` family is closed form, and proved.**
+`Sb(p:2,q:1)` solvable in `k` iff `p <= 2^k - 1`, `q <= 2^k`, `p+q <= 2^(k+1) - k - 1`.
+Necessity is an induction over the four split shapes, all of which give the *same* bound —
+that coincidence is what makes it exact. Sufficiency is an explicit `b=1,d=1` split whose three
+children are singleton states; checked as pure arithmetic over 1,399,926 states at `k = 1..10`,
+zero failures. Corollary: `n(k,3) = 2^k - k`, i.e. Lemma 6 via a new route — the route the
+unproved Lemmas 8/9/10 would need.
+
+**3. `(2,2)` conjectured, `(3,2)`/`(4,2)` pinned at the point that matters.** Details in
+[conjectures.md](conjectures.md#the-two-part-frontier-programme-2026-08-03). The one worth
+naming is the **Mixed-Saturation Lemma**: `g_k(4,2; n(k,5)) = n(k,4)`, verified at `k = 4,5,6,7`
+in both directions. It is exactly what turns `n(k,6) = n(k-1,4) + n(k-1,5)` from a numerical
+coincidence into a construction.
+
+**4. The obstacle moved, it did not vanish.** `Sb(n(k,5):4, n(k,4):2)` has exactly four working
+top-level splits at each of `k = 4,5,6` — a rigid, fully-determined shape whose parameters are
+all one-part frontier values — and its mixed child has **three** parts. So the two-part class is
+not closed under its own optimal descent. That three-part family is the new front.
+
+### Costs, and what did not work
+
+Everything here was cheap; the whole session's compute is under two CPU-hours.
+
+| run | cost |
+|---|---|
+| `k=4` full two-part sweep, all pairs `s+t <= 8` | seconds |
+| `k=5` full two-part sweep, all pairs `s+t <= 10`, 552 cells | ~5 min |
+| `k=6`, 12 staircase tails | ~10 min wall, 8-way concurrent |
+| `k=7`, 10 targeted boundary decisions | ~15 min |
+| `refsolve` exhaustive `(2,1)` and `(2,2)` check, `k <= 5` | ~4 min |
+
+Raw solver output (~2.2 MB total) was **not archived**. It is regenerable in minutes from
+`radio_2part.c`, which is committed, and the distilled frontier is in `data/pareto_2part.csv`
+with the driver named as source — a new status `solver-frontier` records exactly that evidence
+level. This is the "not everything deserves archiving" case in [data.md](data.md).
+
+Dead ends and corrections, recorded so they are not repeated:
+
+- **Two builds were undersized on `MAX_N` and it was nearly missed.** `MAX_N` is the *total*
+  coin count, and a two-part root needs about double the one-part figure. The `k=6` build at
+  `MAX_N=90` aborted with `updated == 0 when caching result`; the `k=5` build at `MAX_N=60`
+  ran to completion against a 66-coin root. Re-running `k=5` at `MAX_N=80` gave identical
+  results in all 552 cells, so nothing was lost — but the failure is silent by default and all
+  the k=5 reasoning had to be re-derived before it could be trusted. `radio_2part.c` now
+  refuses to start when the root exceeds `MAX_N`. Now a trap in [status.md](status.md).
+- **`Sb(n:2)` is not `Sb(n:1, n:1)`.** Both have frontier `2^k - 1` as isolated states, which
+  is suggestive, but in context the double is strictly harder: `Sb(27:1,27:1,32:1)` is solvable
+  in 5 by majorization and `Sb(27:2, 32:1)` is not. Killed a tempting reduction in five minutes.
+- **A "cost per part, sum <= 1" model is impossible.** `Sb(31:2)` at `k=5` is at its own
+  frontier and still admits a second part of 27 coins, so no additive capacity function with
+  `c(n(k,m),m) = 1` can exist.
+- **One descent was run at the wrong `k`** and appeared to show the three-part children had a
+  free level of slack. Re-run at their own budget `k-1`, they are tight. The wrong reading was
+  live for one step; noted because the mistake is easy to repeat with `radio_mixed chain`,
+  whose brute-force split search returns the no-op split `[0:0,...]` whenever the state happens
+  to be solvable one level down.

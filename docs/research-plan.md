@@ -30,6 +30,13 @@ negative needs a cold run, which is why this stays expensive.
 canonical decomposition matrix questions: the missing second generator, and whether
 `473:6 @9` lifts to a scalable compact matrix.
 
+Since 2026-08-03 this has a concrete spine: the **two-part frontier**
+`g_k(s,t; p) = max{q : Sb(p:s, q:t) solvable in k}` determines `n(k,m)` exactly
+([theorems/two-part-reduction.md](theorems/two-part-reduction.md)), the `(2,1)` family is
+solved in closed form, and each further family closes one unproved lemma — `(2,2)`→Lemma 8,
+`(3,2)`→Lemma 9, `(4,2)`→Lemma 10. Work the families in that order; the current obstacle is
+that the `m=6` descent leaves the two-part class for a three-part one.
+
 ## Proximate goals
 
 ### P1 - Make the record trustworthy *(done 2026-08-03)*

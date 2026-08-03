@@ -196,13 +196,23 @@ Maximality at `k=9` is open for every `m`, including these six.
 
 ## Theorems
 
-Two results are proved in full:
+Five results are proved in full:
 
 - [Singleton Majorization Theorem](theorems/singleton-majorization.md) - decides singleton
   states exactly, by weak majorization against `G_k`. This is what turns a canonical tree
   into a proof.
 - [Unit-Group Elimination Theorem](theorems/unit-group-elimination.md) - `1:1` parts can be
   deleted from any state without affecting solvability, subject only to the mass bound.
+- [Subgraph Monotonicity Theorem](theorems/subgraph-monotonicity.md) - a state is a graph and
+  solvability is inherited by subgraphs. Elementary, and what the solver's whole result cache
+  rests on.
+- [Two-Part Reduction Identity](theorems/two-part-reduction.md) - `n(k+1,m)` is exactly the
+  largest `p+q` over the two-part frontier at `k`, under two crossed caps. So the two-part
+  frontier determines the entire one-part table.
+- [Two-Part Frontier Theorem for `(2,1)`](theorems/two-part-reduction.md#theorem-2-two-part-frontier-theorem-family-21) -
+  `Sb(p:2, q:1)` is solvable in `k` iff `p <= 2^k-1`, `q <= 2^k` and `p+q <= 2^(k+1)-k-1`.
+  Reproves `n(k,3) = 2^k - k` through the two-part frontier, which is the route the unproved
+  lemmas for `m = 4,5,6` would need.
 
 The special-case constructions (lemmas 1-11) are in
 [theorems/special-cases.md](theorems/special-cases.md), each marked proved or not.

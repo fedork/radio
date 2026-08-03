@@ -374,8 +374,10 @@ The first is a numerical identity only — `m=6 > 5` cannot appear as a child of
 the split that would saturate it (`a = n(k-1,2)`) is *not* in the working set, so it is not
 realised structurally.
 
-Both constructions bottom out in a 2-part mixed state whose frontier is uncharacterised. That
-is where the work now is.
+Both constructions bottom out in a 2-part mixed state. That state is no longer
+uncharacterised: see [the two-part frontier programme](#the-two-part-frontier-programme-2026-08-03)
+below, which measures it, gives it an exact theorem for one family, and shows that the whole of
+`n(k,m)` follows from it.
 
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 
@@ -534,6 +536,82 @@ hypothesis, m=6 *must* grind two levels deeper than m=5. Required depth by m:
 
 The jump from `q=4` to `q=6` skips 32 entirely — the same gap that appears in the m=11 profile
 length. Whatever forces that skip is probably one phenomenon, not two.
+
+## The two-part frontier programme (2026-08-03)
+
+The blocker recorded above — "bottoms out in a 2-part mixed state whose frontier is
+uncharacterised" — turns out to be the *whole* problem rather than one obstacle in it, and it
+is now measured.
+
+Write `g_k(s,t; p)` for the largest `q` with `Sb(p:s, q:t)` solvable in `k`. Subgraph
+Monotonicity makes it non-increasing in `p`, so each `(k,s,t)` gives a staircase. Staircases
+are in [`../data/pareto_2part.csv`](../data/pareto_2part.csv) (52 of them, `k = 4,5,6`);
+`radio_2part.c` produces them and `tools/refsolve.py two-part` reproduces them independently
+for `k <= 5`.
+
+**The reduction is exact.** `n(k+1,m)` is the largest `p+q` over the two-part frontier at `k`,
+subject to two crossed caps — proved and verified 20/20 in
+[theorems/two-part-reduction.md](theorems/two-part-reduction.md), and re-checked on every run
+by `tools/check_tables.py`. So a characterisation of `g` *is* a characterisation of `n(k,m)`,
+and nothing else is missing.
+
+**One family is settled.** `Sb(p:2, q:1)` is solvable in `k` iff `p <= 2^k - 1`, `q <= 2^k` and
+`p + q <= 2^(k+1) - k - 1` — proved, and exhaustively verified by the independent solver for
+`k <= 5`. It reproves `n(k,3) = 2^k - k`.
+
+### `(2,2)` — conjectured, and it would prove Lemma 8
+
+> `Sb(p:2, q:2)` is solvable in `k >= 4` iff `p, q <= 2^k - 1` and
+> `p + q <= 2^(k+1) - 2k - [max(p,q) >= 2^k - 2]`.
+
+The bracket is an indicator: the last unit of the sum is available only when **neither** side
+is within `1` of `n(k,2)`. Equivalently the top sum `2·n(k,3)` is reached exactly on the window
+`p in [n(k,4)+1, n(k,2)-2]`.
+
+Verified against complete staircases at `k = 4, 5, 6` and at both window edges at `k = 7`:
+`Sb(121:2,121:2)` and `Sb(117:2,125:2)` are solvable, `Sb(121:2,122:2)` and `Sb(116:2,126:2)`
+are not. It is **false at `k = 2, 3`**, where it is conservative — `Sb(1:2,3:2)@2` and
+`Sb(4:2,6:2)@3` are solvable and the form says otherwise. The max-sum half,
+`max_p [p + g_k(2,2; p)] = n(k+1,4)`, holds from `k = 2` with no exception.
+
+Four values of `k` is the bare minimum this repo trusts (see the fits trap in
+[status.md](status.md)); the window bounds in particular are a two-parameter fit on four points.
+
+### `(3,2)` and `(4,2)` — the two the recursions actually need
+
+Both are measured but neither has a closed form yet. What is verified is the sharper statement
+each construction needs, at the single extreme point:
+
+| statement | meaning | verified at |
+|---|---|---|
+| `g_k(4,2; n(k,5)) = n(k,4)` | `Sb(n(k,5):4, n(k,4):2)` is solvable in `k` and one more coin on the 2-side is not | `k = 4,5,6,7` |
+| `g_k(3,2; n(k,3)) = n(k+1,5) - n(k,3)` | the `m=5` split window reaches `n(k+1,5)` at its endpoint | `k = 4,5,6,7` |
+
+The first is the **Mixed-Saturation Lemma** for `m = 6`: together with the two one-part facts
+`n(k,4) <= n(k,4)` and `n(k,5) <= n(k,2)` it gives `n(k+1,6) >= n(k,4) + n(k,5)`, i.e. the
+construction, and with the reduction identity it gives equality. Proving it for all `k` would
+prove Lemma 10.
+
+### The `m=6` mixed child has a rigid split, and it leaves the two-part class
+
+`Sb(n(k,5):4, n(k,4):2)` has **exactly four** working top-level splits at each of `k = 4, 5, 6`
+— two, plus their complements. Writing `A = n(k-1,2)`, `T = n(k-1,3)`,
+`F = n(k-1,4)` and `α = n(k,5) - T`, they are `[α:1, A:2]` and `[(α+1):1, A:2]`, with children
+
+```
+out2  Sb(A:2, α:1)                  a (2,1) state, with A = n(k-1,2) saturated
+out0  Sb(T:3)                       saturated at the one-part frontier
+out1  Sb(α:3, T:1, (F-1):2)         three parts
+```
+
+(the second split shifts `α -> α+1` and `T -> T-1`). Exact at all three `k`:
+`α = 4, 10, 23` and `(A, T, F-1) = (7,5,3), (15,12,9), (31,27,23)`.
+
+So the descent is completely determined, `out2` is governed by the theorem above with slack,
+`out0` is a saturated one-part state — and **`out1` has three parts**. The two-part class is
+not closed under its own optimal descent. Each `out1` was confirmed solvable at its own budget
+`k-1` (so the descent is real, not a wasted level), but the three-part family it lands in is
+uncharacterised, and that is now the frontier of this line of work.
 
 ## Structural threads (from the journal)
 
