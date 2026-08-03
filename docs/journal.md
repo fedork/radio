@@ -690,3 +690,41 @@ Three separate documents were left asserting things this same session had dispro
 "supersede in place" being written down before any of them. Recording a rule does not
 implement it. The session-end protocol in `AGENTS.md` now makes re-reading your own changes an
 explicit step, and `tools/check_docs.py` catches the mechanical part.
+
+---
+
+## 2026-08-03 — the profile is derived, not fitted
+
+`tools/profile_from_tree.py`. Reading the profile off the committed witness trees rather than
+fitting it to the frontier numbers.
+
+**Mechanism.** Fix one m-side coin `y` and a normalisation level `t`. Over the `k-t` tests
+above `t`, `y` is either in the tested set or not, so `y` has exactly `2^(k-t)` paths to level
+`t`; each ends holding one n-side chunk, which must be an atom of `G_t` because it has to be
+resolvable in `t` tests while paired with `y`. **The profile is the multiset of chunk sizes
+along those paths.** Hence `length = 2^q` with `q = k-t` (it counts paths), refinement
+invariance is automatic (lowering `t` doubles them), and the whole-tree leaf census at level
+`t` is `m` copies of the profile — total exactly `m · 2^(k-t)`.
+
+Verified: 248:3@8 both solutions, 496:4@9 both, 480:5@9 seven of nine. For 480:5 the per-coin
+profile is `9x32 + 4x31 + 2x26 + 16 = 480` at level 5, and the whole-tree census
+`32:45, 31:20, 26:10, 16:5` (80 cells) reproduces the `480:5 @ U_5` benchmark recorded in this
+journal years ago — the numbers were already here, unconnected.
+
+**Two failure modes, both real.** Empty paths (a coin ending a path with no n-side coins) and
+asymmetry (census not divisible by `m`, so the coins do not share a decomposition). The latter
+is exactly the "multiple-of-m atom-count sanity check" recorded earlier as failing for 473:6.
+The check was right and now has a reason.
+
+**`Sb(473:6)@9` does not exhibit the m=6 profile.** It is asymmetric and wastes 7 of its 384
+paths. That answers the long-standing question about that witness, negatively. Whether a
+symmetric 473:6 solution exists is open and worth a targeted search — 480:5 shows symmetric
+and asymmetric solutions coexisting for the same state, so failure here may be an artifact of
+which solution the search happened to return.
+
+**The obstruction is reframed.** `q(m)` was an arbitrary fit parameter; since `q = k - t` it is
+now a question about the tree: how deep must a solution go before every leaf is a singleton?
+Also note the earlier mechanism guess in this journal — "q tests separate the m-side into 2^q
+classes" — is **wrong**: at depth 7 the 480:5 tree still holds `120:3`, multiplicity 3. The
+m-side decrements one per level along a chain; it does not split into classes. The `2^q` counts
+paths of a single coin, not classes of coins.

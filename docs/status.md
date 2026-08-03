@@ -68,8 +68,18 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 - The journal's "m=11 first large jump to length 64" **dissolves** if the single
   exactly-diagonal cell `Sb(11:11)` is treated as pre-stabilised; m=11 then fits at length 16
   like its neighbours. Not airtight — m=4 includes *its* diagonal cell and fits fine.
-- **Unexplained:** `q(m) = 0,0,1,2,2,2,3,3,4,4,4,4,4` and the coefficient vectors. This is
-  the obstruction to a general solution.
+- **The profile now has a mechanism, derived from the trees rather than fitted
+  (2026-08-03).** Fix an m-side coin; over the `k-t` tests above normalisation level `t` it is
+  taken or not, giving exactly `2^(k-t)` paths, each ending in one n-side chunk that must be
+  an atom of `G_t`. The profile is that multiset. So `length = 2^q` counts paths, refinement
+  invariance is automatic, and the whole-tree census is `m` copies of it. Verified on 11 of
+  14 committed solutions; `tools/profile_from_tree.py`. Full argument in
+  [conjectures.md](conjectures.md#the-profile-has-a-mechanism-derived-2026-08-03).
+- **`Sb(473:6)@9` does not exhibit the profile** — asymmetric, and it wastes 7 paths. This
+  answers the journal's headline open question negatively *for that witness*; whether a
+  symmetric one exists is open.
+- **Reframed obstruction:** `q(m)` is not arbitrary, since `q = k - t`. The real question is
+  how deep a solution must go before every leaf is a singleton.
 - **Ruled out:** the non-adaptive reformulation. Each test returns
   `[x∈S] + [y∈S]`, so non-adaptive solving is a Sidon condition
   `(U−U) ∩ (V−V) = {0}` — exact for m ≤ 2, but strictly weaker from m = 3 (k=4, m=5: 6 vs 9).

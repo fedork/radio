@@ -105,6 +105,68 @@ recurrence is `Sa(k) = max over n1 <= Sa(k-1) of n1 + n2max(n1)` where `n2max(n1
 obviously settled, and it identifies the 16 states listed in
 [results.md](results.md#why-sa193-is-a-small-question).
 
+## The profile has a mechanism (derived 2026-08-03)
+
+This was a numerical fit. It is now derived from the verified witness trees, by
+`tools/profile_from_tree.py`.
+
+**The mechanism.** Fix one m-side coin `y` and a normalisation level `t`. Over the `k-t`
+tests above level `t`, `y` is either inside the tested set or outside it — so `y` has exactly
+`2^(k-t)` root-to-level-`t` paths. Each path ends holding one chunk of the n-side, and that
+chunk must be resolvable in the `t` remaining tests while paired with `y`, so its size is an
+atom of `G_t`.
+
+> **The profile is the multiset of chunk sizes along one coin's `2^(k-t)` paths.**
+
+Everything that looked arbitrary now follows:
+
+- **`length = 2^q` with `q = k-t`** — it counts binary paths. Not a coincidence.
+- **Refinement invariance** — lowering `t` by one doubles the paths, so `L/2^q` is fixed.
+  `q` is not intrinsic; the refinement class is.
+- **The atoms come from `G_t`** — forced by the terminal chunk being solvable in `t`.
+- **The whole tree's census at level `t` is `m` copies of the profile**, so every count is
+  divisible by `m` and the total is exactly `m · 2^(k-t)`.
+
+### Verified
+
+| tree | m | solutions | carry the profile |
+|---|---|---|---|
+| `canon_248_3_at8` | 3 | 2 | 2 — matches `AC` |
+| `canon_496_4_at9` | 4 | 2 | 2 — matches `AACC` |
+| `canon_480_5_at9` | 5 | 9 | 7 — matches `BBBD` |
+| `canon_473_6_at9` | 6 | 1 | **0** |
+
+For `Sb(480:5)@9` the per-coin profile reads `9x32 + 4x31 + 2x26 + 1x16 = 480` at level 5,
+16 atoms `= 2^4`. The whole-tree census is `32:45, 31:20, 26:10, 16:5`, 80 cells — which is
+exactly the `480:5 @ U_5` benchmark recorded independently in [journal.md](journal.md),
+computed there without the connection being made.
+
+### Two ways a real solution fails to have a profile, both observed
+
+- **Empty paths.** A path where `y` ends with no n-side coins. The atom count then falls short
+  of `m · 2^(k-t)`. `Sb(473:6)@9` wastes **7** slots.
+- **Asymmetry.** The census is not divisible by `m`, so the coins do not share one
+  decomposition. This is precisely the "multiple-of-m atom-count sanity check" the journal
+  records as failing for 473:6 — the check was right and now has a reason.
+
+So a profile describes a **symmetric, non-wasteful** solution. Most solutions are; not all are.
+
+### This answers the journal's headline open question, negatively
+
+> *"Does the canonical 473:6 @9 witness correspond to a genuinely scalable compact atomic
+> decomposition family, or only to a tree/state-level artifact?"*
+
+**That witness does not.** It is asymmetric and wastes 7 paths, so it does not exhibit the m=6
+profile at all. Open: whether a symmetric `Sb(473:6)@9` solution exists. Worth a targeted
+search, since `canon_473_6_at9` is the only one we have and 480:5 shows asymmetric and
+symmetric solutions coexisting for the same state.
+
+### What this does to the open question
+
+`q(m)` is no longer an arbitrary fit parameter. Since `q = k - t`, the question becomes:
+**how deep must a solution go before every leaf is a singleton?** That is a property of the
+tree, and a far more tractable target than an integer pulled out of a curve fit.
+
 ## Structural threads (from the journal)
 
 Carried over from [journal.md](journal.md), unresolved:
@@ -114,8 +176,7 @@ Carried over from [journal.md](journal.md), unresolved:
   final branch-signature multisets. A second generator is needed and no candidate preserving
   the right invariants has been found. The depth-2 block clue is a conservative 3-block
   rewrite `{AACC, AB, BC} <-> {AA, AC, BBCC}`.
-- **Whether `473:6 @9` scales.** Verifying the witness tree (done, see
-  [results.md](results.md)) settles the tree/state level only. Whether it lifts to a valid
-  compact atomic decomposition matrix under one-level scaling is untouched.
+- **Whether `473:6 @9` scales.** Answered negatively for the witness we have — see above.
+  Whether a symmetric one exists is open.
 - **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs.
   Nothing beyond `m = 4` has a matching upper bound.
