@@ -17,8 +17,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 
 ## How facts are recorded
 
-The three files under `data/` are the single source of truth. Everything else references
-them.
+The files under `data/` are the single source of truth. Everything else references them.
 
 - `data/pareto_sb.csv` - the `Sb` Pareto frontier: `k, m, n1, bound, status, source, note`
 - `data/pareto_sa.csv` - the `Sa` sequence
@@ -39,8 +38,9 @@ rejects unresolvable sources and unknown tags.
 
 Every row carries a **bound** and a **status**:
 
-`bound` is `max` (proven maximal) or `lower` (a solution exists, maximality open). The
-distinction matters and is easy to lose in prose.
+`bound` is `max` (proven maximal), `lower` (a solution exists, maximality open) or `upper`
+(exhaustively refuted above this value). The distinction matters and is easy to lose in prose:
+"473 is solvable in 9" and "473 is the maximum" are different claims.
 
 | status | meaning |
 |---|---|
