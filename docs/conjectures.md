@@ -697,15 +697,71 @@ Falsifiable predictions, cheap to test: `Sb(104:6)@7` should succeed at `target_
 at 2; `Sb(46:6)@6` should succeed only at `target_k = 0`; `Sb(50:5)@6` should succeed at
 `target_k = 2` since `q_min(5) = 4`.
 
+### Solved for m = 3, 4, 5 (2026-08-03)
+
+`tools/symbolic_profile.py` implements the search. Results, each the largest-value profile the
+`m` coins can pack in `q` levels:
+
+| m | q_min | profile | `n(k,m)` |
+|---|---|---|---|
+| 3 | 2 | `AABC` | `2^k - k` |
+| 4 | 3 | `AAAABBCC` | `2^k - 2k + 2` |
+| 5 | 4 | `AAAAAAAAABBBBCCD` | `2^k - k(k-3)/2 - 5` |
+
+Three things fall out at once, none of them put in by hand:
+
+- **The formulas are exactly Lemmas 6, 8 and 9** — the last two previously unproved. The solver
+  never sees a value of `n` or `k`.
+- **`q_min = 2, 3, 4` reproduces the tree depths measured independently** from the canonical
+  witnesses (the table under
+  [what is actually invariant](#what-is-actually-invariant-across-the-k9-trees-2026-08-03)).
+- **Each profile is the forced refinement of the fitted one** — `AC`, `AACC`, `BBBD` refined to
+  `q_min` under `A→aa, B→ab, C→bc, D→cd`. So the fitted profile table is derived, not matched.
+
+`m = 6` is consistent so far but not finished: the refinements of `BBCD` at `q = 3` and `q = 4`
+are **infeasible**, as `q_min(6) = 6` predicts. `q = 5, 6` are expensive and still open.
+
+### The value/feasibility split, demonstrated
+
+`AACC` is **infeasible at `q=2`** — the best a 4-coin state can pack in two levels is `ABCC`,
+worth `n(k,4) - 1`. Its refinement `AAAABBCC` is feasible at `q=3` and worth exactly `n(k,4)`.
+So the shortest representative of a profile class need not be realisable; only a deep enough
+refinement is. That is the distinction between the two jobs of `q` above, now measured rather
+than argued.
+
+The prune that kills `AACC` is a counting one, and it is the reason the search terminates: a
+part with `c` coins and `v[i]` copies of letter `i` needs `c · v[i]` slots below it, there are
+`3^d` level-`q` nodes below, and each holds at most `multiplicity(i)` copies. At `d=1` the part
+`(2, AA)` needs 4 slots for `A` and only 3 exist.
+
+### The constructions are real, and they scale
+
+Instantiating a profile at `t = k-q` gives a tree that `tools/check_witness.py` verifies from
+first principles. **24 of them were generated and checked, `k = 4..12` for `m = 3,4,5`**, every
+one matching the closed form. So the lower bounds
+
+```
+n(k,3) >= 2^k - k        n(k,4) >= 2^k - 2k + 2        n(k,5) >= 2^k - k(k-3)/2 - 5
+```
+
+are **unconditional** at every `k` checked, from one letter string each. That is the scalable
+base-sequence construction this programme was after. Three instances are committed as
+`witnesses/symbolic_{1014_3,1006_4,984_5}_at10.tree` and appear in `data/pareto_sb.csv` as the
+first `k = 10` entries in the `Sb` table.
+
 ### What is assumed
 
-- **Symmetry** — every coin carrying the same profile. Two of the nine `Sb(480:5)@9` solutions
-  are asymmetric and the `473:6@9` witness is asymmetric and wastes 7 paths, so this maximises
-  over the symmetric non-wasteful class. A priori a lower bound on `n(k,m)`; it happened to be
-  exact for `m=3`.
-- **The atomic-leaf hypothesis**, for the upper-bound direction only. Anything the model
-  *finds* is an unconditional construction — the `m=3` witness above is checked from first
-  principles.
+- **Optimality, not achievability, is what rests on assumptions.** Anything the model finds is
+  a construction, checkable at any `k`, and does not depend on the model being right.
+- **The atomic-leaf hypothesis** is needed for the upper-bound reading — that the profile found
+  is the *best* one. Its evidence is that the maximum coincides with the known `n(k,m)` for
+  `m = 3,4,5` across every `k` where the frontier is proven.
+- **Symmetry is not an extra assumption here**, contrary to what an earlier draft of this
+  section said. Every coin's profile is the root multiset by construction; and distinct
+  letter-count vectors are linearly independent as functions of `t`, so two coins with equal
+  totals *for all t* necessarily carry the same multiset. Asymmetric solutions exist (two of
+  the nine `Sb(480:5)@9`), but they cannot be described by a single `t`-uniform formula, which
+  is what makes them invisible here and harmless.
 
 ## Structural threads (from the journal)
 

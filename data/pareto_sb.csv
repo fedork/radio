@@ -181,3 +181,6 @@ k,m,n1,bound,status,source,note
 9,94,98,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(99:94) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
 9,95,97,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(98:95) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
 9,96,96,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(97:96) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+10,3,1014,lower,witness,witnesses/symbolic_1014_3_at10.tree,symbolic profile AABC at q=2; matches the m=3 closed form
+10,4,1006,lower,witness,witnesses/symbolic_1006_4_at10.tree,symbolic profile AAAABBCC at q=3; matches the m=4 closed form (lemma-8)
+10,5,984,lower,witness,witnesses/symbolic_984_5_at10.tree,symbolic profile AAAAAAAAABBBBCCD at q=4; matches the m=5 closed form (lemma-9)

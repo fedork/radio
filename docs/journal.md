@@ -1172,3 +1172,55 @@ between `grep` (relative, worktree) and `Read` (absolute, main checkout). Recove
 `git diff > patch` / `git apply --3way` / `git checkout --`, no work lost and nothing of anyone
 else's touched — but the tell was luck, not a check. **In a worktree, keep every tool path
 relative or rooted at the worktree.**
+
+## 2026-08-03 (later still) — the symbolic profile solver, and the k=10 column opens
+
+`tools/symbolic_profile.py`. The programme written up earlier the same day, implemented.
+
+### What it does
+
+Search state is a multiset of parts `(c, v)`: `c` m-side coins, `v` an n-side carried as a
+multiset of dyadic-block *letters*. A split picks `b` coins and a sub-multiset `a ⊆ v`; the
+children are `(b,a)`, `(c-b, v-a)` and `(c-b, a) + (b, v-a)`. After `q` levels every part must
+be one coin holding one letter, and each level-`q` node's letters must respect the block
+multiplicities `1,1,2,4,8,…`. No `n`, no `k`, no `t` appears anywhere.
+
+### Results
+
+| m | q_min | profile | formula | was |
+|---|---|---|---|---|
+| 3 | 2 | `AABC` | `2^k - k` | lemma-6, proved |
+| 4 | 3 | `AAAABBCC` | `2^k - 2k + 2` | lemma-8, **unproved** |
+| 5 | 4 | `AAAAAAAAABBBBCCD` | `2^k - k(k-3)/2 - 5` | lemma-9, **unproved** |
+
+Three independent confirmations, none of them fitted: the formulas are the recorded closed
+forms; `q_min = 2,3,4` matches the tree depths measured from the canonical witnesses; and each
+profile is the forced refinement of the fitted `AC` / `AACC` / `BBBD`.
+
+**The constructions are unconditional.** Instantiating a profile at `t = k-q` yields a tree
+`tools/check_witness.py` verifies from first principles. 24 were generated and checked,
+`k = 4..12`, every one matching the closed form. So `n(k,3) ≥ 2^k - k`, `n(k,4) ≥ 2^k - 2k + 2`
+and `n(k,5) ≥ 2^k - k(k-3)/2 - 5` now rest on machine-checked proofs at every `k` tested, from
+one letter string each. Only *optimality* still needs the atomic-leaf hypothesis.
+
+Consequence for the tables: the `Sb` frontier gains its first `k = 10` entries —
+`n(10,3) ≥ 1014`, `n(10,4) ≥ 1006`, `n(10,5) ≥ 984`, each `status=witness`.
+
+### Two things worth keeping
+
+**`AACC` is infeasible at `q=2`.** The best 4-coin packing in two levels is `ABCC`, worth
+`n(k,4) - 1`; only the refinement `AAAABBCC` at `q=3` reaches `n(k,4)`. So a profile class's
+shortest representative need not be realisable. This is the value/feasibility split, measured.
+
+**Symmetry is not an assumption**, which corrects the write-up from earlier today. Every coin's
+profile *is* the root multiset by construction, and letter-count vectors are linearly
+independent as functions of `t`, so equal totals for all `t` forces equal multisets. Asymmetric
+solutions exist but cannot be described by a `t`-uniform formula.
+
+### Cost
+
+Minutes, and no solver compute. `m=3` and `m=4` are seconds; `m=5` at `q=4` took ~7 minutes
+after adding the capacity prune (a part with `c` coins and `v[i]` copies of letter `i` needs
+`c·v[i]` of the `multiplicity(i)·3^d` slots below it) — before that prune it ran 20+ minutes
+without finishing. `m=6` needs `q=5,6`, i.e. 32- and 64-letter profiles; `q=3` and `q=4` are
+confirmed infeasible, the rest is unfinished and is the obvious next job.

@@ -52,11 +52,17 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 - **The two-part frontier is measured** — 52 staircases at `k = 4,5,6` in
   `data/pareto_2part.csv`; `tools/check_tables.py` re-derives 20 one-part maxima from them on
   every run.
-- **16 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
-  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, a two-sided-only
-  `Sb(480:5)@9`, and `Sb(27:3)@5` derived by hand from the symbolic profile model rather than
-  by search. All pass `tools/check_witness.py`, which re-derives every step without consulting
-  the solver.
+- **The symbolic profile solver works, and `m = 3,4,5` are solved** — profiles `AABC`,
+  `AAAABBCC`, `AAAAAAAAABBBBCCD` at `q_min = 2,3,4`, reproducing Lemmas 6, 8 and 9 with no `n`
+  or `k` anywhere in the search, and reproducing the independently measured tree depths. The
+  constructions are unconditional: 24 instantiations at `k = 4..12` were generated and pass
+  `tools/check_witness.py`. First `k = 10` entries in the `Sb` table come from them.
+  See [conjectures.md](conjectures.md#solved-for-m--3-4-5-2026-08-03).
+- **19 committed witness trees** — `Sa(38)` through `Sa(192)`, canonical trees for
+  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9` and a two-sided-only
+  `Sb(480:5)@9`, and four from the symbolic profile model rather than from search:
+  `Sb(27:3)@5`, `Sb(1014:3)@10`, `Sb(1006:4)@10`, `Sb(984:5)@10`. All pass
+  `tools/check_witness.py`, which re-derives every step without consulting the solver.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
 
