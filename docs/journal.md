@@ -1241,6 +1241,23 @@ with no verdict:
   `n(k,6) = n(k-1,4) + n(k-1,5)` from first principles, including which child saturates, and in
   both formulations it is the *mixed* child that is expensive.
 
-What would make it tractable: force the split one level further down (`out1`'s own root split
-is also predicted by the two-part work), or persist the `feasible` memo across processes. Do
-not simply rerun the plain search — it has now burned ~30 CPU-min twice for nothing.
+**The greedy constructor does not rescue it either.** Reformulating placement as load routing
+(each split conserves `c·v[i]` exactly) turned `m=5` from ~7 CPU-min of exhaustive search into
+1 second, and reproduces `m=3,4,5` — but `m=6` at `q=6` still fails: width 8 returns "found
+nothing" in seconds, and widths 32+ time out at 10 CPU-min. Total spent on `m=6` across all
+approaches: roughly 1.5 CPU-hours, no verdict.
+
+**The fork worth testing next, because it may not be a compute problem at all.** The model only
+ever produces *symmetric* solutions, and it is possible none exists for `m=6`:
+
+- the one atomic `q=6` witness we have, `canon_473_6_at9.tree`, is asymmetric — census
+  `{A:289, B:63, C:20, D:5}`, 377 atoms with 7 empty paths;
+- a symmetric one would need census exactly `6 × (A^46 B^12 C^5 D^1)` = `{A:276, B:72, C:30,
+  D:6}`, 384 atoms with none wasted. Same total value `6·473 = 2838`, a different letter mix.
+
+So either (a) a symmetric solution exists and the search is merely too weak, leaving the model
+complete for `m ≤ 6`; or (b) none exists, in which case `BBCD` is a value-fit with no symmetric
+realisation, and the model must be extended to per-coin profiles that differ. Distinguishing
+these is worth more than more compute on the same search. A cheap first probe: run
+`tools/profile_from_tree.py` over `canon_473_6_at9_twosided.tree` and any other `m=6` solutions
+that can be produced, and see whether *any* of them is symmetric.

@@ -184,21 +184,30 @@ Do not run `gh auth switch`.
 
 ## Immediate next steps
 
-1. **Prove the `(2,2)` two-part family.** It is the next case after the `(2,1)` theorem, the
-   proof shape is known to work (case-split on `b` and `d`, singleton children when `b=1`,
-   induction when `b∈{0,2}`), and it would convert Lemma 8, `n(k,4) = 2^k - 2k + 2`, from
-   conjecture to theorem. No compute needed.
-2. **Characterise the three-part family the `m=6` descent lands in**,
-   `Sb(α:3, n(k-1,3):1, (n(k-1,4)-1):2)` with `α = n(k,5) - n(k-1,3)`. This is the obstacle
-   that replaced the two-part one. `radio_mixed allsplits` only handles two parts — extending
-   it to three is a few lines.
-3. Extend `data/pareto_2part.csv` to `k = 7` for `(2,2)`, `(3,2)`, `(4,2)`. Four values of `k`
+1. **Decide whether `m = 6` is a compute problem or a modelling one.** The symbolic model only
+   produces *symmetric* solutions, and the one atomic `q=6` witness on record
+   (`canon_473_6_at9.tree`) is asymmetric with a different census. Roughly 1.5 CPU-hours has
+   gone into searching for the symmetric solution without a verdict, so settle the prior
+   question first: can one exist? The fork, and a cheap first probe, are in
+   [journal.md](journal.md). **Do not just rerun the search.**
+2. **Push the symbolic solver to `m = 7..11`**, where the profiles are fitted on thin data and
+   `m=11` is already refuted. `construct` (greedy load routing) is the tool, not `solve`.
+3. **Prove the `(2,2)` two-part family.** The proof shape is known to work (case-split on `b`
+   and `d`, singleton children when `b=1`, induction when `b∈{0,2}`), but it needs the
+   auxiliary family `Sb(x:2, y:1, z:1)` — four of the six cases throw it off, so the closed
+   class `C_2` (every `m_i ≤ 2`) is the right unit, not `(2,2)` alone. Would give an
+   independent, non-symbolic proof of Lemma 8. No compute needed.
+4. **Test the `q_min` predictions** on the canonical search, which are cheap and falsifiable:
+   `Sb(104:6)@7` should give a tree at `target_k = 1` and none at 2; `Sb(46:6)@6` only at
+   `target_k = 0`; `Sb(50:5)@6` at `target_k = 2`.
+5. **Characterise the three-part family the `m=6` two-part descent lands in**,
+   `Sb(α:3, n(k-1,3):1, (n(k-1,4)-1):2)` with `α = n(k,5) - n(k-1,3)`.
+   `radio_mixed allsplits` only handles two parts — extending it to three is a few lines.
+6. Extend `data/pareto_2part.csv` to `k = 7` for `(2,2)`, `(3,2)`, `(4,2)`. Four values of `k`
    is the minimum this repo trusts and the `(2,2)` window bounds sit exactly at it.
-4. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
+7. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
-5. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
-   invariant from a fit into a derivation, and needs no new compute.
-6. `... 432 9` — discriminates the profile model (432) from the closed form (431).
-7. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1). An exchange
+8. `... 432 9` — discriminates the profile model (432) from the closed form (431).
+9. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1). An exchange
    argument is the natural shape; the surviving obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).
