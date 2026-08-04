@@ -1784,3 +1784,59 @@ directions.
 **Decide it by measurement on one of the sixteen**, not on the ladder: run the same state with
 and without for a fixed wall-clock budget and compare verdicts produced. That is cheap next to
 the run itself and it is the only workload that answers the question.
+
+## 2026-08-04 — certificate prototype: it verifies, and it found a bug in itself
+
+`tools/certify.py` reduces a solver log to a fact set and verifies it against nothing but the
+three theorems and the split semantics. Built to replace the estimates in
+[certificate.md](certificate.md) with measurements before anything expensive depends on them.
+
+### It found a soundness bug in itself, at low k, immediately
+
+The first version short-circuited each fact with `prev.refuted(f, k)` — consulting the **k-1**
+fact set to accept a fact at **k**. That is backwards: a state unsolvable in `k-1` says nothing
+about `k`, since more tests only help. Every fact "verified" and the run looked perfect.
+
+Fixed, only `COUNT` and `MAJ` short-circuit; everything else must pass `SPLITS`. This is exactly
+why the low-k experiment was worth doing first: at k<=6 the run is seconds, so a wrong "all
+verified" is cheap to catch. Had this gone straight to a `MAX_N=193` log it would have produced a
+confident, meaningless answer after hours.
+
+### After the fix
+
+| log | k | facts | verified | unverified |
+|---|---|---|---|---|
+| k<=6 Sa ladder | 3,4,5 | 11, 10, 2 | all | **0** |
+| k=6 frontier walk | 3 | 121 | 121 | 0 |
+| | **4** | **821** | **612** | **209 (25%)** |
+| | 5 | 155 | 155 | 0 |
+
+The 209 failures are the **closure gap, measured**: those facts have a split whose only refuted
+child is a state the solver dispatched by cache dominance and never logged. For
+`Sb(12:1,10:2,10:1,7:4)` at k=4, 33 splits lack a refuted child, and the missing witnesses are
+small k=3 states like `Sb(7:1,5:2)` (mass 17 against the `3^3=27` cap, so not refutable by
+counting).
+
+The gap concentrates in higher part counts — 157 of 625 four-part facts against 11 of 69
+two-part — which is what one would expect: more parts, more splits, more chances that one split's
+only refuted child went unlogged.
+
+### What this does to the design
+
+- **Breadcrumbs are unnecessary.** The verifier's own dominance search finds the witness whenever
+  it is present. What is needed is that missing witnesses be *emitted*, not that they be
+  *pointed at*. The x6.6 figure in `certificate.md` measured queries, not facts, and was the
+  wrong quantity.
+- **The closure gap is ~25% of facts**, iterated to a fixpoint — not 6.6x. Against 15-25%
+  subsumption the two roughly cancel, so the certificate is about the size of the log's negatives.
+- **Post-processing is the right architecture.** The whole closure computation runs on an
+  unchanged log: add missing children, re-verify, iterate. The run only has to avoid losing
+  information.
+
+### Do not project these ratios
+
+The `SPLITS` cost per fact is the product over parts of their split spaces, pruned by the
+counting bound. Four parts at k=4 is milliseconds; the node that trapped the AWS run was 13 parts
+at k=5 with a 119-billion prefix tree. Part count grows as `2^depth`, so both the cost *and* the
+closure-gap ratio plausibly move with k in ways these small logs cannot show. The 15-25% and ~25%
+figures are measurements at k<=6, not predictions for k=10.
