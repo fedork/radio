@@ -1242,3 +1242,65 @@ current layout, which is within the budget. **Do not pack the split record.**
 Both of today's dead ends (sparse vectors, record packing) were killed by a cheap probe before
 the invasive change was written. The padding probe in particular is one `sed` against
 `SPLIT_FIELD_COUNT`. Reach for the one-line falsification first.
+
+## 2026-08-03 — compact trie nodes: 3.4x memory for 12.4% throughput, not landed
+
+Followed the previous entry's recommendation and built the packed single-block version of
+sparse trie nodes. It works and it is a genuine trade, not a mistake like the first attempt —
+but it is a **trade**, so it is recorded rather than landed.
+
+### Design
+
+One heap block per internal node, so `n->next` is a single dependent load and the header plus
+a typical 8-12 keys land in one cache line:
+
+```
+[ len | cap | can | pad ]  [ int key[cap] ]  [ struct node child[cap] ]
+```
+
+`cap` is kept even so the child array stays 8-aligned; growth doubles from 4 and copies both
+regions into a fresh block. `can` replaces the original's "slot 0 holds can_solve_marker"
+trick. `free_children` iterates the block instead of re-deriving each child's array size from
+the pairs budget, which removes that whole fragile re-derivation.
+
+### Measured
+
+| | dense (committed) | packed block |
+|---|---|---|
+| k=8 ladder | 0.580 s | 0.810 s (**1.40x slower**) |
+| verdicts / 120 s at `MAX_N=193` | 57,571 | 50,455 (**12.4% slower**) |
+| trie at 20,000 inserts | 15.3 MB | 7.1 MB (2.2x) |
+| trie at 40,000 inserts | 65.9 MB | **19.2 MB (3.4x)** |
+
+k=8 output byte-identical (3,639 lines). The memory ratio *grows* with insert count — dense
+arrays widen as more distinct states are cached — so over a full run expect 4-5x, i.e. ~90 GB
+becoming ~20 GB.
+
+Note the single-block layout is much better than the naive two-malloc vector tried earlier
+(0.716x vs 0.63x at k=8): the extra indirection really was most of that first 12.6%. What
+remains is the key scan against dense's single indexed load, and no layout fixes that.
+
+### Why it is not landed
+
+The constraint is "keep memory within reason and avoid swapping", and whether 90 GB violates
+that depends entirely on the machine. On a rented big-memory instance it does not, and dense
+is 12.4% faster. On 24 GB it swaps catastrophically and the block layout is the only option
+that helps. Renting the memory and paying nothing in throughput is roughly cost-neutral
+against paying 12.4% for ~17-20 days — so this should be decided by where the run happens,
+not settled in advance.
+
+**If a memory-constrained run is ever needed, rebuild this.** Two traps found the hard way:
+
+- Putting the header in a separate allocation from the entries costs ~12% on its own. One
+  block, always.
+- `alloc_size += ncap - b->cap` after `free(b)` is a use-after-free. It corrupted only the
+  accounting counter and k=8 output stayed identical, so it survived a full correctness check
+  before being caught by an absurd MB figure. Capture `oldcap` before the free.
+
+### The idea that might get both
+
+The blowup is concentrated in nodes near the root, where a large remaining pairs budget lets
+`clamp_sbb` allocate a wide array; deep nodes are already narrow. A hybrid - dense while the
+clamped `max_sbb` is small, block-sparse above a threshold - would take the memory win where
+it exists and keep dense's single load everywhere else. It needs a discriminant on the hot
+path, which is exactly what has to be measured rather than assumed.
