@@ -702,14 +702,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     int fast_solve;
     while (cont2) {
         pass++;
+        // The pass-1 "fast" filter is a net LOSS, measured 2026-08-03. It skips every
+        // !FAST split, usually fails to conclude, sets skipped_some -> MAYBE, and pass 2
+        // then redoes the level from scratch. On the k=9 ladder that happened to 96% of all
+        // states (345,975 of 359,448 verdicts carried pass=2). Disabling it takes the ladder
+        // from 1021 s to 266 s - 3.84x - and every state is then decided in a single pass.
+        // Verdicts agree: zero cross-contradictions over 127k shared (state,k) pairs at k=9
+        // and 3,492 at k=8, all nine Sa rungs correct.
         fast_solve = FALSE;
-        if(pass==1) {
-            fast_solve = TRUE
-//                && size <= 8
-                && size > 2
-//                && (sb_pairs[tmp[0]] + sb_pairs[tmp[0]]) * 4 < pairs * 3  // if the tail is at least 1/4 pairts of the total
-                ;
-        }
         
         int no_deadline = /*size <=2 || */(pass==1 && size <= 4) || parent_deadline == NO_DEADLINE;
         

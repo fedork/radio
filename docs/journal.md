@@ -1342,3 +1342,52 @@ therefore which states are visited. k=8 rungs and all 3,558 shared verdicts agre
 table memory** (570 -> 391 MB at `MAX_N=193`), across four changes: inline `sort1`, drop three
 never-selected orderings, derive `_DESC` by reversed subscript with per-level hoisting, and the
 counting-bound cut. Every one validated by rungs plus contradiction-freedom.
+
+## 2026-08-03 — the fast_solve pass is a 3.84x net loss
+
+The single largest result of the day, and it is the removal of a heuristic rather than the
+addition of one.
+
+`canSolveB` ran a first pass with `fast_solve = TRUE`, which skips every split not marked
+`FAST`. When that pass fails to conclude it sets `skipped_some`, returns `MAYBE`, and pass 2
+redoes the entire level with the filter off. The instrumentation shows how often that happened
+on the k=9 ladder:
+
+```
+committed engine:   13,473 verdicts at pass=1,  345,975 at pass=2   <- 96% searched TWICE
+fast_solve off:    154,263 verdicts at pass=1,        0 at pass=2
+```
+
+| | committed | fast_solve off |
+|---|---|---|
+| **k=9 ladder** | 1021 s | **266 s (3.84x)** |
+| k=8 ladder | 0.360 s | 0.340 s (1.06x) |
+| `Sb(112:81)` refutation, verdicts / 120 s | 84,103 | 86,560 (1.03x) |
+
+Validation: all nine rungs correct; **zero cross-contradictions** against both the pre-session
+baseline (127,497 shared `(state,k)` pairs) and the committed engine (127,183), and 3,492
+shared at k=8; zero internal contradictions anywhere.
+
+Note the ladder also *visits fewer states* — 154k verdicts against 359k. Without the filter the
+search concludes definitively instead of returning `MAYBE`, so results cache properly and it
+stops re-deriving the same subtrees.
+
+**The single-state probe badly understated this.** Measured on `Sb(112:81)` alone over 120 s it
+looked like 2.9%; end-to-end it is 3.84x. A 120-second window on one deep refutation samples
+throughput inside one node's search, not the multi-pass structure across a whole run. Do not
+size a structural change from a fixed-time window on one state.
+
+### What this suggests about the rest of the deadline machinery
+
+`fast_solve` is one part of a larger apparatus — deadlines, `MAYBE`, `DEADLINE_RATIO`,
+progressive re-passes — all of it built to find solutions quickly by giving up early and
+retrying. On this evidence the giving-up is what costs. The 2023 `Sb(112:81)` run reported
+`pass=12`. The other pieces are worth the same treatment: measure with them disabled before
+assuming they help.
+
+### Cumulative for the day
+
+`radiobase.c` is now **5.72x faster on the k=9 ladder** (1521 s -> 266 s) with **31% less split
+table memory**, over five changes: inline `sort1`, drop three never-selected orderings, derive
+`_DESC` by reversed subscript with per-level hoisting, the counting-bound cut, and removing the
+`fast_solve` pass. Each validated by Sa rungs plus contradiction-freedom.
