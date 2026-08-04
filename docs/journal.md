@@ -1492,3 +1492,66 @@ makes those two impossible to confuse.
 
 Hard cost bound is the 72 h of `capped_run` caps, about $107, after which the instance
 terminates itself. Tag-filtered AWS Budgets would need cost-allocation tags activated, ~24 h.
+
+## 2026-08-04 — the AWS run failed: removing deadlines was a mistake
+
+The overnight `Sa(193)` run produced no verdict in six hours and was killed. The cause was my
+change, and the reasoning behind that change was wrong on its own terms. Recording it in full
+because the failure mode is subtle and the temptation to repeat it is real.
+
+### What happened
+
+`Sb(112:80)` in 9 — the **positive control**, a state with a *known* solution, since it appears
+in both verified `Sa(192)` witness trees — ran for six hours without concluding. The verdict
+rate collapsed about 100-fold partway through:
+
+```
+10:44 -> 10:54   +142,047 verdicts
+11:45 -> 11:55   +  1,143
+```
+
+The log shows the search sunk 43 minutes into a **single k=5 node**:
+
+```
+Sb(12:3,11:3,9:3,8:3,9:2,9:2,8:2,15:1,13:1,12:1,4:3,10:1,9:1)[243,155] in 5
+left=51/52                       <- one of its 52 splits cleared
+totalsplits=130,090,920,500
+```
+
+Thirteen parts, and mass **243 = 3^5 exactly** — information-tight, so the counting bound prunes
+*nothing*. That one node needed an extrapolated ~34 hours, and it sits deep inside the tree.
+
+### Why the reasoning was wrong
+
+Deadlines are the only escape from an intractable subtree. Without one the search commits to
+exhausting it rather than bailing in seconds and trying elsewhere.
+
+I removed them (commit `69ae856`) for the exhaustiveness guarantee. **That guarantee already
+existed.** `can't solve` is printed only when `!skipped_some`, so a printed negative is
+exhaustive whether or not deadlines are enabled — deadlines only cause some states to return
+`MAYBE` instead of a verdict, which is an interpretation trap, not a soundness one. And a
+`NO_DEADLINE` root iteratively deepens (`deadline += deadline - start`) until it concludes, so
+top-level answers stay definitive regardless.
+
+I had even measured the cost: **266 s against 267 s on the k=9 ladder with identical verdicts**.
+The correct reading of "free" was *free insurance*. I read it as "useless machinery" and deleted
+it. Restored 2026-08-04; the ladder is byte-identical again at 256 s.
+
+**The general lesson:** "this mechanism never fires on my benchmark" is not evidence it is
+useless. It is evidence the benchmark never enters the state the mechanism exists for. The Sa
+ladder has no intractable subtree; the real workload does.
+
+### A caveat this puts on yesterday's headline result
+
+`fast_solve` removal measured as **3.84x** — but on the Sa ladder, which is dominated by
+*refutations*. `fast_solve` was a solution-*finding* heuristic. The first large **solvable**
+state tried since is exactly where the engine got into trouble. The 3.84x is likely real for
+`Sb(112:81)` (a refutation) and may be wrong for `Sb(112:80)` (a solution search). Do not assume
+it generalises to solution-finding without measuring there.
+
+### Salvaged
+
+Checkpointing worked, which is the one part of the design that held. Preserved in
+`s3://radio-sa193-393287594714/run/`: `112_80.cache` (128 MB, **3,100,961 verdicts**) and
+`out_112_80.txt.zst` (43 MB). A relaunch warm-starts from those rather than repeating six hours.
+Instance terminated; spend about $9.

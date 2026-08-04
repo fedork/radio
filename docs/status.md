@@ -16,7 +16,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
-| **A missing `can't solve` line does not mean unsolvable — in output from builds before 2026-08-04.** | `canSolveB` used to give up with `MAYBE` on a deadline, printing nothing, so absence of a verdict was not a verdict. Deadlines are disabled as of commit `69ae856`: a full call now always answers `TRUE` or `FALSE` exhaustively. The trap still applies to **every archived artifact**, all of which predate that. |
+| **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 
@@ -158,10 +158,11 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**The `Sa(193)` re-run is live on AWS** (started 2026-08-04, commit `69ae856`):
-`Sb(112:80)` as a positive control, then `Sb(112:81)`, the first of the sixteen H3 states.
-Check it, stop it or resume it with [aws-run.md](aws-run.md). Hard cost bound ~$107; the
-instance terminates itself.
+**Nothing is running.** The first AWS attempt (2026-08-04) was killed after six hours with no
+verdict — removing deadlines trapped it in an intractable subtree. Deadlines are restored;
+3,100,961 verdicts of the control survive as a checkpoint in
+`s3://radio-sa193-393287594714/run/112_80.cache`, so a relaunch resumes rather than repeats.
+See [aws-run.md](aws-run.md) and the 2026-08-04 journal entry.
 
 ## Immediate next steps
 

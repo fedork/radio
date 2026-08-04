@@ -644,14 +644,19 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         // and 3,492 at k=8, all nine Sa rungs correct.
         fast_solve = FALSE;
         
-        // Deadlines are disabled (2026-08-03). Hitting a budget now bumps it rather than
-        // returning MAYBE, so a full canSolveB call always answers TRUE or FALSE
-        // exhaustively and MAYBE survives only as the cache-probe "unknown". That is the
-        // property a certified negative needs, and it removes the "absence of a can't-solve
-        // line is not a verdict" trap. Measured cost of the machinery was ~1 firing in
-        // 358,000 verdicts on a k=8 Pareto walk, so this is about the guarantee, not speed.
-        // External bounds (tools/capped_run.sh) replace it for runaway protection.
-        int no_deadline = 1;
+        // Deadlines restored 2026-08-04 after disabling them trapped a real run. They are
+        // the only escape from an intractable subtree: Sb(112:80) in 9 - a state with a
+        // KNOWN solution - sank 39 minutes into one 13-part k=5 node of mass 243 = 3^5
+        // (exactly information-tight, so nothing prunes), evaluating 119 billion split
+        // combinations to clear 1 of its 52 splits.
+        //
+        // Removing them bought nothing. A printed `can't solve` is emitted only when
+        // !skipped_some, so negatives are exhaustive with deadlines in place - the
+        // "guarantee" I removed them for was already there. And a NO_DEADLINE root
+        // iteratively deepens (`deadline += deadline - start`) until it concludes, so top
+        // level answers stay definitive. Measured cost on the k=9 ladder: 266s vs 267s with
+        // identical verdicts.
+        int no_deadline = /*size <=2 || */(pass==1 && size <= 4) || parent_deadline == NO_DEADLINE;
         
 //        int no_deadline = (pass==1);
         
