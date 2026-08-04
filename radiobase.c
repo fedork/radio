@@ -644,7 +644,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         // and 3,492 at k=8, all nine Sa rungs correct.
         fast_solve = FALSE;
         
-        int no_deadline = /*size <=2 || */(pass==1 && size <= 4) || parent_deadline == NO_DEADLINE;
+        // Deadlines are disabled (2026-08-03). Hitting a budget now bumps it rather than
+        // returning MAYBE, so a full canSolveB call always answers TRUE or FALSE
+        // exhaustively and MAYBE survives only as the cache-probe "unknown". That is the
+        // property a certified negative needs, and it removes the "absence of a can't-solve
+        // line is not a verdict" trap. Measured cost of the machinery was ~1 firing in
+        // 358,000 verdicts on a k=8 Pareto walk, so this is about the guarantee, not speed.
+        // External bounds (tools/capped_run.sh) replace it for runaway protection.
+        int no_deadline = 1;
         
 //        int no_deadline = (pass==1);
         
@@ -1412,6 +1419,10 @@ void parse_file(char *file_name) {
             fflush(stdout);
         }
         debug_printf("\nINPUT: %s\n", buff);
+        if (buff[0] == '#') {           // provenance header - see tools/checkpoint.sh
+            printf("cache header: %s", buff);
+            continue;
+        }
         char* token = strtok(buff, " ");
         if (token == NULL) {
             printf("Unexpected NULL\n");
