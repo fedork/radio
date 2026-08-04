@@ -1618,3 +1618,67 @@ a linear rank.
 **Caveat: this is one state.** "The solution is unique" must not be generalised from n=1. What
 generalises is the arithmetic — mass conservation, the `c1` maximum at the diagonal, and the
 `c1 ≥ 2√(c2 c0)` bound.
+
+## 2026-08-04 — winning splits lie on the mixed-children-balance line, not near the midpoint
+
+New driver `radio_allsol.c`: enumerate every working top-level split, pruning on the counting
+bound at each *prefix* instead of only at the leaf, which is what `all_solutions` does. Mass is
+exactly conserved across the three children, so partial per-child sums only grow and a prefix
+over `3^(k-1)` is dead with everything under it.
+
+Validated against `all_solutions` on two states — 8 solutions and 6 solutions, identical
+per-part winner sets — with 21-26x fewer leaves. It also reproduces the Python DP's counts
+**to the digit** (leaves 231,506,936, prefix nodes 427,673,655), which is two independent
+implementations agreeing exactly.
+
+### The middle child, mapped
+
+`Sb(8:6,7:7,8:5,11:4,7:4,15:1,5:3)` in 5 — 7 parts, mass 239/243 = **0.984 saturation**:
+
+```
+solutions      14,584  of  401,316,249,600  = 3.6e-8
+leaves            231,506,936        prefix nodes  427,673,655
+pruned to         0.000577 of raw    wall 8m00s   (all_solutions would need ~6.1 days)
+```
+
+Winning sets are **wide** — roughly half of each part's splits appear in some solution, against
+exactly one per part in the 4-part parent. That difference is dimensionality, not saturation:
+14 free parameters against ~2 independent constraints, versus 8. Solution *count* is not the
+informative quantity.
+
+### The finding
+
+Per-part peaks looked bimodal — midpoint-peaked for `8:6`, `7:7`, `11:4`, `15:1`; corner-peaked
+for `8:5` (`[0:0]`x3118), `7:4` (`[0:0]`x2980), `5:3` (`[0:0]`x4830). It is not two modes.
+
+The two mixed children have masses `a(m-b)` and `(n-a)b`. They are **equal exactly when
+`a·m = n·b`** — the line through `(0,0)`, the midpoint `(n/2,m/2)`, and `(n,m)`. Measuring
+perpendicular distance to that line:
+
+| state | result |
+|---|---|
+| parent's unique solution | every part within **0.63** of its line (distance from *midpoint* reaches 9.34) |
+| middle child, all 14,584 | 100% within 2.0, 99.4% within 1.5, 72.1% within 1.0, 3.4% within 0.5 |
+
+So "midpoint mode" and "corner mode" are one structure at different positions along one line.
+
+**Consequence for the heuristic.** `FAST` — a local optimum of the harder mixed child in the
+`m2` direction — was already measuring exactly this balance line, which is why it worked.
+`BY_MAGIC3` measures distance from the *midpoint*, a proxy that agrees mid-line and mis-ranks
+the ends, i.e. precisely the corner splits that peak in the map. The improvement is to make the
+ordering use the same geometry as the filter: key on `|a·m - n·b|`, the mixed-children
+imbalance, rather than distance from the midpoint.
+
+Tube of half-width `w` around the line, over these 7 parts: `w=0.5` keeps 1/39,587 of the
+product space and still contains ~500 of the 14,584 solutions; `w=1.0` keeps 1/239 and contains
+72%. So a tight tube is a viable first pass — you need one solution, not most of them.
+
+### Two dead ends recorded
+
+- **The mass lower bound is provably redundant.** Requiring each child to end `>= mass - 2·cap`
+  cannot fire where the upper bound does not: if `p_c + M_rem < mass - 2cap` then
+  `p_a + p_b > 2cap`, so one already exceeds `cap`. Measured: 0.0% of 427,673,655 prefix nodes.
+  Do not re-add it.
+- **Replacing `FAST` with a top-*b* prefix of a linear order.** `FAST` selects a 1-D ridge out
+  of a 2-D space (~`n1+1` of `(n1+1)(n2+1)`); a linear rank cannot express that, and matching it
+  needs `b ~ n1`, which compounds hopelessly across many parts.
