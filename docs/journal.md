@@ -1097,3 +1097,83 @@ sorted vector in one or two cache lines.
    pairs-bound test (rejecting 89% of 84M candidates) into a precomputed cut position. This is
    where the k=9 time actually goes.
 4. Bounded eviction only becomes necessary at k=11; at k=10, sparse nodes suffice.
+
+## 2026-08-03 — sparse trie nodes: built, measured, rejected; the split tables were the target
+
+Acted on the previous entry's recommendation and implemented sparse trie nodes — sorted
+`(sbb, child)` vectors replacing the dense arrays. **It is not a win.** Recording it so it is
+not retried.
+
+| | dense | sparse |
+|---|---|---|
+| trie memory, `MAX_N=193`, 180 s | 149.9 MB | **29.3 MB** (5.1x) |
+| verdicts in 180 s, `MAX_N=193` | 65,933 | **57,635** (-12.6%) |
+| k=8 ladder | 0.640 s | **0.930 s** (1.45x slower) |
+
+Verdicts identical, so it is correct — just not worth it. The cost is one extra dependent
+load: dense is `n->next` then `array[sbb]`, two touches; sparse is `n->next`, header,
+entries, scan. The locality gain does not pay for it.
+
+**And it was the wrong 21% anyway.** Measuring what actually occupies memory at `MAX_N=193`:
+
+```
+SPLIT TABLES  2,516 sbbs built   571.1 MB   <- 79%
+TRIE          154,095 arrays     149.9 MB   <- 21%
+```
+
+`ensure_splits` allocates 76 bytes per split — 36 for `splitsl` plus 40 for **ten** index
+orderings — and `BY_MAX`, `BY_MAGIC` and `BY_MAGIC2` are never selected. The only references
+left are the commented-out experiments above the split loop.
+
+### Landed
+
+Two changes, both verified:
+
+- **Drop the three dead index arrays.** 570.2 MB -> 480.9 MB of split tables, throughput
+  unchanged (65,917 vs 65,933 verdicts in 180 s).
+- **Inline `sort1`.** Measured mean length 2.84 with 81% of calls at len<=3; libc `qsort` costs
+  more than the sort. 1.10x on its own.
+
+Together: **1.12x on the k=8 ladder, 1.14x on the full k=9 ladder (1337 s against 1521 s),
++2.8% verdict throughput at `MAX_N=193`, and 15.7% less split-table memory.**
+
+### The k=9 ladder is not byte-reproducible, and that is not a bug
+
+The gate run differed from the committed baseline: 345,298 lines against 315,278. The search
+is **wall-clock dependent** — deadlines turn into `MAYBE`, which changes the explored set — so
+a faster build simply gets further. k=8 *is* byte-identical because no deadline fires there.
+
+The correct gate is contradiction-freedom, and it passes cleanly:
+
+```
+shared (state,k) pairs   307,406
+cross-contradictions           0
+internal contradictions        0 in each run
+all nine Sa rungs              identical
+```
+
+Use that check, not `diff`, for anything at k>=9. `tools/extract_evidence.py audit` exists for
+exactly this.
+
+### Where this leaves the memory problem
+
+Split tables **saturate**; the trie does not. If every sbb were built:
+
+```
+current layout (76 B/split)     2.2 GB
+minus the 3 dead arrays (64 B)  1.8 GB
+fully packed (~30 B/split)      0.9 GB
+```
+
+So the couple of GB of split tables is bounded, and the trie is what grows toward 90 GB over
+weeks. Both are worth attacking, on different timescales:
+
+1. **Pack the split tables further** — the `_DESC` orderings are exact reversals of their bases
+   (`indexDesc`), so iterate the base backwards instead of storing them (-12 B/split); in
+   `splitsl`, sbb ids fit `uint16`, `m1`/`m2` are derivable from the enumeration index, and
+   `s[4]`/`s[5]`/`FAST` are bytes (36 B -> ~14 B). Bounded work, and it shrinks the working set
+   of the loop that is 86% of runtime.
+2. **Sparse nodes, done properly** — header, `uint16` keys and children in *one* allocation, so
+   it is two dependent touches like dense with 8 keys sharing a cache line. That should get the
+   5x on the trie without the 12.6%. This is the change that decides whether k=11 is reachable.
+   The naive version measured above is not it.

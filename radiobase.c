@@ -90,8 +90,16 @@ int desc (const void * a, const void * b) {
     return ( *(int*)b - *(int*)a );
 }
 
-void sort1(int *x, int len) {
-    qsort(x, len, sizeof(int), desc);
+static inline void sort1(int *x, int len) {
+    // Called ~8.9M times per k=8 ladder, mean length 2.84, 81% of calls len<=3 (measured
+    // 2026-08-03, tools/instrument.py counters). libc qsort - an opaque call with an
+    // indirect comparator per comparison and memcpy-based swaps - costs far more than the
+    // sort itself at those lengths. Descending, matching the `desc` comparator exactly.
+    for (int i = 1; i < len; i++) {
+        int v = x[i], j = i - 1;
+        while (j >= 0 && x[j] < v) { x[j + 1] = x[j]; j--; }
+        x[j + 1] = v;
+    }
 }
 
 int max(int a,int b){
@@ -1241,10 +1249,20 @@ void ensure_splits(int sbb) {
         printf("\nout of memory - can't allocate splitsl for sbb=%d\n", sbb);
         exit(1);
     }
-    for (ii = 0; ii < INDEX_COUNT; ii++) {
-        s->ind[ii] = (int *)malloc(cmax * sizeof(int));
-        if (s->ind[ii] == NULL) {
-            printf("\nout of memory - can't allocate index %d for sbb=%d\n", ii, sbb);
+    // Only seven of the ten orderings are ever selected by `splitincr`; BY_MAX, BY_MAGIC and
+    // BY_MAGIC2 survive solely in the commented-out experiments above the split loop. They
+    // were still being built and indexed for every sbb. Skipping them drops 3 of 10 index
+    // arrays - measured 2026-08-03 at MAX_N=193: split tables 570.2 MB -> 480.9 MB, with
+    // throughput unchanged. Re-admit one here if you re-enable it above.
+    static const int live_orderings[] = {
+        BY_SP0, BY_SP1, BY_SP2, BY_SP0_DESC, BY_SP1_DESC, BY_SP2_DESC, BY_MAGIC3
+    };
+    for (ii = 0; ii < INDEX_COUNT; ii++) s->ind[ii] = NULL;
+    for (ii = 0; ii < (int)(sizeof(live_orderings)/sizeof(live_orderings[0])); ii++) {
+        int which = live_orderings[ii];
+        s->ind[which] = (int *)malloc(cmax * sizeof(int));
+        if (s->ind[which] == NULL) {
+            printf("\nout of memory - can't allocate index %d for sbb=%d\n", which, sbb);
             exit(1);
         }
     }
@@ -1269,8 +1287,6 @@ void ensure_splits(int sbb) {
         }
     }
     s->size = c;
-    indexSpl(sbb, s, BY_MAX, maxpairs);
-    indexSpl(sbb, s, BY_MAGIC, magic);
     indexSpl(sbb, s, BY_SP0, pairs0);
     indexDesc(s, BY_SP0, BY_SP0_DESC);
     indexSpl(sbb, s, BY_SP1, pairs1);
@@ -1278,7 +1294,6 @@ void ensure_splits(int sbb) {
     indexSpl(sbb, s, BY_SP2, pairs2);
     indexDesc(s, BY_SP2, BY_SP2_DESC);
     indexSpl(sbb, s, BY_MAGIC3, magic3);
-    indexSpl(sbb, s, BY_MAGIC2, magic2);
 }
 
 int canSolveAll4(int n1, int n2, int m1, int m2, int k) {
