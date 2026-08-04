@@ -1381,9 +1381,12 @@ size a structural change from a fixed-time window on one state.
 
 `fast_solve` is one part of a larger apparatus — deadlines, `MAYBE`, `DEADLINE_RATIO`,
 progressive re-passes — all of it built to find solutions quickly by giving up early and
-retrying. On this evidence the giving-up is what costs. The 2023 `Sb(112:81)` run reported
-`pass=12`. The other pieces are worth the same treatment: measure with them disabled before
-assuming they help.
+retrying. On this evidence the giving-up is what costs. The other pieces are worth the same
+treatment: measure with them disabled before assuming they help.
+
+(The 2023 `Sb(112:81)` log shows `pass=12`, but that is an **earlier build**. The current one
+caps at 2, which the instrumentation confirms — so the cost measured here is the two-pass
+structure, not a runaway one, and it was still 3.84x.)
 
 ### Cumulative for the day
 
@@ -1391,3 +1394,49 @@ assuming they help.
 table memory**, over five changes: inline `sort1`, drop three never-selected orderings, derive
 `_DESC` by reversed subscript with per-level hoisting, the counting-bound cut, and removing the
 `fast_solve` pass. Each validated by Sa rungs plus contradiction-freedom.
+
+## 2026-08-03 — deadlines are untested, not harmless; and the engine is deterministic again
+
+Two corrections and one property worth having.
+
+### Correction: "deadlines are inert" was scoped wrong
+
+Making child budgets unbounded (`child_deadline = NO_DEADLINE`) changed **nothing** on the k=9
+ladder — 267 s against 266 s, and the verdict sets were *identical*, 154,263 shared out of
+154,263 with zero contradictions. I read that as the deadline machinery being inert.
+
+It only shows that **no deadline ever fired**. The budget cascade is 1000 s at a `NO_DEADLINE`
+root, then `/DEADLINE_RATIO` per level down to a `MIN_DEADLINE` floor of 3 s. The whole ladder
+now runs in 266 s, so no single search comes close. The deadline machinery is **untested**, not
+harmless, and needs a workload heavy enough to engage it — a k=8 Pareto walk, where single
+frontier cells near the diagonal take far longer.
+
+### The FAST machinery is gone, and the search is now deterministic
+
+Removing the `fast_solve` pass left `FAST` read by nothing but a log annotation. Removed ~100
+lines: the init loop, the dead filter branch, the `NOTFAST` annotation and its `s[FAST] = 1`
+self-tuning writeback, and the orphaned `compare_solvability` / `get_max_sbb` / `minK`. That
+last one ran unbounded searches behind a 1000-second deadline, sitting in dead code.
+
+Performance-neutral (1.000x at k=8, 0.995x at `MAX_N=193`) — this is hygiene, not optimisation.
+Verdicts identical (3,569 at k=8, zero contradictions); all seven drivers still compile; the
+only output change is `:NOTFAST` disappearing, which `extract_witness_tree.py` already tolerates.
+
+The payoff is elsewhere. The `s[FAST] = 1` writeback was the documented source of run-to-run
+variation, so **two independent k=9 ladder runs now produce byte-identical verdicts** — 154,337
+lines, both 256 s. `diff` is a valid regression gate again, after stripping ` took N` and the
+`still solving` lines (a 60-second wall-clock heartbeat, so they land at different points).
+`docs/tools.md` said the opposite and has been corrected.
+
+That determinism is conditional on no deadline firing. If a heavier workload starts hitting
+budgets, wall-clock dependence returns and the contradiction audit becomes the right gate again.
+
+### New driver: `radio_pareto.c`
+
+A parameterised frontier walker — step right while solvable, down when not. Generic replacement
+for `radioSbPareto.c` (hardcoded k=9, `MAX_N=204`), and far lighter than `k8_fullrow_batch.c`,
+which runs `all_solutions` at every frontier point. Carries the `MAX_N` guard `radio_2part.c`
+established. Validated against the proven k=6 column: **18 of 18 cells exact**.
+
+This is now the standard heavy benchmark: a well-defined workload with a known answer for
+k <= 8, long enough that deadlines actually engage.

@@ -45,8 +45,7 @@
 #define TRUE 1
 #define MAYBE 2
 
-#define FAST 8
-#define SPLIT_FIELD_COUNT 9
+#define SPLIT_FIELD_COUNT 8
 
 #define DEADLINE_RATIO 10
 #define MIN_DEADLINE 3
@@ -479,37 +478,6 @@ int checkCache(int *sb, int size, int k) {
 #define debug_printf(...) /* Nothing */
 #endif
 
-int minK(int);
-
-// returns >0 if sbb1 is harder to solve than sbb2, <0 if sbb2 is harder, 0 if equal
-int compare_solvability(int sbb1, int sbb2) {
-    if (sbb1==sbb2) return 0;
-    int n11 = sbb_to_n1[sbb1];
-    int n12 = sbb_to_n2[sbb1];
-    int sum1 = n11 + n12;
-    int n21 = sbb_to_n1[sbb2];
-    int n22 = sbb_to_n2[sbb2];
-    int sum2 = n21 + n22;
-    if (sum1 >= sum2 && n12 >= n22) {
-        return 1;
-    } else if (sum1 <= sum2 && n12 <= n22) {
-        return -1;
-    } else {
-        int mink1 = minK(sbb1);
-        int mink2 = minK(sbb2);
-        if (mink1 > mink2) {
-            return 1;
-        } else if (mink1 < mink2) {
-            return -1;
-        } else {
-            // just use natural order for now
-            return sbb1-sbb2;
-            // use pair diff
-//            return sb_pairs[sbb1] - sb_pairs[sbb2];
-        }
-    }
-}
-
 void init_singleton_majorization(void) {
     int current[1 << MAX_K];
     int next[1 << MAX_K];
@@ -552,12 +520,6 @@ int singleton_majorization_can_solve(int *sb, int size, int k) {
         }
     }
     return TRUE;
-}
-
-int get_max_sbb(int n1, int n2, int n3, int n4) {
-    int sbb1 = getSbb(n1, n2);
-    int sbb2 = getSbb(n3, n4);
-    return (compare_solvability(sbb1, sbb2) > 0) ? sbb1 : sbb2;
 }
 
 long long cant_solve_count=0;
@@ -644,35 +606,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     for(i=0;i<size;i++){
         ensure_splits(tmp[i]);
         splitsarr[i] = &sbb_splits[tmp[i]];
-        if (size>1 && splitsarr[i]->splitsl[0][FAST]<0) {
-            int sbb = tmp[i];
-            debug_printf("initializing FAST for %s\n", sbb_to_str[sbb]);
-            int n1=sbb_to_n1[sbb];
-            int n2=sbb_to_n2[sbb];
-            splits* sp = splitsarr[i];
-            int c;
-            for (c=0; c < sp->size; c++) {
-                int m1 = sp->splitsl[c][6];
-                int m2 = sp->splitsl[c][7];
-                int fast = FALSE;
-                if (n1==n2) {
-                    // special case for square groups (n1==n2)
-                    if (m2 == m1-1) fast = TRUE;
-                } else {
-                    int sbb1 = get_max_sbb(m1, n2-m2, n1-m1, m2);
-                    if ((m2==0 || compare_solvability(sbb1, get_max_sbb(m1, n2-m2+1, n1-m1, m2-1)) <= 0) &&
-                        (m2==n2 || compare_solvability(sbb1, get_max_sbb(m1, n2-m2-1, n1-m1, m2+1)) <= 0)) {
-                        fast = TRUE;
-                    }
-                }
-                sp->splitsl[c][FAST] = fast;
-#ifdef DEBUG1
-                if (fast) {
-                    printf("FAST for %s -> [%d:%d]\n", sbb_to_str[sbb], m1, m2);
-                }
-#endif
-            }
-        }
     }
     //full search
     clock_t start = clock();
@@ -854,12 +787,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                 {
                     skiptop++;
                     debug_printf("skiptop\n");
-                } else if (fast_solve
-                           && (i<size_1)
-                           && !s[FAST]
-                           ) {
-                    debug_printf("skipping not fast %d:%d for i = %d (%s)\n", s[6], s[7], i, sbb_to_str[tmp[i]]);
-                    skipped_some = 1;
                 } else {
                     totalsplits++;
                     int p0 = sb0p[i] = sb_pairs[sb0[i] = s[0]] + (i>0?sb0p[i-1]:0);
@@ -989,13 +916,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             int *s = splitsarr[i]->splitsl[spi2];
             if (i>0) printf(",");
             printf("%d:%d", s[6], s[7]);
-            if (!s[FAST]) {
-                printf(":NOTFAST");
-                if (size>2 && i<size_1) {
-                    s[FAST]=1;
-                    printf("-ADDED");
-                }
-            }
         }
         printf("] ");
         printSb(sb0,size);
@@ -1042,22 +962,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     fflush(stdout);
 #endif
     return canSolve;
-}
-
-int sbb_to_min_k[MAX_SBB+1];
-
-int minK(int sbb) {
-    int kk = sbb_to_min_k[sbb];
-    if (kk<0) {
-        debug_printf("computing min_k for %s...\n", sbb_to_str[sbb]);
-        kk=1;
-        int rr;
-        while ((rr = canSolveB(&sbb, 1, kk, clock() + CLOCKS_PER_SEC * 1000)) == TRUE) kk++;
-        debug_printf("min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
-        if (rr == FALSE) sbb_to_min_k[sbb]=kk; // if we got maybe, assume false, but do not memorize
-        debug_printf("cached min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
-    }
-    return kk;
 }
 
 void cache_a(int canSolve, int n, int k) {
@@ -1329,7 +1233,6 @@ void ensure_splits(int sbb) {
             s->splitsl[c][4] = s->splitsl[c][5] = k-1;
             s->splitsl[c][6] = m1;
             s->splitsl[c][7] = m2;
-            s->splitsl[c][FAST] = -1; // we will init on-demand
             c++;
         }
     }
@@ -1567,9 +1470,6 @@ void init(){
     }
     init_singleton_majorization();
     
-    for (i=0; i<=MAX_SBB; i++) {
-        sbb_to_min_k[i] = i<=1?0:-1;
-    }
     k=0;
     for(i=2;i<=MAX_N;i++) {
         sa_can[i] = MAX_K+1;

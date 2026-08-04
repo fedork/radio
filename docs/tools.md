@@ -20,9 +20,9 @@ preferred entry points.
 | what | where |
 |---|---|
 | `(n1:n2)` pair -> `sbb` integer id; split tables built lazily | `init()`, `ensure_splits()` at `radiobase.c:1227` |
-| Ten heuristic split orderings (`BY_MAGIC3`, `BY_SP0/1/2`, descending variants) | `radiobase.c:1130-1282` |
+| Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: a trie over sorted `sbb` ids, closed downward for can-solve and upward for can't-solve | `cacheCanSolve` `:206`, `cacheCantSolve` `:276` |
-| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, deadlines, two passes (`fast_solve` then full) | `canSolveB` `:516` |
+| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, deadlines, single pass (`fast_solve` removed 2026-08-03) | `canSolveB` |
 | Unit-group stripping before search | `radiobase.c:538` |
 | Exact decision for singleton states via majorization against `G_k` | `radiobase.c:464-506` |
 | `Sa` recursion | `canSolveA` `:1011` |
@@ -84,9 +84,17 @@ Two behaviours to be aware of:
 - **`MAYBE` is a real answer.** Deadlines cause `canSolveB` to give up and return `MAYBE`
   rather than `FALSE`. A `can't solve` line in the output is a genuine negative; the absence
   of a line is not.
-- **The search self-tunes.** On success, `canSolveB` writes `s[FAST] = 1` back into the split
-  table (`radiobase.c:929`, printed as `NOTFAST-ADDED`). Search order therefore differs
-  between runs, and a rerun is not guaranteed to explore in the same order.
+- **The search is deterministic (since 2026-08-03).** It used to self-tune - on success
+  `canSolveB` wrote `s[FAST] = 1` back into the split table, so search order differed between
+  runs. The `fast_solve` pass and the whole `FAST` mechanism are gone, and two independent
+  k=9 ladder runs now produce **byte-identical verdicts** (154,337 lines). So `diff` is a
+  valid regression gate again, provided you strip two things: the ` took N` fields, and the
+  `still solving` progress lines, which fire on a 60-second wall-clock heartbeat and so land
+  at different points.
+
+  Caveat: this holds while no deadline fires. Deadlines make results wall-clock dependent, and
+  the budget cascade is 1000s at a `NO_DEADLINE` root, then `/DEADLINE_RATIO` per level down to
+  a `MIN_DEADLINE` floor of 3s. The Sa ladder never gets near that; a Pareto walk can.
 
 ## Choosing a driver
 
@@ -94,6 +102,7 @@ Two behaviours to be aware of:
 |---|---|---|
 | `radio_canon_search_generic.c` | **Prefer this for new `k=9` results.** Finds a tree that terminates in canonical `U_k` singleton states, which is a self-contained proof. Produced the `473:6`, `480:5`, `496:4` trees. | minutes |
 | `radio_one.c` | One question: is this state solvable in `k`? | varies wildly |
+| `radio_pareto.c` | Walk the Sb frontier for any `k` as a staircase: `<k> <n1> <n2> [cache]`. Generic replacement for `radioSbPareto.c`. Reproduces the proven k=6 column exactly; a k=8 walk is the standard heavy benchmark. | minutes to days |
 | `radio_full.c` | Every top-level split plus a solvability matrix. Thorough and **much** more expensive than `radio_one` - the killed `k=9` runs used this. | hours to never |
 | `radio.c` | Walks the `Sa` ladder upward, printing `can/can't solve Sa(n) in k`. Produced `out_radio_1.txt`. | days |
 | `radioR.c` | Same, downward from `MAX_N`. | |
