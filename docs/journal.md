@@ -1304,3 +1304,41 @@ The blowup is concentrated in nodes near the root, where a large remaining pairs
 clamped `max_sbb` is small, block-sparse above a threshold - would take the memory win where
 it exists and keep dense's single load everywhere else. It needs a discriminant on the hot
 path, which is exactly what has to be measured rather than assumed.
+
+## 2026-08-03 — the counting-bound cut: 1.49x on the k=9 ladder
+
+The largest single win of the day, and it came from a property of the split orderings that was
+already there but unused.
+
+`BY_SP2`'s sort key is `pairs2raw*(1+P) + |pairs1raw - pairs0raw|` with `P = sb_pairs[sbb]`, and
+the tiebreak is strictly `< 1+P` — so the key **determines** `pairs2raw`. The split loop walks
+the descending-sorted index from the far end, i.e. in ascending key order, so `sb_pairs[s[0]]`
+and hence the running `p0` are monotone non-decreasing down the level. The first candidate to
+exceed `max_pairs_1` therefore proves every remaining candidate at that level also fails, and
+the level can be abandoned outright. Same for `BY_SP1 -> p1` and `BY_SP0 -> p2`. `_DESC` walks
+the other way and `BY_MAGIC3` is a distance, so neither admits the cut.
+
+Previously ~89% of the 84M candidates reaching that point were rejected by the counting bound
+**one at a time**.
+
+| | before | with cut |
+|---|---|---|
+| k=8 ladder | 0.590 s | **0.370 s (1.59x)** |
+| **k=9 ladder (full)** | 1521 s | **1021 s (1.49x)** |
+| verdicts / 120 s at `MAX_N=193` | 57,407 | **81,873 (1.43x)** |
+
+Validation: all nine rungs correct; 305,891 shared `(state,k)` pairs against the committed
+baseline with **0 cross-contradictions** and 0 internal contradictions.
+
+**Output is deliberately not byte-identical, even at k=8.** The cut sits before the
+`fast_solve` filter, so candidates that are both `!FAST` and counting-bound-rejected no longer
+set `skipped_some`. That converts some `MAYBE` results into `FALSE` — strictly more
+informative, since those candidates provably cannot work — which changes what gets cached and
+therefore which states are visited. k=8 rungs and all 3,558 shared verdicts agree.
+
+### Cumulative for the day
+
+`radiobase.c` is **1.49x faster on the k=9 ladder** (1521 s -> 1021 s) with **31% less split
+table memory** (570 -> 391 MB at `MAX_N=193`), across four changes: inline `sort1`, drop three
+never-selected orderings, derive `_DESC` by reversed subscript with per-level hoisting, and the
+counting-bound cut. Every one validated by rungs plus contradiction-freedom.
