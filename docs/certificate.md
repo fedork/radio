@@ -54,6 +54,7 @@ so the provenance header costs nothing.
 | ⇒ facts for that one state | **~43 M** |
 | at ~25 bytes/line | ~1.1 GB raw |
 | union of all sixteen (they share heavily — same 193 coins, which is why the 2023 tail collapsed 1300x on a warm cache) | order 2-4 GB raw |
+| **x6.6 for dominance breadcrumbs** (measured, see below) | **order 2-4 GB shipped** |
 | sorted small integers, `zstd` | **order 300-600 MB shipped** |
 
 Smaller than the raw log of a *single* 2023 state (905 MB).
@@ -88,25 +89,53 @@ The solver's cache materialises the **upward closure** — `cacheCantSolve` inse
 in the log**. The set of logged facts is therefore not closed under `SPLITS`, and a naive
 verifier would reject perfectly good refutations because a referenced child is absent.
 
-Three ways out, in increasing order of rigour:
+### The fix: inference breadcrumbs
 
-1. **Emit the closure.** ~19 members per logical insert (measured at `MAX_N=193`), so ~800 M
-   facts, ~8x the data. Verification becomes a hash lookup with no dominance logic at all.
-   Cheapest to build; but the verifier is then trusting the *emitter's* closure computation,
-   which is the opposite of the point.
-2. **Emit a `DOM` witness.** When `checkCache` returns `FALSE` by hitting a `cant_solve_marker`
-   at a prefix, log the fact that justified it. Certificate stays minimal; each `DOM` step is
-   an O(parts) check of `s' <= s` plus a lookup. Needs the marker to remember its originating
-   fact, which costs memory in the solver.
-3. **Let the verifier find the witness.** Store minimal facts only; when a child is not present
-   literally, search the refuted set for some `s' <= s`. Needs a dominance index (by part count
-   and mass, then candidate check). Most rigorous — the verifier implements Subgraph
-   Monotonicity itself rather than trusting anyone — and the most work.
+Emit, for each distinct state that was refuted *by dominance*, a record naming the witness:
 
-**Recommendation: (3), with (1) as the fallback if the index turns out slow.** The whole value
-of a certificate is that the verifier trusts as little as possible, and (1) moves the trust into
-the emitter. But this is the decision that should be made with a measurement — build the index,
-time a dominance query against a few million facts, and if it is hopeless take (1) and say so.
+```
+- b 9 5 7 3 t 66 24 5   dom 41827        <- this state is refuted; witness is fact 41827
+```
+
+A breadcrumb is a **hint, not an assertion**. The verifier confirms `s' <= s` componentwise
+(O(parts)) and confirms `s'` is itself in the set. A wrong breadcrumb fails the check. So this
+adds **nothing** to the trust base — it is exactly the LRAT-versus-DRAT distinction, where hints
+make checking cheap without making it more credulous. An earlier draft of this page claimed
+witnesses meant "trusting the emitter"; that was wrong.
+
+**It is free to produce.** `cant_solve_marker` is a shared sentinel occupying the node's `next`
+pointer slot. Replace it with a *tagged pointer* carrying the originating fact's id — low bits
+tag it as a marker, the rest is the id. No extra memory in the solver, and the breadcrumb falls
+out of the closure machinery that already exists.
+
+### What it costs, measured
+
+Instrumented `checkCache` over the k=8 ladder:
+
+```
+2,256,002 FALSE probes
+   -> 18,770 distinct (state,k) pairs
+        16,326 reached by a STRICT PREFIX   (refuted by dominance)
+         2,534 reached at full depth
+   vs  2,854 explicitly logged negatives
+```
+
+So the certificate carries **~6.6x the facts the log contains** — the dominance-derived states
+have to be named, because the verifier will encounter them when it re-enumerates splits. Revised
+size: order **2-4 GB shipped** for all sixteen rather than 300-600 MB.
+
+That ratio is measured at k=8 ladder scale and may differ at `MAX_N=193`; it is the first thing
+to re-measure on a real state.
+
+### Why pay the 6.6x
+
+The alternative is a minimal certificate plus a **dominance index** in the verifier, which
+searches the fact set for some `s' <= s`. That is smaller on disk and strictly more complex
+where it matters least: the verifier is the artefact we audit, and every line in it is a line
+someone has to believe. Breadcrumbs reduce each dominance step to a componentwise comparison a
+reader can check by eye.
+
+Low single-digit GB is not the binding constraint on this project. Verifier simplicity is.
 
 ## Trust base
 
@@ -149,7 +178,9 @@ is the fix for the exact defect that makes this re-run necessary.
 
 ## Open decisions
 
-1. **Dominance: option 1, 2 or 3.** Decide by timing an index, not by preference.
+1. **Re-measure the breadcrumb ratio on a real state.** 6.6x comes from the k=8 ladder. If it
+   is much worse at `MAX_N=193` — the dominance closure is wider there — reconsider a minimal
+   certificate with a verifier-side index.
 2. **`FAST` on or off for the sixteen.** They are refutations, where the pass-1 filter is pure
    cost (measured 4x on the k=9 ladder) — but refuting a root requires *proving children
    solvable* to rule them out, and that is where `FAST` pays. Decide by running one of the
