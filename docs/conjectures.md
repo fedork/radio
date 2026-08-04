@@ -612,6 +612,100 @@ So the descent is completely determined, `out2` is governed by the theorem above
 not closed under its own optimal descent. Each `out1` was confirmed solvable at its own budget
 `k-1` (so the descent is real, not a wasted level), but the three-part family it lands in is
 uncharacterised, and that is now the frontier of this line of work.
+## The symbolic profile programme (2026-08-03)
+
+A route to `n(k,m)` for general `m`, arrived at from the coin side. It subsumes the profile
+model above by giving it a mechanism *and* a feasibility condition, and it is the direction
+the next session should take.
+
+### The two facts it rests on
+
+**Parts partition the m-side.** At every node the parts' m-sides form a partition of a subset
+of the original `m` coins — the root is one part holding all of `Y`, and a split sends
+in-coins to outcome 2, out-coins to outcome 0, and both to outcome 1 *as two separate parts*,
+never duplicating a coin. Hence **at most `m` non-nil parts at any node**. Unlike the profile
+census this is immune to the orientation-flip trap below, because it is about the intrinsic
+bipartition rather than the stored orientation.
+
+**Distinct parts are vertex-disjoint** (the graph reformulation), so at a level-`q` node, where
+the m-side is atomized, the alive coins hold pairwise disjoint n-side chunks and each splits
+independently. Coins only share a chunk while they share a part.
+
+### The formulation
+
+Fix `m` and `q`, and let `t = k - q`. Write atoms as dyadic-block letters of `G_t` —
+`A` = block 0, `B` = block 1, `C` = block 2, `D` = block 3.
+
+> Find an m-side pattern — which coins are alive at which of the `3^q` nodes, and how they are
+> grouped into parts — together with a letter string `P` of length `2^q`, such that `m` copies
+> of `P` can be laid on the level-`q` nodes, coin `y`'s copy on `y`'s own `2^q` nodes, one
+> letter per alive coin, with every node's received multiset a legal sub-multiset of `G_t`.
+> Maximise the value of `P`.
+
+**The whole condition is `t`-free.** Block multiplicities in `G_t` are `1, 1, 2, 4, 8, …`
+regardless of `t`, so "sub-multiset of `G_t`" reads in letters as "at most one `A`, at most one
+`B`, at most two `C`, at most four `D`, …". The m-side pattern contains no `n` either. So one
+solve per `(m,q)` yields a letter string, and `n(k,m)` is that string evaluated at `t = k-q`
+— *for every `k` at once*. That is the scalable formula the profile model was reaching for.
+
+The only role of `t` is that `G_t` has `t+1` distinct blocks, so `t` must exceed the deepest
+letter used. That is the precise form of the "`n` far from the diagonal, no edge effects"
+assumption.
+
+### Worked, verified, and it hits the maximum
+
+`m = 3`, `q = 2`. All three coins carry the profile **`AABC`**; the shared nodes read
+`{A,B}`, `{A,B,C}`, `{A,C}`, all legal. Evaluating at `t = k-2`:
+
+```
+2A + B + C = 2·2^(k-2) + (2^(k-2) - 1) + (2^(k-2) - k + 1) = 2^k - k = n(k,3)
+```
+
+for every `k`, from one packing solve. The `k = 5` instance is committed as
+[`../witnesses/canon_27_3_at5_symbolic.tree`](../witnesses/canon_27_3_at5_symbolic.tree) and
+passes `tools/check_witness.py` — a hand-derived construction, not solver output, reaching the
+proven maximum `n(5,3) = 27`.
+
+`AABC` is the forced refinement of the `AC` recorded for `m=3` in `data/conjectures.csv`. So
+this route does not merely match the fitted profile table, it would **derive** it. The same
+evaluation checks out for `AACC` → `n(k,4)`, `BBBD` → `n(k,5)`, `BBCD` → `n(k,6)`.
+
+### `q` has two different jobs, and the repo has been conflating them
+
+- **Value.** Refinement is forced (Atom Descent, Corollary 2 in
+  [theorems/singleton-majorization.md](theorems/singleton-majorization.md)), so `AC` and `AABC`
+  are the same number. Larger `q` adds no expressive power to the profile. This is the
+  "refinement invariance" already recorded above, now with a proof.
+- **Feasibility.** Larger `q` buys *packing room*, and that is what `q_min(m)` measures.
+  `m = 6` has a length-4 profile yet needs `q = 6`; atomizing 6 coins takes only
+  `⌈log₂ 6⌉ = 3` levels. So `q_min` is a packing threshold, and the journal's "why does `q` skip
+  4 → 6 at `m=6`" is a question about packing feasibility, not about refining the m-side.
+
+### It explains the canonical search's small-k failures
+
+Atom Descent Corollary 1 says atomic-leaf feasibility is monotone, so a `NO_CANONICAL_TREE` at
+`target_k = t` forces one at every larger `t`. The recorded failures are then all one fact,
+`q_min(6) ≈ 6`, rather than a defect of the atomic-leaf hypothesis:
+
+| state | recorded | implies |
+|---|---|---|
+| `Sb(46:6)@6` | fails at `target_k` 2 and 3 | largest feasible `t ≤ 1`, so `q_min ≥ 5` |
+| `Sb(104:6)@7` | fails at `target_k` 3 | largest feasible `t ≤ 2`, so `q_min ≥ 5` |
+| `Sb(473:6)@9` | fails at 4, works at 3 | largest feasible `t = 3`, so `q_min = 6` |
+
+Falsifiable predictions, cheap to test: `Sb(104:6)@7` should succeed at `target_k = 1` and fail
+at 2; `Sb(46:6)@6` should succeed only at `target_k = 0`; `Sb(50:5)@6` should succeed at
+`target_k = 2` since `q_min(5) = 4`.
+
+### What is assumed
+
+- **Symmetry** — every coin carrying the same profile. Two of the nine `Sb(480:5)@9` solutions
+  are asymmetric and the `473:6@9` witness is asymmetric and wastes 7 paths, so this maximises
+  over the symmetric non-wasteful class. A priori a lower bound on `n(k,m)`; it happened to be
+  exact for `m=3`.
+- **The atomic-leaf hypothesis**, for the upper-bound direction only. Anything the model
+  *finds* is an unconditional construction — the `m=3` witness above is checked from first
+  principles.
 
 ## Structural threads (from the journal)
 

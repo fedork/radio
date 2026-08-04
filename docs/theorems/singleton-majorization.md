@@ -254,6 +254,44 @@ So block 0 is `2^k`, block 1 is `2^k - 1`, block 2 is `2^k - 1 - k`, block 3 is
 `make_u_freq` computes in `radio_canon_search_generic.c:121`, and it makes the theorem's
 criterion fully explicit: no recursion is needed to test a candidate singleton state.
 
+## Atom Descent, and where the refinement rule comes from (2026-08-03)
+
+The recurrence gives a second, sharper statement than weak majorization, about states whose
+parts are an exact **sub-multiset** of `G_t` — the condition `tools/check_witness.py` verifies
+and `radio_canon_search_generic` demands of its leaves.
+
+> **Atom Descent.** If a singleton state's parts form a sub-multiset of `G_t`, there is a
+> single test whose three children are each a sub-multiset of `G_{t-1}`.
+
+### Proof
+
+`G_t = sort(L_t + M_t + R_t)`, and by construction each of `L_t[j]`, `M_t[j]`, `R_t[j]` is
+either an entry of `G_{t-1}` or `0`. A sub-multiset assigns its parts to *distinct* positions
+`j`, and the part at position `j` has size exactly `L_t[j] + M_t[j] + R_t[j]`. Split that
+part's n-side in those three proportions and test left ∪ mixed, as in the sufficiency argument
+above. Each child then collects a sub-multiset of `L_t`, `M_t` or `R_t`, and each of those is
+`G_{t-1}` after deleting zeros. ∎
+
+**Corollary 1 — feasibility is monotone in depth.** Atomic-leaf solvability at remaining depth
+`t` implies it at every `t' < t`. Contrapositive: a `NO_CANONICAL_TREE` at `target_k = t`
+implies one at every `target_k > t`. At `t = 0` the condition is vacuous (`G_0 = (1)`, leaves
+are single pairs), so *some* `t` always works and the real quantity is the largest feasible
+one.
+
+**Corollary 2 — the refinement rule is forced.** At position `j` exactly one of `L_t[j]`,
+`R_t[j]` is zero, so every atom splits into exactly **two** nonzero children, never three.
+Reading positions 1..5 gives
+
+```
+A -> aa      B -> ab      C -> bc      D -> cd
+```
+
+in dyadic-block letters, since `A_t = 2·A_{t-1}`, `B_t = A_{t-1} + B_{t-1}`,
+`C_t = B_{t-1} + C_{t-1}`, `D_t = C_{t-1} + D_{t-1}`. That is exactly the refinement rule
+recorded as a fit in [../conjectures.md](../conjectures.md) and `data/conjectures.csv`; it is
+now derived. It also explains why a profile's length doubles under refinement while its value
+does not change, and why an m-side coin's reachable subtree is binary.
+
 ## Consequence used throughout this project
 
 If the parts of a singleton state form a **sub-multiset** of `G_k`, its prefix sums are

@@ -41,7 +41,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   [`../evidence/pareto_certification_k1_8.txt`](../evidence/pareto_certification_k1_8.txt),
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
-- **Five theorems** — Singleton Majorization, Unit-Group Elimination, Subgraph Monotonicity,
+- **Six theorems** — Singleton Majorization (with **Atom Descent** as a new corollary, which
+  derives the profile refinement rule `A→aa, B→ab, C→bc, D→cd` that was previously a fit),
+  Unit-Group Elimination, Subgraph Monotonicity,
   and, new on 2026-08-03, the **Two-Part Reduction Identity** and the **Two-Part Frontier
   Theorem for `(2,1)`** ([theorems/two-part-reduction.md](theorems/two-part-reduction.md)).
   The reduction says `n(k+1,m)` is exactly the largest `p+q` over the two-part frontier at `k`
@@ -50,10 +52,11 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 - **The two-part frontier is measured** — 52 staircases at `k = 4,5,6` in
   `data/pareto_2part.csv`; `tools/check_tables.py` re-derives 20 one-part maxima from them on
   every run.
-- **15 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
-  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
-  `Sb(480:5)@9`. All pass
-  `tools/check_witness.py`, which re-derives every step without consulting the solver.
+- **16 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
+  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, a two-sided-only
+  `Sb(480:5)@9`, and `Sb(27:3)@5` derived by hand from the symbolic profile model rather than
+  by search. All pass `tools/check_witness.py`, which re-derives every step without consulting
+  the solver.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
 

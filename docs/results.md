@@ -225,14 +225,20 @@ The special-case constructions (lemmas 1-11) are in
 | `canon_496_4_at9.tree` | `Sb(496:4)` in 9 | 2 trees, 20 splits, 42 leaves |
 | `canon_480_5_at9.tree` | `Sb(480:5)` in 9 | 9 trees, 182 splits, 373 leaves |
 | `canon_473_6_at9.tree` | `Sb(473:6)` in 9 | 154 nodes, 51 splits, 103 leaves |
+| `canon_480_5_at9_twosided.tree` | `Sb(480:5)` in 9 | 5 trees, 262 splits, 529 leaves; no one-sided n-split |
+| `canon_473_6_at9_twosided.tree` | `Sb(473:6)` in 9 | 172 nodes, 57 splits, 115 leaves; no one-sided n-split |
+| `canon_27_3_at5_symbolic.tree` | `Sb(27:3)` in 5 | 13 nodes, 4 splits, 9 leaves; hand-derived, not search output |
 | `sa38_k7.tree` | `Sa(38)` in 7 | 24 numbered nodes |
 | `sa65_k8_{a,b,c}.tree` | `Sa(65)` in 8 | 46 / 40 / 35 nodes |
 | `sa112_k9_{a,b,c}.tree` | `Sa(112)` in 9 | 78 / 72 / 74 nodes |
 | `sa192_k10_a.tree` | `Sa(192)` in 10 | 154 numbered nodes |
 | `sa192_k10_b.tree` | `Sa(192)` in 10 | 149 numbered nodes (tighter) |
 
-All thirteen pass `tools/check_witness.py`. The seven `Sa(38)` / `Sa(65)` / `Sa(112)` trees
-were recovered from `radio.zip` on 2026-08-02.
+All sixteen pass `tools/check_witness.py`. The seven `Sa(38)` / `Sa(65)` / `Sa(112)` trees
+were recovered from `radio.zip` on 2026-08-02. `canon_27_3_at5_symbolic.tree` is the odd one
+out: it was written down from the symbolic profile model
+([conjectures.md](conjectures.md#the-symbolic-profile-programme-2026-08-03)) rather than found
+by the solver, and it attains the proven maximum `n(5,3) = 27`.
 
 ## Exhaustively enumerated multi-part states
 

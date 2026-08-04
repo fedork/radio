@@ -92,8 +92,21 @@ is a proven frontier point with four working splits from `radio_full`, yet
 restriction applied. Same for `Sb(104:6)` in 7 at `target_k=3`.
 
 So small-k states are **not** valid cheap proxies for testing structural hypotheses with this
-tool: a negative there says the state has no atomic-leaf solution, not that it has no solution.
-Use `radio_full` when the question is about solutions in general.
+tool: a negative there says the state has no atomic-leaf solution *at that `target_k`*, not that
+it has no solution. Use `radio_full` when the question is about solutions in general.
+
+**These failures now have an explanation, and it is not a defect of the hypothesis
+(2026-08-03).** Atom Descent
+([theorems/singleton-majorization.md](theorems/singleton-majorization.md#atom-descent-and-where-the-refinement-rule-comes-from-2026-08-03))
+makes atomic-leaf feasibility *monotone*: feasible at remaining depth `t` implies feasible at
+every smaller `t`, so a `NO_CANONICAL_TREE` at `target_k = t` forces one at every larger
+`target_k`, and `target_k = 0` is always feasible for a solvable state. What the failures
+measure is `q_min(m) = k - t_max`, the depth a solution must reach before every leaf is an
+atom — and every recorded m=6 failure is consistent with the single value `q_min(6) = 6`
+read off `Sb(473:6)@9`. At `k = 6` that leaves `t_max = 0`, which is why `Sb(46:6)@6` has no
+atomic tree at any `target_k` the search was run with. Predictions worth testing: `Sb(104:6)@7`
+should succeed at `target_k = 1` and fail at 2, and `Sb(50:5)@6` should succeed at
+`target_k = 2`.
 
 and check for strays with `pgrep -f radio_canon` before starting another.
 

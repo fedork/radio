@@ -1,0 +1,28 @@
+# Canonical witness tree for Sb(27:3) in 5, at t=3 (q = k-t = 2).
+# Not solver output. Derived by hand from the symbolic profile model
+# (docs/conjectures.md#the-symbolic-profile-programme-2026-08-03): every m-side coin
+# carries the same letter profile AABC over its 2^q = 4 paths, and the per-node
+# constraint "chunk multiset is a sub-multiset of G_t" is imposed in letters.
+#
+# In letters at t=3 -- A=8, B=7, C=4 (two copies), D=1 (four copies):
+#   y1: A C | A B      y2: B A | C A      y3: A B | A C     each = AABC = 27
+# and the shared nodes read {A,B}, {A,B,C}, {A,C} -- all legal in any G_t.
+# AABC is the forced refinement of the profile AC recorded for m=3 in
+# data/conjectures.csv, under that file's own rule A->aa, C->bc.
+#
+# format  : indented '<state> @k --[split]-->' / '<state> @k [canonical U_k]'
+# checked : tools/check_witness.py
+#
+27:3 @5 --[12:1]-->
+  12:1 @4 --[8:1]-->
+    8:1 @3 [canonical U_3]
+    4:1 @3 [canonical U_3]
+    0:0 @3 [canonical U_3]
+  12:2,15:1 @4 --[4:1,8:1]-->
+    4:1,8:1 @3 [canonical U_3]
+    4:1,8:1,7:1 @3 [canonical U_3]
+    8:1 @3 [canonical U_3]
+  15:2 @4 --[7:1]-->
+    7:1 @3 [canonical U_3]
+    7:1,8:1 @3 [canonical U_3]
+    8:1 @3 [canonical U_3]

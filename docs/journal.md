@@ -1107,3 +1107,68 @@ Dead ends and corrections, recorded so they are not repeated:
   live for one step; noted because the mistake is easy to repeat with `radio_mixed chain`,
   whose brute-force split search returns the no-op split `[0:0,...]` whenever the state happens
   to be solvable one level down.
+
+## 2026-08-03 (later) — the symbolic profile programme, and Atom Descent
+
+Same day, second thread. The two-part work above answers `n(k,m)` in principle but family by
+family; this is an attempt at all `m` at once, coming from the coin side rather than the tree
+side. Direction proposed by Fedor; the results below are what survived checking.
+
+### Atom Descent (proved)
+
+> If a singleton state's parts are a sub-multiset of `G_t`, one test makes all three children
+> sub-multisets of `G_{t-1}`.
+
+Immediate from `G_t = sort(L_t + M_t + R_t)`: each of `L_t[j]`, `M_t[j]`, `R_t[j]` is an entry
+of `G_{t-1}` or zero, and a sub-multiset occupies distinct positions `j`. Written up in
+[theorems/singleton-majorization.md](theorems/singleton-majorization.md).
+
+Two corollaries earn their keep:
+
+- **Atomic-leaf feasibility is monotone in depth.** So `NO_CANONICAL_TREE` at `target_k = t`
+  forces one at every larger `target_k`, and `target_k = 0` always works. **This retracts a
+  claim I made earlier in the session** — that the atomic-leaf hypothesis is known to be lossy.
+  It is not. The `Sb(46:6)@6` evidence shows only that `t = 2, 3` fail for that state, which is
+  a statement about `q_min(6)`, not about the hypothesis. Fedor pushed back on this and was
+  right.
+- **The refinement rule `A→aa, B→ab, C→bc, D→cd` is forced**, and each atom splits into exactly
+  *two* children, never three. That rule was a fit in `data/conjectures.csv`; it is now derived,
+  and it explains both why profile length doubles while its value does not, and why an m-side
+  coin's reachable subtree is binary.
+
+### The programme
+
+Because block multiplicities in `G_t` are `1,1,2,4,8,…` for every `t`, the constraint "each
+node's chunk multiset is a sub-multiset of `G_t`" is **`t`-free** when written in dyadic-block
+letters. The m-side pattern is `n`-free. So one packing solve per `(m,q)` gives a letter string,
+and `n(k,m)` is that string evaluated at `t = k-q`, for all `k` at once. Full statement in
+[conjectures.md](conjectures.md#the-symbolic-profile-programme-2026-08-03).
+
+Worked by hand for `m=3`, `q=2`: profile `AABC`, shared nodes `{A,B}`, `{A,B,C}`, `{A,C}`,
+evaluating to `2^k - k = n(k,3)`. The `k=5` instance is committed as
+`witnesses/canon_27_3_at5_symbolic.tree` and passes `check_witness.py` — a construction written
+down from the model, not found by search, hitting the proven maximum. `AABC` is the forced
+refinement of the fitted `AC`, so the programme would *derive* the profile table rather than
+match it.
+
+### What this reframes
+
+`q` was doing two jobs and the repo was conflating them. Value is refinement-invariant, so
+larger `q` adds nothing there. Feasibility is not, and that is what `q_min(m) = 2,3,4,6` for
+`m = 3,4,5,6` measures. It is not m-side atomization either — atomizing 6 coins takes 3 levels
+and `m=6` needs 6. So the journal's "why does `q` skip 4 → 6 at `m=6`" is a packing-feasibility
+question, and all three recorded canonical-search failures for `m=6` collapse to the single
+value `q_min(6) = 6`.
+
+### Cost, and a process failure worth recording
+
+No solver compute at all — the `m=3` result is a hand derivation plus `check_witness.py`
+(milliseconds). Cheapest result of the session by a wide margin.
+
+**I edited the shared checkout by mistake.** Working in a per-chat worktree at
+`~/radio-wt/two-part-frontier`, several `Edit` calls used absolute `/Users/fedor/radio/...`
+paths and landed in `~/radio`, which other chats were using. Caught by a line-number mismatch
+between `grep` (relative, worktree) and `Read` (absolute, main checkout). Recovered with
+`git diff > patch` / `git apply --3way` / `git checkout --`, no work lost and nothing of anyone
+else's touched — but the tell was luck, not a check. **In a worktree, keep every tool path
+relative or rooted at the worktree.**
