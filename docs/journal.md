@@ -1736,3 +1736,51 @@ died on measuring the wrong thing, which is worse.
 
 Restoring `FAST` as written. It tests the balance line — the structure the witness data supports
 across 2,126 splits — and it needs no improvement from me.
+
+## 2026-08-04 — FAST restored; its cost measured, its benefit still not
+
+Restored the `fast_solve` pass and the whole `FAST` mechanism (init loop,
+`compare_solvability` / `get_max_sbb` / `minK`, the `FAST` slot, the `NOTFAST` annotation),
+cherry-picked onto the current engine so the later work survived — inline `sort1`, four live
+orderings, `_DESC` by reversed subscript with per-level hoisting, the counting-bound cut,
+deadlines.
+
+The restoration is **faithful**: k=9 ladder 1020 s against the 1021 s measured before removal,
+and 345,847 of 359,320 verdicts carry `pass=2` — the same 96% double-pass. Contradiction-clean
+(0 over 127,182 shared `(state,k)` pairs, all nine rungs, k=6 frontier 18/18).
+
+| | no FAST | FAST |
+|---|---|---|
+| k=9 ladder | **256 s** | **1020 s** (4.0x) |
+| states at `pass=2` | 0 | 96% |
+
+**A trap caught by diffing rather than by compiling.** `sbb_to_min_k` is a static array, so it
+zero-initialises, and `minK` treats 0 as "already computed". Without restoring
+`sbb_to_min_k[i] = i<=1?0:-1` it returns 0 for every sbb, silently degrading
+`compare_solvability` to natural-order tiebreaks — so `FAST` would have been computed from a
+broken comparator. It compiles and produces correct-but-differently-filtered results. Verify a
+restoration by diffing against the pre-removal source, not by whether it builds.
+
+### Why 4x is not an argument against FAST
+
+The Sa ladder cannot see FAST's benefit, for two independent reasons:
+
+- it is **refutation-dominated**, and on a refutation pass 1 finds nothing and pass 2 redoes the
+  level, so FAST is pure cost;
+- `fast_solve` is gated on `size > 2` and the filter on `i < size_1`, so it does nothing for one-
+  or two-part states — and the ladder's expensive nodes are exactly those: `Sa(111)`/`Sa(112)`
+  reduce to the **single-part** `Sb(65:46)`, `Sb(65:47)`.
+
+So this 4x is FAST's cost with essentially none of its benefit in view. It is the price, measured
+cleanly; it is not evidence about the trade.
+
+### The open question this leaves for the Sa(193) run
+
+The sixteen states are refutations, which is where FAST is pure cost — but refuting a root
+requires *proving children solvable* to rule them out as the failing branch, and those
+sub-searches are where FAST pays. Genuinely mixed, and the ladder is a poor proxy in both
+directions.
+
+**Decide it by measurement on one of the sixteen**, not on the ladder: run the same state with
+and without for a fixed wall-clock budget and compare verdicts produced. That is cheap next to
+the run itself and it is the only workload that answers the question.
