@@ -164,6 +164,15 @@ verdict — removing deadlines trapped it in an intractable subtree. Deadlines a
 `s3://radio-sa193-393287594714/run/112_80.cache`, so a relaunch resumes rather than repeats.
 See [aws-run.md](aws-run.md) and the 2026-08-04 journal entry.
 
+## The Sa(193) certificate
+
+Design in [certificate.md](certificate.md), nothing built yet. The object is sixteen k=9
+refutations; the certificate is the set of refuted facts (the existing `parse_out.sh` format plus
+a provenance header), verified level by level in `k`. Estimated order 300-600 MB shipped, and
+`radio_allsol.c` is already most of the `SPLITS` checker. The one real problem is that the
+solver's cache materialises the upward closure, so the log is **not closed** — three options,
+decided by measurement not preference.
+
 ## Immediate next steps
 
 1. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
