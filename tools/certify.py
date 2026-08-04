@@ -75,13 +75,23 @@ def mass(s) -> int:
 
 
 def maj_refutes(s, k: int) -> bool:
-    """Singleton Majorization: an all-singleton state is unsolvable iff its n-sides are NOT
-    weakly majorized by G_k."""
-    if any(m != 1 for _, m in s):
+    """Refute s using the SINGLETON SUB-MULTISET, not only the all-singleton case.
+
+    Singleton Majorization decides all-singleton states exactly: unsolvable iff the n-sides are
+    not weakly majorized by G_k. Combined with Subgraph Monotonicity that extends to any state -
+    the singleton parts form a subgraph, so if *they* violate majorization the whole state is
+    unsolvable. radiobase.c does exactly this (the `singleton_size > 0` branch of canSolveB) and
+    returns FALSE without printing, which is why such facts never appear in a log.
+
+    An earlier version only handled the all-singleton case and therefore could not reproduce
+    25% of the k=4 facts in a frontier walk - they were not a closure gap at all, just a rule
+    the verifier was missing."""
+    singles = sorted((n for n, m in s if m == 1), reverse=True)
+    if not singles:
         return False
     pref = gprefix(k)
     run = 0
-    for i, (n, _) in enumerate(s):
+    for i, n in enumerate(singles):
         run += n
         if i >= len(pref) or run > pref[i]:
             return True
@@ -153,6 +163,36 @@ class Index:
 
 # ---------------------------------------------------------------- SPLITS verification
 
+_LIVE: dict = {}
+
+
+def _live_splits(part, k: int, below: Index, restrict: bool):
+    """Splits of one part that are not dead group-locally.
+
+    Depends only on (part, k, restrict) - never on the state containing the part - so it is
+    memoised. Measured 2026-08-04 on the k=9 ladder: 729 distinct (part,k) pairs serve 657,945
+    part-slots across 148,626 facts, a reuse factor near 900x and 5,120x at k=4. That is why
+    this table is a verifier-side memo and not something worth shipping in the certificate.
+
+    `restrict` applies the complement symmetry, valid for one designated group only."""
+    key = (part, k, restrict)
+    hit = _LIVE.get(key)
+    if hit is not None:
+        return hit
+    n, m = part
+    opts = []
+    for a in range(n + 1):
+        for b in range(m + 1):
+            if restrict and (a, b) > (n - a, m - b):
+                continue
+            if (below.refuted(canon([(a, b)]), k - 1)
+                    or below.refuted(canon([(n - a, m - b)]), k - 1)
+                    or below.refuted(canon([(a, m - b), (n - a, b)]), k - 1)):
+                continue
+            opts.append((a, b, a * b, (n - a) * (m - b), n * m - a * b - (n - a) * (m - b)))
+    _LIVE[key] = opts
+    return opts
+
 def splits_ok(s, k: int, below: Index, budget_end: float):
     """Every split of s must have a child refuted at k-1.
 
@@ -163,26 +203,44 @@ def splits_ok(s, k: int, below: Index, budget_end: float):
     used = set()
     P = len(s)
 
+    # Group-local rejection, the same test radiobase.c memoises in s[4]/s[5]. If ONE group's
+    # split has a child that is refuted at k-1 in isolation, that split is dead whatever every
+    # other group does: the full child contains this group's contribution as a sub-multiset, so
+    # Subgraph Monotonicity refutes the full child too. Measured 2026-08-04 over 25 facts with
+    # >=3 parts: this cuts a further 107x beyond the counting bound (408,590 leaves -> 3,824),
+    # and some facts drop to zero leaves, i.e. refuted with no product enumeration at all.
+    live = [_live_splits(p, k, below, gi == 0) for gi, p in enumerate(s)]
+    last = [-1] * (P + 1)
+
     def rec(i: int, s2, s0, s1, c2, c0, c1):
         if time.time() > budget_end:
             raise TimeoutError
-        if i == P:
+        # Subset narrowing on the PREFIX {0..i-1}. A refuted PARTIAL child means every
+        # completion has that child refuted too, since completions only add parts and Subgraph
+        # Monotonicity preserves unsolvability upward - so the whole subtree is discharged here.
+        # radiobase.c does this at every prefix via its three CACHE_ONLY probes; checking only
+        # at the leaf, as an earlier version did, throws the reduction away.
+        if i:
             for child in (canon(c2), canon(c0), canon(c1)):
                 if below.refuted(child, k - 1):
                     used.add(child)
                     return True
+        if i == P:
             return False                      # a split with no refuted child: not verified
         n, m = s[i]
-        for a in range(n + 1):
-            for b in range(m + 1):
-                k2, k0 = a * b, (n - a) * (m - b)
-                k1 = n * m - k2 - k0
-                if s2 + k2 > cap or s0 + k0 > cap or s1 + k1 > cap:
-                    continue
-                if not rec(i + 1, s2 + k2, s0 + k0, s1 + k1,
-                           c2 + [(a, b)], c0 + [(n - a, m - b)],
-                           c1 + [(a, m - b), (n - a, b)]):
-                    return False
+        # Identical-part symmetry: equal parts have identical option lists, and swapping their
+        # splits permutes the children, which are multisets. So require non-decreasing option
+        # index across a run of equal parts. Factorial saving where parts repeat.
+        lo = last[i - 1] + 1 if i and s[i] == s[i - 1] else 0
+        for oi in range(lo, len(live[i])):
+            a, b, k2, k0, k1 = live[i][oi]
+            if s2 + k2 > cap or s0 + k0 > cap or s1 + k1 > cap:
+                continue
+            last[i] = oi
+            if not rec(i + 1, s2 + k2, s0 + k0, s1 + k1,
+                       c2 + [(a, b)], c0 + [(n - a, m - b)],
+                       c1 + [(a, m - b), (n - a, b)]):
+                return False
         return True
 
     try:

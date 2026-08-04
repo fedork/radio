@@ -54,8 +54,8 @@ so the provenance header costs nothing.
 | ⇒ facts for that one state | **~43 M** |
 | at ~25 bytes/line | ~1.1 GB raw |
 | union of all sixteen (they share heavily — same 193 coins, which is why the 2023 tail collapsed 1300x on a warm cache) | order 2-4 GB raw |
-| x6.6 for dominance breadcrumbs (measured, see below) | order 13-26 GB raw |
-| sorted small integers, `zstd` at ~15-25% | **order 2-6 GB shipped** |
+| no breadcrumb multiplier — the log is closed as it stands (see below) | x1 |
+| sorted small integers, `zstd` at ~15-25% | **order 0.3-1 GB shipped** |
 
 For comparison, the 2023 run's raw log for a *single* state was 905 MB, and ~18 GB of that era's
 `out*` was deliberately not archived (see [data.md](data.md)). So this is the same order as
@@ -81,63 +81,66 @@ in 8 minutes. Replace "are all three children solvable" with "is some child in t
 and it is a `SPLITS` checker. Per-fact independence makes the whole verification embarrassingly
 parallel, unlike the search that produced it.
 
-Verification is *cheaper* than the proof: no search, no `MAYBE`, no re-passes, no heuristics, no
-cache tuning. One pass with every answer already known.
+**Verification is not cheaper than the proof.** An earlier draft claimed it was. Dropping search,
+`MAYBE` and re-passes removes constant factors, not the enumeration: checking one fact still
+enumerates its split space. Measured on the `Sa(113)` k=9 ladder, the 216,580 facts at k=4 take
+91 s single-threaded against 1,521 s for the whole solve, and the k=4 level alone is 1.4 billion
+recursion nodes.
 
-## The one real problem: the log is not closed
+What verification buys is not speed. It is a trust base of three theorems and ~700 lines
+(`radio_verify.c`) instead of ~1,600 lines of orderings, deadlines, passes and cache; per-fact
+independence, so it parallelises arbitrarily where the search does not; per-level independence, so
+resident memory is one level rather than the certificate; and spot-checkability, so any single
+disputed fact can be re-derived alone.
 
-The solver's cache materialises the **upward closure** — `cacheCantSolve` inserts every
-`sbb_greater` substitution — so a child can be refuted purely by domination and **never appear
-in the log**. The set of logged facts is therefore not closed under `SPLITS`, and a naive
-verifier would reject perfectly good refutations because a referenced child is absent.
+## Closure depends on how the run was conducted
 
-### The fix: inference breadcrumbs
+An earlier draft called non-closure "the one real problem" and designed inference breadcrumbs
+around it. A later draft said the problem did not exist. Both were too general. The measured
+position:
 
-Emit, for each distinct state that was refuted *by dominance*, a record naming the witness:
+- **A cold single-session run produces a closed log.** The `Sa(113)` k=9 ladder verifies with 0
+  unverified at every level checked. Most of what looked like a gap was the verifier missing
+  Singleton Majorization on the singleton **sub-multiset** — `canSolveB` refutes that way and
+  returns FALSE without printing, so those states are legitimately absent from every log.
+- **A resumed run does not.** The 2023 `Sa(193)` run ran for months, warm-started repeatedly, and
+  ~18 GB of its earlier output was deliberately not archived. Its cache therefore knew facts whose
+  proofs are gone. Measured: ~5% of its k=5 facts cite a k=4 child that was never logged, and each
+  of its sixteen k=9 facts cites a k=8 child that was never logged.
 
-```
-- b 9 5 7 3 t 66 24 5   dom 41827        <- this state is refuted; witness is fact 41827
-```
+**Constraint on the re-run: keep every session's raw output, or start cold and never resume.** This
+is the one operational requirement the format cannot fix after the fact.
 
-A breadcrumb is a **hint, not an assertion**. The verifier confirms `s' <= s` componentwise
-(O(parts)) and confirms `s'` is itself in the set. A wrong breadcrumb fails the check. So this
-adds **nothing** to the trust base — it is exactly the LRAT-versus-DRAT distinction, where hints
-make checking cheap without making it more credulous. An earlier draft of this page claimed
-witnesses meant "trusting the emitter"; that was wrong.
+### The fix is derivation, not breadcrumbs
 
-**It is free to produce.** `cant_solve_marker` is a shared sentinel occupying the node's `next`
-pointer slot. Replace it with a *tagged pointer* carrying the originating fact's id — low bits
-tag it as a marker, the rest is the id. No extra memory in the solver, and the breadcrumb falls
-out of the closure machinery that already exists.
+When nothing in the fact set refutes a state, the checker runs the same `SPLITS` check on that
+state one level down, memoised. Deriving is proving: a derived fact is checked by exactly the rules
+a shipped one would be, so this does not touch the trust base — it shrinks the artifact. At k<=4 it
+costs milliseconds and it closed the 2023 k=5 gap completely (4,859 of 4,859 sampled facts verified
+after deriving 2,836 missing children).
 
-### What it costs, measured
+So the certificate is **the facts that are expensive to re-derive**, and the right extent is the
+sub-DAG *reachable from the sixteen roots*, not a whole log. The x6.6 breadcrumb multiplier is
+withdrawn: it measured cache queries, not facts.
 
-Instrumented `checkCache` over the k=8 ladder:
+## The sixteen are already 31/32 checked
 
-```
-2,256,002 FALSE probes
-   -> 18,770 distinct (state,k) pairs
-        16,326 reached by a STRICT PREFIX   (refuted by dominance)
-         2,534 reached at full depth
-   vs  2,854 explicitly logged negatives
-```
+`sa193-2023` contains all sixteen `can't solve Sb(n1:193-n1) in 9`. Verified against itself plus
+the 2026 `out_k8.txt`, **each fails on exactly one split** — 32 recursion nodes across all sixteen.
+Every other split of every root is discharged. The survivor is always the near-balanced split, and
+its two single-part children are both solvable by the proven Pareto table, so the refutation must
+be the two-part mixed child:
 
-So the certificate carries **~6.6x the facts the log contains** — the dominance-derived states
-have to be named, because the verifier will encounter them when it re-enumerates splits. That is
-what the x6.6 row in the size table above accounts for: **order 2-6 GB shipped** for all sixteen.
+| root | surviving split | the one k=8 fact needed |
+|---|---|---|
+| `Sb(112:81)` | `(38,40)` | `Sb(74:40, 41:38)` |
+| `Sb(111:82)` | `(39,42)` | `Sb(72:42, 40:39)` |
+| ... | ... | (one per root, `n1 = 97..112`) |
 
-That ratio is measured at k=8 ladder scale and may differ at `MAX_N=193`; it is the first thing
-to re-measure on a real state.
-
-### Why pay the 6.6x
-
-The alternative is a minimal certificate plus a **dominance index** in the verifier, which
-searches the fact set for some `s' <= s`. That is smaller on disk and strictly more complex
-where it matters least: the verifier is the artefact we audit, and every line in it is a line
-someone has to believe. Breadcrumbs reduce each dominance step to a componentwise comparison a
-reader can check by eye.
-
-Low single-digit GB is not the binding constraint on this project. Verifier simplicity is.
+Nothing among the 1,879 logged 2023 k=8 facts dominates `Sb(74:40, 41:38)`. So the remaining work
+at the top of the DAG is **sixteen two-part k=8 refutations** — finite, independent, and
+parallel — not a 47-day re-run. Whether the k=6 and k=7 levels are equally close is the open
+measurement; k=7 carries 3.1 M facts at P=4 with ~558 options per part.
 
 ## Trust base
 
@@ -180,9 +183,11 @@ is the fix for the exact defect that makes this re-run necessary.
 
 ## Open decisions
 
-1. **Re-measure the breadcrumb ratio on a real state.** 6.6x comes from the k=8 ladder. If it
-   is much worse at `MAX_N=193` — the dominance closure is wider there — reconsider a minimal
-   certificate with a verifier-side index.
+1. **How `SPLITS` cost scales with part count.** Measured at k=4 on the k=9 ladder, nodes per
+   fact go 11, 74, 427, 2231, 9027, 12079 for 2..7 parts — roughly x4.5 per added part, and 93%
+   of all nodes sit in 6- and 7-part facts. Part count grows with depth, so this exponent, not
+   the fact count, sets the cost at `MAX_N=193`. Measure it on one real k=9 state before sizing
+   the machine.
 2. **`FAST` on or off for the sixteen.** They are refutations, where the pass-1 filter is pure
    cost (measured 4x on the k=9 ladder) — but refuting a root requires *proving children
    solvable* to rule them out, and that is where `FAST` pays. Decide by running one of the

@@ -1811,27 +1811,33 @@ confident, meaningless answer after hours.
 | | **4** | **821** | **612** | **209 (25%)** |
 | | 5 | 155 | 155 | 0 |
 
-The 209 failures are the **closure gap, measured**: those facts have a split whose only refuted
-child is a state the solver dispatched by cache dominance and never logged. For
-`Sb(12:1,10:2,10:1,7:4)` at k=4, 33 splits lack a refuted child, and the missing witnesses are
-small k=3 states like `Sb(7:1,5:2)` (mass 17 against the `3^3=27` cap, so not refutable by
-counting).
-
-The gap concentrates in higher part counts — 157 of 625 four-part facts against 11 of 69
-two-part — which is what one would expect: more parts, more splits, more chances that one split's
-only refuted child went unlogged.
+**The 209 failures were not a closure gap. They were a missing rule in the verifier** — see the
+retraction below, recorded the same day. The paragraphs that stood here interpreted them as
+unlogged dominance witnesses and are withdrawn.
 
 ### What this does to the design
 
 - **Breadcrumbs are unnecessary.** The verifier's own dominance search finds the witness whenever
-  it is present. What is needed is that missing witnesses be *emitted*, not that they be
-  *pointed at*. The x6.6 figure in `certificate.md` measured queries, not facts, and was the
+  it is present. The x6.6 figure in `certificate.md` measured queries, not facts, and was the
   wrong quantity.
-- **The closure gap is ~25% of facts**, iterated to a fixpoint — not 6.6x. Against 15-25%
-  subsumption the two roughly cancel, so the certificate is about the size of the log's negatives.
-- **Post-processing is the right architecture.** The whole closure computation runs on an
-  unchanged log: add missing children, re-verify, iterate. The run only has to avoid losing
-  information.
+- **Post-processing is the right architecture.** Everything the certificate needs is computable
+  from an unchanged log. The run only has to avoid losing information.
+
+### Retraction, same day: there is no closure gap
+
+`maj_refutes` only fired when **every** part was a singleton. `radiobase.c` applies Singleton
+Majorization to the singleton **sub-multiset** — the `singleton_size > 0` branch of `canSolveB`,
+which returns FALSE without printing, so such refutations never reach a log. That is why the
+missing witnesses all looked like small mixed states.
+
+With the sub-multiset rule implemented, the same k=6 frontier walk verifies **1,330 of 1,330 with
+0 unverified**, including all 968 four-part facts that previously failed. The log *is* closed
+under `SPLITS`; nothing has to be added to it, and no fixpoint iteration is needed.
+
+The lesson is about method, not about the rule: a 25% failure rate was read as a property of the
+*data* when it was a property of the *checker*. The user's first guess — "is it just a difference
+in how domination is applied?" — was right, and cost nothing to test against the alternative of
+designing an emission mechanism for witnesses that were never missing.
 
 ### Do not project these ratios
 
@@ -1840,3 +1846,136 @@ counting bound. Four parts at k=4 is milliseconds; the node that trapped the AWS
 at k=5 with a 119-billion prefix tree. Part count grows as `2^depth`, so both the cost *and* the
 closure-gap ratio plausibly move with k in ways these small logs cannot show. The 15-25% and ~25%
 figures are measurements at k<=6, not predictions for k=10.
+
+## 2026-08-04 — the C verifier, and the 2023 corpus turns out to be nearly checkable
+
+Two separate things happened. The engineering was mostly negative results. The finding was large.
+
+### Do not tune on small k — a worked example of getting this wrong
+
+Every performance number in the first half of this session came from part counts 1-8, on
+`bench_sa113_k9.txt` and `out_k8.txt`. Part count is the exponent in `SPLITS` cost, so that is
+the one axis a benchmark must span, and mine did not. What the shape actually is:
+
+    P <= min(2^(K-k), 3^k/2)
+
+Part count doubles going down (the mixed child splits one part in two) and is capped by mass,
+since every surviving part has mass >= 2 after Unit-Group Elimination. The bounds cross at
+`k ~ 0.387(K+1)`. Measured on the **real `Sa(193)` logs** (`sa193-2023`), the realised shape is:
+
+| k | facts | max P | mean mass / 3^k |
+|---|---|---|---|
+| 9 | 16 | 1 | 9,155 / 19,683 |
+| 8 | 1,879 | 2 | 4,620 / 6,561 |
+| 7 | **3,091,929** | **4** | 2,101 / 2,187 (96%) |
+| 6 | 4,541 | 8 | 687 / 729 |
+| 5 | 97,167 | 8 | 238 / 243 |
+| 4 | 940 | 10 | 79.5 / 81 |
+
+The doubling bound saturates only down to k=6, then collapses: a mixed child loses a part whenever
+`a in {0,n}` or `b in {0,m}`, and the counting bound forces near-equipartition, so the effective
+growth factor is well under 2. **Max part count never exceeds 10**, and the mass is 96-99% of
+`3^k` throughout — the hard facts live in a thin shell just under the counting bound.
+
+Consequence: mid-session I extrapolated "P ~ 30 at k=4-5 for K=10" from the `2^(K-k)` bound and
+concluded single-machine verification was hopeless. **That was wrong** — the bound is not
+realised. The real cost is the opposite corner: **few parts, enormous parts, high k** — 3.1 M
+facts at k=7 with P=4 and parts of mass ~520 (about 558 live options each).
+
+### Verifier performance: one win, three negative results
+
+All measured with identical verdicts and, where the change is semantics-preserving, byte-identical
+node counts.
+
+| change | effect |
+|---|---|
+| incremental child construction (copy-and-insert, rolling mass and hash, replacing `canon()` per node) | **1.20x** |
+| pairwise narrowing as CSP forward checking | 1.25x fewer nodes, **1.12x** wall |
+| combined, k=4 of the k=9 ladder | 123.4 s -> **91.2 s** |
+| subtree DP on the prefix state | **net 2.4x LOSS** — abandoned |
+| group ordering: ascending / fewest-options-first | 3.8x / 1.09x **worse** than canonical descending |
+
+- **Bucketing the fact set by part count is irrelevant.** The direct-mapped memo intercepts
+  99.996% of refutation queries (4.30 G hits, 7,646 misses); only 2.1 M reach the index.
+- **Pairwise narrowing's benefit decays with part count** — paired on identical facts: 1.29x at
+  P=6, 1.18x at P=7, 1.09x at P=8, 1.04x at P=9, 1.014x at P=10, and a net *time* loss from P=9.
+  I had predicted the opposite from a model where a future group's domain shrinks as `q^i` with
+  `q=0.62` measured, giving a critical depth `ln L / ln(1/q) ~ 6-8` beyond which domains empty and
+  the saving is `L^(P-i_crit)`. The model is wrong by **survivorship bias**: the nodes that reach
+  depth `i` are exactly those whose prefix wiped nothing, so their domains are systematically
+  fuller than the unconditional estimate. Same error shape as the balance-line ordering mistake —
+  reasoning about a population conditioned on survival as if it were the whole population.
+  Since the decay runs the other way, pairwise narrowing is most valuable at **P=4**, which is
+  where 3.1 M of the `Sa(193)` facts sit. It is left on by default.
+- **Prefix narrowing already subsumes every SUBSET of the prefix**, because a refuted
+  subset-child is a sub-multiset of the prefix-child and `refuted()` finds it by dominance. So
+  "arbitrary subgroup narrowing" adds only *look-ahead* to groups not yet fixed. That is the whole
+  content of the pairwise mechanism, and it is thin.
+- **The subtree DP fails for a measurable reason.** 1.03 G nodes at P=9 held 7.1e8 distinct prefix
+  states — **1.44 nodes per state**. Prefix states are nearly all distinct, so there is nothing to
+  collapse. My argument that saturation makes the state "almost purely numeric" (`s1` is implied,
+  so `(s2,s0)` has <= 784 values at k=4) was right about the numeric half and wrong that the
+  structural half vanishes: at mean part mass 14 the children keep real structure.
+
+Net: the checker is within a small factor of the enumeration's intrinsic size. The remaining
+leverage is parallelism, which is free here — facts are independent and levels are independent.
+
+### `radio_verify.c` verifies the k=9 ladder
+
+304,105 negative facts, k=2..4 complete at **0 unverified** (216,580 at k=4 in 91 s), k=5 stopped
+by its own cap inside a single 5.5e7-node fact. Per-fact cost spans four orders of magnitude, so a
+frozen progress counter is the normal appearance of the tail, not a hang.
+
+### The finding: the 2023 corpus is nearly a certificate already
+
+`sa193-2023` contains **all sixteen** `can't solve Sb(n1:193-n1) in 9` for `n1 = 97..112` —
+exactly the set `certificate.md` says `Sa(193)` reduces to. So the question is not whether to
+re-run 47 days; it is whether the existing logs can be *checked*.
+
+Running the verifier top-down, with the 2026 `out_k8.txt` merged in as additional database (the
+union of fact sets is itself a fact set — every fact is checked on its own merits, so an unsound
+one cannot be laundered by the company it keeps):
+
+- **k=9: 16 facts, each fails on exactly ONE split** — 32 recursion nodes in total. Every other
+  split of every root is discharged. The survivor is always the near-balanced one, e.g.
+  `Sb(112:81) -> (38,40)`, whose two single-part children are both *solvable* by the proven Pareto
+  table (`Sb(40:38)`, `Sb(74:41)` — the latter exactly on the boundary, max n1=74 at m=41). So each
+  root needs exactly one two-part k=8 fact, for `Sb(112:81)` that is **`Sb(74:40, 41:38)` at k=8**.
+  **Nothing among the 1,879 logged 2023 k=8 facts dominates it.**
+- **k=4: 940 facts, 0 unverified** in 35 s.
+- **k=5: 4,859 of 4,859 sampled facts verified, 0 unverified**, once missing low-k children are
+  derived rather than cited (2,836 derived).
+
+### Closure is a property of how the run was conducted
+
+Earlier today I recorded "the log is closed, breadcrumbs unnecessary". That was measured on
+`bench_sa113_k9.txt`, a **single cold-cache session**, and it does not generalise. The 2023
+`Sa(193)` run was resumed over months from warm caches whose own logs were **not archived**
+(~18 GB deliberately dropped, see [data.md](data.md)), so it cites facts whose proofs are gone:
+~5% of its k=5 facts reference a k=4 child that was never logged, and the sixteen k=9 facts each
+reference a k=8 child that was never logged.
+
+So: **a cold single-session run produces a closed log; a resumed run does not.** This is a direct
+constraint on the re-run — keep every session's output, or start cold and never resume.
+
+### On-demand derivation, and what it does to the certificate
+
+The fix is not to ship the missing facts, it is to let the checker **prove** them. When nothing in
+the fact set refutes a state, `refuted_raw` now runs the same `SPLITS` check on that state one
+level down, memoised, for `k <= a threshold`. Deriving is proving, and a derived fact is checked by
+exactly the rules a shipped one would be — so this does not touch the trust base, it shrinks the
+artifact. At k<=4 it costs milliseconds and it closed the k=5 gap completely.
+
+That changes the shape of the certificate: **ship only the facts that are expensive to re-derive,
+and let the checker regenerate the cheap bottom of the DAG.** It also means the right definition
+of the certificate is the sub-DAG *reachable from the sixteen roots*, not the whole log —
+`radio_verify` now takes a target mask so a run can verify one log's facts against every log as
+database.
+
+### Cost, honestly
+
+Verification is not cheap and I have retracted the claim that it is cheaper than the proof
+(see `certificate.md`). k=4 of the k=9 ladder is 91 s for 216,580 facts and 1.42 G nodes, against
+1,521 s for the whole `Sa(113)` solve. The k=7 level of `Sa(193)` — 3.1 M facts at P=4 with ~558
+options per part — is the term that decides feasibility and was still running when this entry was
+written.

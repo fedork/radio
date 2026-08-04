@@ -166,12 +166,44 @@ See [aws-run.md](aws-run.md) and the 2026-08-04 journal entry.
 
 ## The Sa(193) certificate
 
-Design in [certificate.md](certificate.md), nothing built yet. The object is sixteen k=9
-refutations; the certificate is the set of refuted facts (the existing `parse_out.sh` format plus
-a provenance header), verified level by level in `k`. Estimated order 2-6 GB shipped once dominance breadcrumbs are counted, and
-`radio_allsol.c` is already most of the `SPLITS` checker. The one real problem is that the
-solver's cache materialises the upward closure, so the log is **not closed** — three options,
-decided by measurement not preference.
+Design in [certificate.md](certificate.md). The object is sixteen k=9 refutations; the certificate
+is the set of refuted negative facts in the existing `parse_out.sh` format plus a provenance
+header, verified level by level in `k`.
+
+**Built and working: `radio_verify.c`.** An independent checker sharing no code with the solver.
+It verifies the whole `Sa(113)` k=9 ladder — 304,105 negative facts across k=2..8 — with **0
+unverified**, single-threaded. Trust base is three theorems plus the split semantics; ~700 lines.
+
+**The 2023 corpus is nearly a certificate already, and the gap is localised.** `sa193-2023`
+contains all sixteen `can't solve Sb(n1:193-n1) in 9`. Checked top-down against itself plus the
+2026 `out_k8.txt`:
+
+- **k=9: each of the sixteen fails on exactly ONE split** — 32 recursion nodes total. The survivor
+  is always the near-balanced one, and it needs a single two-part k=8 fact: for `Sb(112:81)` that is
+  **`Sb(74:40, 41:38)` at k=8**, which nothing among the 1,879 logged 2023 k=8 facts dominates.
+- **k=4: 940 facts, 0 unverified. k=5: 4,859 of 4,859 sampled, 0 unverified.**
+- k=7 — 3.1 M facts, P=4, ~558 options per part — is the term that decides feasibility. Not yet
+  measured to completion.
+
+So the question is no longer "re-run 47 days"; it is "prove sixteen k=8 two-part states and check
+the rest". See the 2026-08-04 journal entry.
+
+Two design claims that stood here are **withdrawn**:
+
+- *"The log is not closed."* Qualified, not withdrawn: **a cold single-session run is closed; a
+  resumed run is not.** The k=9 ladder (one cold session) verifies at 0 unverified. The 2023
+  `Sa(193)` run was resumed for months from warm caches whose logs were not archived, so ~5% of its
+  k=5 facts and all sixteen of its k=9 facts cite children that were never logged. **Constraint on
+  the re-run: keep every session's output, or start cold and never resume.** The fix is not
+  breadcrumbs but **on-demand derivation** — the checker proves cheap missing facts itself, which
+  closed the k=5 gap completely and shrinks the artifact to facts that are expensive to re-derive.
+- *"Verification is cheaper than the proof."* It is not — removing search removes constant
+  factors, not the enumeration. k=4's 216,580 facts cost 91 s against 1,521 s for the whole
+  `Sa(113)` solve. The value is the trust base, arbitrary parallelism, one-level memory
+  residency, and spot-checkability.
+
+The open question is how `SPLITS` cost scales with **part count**, not fact count: ~4.5x per added
+part, with 93% of nodes in 6- and 7-part facts. That exponent sizes the `MAX_N=193` run.
 
 ## Immediate next steps
 
