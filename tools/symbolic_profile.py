@@ -572,7 +572,25 @@ def cmd_construct(argv) -> int:
     return 0
 
 
+def cmd_teststate(argv) -> int:
+    """teststate <d> <c>:<profile> [<c>:<profile> ...] -- feasibility of one node's state.
+
+    Lets a known split be pinned from outside and the residual subproblems checked
+    separately, which is far cheaper than searching the whole tree."""
+    d = int(argv[0])
+    raw = [x.split(":") for x in argv[1:]]
+    nlet = max(4, max(len(parse_profile(pr)) for _, pr in raw))
+    solver = Solver(nlet)
+    parts = tuple((int(c), tuple(parse_profile(pr))
+                   + (0,) * (nlet - len(parse_profile(pr)))) for c, pr in raw)
+    label = " + ".join(f"{c}x[{as_string(v)}]" for c, v in parts)
+    ok = solver.feasible(solver.norm(parts), d)
+    print(f"d={d}  {label}  ->  {'FEASIBLE' if ok else 'infeasible'}")
+    return 0 if ok else 1
+
+
 COMMANDS = {"solve": cmd_solve, "check": cmd_check, "show": cmd_show,
+            "teststate": cmd_teststate,
             "testroot": cmd_testroot, "construct": cmd_construct,
             "witness": cmd_witness, "test": cmd_test, "refine": cmd_refine}
 

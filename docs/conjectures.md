@@ -749,6 +749,71 @@ base-sequence construction this programme was after. Three instances are committ
 `witnesses/symbolic_{1014_3,1006_4,984_5}_at10.tree` and appear in `data/pareto_sb.csv` as the
 first `k = 10` entries in the `Sb` table.
 
+### m = 6: not a search problem, and probably not a compute problem (2026-08-03)
+
+`m=6` resisted every search thrown at it. Rather than widen the search, the descent was
+*pinned* from outside, using the two-part enumeration, and the residue examined. That turned
+out to be decisive about where the difficulty is.
+
+**No counting obstruction exists.** Three necessary conditions were computed exactly from the
+m-side pattern alone (no `n`, no letters), and all pass:
+
+| condition | why | m=6, q=6 |
+|---|---|---|
+| `m·nA(P) <= max occupied nodes` | `A` has multiplicity 1, so every A-play needs its own node | `276 <= 325` |
+| `S_1 <= m(nB+nC+nD)` | at a node with `r` coins, `r-1` play non-`A` | `59 <= 108` |
+| `S_2 <= m(nC+nD)`, `S_4 <= m·nD` | at most 2 coins play `A` or `B`, at most 4 play `A..C` | both pass |
+
+(`S_j = Σ_v max(0, r_v − j)`.) They are tight — 276 of at most 325 occupied nodes must carry an
+`A` — but they do not block. So if `m=6` fails, it fails for a structural reason, not a
+counting one.
+
+**The forced descent lands exactly where the repo already looked.** The root split of
+`Sb(473:6)@9` is unique, and the two-part work fixes the next level too. Instantiating the
+symbolic descent at `k=9` (`t = 3`, so `A=8, B=7, C=4, D=1`) gives
+
+```
+P = A^46 B^12 C^5 D                      -> Sb(473:6)          = n(9,6)
+  out2 Sb(231:2)   out0 Sb(242:4)        = n(8,5), n(8,4) saturated
+  out1 Sb(231:4, 242:2)                  the Mixed-Saturation state
+    out1/out2  Sb(127:2, 110:1)          FEASIBLE
+    out1/out0  Sb(121:3)                 FEASIBLE
+    out1/out1  Sb(110:3, 121:1, 115:2)   <- the whole remaining question
+```
+
+That last state is **already in [`../data/exhaustive_multipart.csv`](../data/exhaustive_multipart.csv)**:
+`Sb(110:3, 115:2, 121:1)` in 7, solvable, with exactly **2 working splits out of 37,700,928** —
+and its neighbour `Sb(111:3, 115:2, 121:1)` is recorded unsolvable. The symbolic model, which
+never sees an `n` or a `k`, reconstructs a state that a 2023 exhaustive enumeration had already
+singled out, sitting one coin away from impossible. Whatever else is true, the model is
+tracking the real extremal structure.
+
+**And the pinned split fails.** A symbolic solution instantiated at `k=9` must use one of those
+two splits (they are mirrors). Translating `[57:2, 52:0, 64:1]` back into letters gives 3 x 3 x 1
+= 9 candidate decompositions — the numeric split does not determine the letters, and different
+letter multisets behave differently at other `t`. **All nine are infeasible.**
+
+So the live hypothesis is that `m=6` has **no symmetric atomic solution**, i.e. the model is
+incomplete for `m=6` rather than merely slow. Supporting it: the only atomic `q=6` witness on
+record, `canon_473_6_at9.tree`, is asymmetric — census `{A:289, B:63, C:20, D:5}`, 377 atoms
+with 7 empty paths, against the `6 x (A^46 B^12 C^5 D)` = `{A:276, B:72, C:30, D:6}` a symmetric
+one would need.
+
+**What is not yet closed**, and should be before this is called settled:
+
+- the second level-2 split family (`alpha+1` instead of `alpha`) was still under test;
+- "exactly 2 working splits" is a 2023-era claim resting on 37.7M *negative* verdicts, from the
+  build with known false negatives. Fine as a guide, not as a proof;
+- the 2023 enumeration of the Mixed-Saturation state itself, `full_231_4_242_2.txt`, **aborted**
+  with `updated == 0 when caching result` — the `MAX_N` trap documented in
+  [tools.md](tools.md#max_n-undersizing-is-silent-found-2026-08-03) — which is why that state
+  never made it into `exhaustive_multipart.csv`. Redoing it on a correctly sized build would
+  close the level-2 case properly.
+
+If the hypothesis holds, the fix is not more compute: it is to let coins carry *different*
+profiles, which costs the `t`-uniformity argument that currently forces symmetry and is the
+next real modelling question.
+
 ### What is assumed
 
 - **Optimality, not achievability, is what rests on assumptions.** Anything the model finds is

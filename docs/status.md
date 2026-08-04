@@ -184,7 +184,14 @@ Do not run `gh auth switch`.
 
 ## Immediate next steps
 
-1. **Decide whether `m = 6` is a compute problem or a modelling one.** The symbolic model only
+1. **Close out `m = 6`, which now looks like a *modelling* limit.** Counting obstructions are
+   ruled out; the descent has been pinned using the two-part enumeration and the pinned split's
+   nine letter decompositions are all infeasible. The live hypothesis is that no *symmetric*
+   atomic solution exists, so the fix is per-coin profiles that differ — not more search.
+   Remaining to check: the second level-2 split family, and a correctly-sized rerun of
+   `full_231_4_242_2` (the 2023 one aborted on the `MAX_N` trap). Detail in
+   [conjectures.md](conjectures.md#m--6-not-a-search-problem-and-probably-not-a-compute-problem-2026-08-03).
+   *(was: decide whether `m = 6` is a compute problem or a modelling one)* The symbolic model only
    produces *symmetric* solutions, and the one atomic `q=6` witness on record
    (`canon_473_6_at9.tree`) is asymmetric with a different census. Roughly 1.5 CPU-hours has
    gone into searching for the symmetric solution without a verdict, so settle the prior

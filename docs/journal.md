@@ -1261,3 +1261,48 @@ realisation, and the model must be extended to per-coin profiles that differ. Di
 these is worth more than more compute on the same search. A cheap first probe: run
 `tools/profile_from_tree.py` over `canon_473_6_at9_twosided.tree` and any other `m=6` solutions
 that can be produced, and see whether *any* of them is symmetric.
+
+
+## 2026-08-03 (m=6, carefully) — where the difficulty actually is
+
+Asked to stop brute-forcing and work it out. The answer: `m=6` is very likely a **modelling**
+limit, not a compute limit. Full write-up in
+[conjectures.md](conjectures.md#m--6-not-a-search-problem-and-probably-not-a-compute-problem-2026-08-03);
+the route is what is worth recording here.
+
+**1. Rule out counting.** Three necessary conditions computable from the m-side pattern alone
+— max occupied nodes vs `m·nA(P)`, and the two multiplicity bounds `S_2 ≤ m(nC+nD)`,
+`S_4 ≤ m·nD` — all pass for `m=6, q=6` (`276 ≤ 325`, etc.), and all were validated against the
+known feasible and infeasible cases first. `/tmp` scripts; cheap enough to redo. So no counting
+argument blocks `m=6`, and none will.
+
+**2. Pin the descent instead of searching it.** The root split of `Sb(473:6)@9` is unique and
+the two-part enumeration fixes the level-2 split, leaving three residual subproblems at `d=4`
+instead of one 64-letter search at `d=6`. Two came back **feasible** in minutes. The third is
+`Sb(110:3, 121:1, 115:2)`.
+
+**3. That state was already in the repo.** `data/exhaustive_multipart.csv` has it: solvable in
+7 with exactly **2 working splits out of 37,700,928**, its `111:3` neighbour unsolvable. The
+symbolic model — no `n`, no `k`, letters only — had reconstructed one of the sixteen states a
+2023 exhaustive run singled out, sitting one coin from impossible. Whatever `m=6` turns out to
+be, the model is tracking the true extremal structure.
+
+**4. The pinned split fails.** A symbolic solution instantiated at `k=9` must use one of those
+two splits. A numeric split does not determine the letters, so `[57:2, 52:0, 64:1]` has 3x3x1 =
+9 letter decompositions. **All nine are infeasible.**
+
+**Cost.** The whole analysis above is minutes. Compare ~1.5 CPU-hours of blind search earlier
+that produced nothing. The lesson is the obvious one and I took too long to apply it: this
+problem has an enormous amount of external structure recorded in the repo, and using it beats
+searching every time.
+
+**Two verifications were still running when the session ended**, both capped: the second
+level-2 split family (`alpha+1`), and `allsplits` on `Sb(231:4,242:2)@8` to confirm at `k=8`
+the four-split pattern established at `k=4,5,6`. Neither changes the picture unless it turns up
+a feasible branch.
+
+**Incidental, and it validates today's other finding:** the 2023 enumeration of the
+Mixed-Saturation state, `full_231_4_242_2.txt` in `trees-2023`, **aborted** with
+`updated == 0 when caching result` — the `MAX_N` trap documented earlier the same day. That is
+why the state is missing from `exhaustive_multipart.csv`. Redoing it on a correctly sized build
+is a small job that would close the level-2 case properly.
