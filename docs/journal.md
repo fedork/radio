@@ -1682,3 +1682,57 @@ product space and still contains ~500 of the 14,584 solutions; `w=1.0` keeps 1/2
 - **Replacing `FAST` with a top-*b* prefix of a linear order.** `FAST` selects a 1-D ridge out
   of a 2-D space (~`n1+1` of `(n1+1)(n2+1)`); a linear rank cannot express that, and matching it
   needs `b ~ n1`, which compounds hopelessly across many parts.
+
+## 2026-08-04 — the balance-line ordering: right geometry, wrong metric, reverted
+
+Implemented an ordering keyed on `|a·m − n·b|` (the mixed-children imbalance) in place of
+`BY_MAGIC3`'s distance-from-midpoint, and reverted it. The geometry is real; the justification
+was not.
+
+### What stands
+
+Winning splits lie on the balance line. Measured over **2,126 winning part-splits from all 15
+witness trees** — five `Sa` targets from k=7 to k=10 plus six canonical trees, produced by
+different solver runs in different eras, so independent of any current ordering:
+
+```
+exactly on the line   32.6%      within 1.0   96.5%
+within 2.19          100.0%      median       0.24
+```
+
+And it is arithmetic, not statistical: the two mixed children have masses `a(m−b)` and
+`(n−a)b`, equal exactly when `a·m = n·b`. That line runs through `(0,0)`, the midpoint, and
+`(n,m)`, which is why the full map's "midpoint winners" and "corner winners" are one structure.
+**This is what `FAST` tests**, and it is the best available explanation of why `FAST` worked.
+
+### Why the ordering change failed
+
+I measured, for each witness split, what fraction of the part's split space a key ranks ahead of
+it. The balance line looked 1.79x better on the mean and moved the 99th percentile from 0.91 to
+0.67.
+
+**That metric was wrong.** The search stops at the *first* winner it reaches, so what matters is
+the rank of the **nearest** winner, not of the one a particular witness happened to use. Under
+that metric, on the 7-part middle child where every solution is known:
+
+| part | nearest-winner rank, midpoint | balance line |
+|---|---|---|
+| 8:6, 7:7, 8:5, 7:4, 15:1, 5:3 | 0.0000 | 0.0000 |
+| 11:4 | 0.0000 | 0.0333 |
+
+`BY_MAGIC3` already places a winner **first** on 7 of 7 parts. There was no headroom, and the
+balance line is strictly worse on one part.
+
+The measurements agree: k=9 ladder 261 s against 256 s, and on the solvable states alone 4%
+worse, with `Sa(111)` going 0.04 s -> 3.00 s and `Sa(110)` 0.06 s -> 1.00 s. Contradiction-clean
+(0 over 128,805 shared verdicts, all nine rungs), so it was correct — just not better.
+
+**Lesson, and it is the general one:** when evaluating a search heuristic, measure the quantity
+the search actually consumes. Rank-of-a-known-good-choice is not that quantity when any of many
+choices will do. Three of my four heuristic proposals this session died on measurement; this one
+died on measuring the wrong thing, which is worse.
+
+### What this does justify
+
+Restoring `FAST` as written. It tests the balance line — the structure the witness data supports
+across 2,126 splits — and it needs no improvement from me.
