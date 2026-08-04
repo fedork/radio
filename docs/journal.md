@@ -1222,5 +1222,25 @@ solutions exist but cannot be described by a `t`-uniform formula.
 Minutes, and no solver compute. `m=3` and `m=4` are seconds; `m=5` at `q=4` took ~7 minutes
 after adding the capacity prune (a part with `c` coins and `v[i]` copies of letter `i` needs
 `c·v[i]` of the `multiplicity(i)·3^d` slots below it) — before that prune it ran 20+ minutes
-without finishing. `m=6` needs `q=5,6`, i.e. 32- and 64-letter profiles; `q=3` and `q=4` are
-confirmed infeasible, the rest is unfinished and is the obvious next job.
+without finishing. `m=6` needs `q=5,6`, i.e. 32- and 64-letter profiles.
+
+**`m=6` status, with costs, so it is not blindly reattempted.** The `BBCD` refinement chain is
+**infeasible at `q=3`, `q=4` and `q=5`** — seconds, ~1 min and ~12 CPU-min respectively. That
+is a third independent confirmation of `q_min(6) = 6`, after the `473:6@9` `target_k` sweep and
+the `46:6@6` / `104:6@7` failures.
+
+`q=6` is a 64-letter profile and **did not resolve**. Two attempts, both stopped at ~30 CPU-min
+with no verdict:
+
+- the plain search, `test 6 6 <64-letter profile>`;
+- `testroot`, forcing the root split the recursion names (`b=2`, `a` worth `n(k-1,5)`). This is
+  the more promising route and it got further: `out2 = Sb(n(k-1,5):2)` and
+  `out0 = Sb(n(k-1,4):4)` both came back **feasible**, leaving only
+  `out1 = Sb(n(k-1,5):4, n(k-1,4):2)` — exactly the Mixed-Saturation state from the two-part
+  thread earlier the same day. So the symbolic model reproduces
+  `n(k,6) = n(k-1,4) + n(k-1,5)` from first principles, including which child saturates, and in
+  both formulations it is the *mixed* child that is expensive.
+
+What would make it tractable: force the split one level further down (`out1`'s own root split
+is also predicted by the two-part work), or persist the `feasible` memo across processes. Do
+not simply rerun the plain search — it has now burned ~30 CPU-min twice for nothing.
