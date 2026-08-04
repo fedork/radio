@@ -185,6 +185,17 @@ typedef struct {
     int hmask;
     int32_t *hslot;          /* open addressing -> index into f, -1 empty */
     uint64_t *hkey;
+    /* Single-part dominance, answered in O(1) instead of by scanning the np=1 bucket.
+       sdom[(n<<8)|m] is 1 iff some ONE-part fact (a:b) with a<=n and b<=m is in this level; by
+       Subgraph Monotonicity that refutes any state having a part (n:m). Built by a 2-D prefix OR
+       over the 1-part facts, so it is exactly equivalent to the scan it replaces.
+
+       This is where the time goes at high k, and it is the opposite of what k=4 suggested. At k=4
+       the direct-mapped memo intercepts 99.996% of queries and the index never runs. At k=7 the
+       memo hits only 74%: a fact there has ~4 parts of mass ~520, so live_get enumerates ~558
+       options per part and issues ~6,700 refutation queries, ~1,700 of which fall through to a
+       bucket scan over a 2.5 M-fact level. The enumeration is 25,700 nodes; the scans were 5 s. */
+    unsigned char *sdom;
 } Level;
 
 static int fact_cmp(const void *A, const void *B) {
@@ -210,6 +221,18 @@ static void level_freeze(Level *L) {
         int s = (int)(h & L->hmask);
         while (L->hslot[s] >= 0) s = (s + 1) & L->hmask;
         L->hslot[s] = i; L->hkey[s] = h;
+    }
+    L->sdom = calloc(NPART, 1);
+    for (i = L->bstart[1]; i < L->bstart[2]; i++)          /* the 1-part facts */
+        L->sdom[(L->f[i].p[0].n << 8) | L->f[i].p[0].m] = 1;
+    { int n, m;                                             /* 2-D prefix OR */
+      for (n = 0; n < 256; n++)
+          for (m = 0; m < 256; m++) {
+              unsigned char v = L->sdom[(n << 8) | m];
+              if (n) v |= L->sdom[((n - 1) << 8) | m];
+              if (m) v |= L->sdom[(n << 8) | (m - 1)];
+              L->sdom[(n << 8) | m] = v;
+          }
     }
 }
 
@@ -297,7 +320,11 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
     if (level_has(L, s)) return 1;
     if (maj_refutes(s, k)) return 1;                 /* MAJ (singleton sub-multiset) */
     int lim = s->np < MAXP ? s->np : MAXP, np, i;    /* DOM */
-    for (np = 1; np <= lim; np++)
+    if (L->sdom) {                                   /* one-part dominance, O(np) */
+        for (i = 0; i < s->np; i++)
+            if (L->sdom[(s->p[i].n << 8) | s->p[i].m]) return 1;
+    }
+    for (np = 2; np <= lim; np++)
         for (i = L->bstart[np]; i < L->bstart[np + 1]; i++) {
             if (L->f[i].mass > s->mass) break;
             if (dominates(&L->f[i], s)) return 1;
@@ -484,7 +511,7 @@ static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part
    Exact confirmation, not hashing alone: the 64-bit rolling hashes only pick the slot. A
    probabilistic match is not acceptable in a checker whose only product is trust. */
 
-static int g_dpen = 1;
+static int g_dpen = 0;      /* measured a net 2.4x loss - see the journal; off by default */
 static int g_diag = 0, g_diag_left, g_srcmask = 0;
 
 #define DPBITS 20

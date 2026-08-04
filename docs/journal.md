@@ -1979,3 +1979,38 @@ Verification is not cheap and I have retracted the claim that it is cheaper than
 1,521 s for the whole `Sa(113)` solve. The k=7 level of `Sa(193)` — 3.1 M facts at P=4 with ~558
 options per part — is the term that decides feasibility and was still running when this entry was
 written.
+
+### Addendum, same day: k=7 is the term that decides feasibility, and it is not yet explained
+
+The `Sa(193)` DAG is 3.1 M facts at k=7 out of ~3.2 M total, so that level *is* the cost. Measured
+on a sample: each k=7 fact enumerates only ~25,700 nodes but takes **~5 s**, i.e. 195 us per node,
+which no enumeration can account for. The memo hit rate there is **74%, not the 99.996% seen at
+k=4** — a k=7 fact has ~4 parts of mass ~520, so `live_get` enumerates ~558 options per part and
+issues ~6,700 refutation queries, ~1,700 of which miss the memo.
+
+So at high k the *index* is hot, exactly the component the k=4 measurement said was irrelevant.
+That is the clearest instance of the small-k trap in this session: the same code path is 0.004% of
+queries at k=4 and 26% at k=7.
+
+**The obvious fix did not work.** I added a per-level 2-D table `sdom[n][m]` — 1 iff some one-part
+fact `(a:b)` with `a<=n, b<=m` is in the level — which answers single-part dominance in O(np)
+instead of scanning the `np=1` bucket, and is exactly equivalent (verified by byte-identical node
+counts, 41,616 at k=3). It made **no measurable difference** to the k=7 rate. So the misses are not
+being served by the `np=1` bucket, and the 5 s per fact is still unexplained. The table is kept
+because it is free and provably equivalent, but it is not the answer.
+
+What this leaves open, in priority order:
+
+1. **Profile one k=7 fact.** 5 s against 25,700 nodes is a 5-order-of-magnitude mismatch; something
+   specific is wrong, and guessing has now failed twice.
+2. **k=6 does not verify at all.** One 8-part fact of mass 687/729 ran 12 minutes without
+   finishing. Its partial children have masses far below `3^5`, so nothing refutes them until deep
+   and the tree is genuinely huge — verification cost mirrors proof cost exactly where the proof
+   was hard. The 2023 k=6 level has only 4,541 facts, sitting between 97 K at k=5 and 3.1 M at k=7,
+   which is itself evidence that most k=6 refutations came from the warm cache and were never
+   logged.
+3. **The sixteen k=8 facts.** Independent, parallel, and the whole remaining gap at the top.
+
+Also fixed: the subtree DP was left enabled by default after being measured as a 2.4x loss, which
+silently changed node counts between builds and briefly made the `sdom` change look like a win.
+Defaults now match what the measurements support.
