@@ -1555,3 +1555,66 @@ Checkpointing worked, which is the one part of the design that held. Preserved i
 `s3://radio-sa193-393287594714/run/`: `112_80.cache` (128 MB, **3,100,961 verdicts**) and
 `out_112_80.txt.zst` (43 MB). A relaunch warm-starts from those rather than repeating six hours.
 Instance terminated; spend about $9.
+
+## 2026-08-04 — a saturated 4-group state has exactly ONE solution in 1.2 billion tuples
+
+Full `radio_full` map of `Sb(15:13,19:9,19:8,24:5)` in 6 — a 4-group node lifted from
+`witnesses/sa112_k9_a.tree`, mass 638 against `3^6 = 729`, so ratio **0.875**. 26m34s, complete.
+
+```
+solutions: 2 of 1,209,600,000 tuples   =  1.65e-9
+  [ 8:7,  8:4,  4:1, 21:5]   -> c2=197  c1=239  c0=202   (cap 243)
+  [ 7:6, 11:5, 15:7,  3:0]   -> the exact global complement of the first
+```
+
+**One solution up to symmetry. Every group's split is forced** — the per-group winning band is
+a single point, not a band. The first solution the systematic sweep reaches is also the tuple
+the witness tree uses, so that tuple was never a free choice.
+
+### Why this matters for search design
+
+At a solvability ratio of 1.65e-9, **no per-group ranking heuristic can find this by ordering
+alone.** Independent per-group preferences have to coincide on the unique winner in all four
+groups simultaneously. What matters is admitting the right *shapes* and then coordinating.
+
+The shapes are not uniform:
+
+| part | mass | winner | midpoint | where |
+|---|---|---|---|---|
+| 15:13 | 195 | 8:7 | 7:6 | **at the midpoint** |
+| 19:9 | 171 | 8:4 | 9:4 | interior, off-centre |
+| 19:8 | 152 | 4:1 | 9:4 | interior, off-centre |
+| 24:5 | 120 | 21:5 | 12:2 | **on the m2 boundary** (b = m) |
+
+The two largest groups sit at or near the diagonal; the smallest sits on the boundary. There is
+an arithmetic reason: `c1 = a(m−b) + (n−a)b` is *maximised* at the midpoint (`c1 = nm/2`), and
+the mixed child's mass is the **sum over groups**. Midpoint-everywhere gives `c1 = 318` against
+a 243 cap — infeasible by 75. So some groups must go extreme to pay for the ones that don't.
+It is a three-way budget allocation across groups, not an independent per-group preference.
+
+The exact statement, one line from AM–GM on `c1 = a(m−b) + (n−a)b` and
+`c2·c0 = ab·(n−a)(m−b)`:
+
+> **`c1 ≥ 2·√(c2·c0)`**, equivalently `√c2 + √c0 ≤ √mass`, with equality exactly on the diagonal.
+
+A group cannot feed both outer children generously without paying the mixed child at least
+their geometric mean. Verified, 0 violations in 300,000 random splits. **Not yet shown to prune
+usefully** — it did not bite on the prefixes tried here.
+
+### Why `FAST` worked, mechanically
+
+`FAST` tested `(m2==0 || cmp(..) <= 0) && (m2==n2 || cmp(..) <= 0)` — a local optimum in the
+`m2` direction, i.e. the ridge where the two mixed children balance. Crucially one clause
+**auto-passes at `m2 = 0` or `m2 = n2`**, so it admits the diagonal *and* the boundary — exactly
+the two shapes this solution needs. That is a much better reason to keep it than "many winners
+are near the diagonal", and it explains why a top-*b* prefix of a linear ordering is **not** a
+substitute: `FAST` selects a 1-D ridge plus edges out of a 2-D space, roughly `n1+1` splits of
+`(n1+1)(n2+1)`, a factor `n2+1` reduction. To match that with a count you would need
+`b ≈ n1`, which compounds hopelessly across many groups.
+
+Any widening should therefore stay in the ridge's geometry (`±d` around the FAST curve), not in
+a linear rank.
+
+**Caveat: this is one state.** "The solution is unique" must not be generalised from n=1. What
+generalises is the arithmetic — mass conservation, the `c1` maximum at the diagonal, and the
+`c1 ≥ 2√(c2 c0)` bound.
