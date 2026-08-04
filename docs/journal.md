@@ -1272,9 +1272,11 @@ the route is what is worth recording here.
 
 **1. Rule out counting.** Three necessary conditions computable from the m-side pattern alone
 — max occupied nodes vs `m·nA(P)`, and the two multiplicity bounds `S_2 ≤ m(nC+nD)`,
-`S_4 ≤ m·nD` — all pass for `m=6, q=6` (`276 ≤ 325`, etc.), and all were validated against the
-known feasible and infeasible cases first. `/tmp` scripts; cheap enough to redo. So no counting
-argument blocks `m=6`, and none will.
+`S_4 ≤ m·nD` — all pass for `m=6, q=6`: 276 A-nodes needed against 325 reachable, crowding
+`(59,16,2)` against limits `(108,36,6)`. Validated against the known feasible and infeasible
+cases first. Committed as `tools/occupancy_bound.py`; `check` reruns the lot in seconds. So no
+counting argument blocks `m=6`, and none will — note it does not refute `AACC@q=2` either, so
+it is genuinely weaker than the search and only useful for ruling things out cheaply.
 
 **2. Pin the descent instead of searching it.** The root split of `Sb(473:6)@9` is unique and
 the two-part enumeration fixes the level-2 split, leaving three residual subproblems at `d=4`
@@ -1296,10 +1298,14 @@ that produced nothing. The lesson is the obvious one and I took too long to appl
 problem has an enormous amount of external structure recorded in the repo, and using it beats
 searching every time.
 
-**Two verifications were still running when the session ended**, both capped: the second
-level-2 split family (`alpha+1`), and `allsplits` on `Sb(231:4,242:2)@8` to confirm at `k=8`
-the four-split pattern established at `k=4,5,6`. Neither changes the picture unless it turns up
-a feasible branch.
+**Two verifications were started and stopped without a verdict**, ~12 CPU-min each: the second
+level-2 split family (`alpha+1` in place of `alpha`), and `allsplits` on `Sb(231:4,242:2)@8` to
+confirm at `k=8` the four-split pattern established at `k=4,5,6`. Both are worth finishing —
+neither changes the picture unless it turns up a feasible branch, but until the second family
+is checked the `m=6` conclusion is a hypothesis rather than a result. To redo: build
+`radio_mixed` with `-DMAX_K=8 -DMAX_N=500` (the default 260 is far too small for a 479-coin
+root) and run `allsplits 8 231 4 242 2`; for the split families, enumerate sub-multisets of
+`A^22 B^6 C^3 D` worth 110 and 111 at `t=3` against `Solver.feasible(..., 4)`.
 
 **Incidental, and it validates today's other finding:** the 2023 enumeration of the
 Mixed-Saturation state, `full_231_4_242_2.txt` in `trees-2023`, **aborted** with
