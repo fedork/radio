@@ -46,6 +46,7 @@ Usage:
 """
 from __future__ import annotations
 
+import os
 import sys
 from functools import lru_cache
 from itertools import product
@@ -87,9 +88,11 @@ def order_key(counts):
 # ------------------------------------------------------------------- the search
 
 class Solver:
-    def __init__(self, nlet: int):
+    def __init__(self, nlet: int, radius: int = 1):
         self.nlet = nlet
         self.zero = (0,) * nlet
+        self._radius = radius
+        self._gfail = set()
 
     @lru_cache(maxsize=None)
     def submultisets(self, v):
@@ -197,6 +200,100 @@ class Solver:
                             k1 + ((c - b, a), (b, rest)), d, n2, n0, n1):
                 return True
         return False
+
+    # ------------------------------------------------ greedy routing (see cmd_construct)
+
+    def load(self, dem, d):
+        """How full the fullest letter class of a child is, as a fraction of capacity."""
+        room = 3 ** d
+        return max((dem[i] / (multiplicity(i) * room) for i in range(self.nlet)
+                    if dem[i]), default=0.0)
+
+    def near_balanced(self, v, radius):
+        """Sub-multisets of `v` that halve each letter count to within `radius`.
+
+        Enumerating every sub-multiset is what makes q=6 hopeless -- a 64-letter profile has
+        7332 of them, per part, per node. Since the load being routed is conserved, the
+        splits worth trying are the ones that halve it, so only those are generated."""
+        rng = []
+        for x in v:
+            lo, hi = max(0, x // 2 - radius), min(x, (x + 1) // 2 + radius)
+            rng.append(range(lo, hi + 1))
+        return [tuple(c) for c in product(*rng)]
+
+    def greedy_options(self, parts, i, dem2, dem0, dem1, d, radius):
+        c, v = parts[i]
+        cap, room = 1 << (d - 1), 3 ** (d - 1)
+        lim = [multiplicity(j) * room for j in range(self.nlet)]
+        out = []
+        for a in self.near_balanced(v, radius):
+            rest = self.sub(v, a)
+            sa, sr = sum(a), sum(rest)
+            for b in range(c + 1):
+                if b and sa and (b > cap or sa > cap):
+                    continue
+                if (c - b) and sr and (c - b > cap or sr > cap):
+                    continue
+                n2 = self._add(dem2, b, a, lim)
+                if n2 is None:
+                    continue
+                n0 = self._add(dem0, c - b, rest, lim)
+                if n0 is None:
+                    continue
+                mid = self._add(dem1, c - b, a, lim)
+                if mid is None:
+                    continue
+                n1 = self._add(mid, b, rest, lim)
+                if n1 is None:
+                    continue
+                out.append((b, a, rest, n2, n0, n1))
+        return out
+
+    def greedy(self, parts, d, width):
+        """Depth-first over the `width` most balanced splits per part.
+
+        A split conserves each letter's demand exactly -- part (c,v) hands its children
+        c*v[i] copies of letter i in total, always -- so getting a profile placed is a
+        question of routing a fixed load down the ternary tree without overfilling any
+        node, not of searching for a lucky arrangement. Balancing the load at every step
+        is therefore the natural move, and it finds in seconds what exhaustive search
+        does not finish. One-sided: it can confirm feasibility, never refute it."""
+        parts = self.norm(parts)
+        if not parts:
+            return ()
+        if d == 0:
+            return () if self.leaf_ok(parts) else None
+        key = (parts, d)
+        if key in self._gfail:
+            return None
+        got = self._greedy(parts, 0, (), (), (), d, self.zero, self.zero, self.zero,
+                           (), width)
+        if got is None:
+            self._gfail.add(key)          # same dead state recurs constantly
+        return got
+
+    def _greedy(self, parts, i, k2, k0, k1, d, dem2, dem0, dem1, choices, width):
+        if i == len(parts):
+            sub = []
+            for kp in (k2, k1, k0):
+                got = self.greedy(kp, d - 1, width)
+                if got is None:
+                    return None
+                sub.append(got)
+            return (choices, sub)
+        c, _ = parts[i]
+        opts = self.greedy_options(parts, i, dem2, dem0, dem1, d, self._radius)
+        # most balanced first: keep the fullest child as empty as possible
+        opts.sort(key=lambda o: (max(self.load(o[3], d - 1), self.load(o[4], d - 1),
+                                     self.load(o[5], d - 1)),
+                                 abs(2 * o[0] - c)))
+        for b, a, rest, n2, n0, n1 in opts[:width]:
+            got = self._greedy(parts, i + 1, k2 + ((b, a),), k0 + ((c - b, rest),),
+                               k1 + ((c - b, a), (b, rest)), d, n2, n0, n1,
+                               choices + ((b, a),), width)
+            if got is not None:
+                return got
+        return None
 
     def build(self, parts, d):
         """The tree behind a `feasible` verdict, as nested choices. Cheap: `feasible` is
@@ -424,8 +521,59 @@ def cmd_testroot(argv) -> int:
     return 0 if ok else 1
 
 
+def greedy_tree(node, parts_at, solver):
+    """Turn the greedy result into the same nested form `build` returns."""
+    parts = solver.norm(parts_at)
+    if not parts:
+        return ("nil",)
+    if node == ():
+        return ("leaf", parts)
+    choices, subs = node
+    kids = [[], [], []]
+    for (c, v), (b, a) in zip(parts, choices):
+        rest = solver.sub(v, a)
+        kids[0].append((b, a))
+        kids[1] += [(c - b, a), (b, rest)]
+        kids[2].append((c - b, rest))
+    return ("split", parts, choices,
+            [greedy_tree(subs[0], tuple(kids[0]), solver),
+             greedy_tree(subs[1], tuple(kids[1]), solver),
+             greedy_tree(subs[2], tuple(kids[2]), solver)])
+
+
+def cmd_construct(argv) -> int:
+    """construct <m> <q> <profile> [width] [k] -- greedy routing, then emit a witness."""
+    m, q, prof = int(argv[0]), int(argv[1]), argv[2]
+    width = int(argv[3]) if len(argv) > 3 else 4
+    radius = int(os.environ.get("SP_RADIUS", "1"))
+    solver = Solver(max(4, len(parse_profile(prof))), radius)
+    counts = tuple(parse_profile(prof))
+    counts += (0,) * (solver.nlet - len(counts))
+    root = ((m, counts),)
+    got = solver.greedy(root, q, width)
+    if got is None:
+        print(f"m={m} q={q} {as_string(counts)}: greedy(width={width} radius={radius}) found nothing "
+              f"(this does not mean infeasible)")
+        return 1
+    print(f"m={m} q={q} {as_string(counts)}: CONSTRUCTED (greedy width={width} radius={radius})")
+    print(f"   n(k,{m}) = {formula(counts, q)}")
+    if len(argv) > 4:
+        k = int(argv[4])
+        out = [f"# Symbolic profile solution for Sb({evaluate(counts, q, k)}:{m}) in {k}, "
+               f"profile {as_string(counts)} at q={q} (t={k - q}).",
+               f"# Built by tools/symbolic_profile.py construct {m} {q} "
+               f"{as_string(counts)} {width} {k} -- greedy load routing, not search.",
+               f"# n(k,{m}) = {formula(counts, q)}",
+               "# format  : indented '<state> @k --[split]-->' / "
+               "'<state> @k [canonical U_k]'",
+               "# checked : tools/check_witness.py", "#"]
+        render(greedy_tree(got, root, solver), k - q, k, out, 0)
+        open(argv[5] if len(argv) > 5 else "/dev/stdout", "w").write("\n".join(out) + "\n")
+    return 0
+
+
 COMMANDS = {"solve": cmd_solve, "check": cmd_check, "show": cmd_show,
-            "testroot": cmd_testroot,
+            "testroot": cmd_testroot, "construct": cmd_construct,
             "witness": cmd_witness, "test": cmd_test, "refine": cmd_refine}
 
 
