@@ -1440,3 +1440,55 @@ established. Validated against the proven k=6 column: **18 of 18 cells exact**.
 
 This is now the standard heavy benchmark: a well-defined workload with a known answer for
 k <= 8, long enough that deadlines actually engage.
+
+## 2026-08-04 — the Sa(193) run is on AWS; deadlines removed
+
+### Deadlines are gone
+
+Hitting a budget now bumps it rather than returning `MAYBE`, so a full `canSolveB` call always
+answers `TRUE` or `FALSE` exhaustively and `MAYBE` survives only as the cache-probe "unknown".
+That is the property a certified negative needs, and for runs built this way it retires the
+"absence of a can't-solve line is not a verdict" trap.
+
+This is about the guarantee, not speed — the machinery fired **once in 358,000 verdicts** on a
+k=8 Pareto walk. And precisely because it never fires on the Sa ladder, the k=9 ladder output
+is **byte-identical** to the deterministic baseline (154,337 lines), which is an exact
+regression test rather than a contradiction audit. k=6 frontier still reproduces its proven
+column, 18/18.
+
+External bounds (`tools/capped_run.sh`) now replace deadlines for runaway protection.
+
+### k=8 Pareto walk as the new heavy benchmark
+
+40 minutes resolved **9 frontier cells (m = 47..55) with 0 mismatches** against the proven
+column. That is stronger correctness evidence than the Sa ladder's nine rungs, and it is the
+workload where deadlines actually engaged.
+
+### The run
+
+`Sb(112:80)` then `Sb(112:81)`, both in 9, on `r7iz.4xlarge` in us-west-2. Operational detail —
+how to check, stop and resume — is in [aws-run.md](aws-run.md).
+
+The design decision worth recording: **`Sb(112:80)` runs first as a positive control.** It is
+the `Sa(192)` construction, already proven solvable by verified witness trees. The engine
+changed enormously on 2026-08-03 (5.72x on the ladder, five changes), so a run that cannot
+rediscover a known solution has no business producing a negative. If the control fails the run
+stops itself. It also warm-starts `Sb(112:81)`, which shares most of its substructure.
+
+Two facts that shaped the setup:
+
+- **Graviton is unavailable on this account** — the ARM vCPU quota is 0. `x2gd.2xlarge` would
+  have been half the price for the same 128 GB. The x86 quota is 5000 with ~1372 in use.
+- **AWS is slower than the laptop**: the k=9 ladder is 391 s on `r7iz.4xlarge` against 261 s on
+  the M4 Pro. We are renting RAM, not cores. Worth remembering before assuming a cloud instance
+  speeds anything up.
+
+Checkpointing is the part that mattered. The cache is regenerated from the run's own log every
+10 minutes and pushed to S3, so an interruption costs at most that. A restart re-runs only the
+top-level call — every completed sub-state is a cache hit. Each checkpoint carries a header
+naming build, state and time, and `parse_file` now skips `#` lines: warm-starting a negative
+from `parsed_260.txt` is forbidden, from a run's own output is sound, and the header is what
+makes those two impossible to confuse.
+
+Hard cost bound is the 72 h of `capped_run` caps, about $107, after which the instance
+terminates itself. Tag-filtered AWS Budgets would need cost-allocation tags activated, ~24 h.
