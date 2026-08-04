@@ -397,7 +397,35 @@ def cmd_refine(argv) -> int:
     return 0
 
 
+def cmd_testroot(argv) -> int:
+    """testroot <m> <q> <profile> <b> <a> -- feasibility with the root split forced.
+
+    Cuts the search enormously when the right root split is known from elsewhere. For m=6
+    the recursion n(k,6) = n(k-1,4) + n(k-1,5) names it: b=2 and a worth n(k-1,5)."""
+    m, q, prof, b, aprof = int(argv[0]), int(argv[1]), argv[2], int(argv[3]), argv[4]
+    solver = Solver(4 if m <= 6 else 5)
+    pad = lambda c: tuple(c) + (0,) * (solver.nlet - len(c))
+    P, a = pad(parse_profile(prof)), pad(parse_profile(aprof))
+    rest = solver.sub(P, a)
+    if any(x < 0 for x in rest):
+        print("a is not a sub-multiset of the profile", file=sys.stderr)
+        return 2
+    kids = {"out2": ((b, a),), "out0": ((m - b, rest),),
+            "out1": ((m - b, a), (b, rest))}
+    ok = True
+    for name, kp in kids.items():
+        good = solver.feasible(solver.norm(kp), q - 1)
+        parts = ", ".join(f"{c}x[{as_string(v)}]" for c, v in solver.norm(kp))
+        print(f"  {name}: {parts or 'nil'} -> {'ok' if good else 'INFEASIBLE'}")
+        ok &= good
+        sys.stdout.flush()
+    print(f"m={m} q={q} {as_string(P)} with root split b={b}, a={as_string(a)}: "
+          f"{'FEASIBLE' if ok else 'infeasible'}")
+    return 0 if ok else 1
+
+
 COMMANDS = {"solve": cmd_solve, "check": cmd_check, "show": cmd_show,
+            "testroot": cmd_testroot,
             "witness": cmd_witness, "test": cmd_test, "refine": cmd_refine}
 
 
