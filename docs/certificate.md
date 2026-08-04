@@ -54,10 +54,12 @@ so the provenance header costs nothing.
 | ⇒ facts for that one state | **~43 M** |
 | at ~25 bytes/line | ~1.1 GB raw |
 | union of all sixteen (they share heavily — same 193 coins, which is why the 2023 tail collapsed 1300x on a warm cache) | order 2-4 GB raw |
-| **x6.6 for dominance breadcrumbs** (measured, see below) | **order 2-4 GB shipped** |
-| sorted small integers, `zstd` | **order 300-600 MB shipped** |
+| x6.6 for dominance breadcrumbs (measured, see below) | order 13-26 GB raw |
+| sorted small integers, `zstd` at ~15-25% | **order 2-6 GB shipped** |
 
-Smaller than the raw log of a *single* 2023 state (905 MB).
+For comparison, the 2023 run's raw log for a *single* state was 905 MB, and ~18 GB of that era's
+`out*` was deliberately not archived (see [data.md](data.md)). So this is the same order as
+artefacts the project already handles, but unlike them it is checkable.
 
 ## The reasons, and what checking each costs
 
@@ -121,8 +123,8 @@ Instrumented `checkCache` over the k=8 ladder:
 ```
 
 So the certificate carries **~6.6x the facts the log contains** — the dominance-derived states
-have to be named, because the verifier will encounter them when it re-enumerates splits. Revised
-size: order **2-4 GB shipped** for all sixteen rather than 300-600 MB.
+have to be named, because the verifier will encounter them when it re-enumerates splits. That is
+what the x6.6 row in the size table above accounts for: **order 2-6 GB shipped** for all sixteen.
 
 That ratio is measured at k=8 ladder scale and may differ at `MAX_N=193`; it is the first thing
 to re-measure on a real state.
