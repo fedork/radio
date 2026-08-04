@@ -810,9 +810,26 @@ one would need.
   never made it into `exhaustive_multipart.csv`. Redoing it on a correctly sized build would
   close the level-2 case properly.
 
-If the hypothesis holds, the fix is not more compute: it is to let coins carry *different*
-profiles, which costs the `t`-uniformity argument that currently forces symmetry and is the
-next real modelling question.
+**The fork is three-way, not two-way.** An earlier draft of this section said the fix would be
+to let coins carry different profiles. That is wrong, and the reason matters: symmetry is
+*derived*, not assumed — every coin's total is `n`, and letter-count vectors are linearly
+independent as functions of `t`, so equal totals for all `t` force equal multisets. Asymmetric
+profiles cannot produce a `t`-uniform formula at all. So if no symmetric atomic solution exists:
+
+- **(a) it exists and the search is too weak.** Finish the two open verifications, then
+  quantify: run the greedy constructor downward from the `BBCD` value and find the best profile
+  the class *does* reach. If that is exactly `n(k,6)` the question is closed.
+- **(b) symmetric but *non-atomic*.** The atomic-leaf hypothesis is strictly stronger than weak
+  majorization: `{A, A-2}` is majorized by `G_t` but `A-2 = 2^t - 2` is not a `G_t` entry, so the
+  model cannot express it. A `t`-uniform construction may exist over a wider alphabet of
+  integer-valued functions of `t`. This is the interesting modelling extension and the most
+  likely resolution.
+- **(c) no `t`-uniform construction for `m=6` at all**, in which case the closed form
+  `2^k - k(k-1)/2 - 3` fitting `k = 4..9` is a six-point coincidence. That would be a
+  significant negative result, and it is testable: it predicts `n(10,6) = 976`.
+
+Note (b) and (c) are both consistent with `canon_473_6_at9.tree` being atomic *and* asymmetric —
+an atomic solution existing at one `k` says nothing about a uniform family.
 
 ### What is assumed
 

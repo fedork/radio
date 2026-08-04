@@ -1312,3 +1312,10 @@ Mixed-Saturation state, `full_231_4_242_2.txt` in `trees-2023`, **aborted** with
 `updated == 0 when caching result` — the `MAX_N` trap documented earlier the same day. That is
 why the state is missing from `exhaustive_multipart.csv`. Redoing it on a correctly sized build
 is a small job that would close the level-2 case properly.
+
+**Correction to the same entry.** I first wrote that the fix would be per-coin profiles that
+differ. That is self-contradictory: symmetry is *derived* from wanting one formula for all `t`,
+not assumed, so asymmetric profiles cannot give a scalable construction either. The real
+alternative is a **non-atomic** symmetric construction — weak majorization admits chunks like
+`2^t - 2` that are not `G_t` entries, and the model cannot express them. Three-way fork written
+up in [conjectures.md](conjectures.md#m--6-not-a-search-problem-and-probably-not-a-compute-problem-2026-08-03).
