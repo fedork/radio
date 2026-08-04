@@ -1177,3 +1177,68 @@ weeks. Both are worth attacking, on different timescales:
    it is two dependent touches like dense with 8 keys sharing a cache line. That should get the
    5x on the trie without the 12.6%. This is the change that decides whether k=11 is reachable.
    The naive version measured above is not it.
+
+## 2026-08-03 — the _DESC orderings need not be stored; split-record packing is dead
+
+Two more results on the split tables, one landed and one a measured dead end.
+
+### Landed: derive the _DESC orderings instead of storing them
+
+`indexDesc` materialised each `_DESC` ordering as an exact reversal of its base,
+`ind[DESC][e] == ind[BASE][size-1-e]` — 12 bytes per split for no information. Reversing the
+subscript instead takes the stored index arrays from seven to **four**.
+
+The naive form cost **+3.4%** on the k=8 ladder, because resolving base-and-direction through
+two lookup tables ran on every one of ~108M split-loop iterations. The ordering is chosen once
+per level, so hoisting that resolution to the ~8 sites where `splitincr[i]` is assigned — a
+per-level cursor pointer and a +/-1 step — recovers all of it:
+
+| | committed before | DESC-derived | + hoisted |
+|---|---|---|---|
+| k=8 ladder | 0.590 s | 0.610 s (+3.4%) | **0.590 s (0.0%)** |
+| split tables at `MAX_N=193` | 480.9 MB | **390.8 MB (-18.7%)** | 390.8 MB |
+| verdicts / 180 s at `MAX_N=193` | 67,641 | — | 67,552 (noise) |
+
+Validated: k=8 byte-identical to the pre-session engine through `radio.c` (3,639 lines); k=9
+ladder contradiction-free against the committed baseline — 307,632 shared `(state,k)` pairs,
+**0 cross-contradictions**, 0 internal contradictions, all nine rungs correct, 1367 s.
+
+`indexDesc` is deleted; the relationship it encoded now lives in `ORDER_BASE` / `ORDER_REVERSED`.
+
+### Dead end: packing the split record
+
+The next step looked like shrinking `splitsl` from 9 ints (36 B) to ~12 B — `uint16` sbb ids,
+`m1`/`m2` derived from the enumeration index, byte-sized `s[4]`/`s[5]`/`FAST`. That is ~25
+sites in `radiobase.c`, all twelve ordering functions, plus `radio_print.c`.
+
+Before paying for it, the premise was tested in one line — pad `SPLIT_FIELD_COUNT` and see
+whether *larger* records hurt:
+
+| record size | k=8 ladder | verdicts / 150 s at `MAX_N=193` |
+|---|---|---|
+| 36 B (9 ints, current) | 0.590 s | 62,441 |
+| 48 B (12 ints) | 0.590 s | — |
+| 64 B (16 ints) | 0.580 s | 62,524 (**1.001x**) |
+
+A 1.78x larger record is **not slower at either scale**. So there is no speed case for packing.
+The reason, in hindsight: `splitsl[spi2]` is random *within one sbb's split array* — 112 KB for
+`Sb(65:46)` — not across the 390 MB of all split tables. The hot working set is a few hundred
+KB and L2-resident at any record size. The 390 MB total is never hot at once.
+
+And the memory case is weak on its own terms: split tables **saturate** near 1.4 GB at the
+current layout, which is within the budget. **Do not pack the split record.**
+
+### Where the remaining upside is
+
+1. **Sparse trie nodes with a packed single-block layout** — header, `uint16` keys and children
+   in *one* allocation, so it is two dependent touches like dense with ~8 keys sharing a cache
+   line. The naive vector version measured earlier cost 12.6%; this is the version worth
+   trying, and it is the only change that addresses the trie's unbounded growth toward 90 GB.
+2. **The pairs-bound test** — it rejects ~89% of 84M candidates one at a time, while the
+   orderings are already sorted by child pairs, so it should be a precomputed cut position.
+
+### Method note
+
+Both of today's dead ends (sparse vectors, record packing) were killed by a cheap probe before
+the invasive change was written. The padding probe in particular is one `sed` against
+`SPLIT_FIELD_COUNT`. Reach for the one-line falsification first.

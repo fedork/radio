@@ -62,6 +62,30 @@ typedef struct {
     int *ind[INDEX_COUNT];
 } splits;
 
+// The three _DESC orderings were materialised by indexDesc as exact reversals of their
+// bases: ind[DESC][e] == ind[BASE][size-1-e]. Storing them cost 12 bytes per split for no
+// information. Reverse the subscript instead; only four arrays are now allocated.
+static const unsigned char ORDER_BASE[INDEX_COUNT] = {
+    [BY_MAGIC] = BY_MAGIC, [BY_MAX] = BY_MAX, [BY_MAGIC2] = BY_MAGIC2,
+    [BY_MAGIC3] = BY_MAGIC3,
+    [BY_SP0] = BY_SP0, [BY_SP1] = BY_SP1, [BY_SP2] = BY_SP2,
+    [BY_SP0_DESC] = BY_SP0, [BY_SP1_DESC] = BY_SP1, [BY_SP2_DESC] = BY_SP2,
+};
+static const unsigned char ORDER_REVERSED[INDEX_COUNT] = {
+    [BY_SP0_DESC] = 1, [BY_SP1_DESC] = 1, [BY_SP2_DESC] = 1,
+};
+
+/* The ordering is chosen once per level, so resolve base/direction there rather than on
+   every one of the ~108M split-loop iterations. `ordp` points at the first element in
+   iteration order and `ords` is the step, so the lookup is a single indexed load. */
+#define HOIST_ORDER(lvl) do {                                                        \
+    int _o = splitincr[lvl];                                                         \
+    int _rev = ORDER_REVERSED[_o];                                                   \
+    ordp[lvl] = splitsarr[lvl]->ind[ORDER_BASE[_o]] +                                \
+                (_rev ? splitsarr[lvl]->size - 1 : 0);                               \
+    ords[lvl] = _rev ? -1 : 1;                                                       \
+} while (0)
+
 int power3[MAX_K+1];
 int n_to_sbb[MAX_N+1][MAX_N/2 + 1];
 int sbb_to_n1[MAX_SBB+1];
@@ -591,6 +615,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     long long totalsplits;
     int skiptop;
     int splitincr[size];
+    int *ordp[size];
+    int ords[size];
     int splitindex[size];
     splits *splitsarr[size];
     int spi, spi2;
@@ -688,6 +714,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         
         memset(splitindex, 0, size * sizeof(int));
         splitindex[0] = splitsarr[0]->size;
+        HOIST_ORDER(0);
         
 #ifdef DEBUG1
         clock_t t = clock();
@@ -752,14 +779,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             }
             if (!cont) break;
             spi = --splitindex[i];
-            spi2 = splitsarr[i]->ind[splitincr[i]][spi];
+            spi2 = ordp[i][ords[i] * spi];
             
             debug_printf("i=%d, spi=%d, spi2=%d\n", i, spi, spi2);
             
             // for identical groups avoid trying redundant permutations
             if (i>1 && tmp[i] == tmp[i-1]) { // do not do this for i==1 because it conflicts with skiptop
                 int spi_1 = splitindex[i-1];
-                int spi2_1 = splitsarr[i-1]->ind[splitincr[i-1]][spi_1];
+                int spi2_1 = ordp[i-1][ords[i-1] * spi_1];
                 if (spi2 > spi2_1) {
                     debug_printf("skip permutations\n");
                     continue;
@@ -911,6 +938,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     }
                                 }
                             }
+                            HOIST_ORDER(i);
                         }
                     }
                 }
@@ -927,7 +955,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printf(" in %d with [",k);
         for (i = 0; i<size; i++) {
             spi = splitindex[i];
-            spi2 = splitsarr[i]->ind[splitincr[i]][spi];
+            spi2 = ordp[i][ords[i] * spi];
             int *s = splitsarr[i]->splitsl[spi2];
             if (i>0) printf(",");
             printf("%d:%d", s[6], s[7]);
@@ -1126,15 +1154,6 @@ void indexSpl(int sbb, splits* s, int indexindex, int (*f)(int, int[])) {
     free(splitsort);
 }
 
-void indexDesc(splits* s, int indexSource, int indexDest) {
-    int e;
-    int c = s->size;
-    for(e = 0; e<c; e++) {
-        s->ind[indexDest][e] = s->ind[indexSource][c - 1 - e];
-    }
-}
-
-
 int maxpairsraw(int sbb, int spl[]) {
     return max(sb_pairs[spl[0]], max(sb_pairs[spl[3]], sb_pairs[spl[1]] + sb_pairs[spl[2]]));
 }
@@ -1254,9 +1273,7 @@ void ensure_splits(int sbb) {
     // were still being built and indexed for every sbb. Skipping them drops 3 of 10 index
     // arrays - measured 2026-08-03 at MAX_N=193: split tables 570.2 MB -> 480.9 MB, with
     // throughput unchanged. Re-admit one here if you re-enable it above.
-    static const int live_orderings[] = {
-        BY_SP0, BY_SP1, BY_SP2, BY_SP0_DESC, BY_SP1_DESC, BY_SP2_DESC, BY_MAGIC3
-    };
+    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3 };
     for (ii = 0; ii < INDEX_COUNT; ii++) s->ind[ii] = NULL;
     for (ii = 0; ii < (int)(sizeof(live_orderings)/sizeof(live_orderings[0])); ii++) {
         int which = live_orderings[ii];
@@ -1288,11 +1305,8 @@ void ensure_splits(int sbb) {
     }
     s->size = c;
     indexSpl(sbb, s, BY_SP0, pairs0);
-    indexDesc(s, BY_SP0, BY_SP0_DESC);
     indexSpl(sbb, s, BY_SP1, pairs1);
-    indexDesc(s, BY_SP1, BY_SP1_DESC);
     indexSpl(sbb, s, BY_SP2, pairs2);
-    indexDesc(s, BY_SP2, BY_SP2_DESC);
     indexSpl(sbb, s, BY_MAGIC3, magic3);
 }
 
