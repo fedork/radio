@@ -96,6 +96,17 @@ status() {
             sline = $0
             sub(/^still solving in [0-9]+ /, "", sline)
             sub(/ trying .*elapsed /, "  elapsed ", sline)
+            # An "elapsed X/Y" with Y barely above X is NOT a budget about to expire. On pass 2 every
+            # descendant is given NO_DEADLINE (radiobase.c: child_deadline = pass<2 ? deadline :
+            # NO_DEADLINE), and such a node does not return MAYBE when it passes its deadline - it
+            # sets deadline = now + 10s and continues, forever. So Y tracks X at a fixed ~10s offset
+            # and the node runs until it concludes. Saying "99.7% of budget used" about that is
+            # exactly backwards: nothing is going to stop it.
+            if (match(sline, /elapsed [0-9]+\/[0-9]+/)) {
+                ef = substr(sline, RSTART + 8, RLENGTH - 8)
+                split(ef, ep, "/")
+                if (ep[2] - ep[1] <= 12) sub(/elapsed [0-9]+\/[0-9]+/, "elapsed " ef " (no deadline: auto-extends)", sline)
+            }
             still[sk] = sline; stillnr[sk] = NR
         }
         { nr = NR }
@@ -151,7 +162,8 @@ status() {
         "$(grep -m1 'result CONTROL' "$LOG" 2>/dev/null || echo 'not yet reported')"
     printf '\n  latest activity per level, from the level the search is on (k=%s) up to the root\n' \
         "$(awk '/^CURK/{print $2}' <<<"$scan")"
-    printf '  (solving: left=<splits remaining>/<total>, elapsed=<used>/<deadline budget>)\n'
+    printf '  (solving: left=<splits remaining>/<total> is the progress; a deadline marked\n'
+    printf '   auto-extends is NOT expiring - pass-2 descendants get NO_DEADLINE and bump it 10s)\n'
     awk '/^ACT/ { k=$2; kind=$3; age=$4; $1=""; $2=""; $3=""; $4=""; sub(/^    /,"")
                   printf "    k=%-2s %-7s %s%s\n", k, kind, $0,
                          (age > 200000 ? "   (stale)" : "") }' <<<"$scan"

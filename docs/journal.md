@@ -2510,12 +2510,25 @@ k=6  Sb(23:6,17:8,16:8,22:4,13:6,17:4,26:2,19:2)[726,193]
                                             elapsed 3963/3973  left=59/168    totalsplits=307871277349
 ```
 
-The k=6 node has enumerated **308 billion** split combinations, is at 99.7% of its deadline budget, and
-has 59 of 168 splits left. Its state is 8 parts at mass **726 against 3^6 = 729** — 99.6% saturated, so
-the counting bound prunes nothing. That is the same pathology recorded on 2026-08-04 (a 13-part k=5 node
-of mass 243 = 3^5 that trapped a run for 43 minutes), and it is exactly what deadlines exist for: it will
-bail with `MAYBE` and be retried with a larger budget rather than sit there. k=7 shows the same shape one
-level up — 1 of 578 splits cleared with 87% of its budget gone.
+The k=6 node has enumerated **308 billion** split combinations on an 8-part state at mass **726 against
+3^6 = 729** — 99.6% saturated, so the counting bound prunes nothing.
+
+**I then misread its deadline, and the correction matters.** I wrote that it was "at 99.7% of its budget"
+and "about to bail with MAYBE" — it is not, and it never will. `radiobase.c:795` gives every descendant
+of a pass-2 node `NO_DEADLINE`:
+
+    clock_t child_deadline = pass<2 ? deadline : NO_DEADLINE;
+
+and a `no_deadline` node that passes its deadline does **not** return `MAYBE`; it sets
+`deadline = t + 10 * CLOCKS_PER_SEC` and continues (line ~950). So the printed `elapsed X/Y` has Y
+tracking X at a fixed ~10 s offset forever, and the node runs until it concludes. The two samples I had
+already collected said so plainly — `3963/3973` then `4231/4241`, gap constant at 10 — and I read a
+constant gap as a nearly-exhausted budget.
+
+The consequence is the opposite of reassuring: **below a pass-2 node there is no deadline protection at
+all.** It is progressing (`left` went 59/168 -> 43/168 in four minutes, so this node should finish in
+~10), but nothing bounds it if it does not. The status now detects the case (Y - X <= 12) and labels it
+`(no deadline: auto-extends)` rather than implying a countdown.
 
 Also note `totalsplits=307871277349` against `k=6`: the saturated multi-part states at k=5-6 are where
 this run will spend its time, which matches the 2026-08-04 finding that realised part count peaks near
