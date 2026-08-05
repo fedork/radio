@@ -70,7 +70,10 @@ while :; do
             --content-type text/plain >/dev/null 2>&1 || true
     fi
 
-    DONE=$(printf '%s\n' "$S" | awk '/top-level states done/ {print $5}')
+    # $4 is the count: the line is "  top-level states done   N of 16", so $5 is the word "of".
+    # Getting this wrong makes DONE a constant, which silently disables every milestone email and
+    # leaves only the heartbeat - the failure is invisible because the heartbeat still arrives.
+    DONE=$(printf '%s\n' "$S" | awk '/top-level states done/ {print $4}')
     NOW=$(date +%s)
 
     # Milestones worth an email: another of the sixteen is done, the control reported, the final
