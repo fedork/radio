@@ -2345,31 +2345,36 @@ faster. For scale, in 2023 `Sb(112:81)` cost 1,337x what `Sb(97:96)` did. Do not
 that ratio — the 1,725,456 s for `Sb(112:81)` includes 12 passes, and the current engine does at
 most 2 — but the run is weeks, not days.
 
-### Pass 1 is nearly pure overhead below k=7
+### Pass 1 / FAST: I measured the wrong thing — retracted the same day
 
-Every one of the 356,433 verdicts in that cold run is a **negative**; pass 1 printed no positive at
-any level. Share of verdicts pass 1 actually resolved:
+I counted the share of verdicts pass 1 *resolved* — 100% at k=8, 26.3% at k=7, then 0.5%, 0.4%, 0.2%
+at k=6, 5, 4 — concluded it was overhead low in the tree, gated it with `FAST_MIN_K=7`, and measured
+4.3x on a progress marker. **That reasoning is wrong and the gate is withdrawn.**
 
-| k | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-|---|---|---|---|---|---|---|---|
-| pass-1 share | 100% | 5.4% | **0.2%** | **0.4%** | **0.5%** | 26.3% | 100% |
+FAST is not a decision procedure whose value is the verdicts it closes. A split is three-way and only
+one child needs refuting; the expensive mistake is grinding toward a refutation on a child that is
+actually *solvable*, exhausting its whole space and finding a solution at the end anyway. FAST exists
+to exhibit one witness cheaply on those children, so the search can spend its exhaustion where
+exhaustion is the only option. A pass-1 success **prevents** work — it does not print a verdict, so
+counting verdicts is blind to precisely the thing it does. That is what the `NOTFAST` annotation is
+about.
 
-Pass 1 earns its keep high in the tree and is close to waste low in it, which is where nearly all the
-verdicts are. `FAST_MIN_K` now gates it (0 = the old unconditional behaviour). With `FAST_MIN_K=7`,
-the same cold `Sb(97:96)` reached **1,258 k=8 verdicts in 10:21 — the count the ungated run needed
-the full 45 minutes to reach**. About **4.3x**, consistent with the 3.84x FAST cost measured on the
-k=9 ladder.
+Two things in my own data say so, both of which I recorded and misread:
 
-This is a heuristic and cannot affect correctness: pass 2 is exhaustive either way. What it can
-affect is whether a *solvable* state is found before a deadline fires, which is exactly the failure
-the FAST restoration was for.
+- **Zero positives printed at any k**, across all 356,433 verdicts. I read that as "pass 1 never did
+  its job". It means the log does not record pass 1 doing its job.
+- **The gated run stalled.** It reached 1,258 k=8 verdicts at 10:21 and was still at exactly 1,258 at
+  45:00. I called that "grinding on something hard". It is what sinking into a solvable branch looks
+  like — the same failure the FAST restoration was for, reproduced by removing FAST again.
 
-### The solvable control is inconclusive, and that is the open question
+So the 4.3x is not a speedup, it is the gated run racing through negatives while losing the ability
+to dispatch solvable children. `FAST_MIN_K` stays in the source with **default 0 — the old
+unconditional behaviour** — because the gate is useful for experiments, and the comment at its
+definition now records why it must not be turned on casually.
 
-`Sb(112:80)` in 9 — solvable, with a verified witness tree — did **not** conclude in 45 minutes cold
-*with* the gate. That is not yet evidence against the gate: no cold ungated time for that state
-exists either, so there is nothing to compare against. Running it. Until that comparison exists,
-**`FAST_MIN_K` stays defaulted to 0** and the gate is not recommended.
+The direction this rules out and the direction it points at: **do not make FAST cheaper by doing less
+of it.** If pass 1 is to be improved, the target is its hit rate on solvable children — finding the
+witness sooner, or recognising sooner that a child is solvable — not skipping it.
 
 Note what this measurement is not: pass-share by k is an artifact of the current ordering, as is
 verdict count. The progress marker used above (k=8 verdicts, the direct children of the k=9 root) is

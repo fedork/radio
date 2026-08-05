@@ -716,16 +716,25 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         // ladder is refutation-dominated, and without this the search sank into single
         // prefixes on solvable states (Sb(112:80) in 9 spent 43 minutes on one k=5 node,
         // clearing 1 of its 52 splits). Do not remove it on a refutation-only benchmark.
-        // Gate measured 2026-08-05 on a COLD Sb(97:96) in 9, 45 minutes, 356,433 verdicts, every
-        // one of them a negative - pass 1 printed no positive at any level. Share of verdicts that
-        // pass 1 resolved: 100% at k=8, 26.3% at k=7, then 0.5% at k=6, 0.4% at k=5, 0.2% at k=4.
-        // So on a refutation workload pass 1 earns its keep high in the tree and is close to pure
-        // overhead low in it, which is where nearly all the verdicts are. FAST_MIN_K skips it below
-        // a level; 0 restores the old unconditional behaviour.
+        // FAST_MIN_K skips pass 1 below a level. Default 0 = unconditional, and LEAVE IT THERE.
         //
-        // This is a heuristic and cannot affect correctness - pass 2 is exhaustive either way. What
-        // it CAN affect is whether a solvable state gets found before a deadline fires, which is why
-        // the k=9 solvable control Sb(112:80) must be re-run whenever this is changed.
+        // 2026-08-05: I gated it at 7 after measuring the share of verdicts pass 1 resolved - 100%
+        // at k=8, 26.3% at k=7, then 0.5%, 0.4%, 0.2% at k=6, 5, 4 - and reported 4.3x. That
+        // reasoning was wrong. FAST's value is not the verdicts it closes. A split is three-way and
+        // only one child needs refuting; the expensive mistake is grinding toward a refutation on a
+        // child that is actually solvable, exhausting it, and finding a solution at the end anyway.
+        // FAST exhibits one witness cheaply on those children so exhaustion is spent where it is the
+        // only option. A pass-1 success PREVENTS work and prints no verdict, so counting verdicts is
+        // blind to what it does - across 356,433 verdicts of that run, pass 1 printed no positive at
+        // any level, which measures the instrument and not the mechanism.
+        //
+        // The gated run showed it: 1,258 k=8 verdicts at 10:21, still exactly 1,258 at 45:00, and
+        // the solvable control Sb(112:80) in 9 never concluded. That is sinking into a solvable
+        // branch - the same failure the 2026-08-04 restoration was for.
+        //
+        // Correctness is not at stake either way (pass 2 is exhaustive). Throughput is, in the
+        // opposite direction to the one I measured. If pass 1 is to be improved, improve its hit
+        // rate on solvable children; do not do less of it.
 #ifndef FAST_MIN_K
 #define FAST_MIN_K 0
 #endif
