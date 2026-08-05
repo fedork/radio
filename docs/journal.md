@@ -2400,3 +2400,22 @@ the cache for `Sa(193)`, since the two share almost everything.
 Monitoring is built around the only honest progress metric: **how many of the sixteen** are done.
 Verdict counts and elapsed time say nothing about remaining work; `Sb(112:81)` alone was 1,337x
 `Sb(97:96)` in 2023. Details in [aws-run.md](aws-run.md).
+
+### The control passed, 2026-08-05
+
+`result CONTROL Sa(192) in 10 = SOLVABLE (2209.1 s)` — the current engine reproduces the known
+`Sa(192)` construction cold at k=10 in 37 minutes. That was the gate on the whole run: anything else
+and `radio_sa193` aborts rather than produce a negative for 193. The run is now on `Sa(193)` itself.
+
+At one hour: 998,682 verdicts, **5.28 GB** resident, `0 of 16`. Memory went 0.53 GB at five minutes to
+5.28 GB at an hour, which looks like the 2023 profile (~90 GB), so **memory exhaustion is the expected
+first failure mode**, not a surprise. `capped_run --rss-gb 110` stops it before the OOM killer does,
+which preserves the hourly checkpoint in S3 and lets the run resume on a larger instance instead of
+losing the work.
+
+Watchdog bug found and fixed live: the milestone count read awk field `$5` of
+`  top-level states done   N of 16`, which is the word "of", so `DONE` was constant and the
+"another one done" emails could never fire — only the 6-hour heartbeat. Worst shape for a monitoring
+bug, since the heartbeat keeps the channel looking healthy. Patched over SSM without touching the
+solver. Also added `tools/sa193_status.sh`, which prints the snapshot's **age**: the watchdog writes
+every ten minutes, so a six-minute-old snapshot is healthy, and I misread exactly that as a hang.
