@@ -3,27 +3,39 @@
 Started 2026-08-03 from commit `69ae856`. This page is the operational handle; the findings go
 to [journal.md](journal.md) as usual.
 
-## What is running
+## Nothing is running
 
-| | |
-|---|---|
-| instance | `i-0b8ca7169585b7cc1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2c, **on-demand** |
-| account | 393287594714 (shared production account — everything is tagged `Project=radio-sa193`) |
-| bucket | `s3://radio-sa193-393287594714/` |
-| IAM | role + instance profile `radio-sa193-ec2`, write access to that one bucket and nothing else |
+The 2026-08-03 run (`i-0b8ca7169585b7cc1`, `r7iz.4xlarge`) **failed and was terminated**. It sank
+43 minutes into a single 13-part k=5 node of mass 243 because deadlines had been removed; that
+change was reverted the same day. Confirmed 2026-08-05: no instance carries the
+`Project=radio-sa193` tag in any state, so nothing is billing.
 
-Two states, in this order:
+## What the next run is for — and it is not the old job
 
-1. **`Sb(112:80)` in 9 — a positive control.** This is the `Sa(192)` construction, already proven
-   solvable by verified witness trees. The engine changed a great deal on 2026-08-03, so if this
-   does not come back `can solve` the run **stops itself** and the negative below is not to be
-   trusted. Cap 12 h.
-2. **`Sb(112:81)` in 9 — the actual question.** One of the sixteen states behind
-   [H3](status.md). Warm-started from the control's own output. Cap 60 h.
+The old plan was to re-prove `Sa(193)` from scratch: sixteen `Sb(n1:193-n1)` at k=9, ~47 days of
+solve time. **That is no longer the job.** The 2023 corpus turns out to be nearly checkable
+(2026-08-04, see [certificate.md](certificate.md)):
 
-The instance terminates itself when done, or when a cap trips. Total cap 72 h, so the run
-cannot cost more than about **$107** whatever happens. That bound *is* the budget guard —
-tag-filtered AWS Budgets need cost-allocation tags activated, which takes ~24 h.
+- all sixteen k=9 facts are present, and each fails on **exactly one split**;
+- the survivor is always the near-balanced one, whose two single-part children are both *solvable*
+  by the proven Pareto table, so each root needs exactly one **two-part k=8 fact** — for
+  `Sb(112:81)` that is `Sb(74:40, 41:38)`;
+- with top-down painting the k=7 level is 16,347 reachable facts, not 3,098,762 — order 100-300
+  core-hours rather than 6.3 core-years.
+
+So the next run has two parts, and they are independent:
+
+1. **Prove the sixteen k=8 two-part facts.** The only genuinely new compute. Sixteen independent
+   jobs, one per root, `radio_one <cache> 8 74 40 41 38` and its fifteen siblings. Cold is
+   hopeless — even the single part `Sb(74:41)` at k=8 does not resolve in 10 minutes — so each
+   needs a warm start. `out_k8.txt` is the right source: 2026-era, audited clean, and the
+   warm-start prohibition is specific to `cache-2025:parsed_260.txt`. **Unsized as of 2026-08-05**;
+   size one before provisioning sixteen.
+2. **Verify the painted sub-DAG.** `radio_verify`, `TOPDOWN=9`, embarrassingly parallel across
+   facts and across levels, so this wants cores rather than the 128 GB the old plan needed.
+
+The instance shape below was chosen for (1)'s memory profile and is still right for it. For (2),
+prefer many vCPUs; the verifier's resident set is one level, not the certificate.
 
 ## Checking on it
 
@@ -70,7 +82,10 @@ confused. Only warm-start from a file that has that header.
 - **r7iz.4xlarge.** The Graviton option (`x2gd`, half the price for the same 128 GB) is
   unavailable: the ARM vCPU quota on this account is **0**. The x86 quota is 5000 with ~1372 in
   use, so there is room to go bigger if memory demands it.
-- **128 GB.** Measured 2.32 KB of trie per insert at this geometry; the 2023 run reached ~90 GB.
+- **128 GB.** For job (1) only. Measured 2.32 KB of trie per insert at this geometry; the 2023 run
+  reached ~90 GB. Note this also bounds how large a warm cache can be loaded: the filtered
+  `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, which at that
+  rate is ~25 GB of trie before the search starts. Filter harder, or size the instance for it.
   The current engine visits about half as many states, so the estimate is 40–60 GB with 90 GB
   pessimistic. `capped_run.sh --rss-gb 110` kills cleanly *before* the OOM killer, so a memory
   overrun preserves the checkpoint instead of losing it — resume on a larger instance.
