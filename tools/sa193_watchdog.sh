@@ -29,6 +29,13 @@ done
 START=$(date +%s)
 LAST_BEAT=0
 LAST_DONE=-1
+LAST_UPLOAD=0
+# A run may span more than one process lifetime. Fixed keys would let segment two overwrite segment
+# one, and segment two CITES facts proved in segment one - losing it recreates the exact defect that
+# makes the 2023 corpus unusable: verdicts whose proofs are gone. So every artifact key carries the
+# segment stamp, and nothing is ever overwritten.
+SEG=${SEG:-$(date -u +%Y%m%dT%H%M%SZ)}
+echo "segment $SEG"
 notify() {   # never let a failed AWS call kill the watchdog - the run matters more than the report
     local subject="$1" body="$2"
     [[ -n "$TOPIC" ]] && aws sns publish --topic-arn "$TOPIC" \
@@ -94,9 +101,10 @@ while :; do
         # Final upload: the raw log is the archival artifact, and its parsed form is the restart
         # checkpoint. Warm-starting a negative from a run's OWN output is sound.
         if [[ -n "$BUCKET" ]]; then
-            zstd -q -19 -c "$LOG" | aws s3 cp - "s3://$BUCKET/run/out_sa193.txt.zst" >/dev/null 2>&1 || true
-            { echo "# radio-cert v1 sa193 cold, generated $(date -u +%FT%TZ)";
-              ./parse_out.sh < "$LOG"; } | aws s3 cp - "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
+            head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -19 -c | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
+            { echo "# radio-cert v1 sa193 cold segment $SEG, final, generated $(date -u +%FT%TZ)";
+              head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } | tee >(aws s3 cp - "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \
+              | aws s3 cp - "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
         fi
         notify "Sa(193): run ended" "$(status)"
         exit 0
@@ -104,10 +112,14 @@ while :; do
 
     # Hourly: stream the log out and refresh the restart checkpoint, so a lost instance costs at
     # most an hour rather than the whole run.
-    if (( (NOW - START) % 3600 < INTERVAL )) && [[ -n "$BUCKET" ]]; then
-        zstd -q -3 -c "$LOG" | aws s3 cp - "s3://$BUCKET/run/out_sa193.txt.zst" >/dev/null 2>&1 || true
-        { echo "# radio-cert v1 sa193 cold, generated $(date -u +%FT%TZ)";
-          ./parse_out.sh < "$LOG"; } | aws s3 cp - "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
+    # Explicit cadence, not (NOW-START) % 3600: iteration times drift by the work done each cycle,
+    # so a modulo window silently skips hours.
+    if (( NOW - LAST_UPLOAD >= 3600 )) && [[ -n "$BUCKET" ]]; then
+        LAST_UPLOAD=$NOW
+        head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -3 -c | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
+        { echo "# radio-cert v1 sa193 cold segment $SEG, generated $(date -u +%FT%TZ)";
+          head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1 || true
+        aws s3 cp "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
     fi
     sleep "$INTERVAL"
 done

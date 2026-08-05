@@ -6,12 +6,19 @@
 #
 #   tools/sa193_launch.sh [--days 7] [--type r7iz.4xlarge] [--dry-run]
 #
-# Cost is bounded by --days: the instance terminates itself when the cap trips, and the run resumes
-# from its own checkpoint in S3. Seven-day increments keep the decision to continue with the human.
+# --days is a BACKSTOP, not a schedule. It defaults to 60 because the point of this run is a single
+# cold session: an interruption makes the log multi-segment, which is only closed if every segment
+# survives, so stopping and resuming is a cost to avoid rather than a checkpoint strategy. Shutdown
+# behaviour is `stop`, not `terminate`, so if the backstop or the memory cap does trip, the EBS volume
+# and the full uncompressed log survive and the instance can simply be started again.
+#
+# The memory cap is the guard that matters. 2023 reached ~90 GB and this run was at 5.28 GB after one
+# hour, so exhaustion is the expected first failure; --rss-gb 110 stops it before the OOM killer,
+# which preserves the checkpoint instead of losing it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DAYS=7 TYPE=r7iz.4xlarge DRY=0
+DAYS=60 TYPE=r7iz.4xlarge DRY=0
 while (( $# )); do
     case "$1" in
         --days) DAYS="$2"; shift 2 ;;
@@ -77,7 +84,7 @@ AMI=$(aws ssm get-parameter \
 aws ec2 run-instances \
   --image-id "$AMI" --instance-type "$TYPE" \
   --iam-instance-profile Name=radio-sa193-ec2 \
-  --instance-initiated-shutdown-behavior terminate \
+  --instance-initiated-shutdown-behavior stop \
   --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=200,VolumeType=gp3,DeleteOnTermination=true}' \
   --user-data "file:///tmp/sa193_userdata.sh" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=radio-sa193},{Key=Name,Value=sa193-cold-$SHA}]" \
