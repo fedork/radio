@@ -3,39 +3,44 @@
 Started 2026-08-03 from commit `69ae856`. This page is the operational handle; the findings go
 to [journal.md](journal.md) as usual.
 
-## Nothing is running
+## What is running
 
-The 2026-08-03 run (`i-0b8ca7169585b7cc1`, `r7iz.4xlarge`) **failed and was terminated**. It sank
-43 minutes into a single 13-part k=5 node of mass 243 because deadlines had been removed; that
-change was reverted the same day. Confirmed 2026-08-05: no instance carries the
-`Project=radio-sa193` tag in any state, so nothing is billing.
+Launched **2026-08-05** from commit `0a468ca`, `tools/sa193_launch.sh --days 7`.
 
-## What the next run is for — and it is not the old job
+| | |
+|---|---|
+| instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
+| what | `radio_sa193`, `MAX_K=10 MAX_N=193` — the `Sa(192)` control, then `canSolveA(193, 10)` |
+| account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
+| bucket | `s3://radio-sa193-393287594714/` |
+| notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
+| cap | 7 days, self-terminating; ~$250 of instance time |
 
-The old plan was to re-prove `Sa(193)` from scratch: sixteen `Sb(n1:193-n1)` at k=9, ~47 days of
-solve time. **That is no longer the job.** The 2023 corpus turns out to be nearly checkable
-(2026-08-04, see [certificate.md](certificate.md)):
+**Serialized on purpose.** One process, one cache, all sixteen top-level states in sequence. Sixteen
+parallel cold jobs would each rebuild the shared low-k work; the 2023 run's later states were only
+affordable because of that reuse.
 
-- all sixteen k=9 facts are present, and each fails on **exactly one split**;
-- the survivor is always the near-balanced one, whose two single-part children are both *solvable*
-  by the proven Pareto table, so each root needs exactly one **two-part k=8 fact** — for
-  `Sb(112:81)` that is `Sb(74:40, 41:38)`;
-- with top-down painting the k=7 level is 16,347 reachable facts, not 3,098,762 — order 100-300
-  core-hours rather than 6.3 core-years.
+The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
+sank 43 minutes into one 13-part k=5 node — and was terminated.
 
-So the next run has two parts, and they are independent:
+### Following it without logging in
 
-1. **Prove the sixteen k=8 two-part facts.** The only genuinely new compute. Sixteen independent
-   jobs, one per root, `radio_one <cache> 8 74 40 41 38` and its fifteen siblings. Cold is
-   hopeless — even the single part `Sb(74:41)` at k=8 does not resolve in 10 minutes — so each
-   needs a warm start. `out_k8.txt` is the right source: 2026-era, audited clean, and the
-   warm-start prohibition is specific to `cache-2025:parsed_260.txt`. **Unsized as of 2026-08-05**;
-   size one before provisioning sixteen.
-2. **Verify the painted sub-DAG.** `radio_verify`, `TOPDOWN=9`, embarrassingly parallel across
-   facts and across levels, so this wants cores rather than the 128 GB the old plan needed.
+`tools/sa193_watchdog.sh` emails on every milestone plus a 6-hour heartbeat. The progress metric is
+the only one that means anything here: `Sa(193)` in 10 is unsolvable **iff all sixteen**
+`Sb(n1:193-n1)` fail in 9, for `n1 = 97..112`, so each is 1/16 of the job and each prints a line.
+Verdict counts and elapsed time are not progress; "3 of 16" is.
 
-The instance shape below was chosen for (1)'s memory profile and is still right for it. For (2),
-prefer many vCPUs; the verifier's resident set is one level, not the certificate.
+Emails fire on: run started, another of the sixteen done, the control reporting, the final answer,
+the solver process dying, and every 6 hours otherwise. Every AWS call in the watchdog is
+failure-tolerant — a broken report must never kill the run.
+
+### Why the control runs first
+
+`radio_sa193` asks `Sa(192)` in 10 before `Sa(193)`, and **aborts** if it does not come back
+solvable. `Sa(192)` has a verified witness tree, so this catches a broken engine before the negative
+is produced — which is not a formality, given the 2023 corpus holds 37 provably false negatives with
+no syntactic marker, and given an engine change trapped the last run. It is also not wasted work:
+`Sa(192)` and `Sa(193)` share almost everything, so the control warms the cache for the real query.
 
 ## Checking on it
 

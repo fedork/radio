@@ -2379,3 +2379,24 @@ witness sooner, or recognising sooner that a child is solvable — not skipping 
 Note what this measurement is not: pass-share by k is an artifact of the current ordering, as is
 verdict count. The progress marker used above (k=8 verdicts, the direct children of the k=9 root) is
 the one quantity here that means the same thing in both builds.
+
+### The run is live
+
+Launched 2026-08-05, `i-0005d74f985c52ae1`, `r7iz.4xlarge`, from `0a468ca`. Serialized: one process,
+one cache, sixteen states in sequence — the parallel design was dropped because sixteen cold jobs
+each rebuild the shared low-k work, and that reuse is why 2023's later states were affordable at all.
+I had been underweighting it.
+
+Also withdrawn: **"memory is free" does not apply to this run.** The 1.36 GB figure was one k=9 state,
+incomplete, at 45 minutes. A serialized process accumulates the shared cache, which is where 2023's
+~90 GB came from, so the 128 GB instance is the right shape after all. Generalising a memory bound
+from a partial single-state run was the error.
+
+Pre-flight before committing instance time: `radio_sa193` builds at `MAX_K=10 MAX_N=193`, starts, and
+reached 288,956 verdicts in 12 minutes locally at 0.38 GB. The `Sa(192)` control did not finish in
+that window, which is expected for a cold k=10 search and is not a problem — the control's work warms
+the cache for `Sa(193)`, since the two share almost everything.
+
+Monitoring is built around the only honest progress metric: **how many of the sixteen** are done.
+Verdict counts and elapsed time say nothing about remaining work; `Sb(112:81)` alone was 1,337x
+`Sb(97:96)` in 2023. Details in [aws-run.md](aws-run.md).
