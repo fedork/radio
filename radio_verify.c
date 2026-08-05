@@ -196,11 +196,58 @@ typedef struct {
        options per part and issues ~6,700 refutation queries, ~1,700 of which fall through to a
        bucket scan over a 2.5 M-fact level. The enumeration is 25,700 nodes; the scans were 5 s. */
     unsigned char *sdom;
+
+    /* Columnar dominance index. A dominance query is an exact orthogonal range query, not a
+       similarity search, so the useful structure is a monotone signature plus a sort order that
+       makes the answer a contiguous range.
+
+       The signature: if f <= s by an injection, then taking f's j largest parts by n, they map to
+       j distinct parts of s each with a larger n, so s has j parts with n >= N_j(f). Hence
+       N_j(f) <= N_j(s) for every j, where N_j is the j-th largest n. The same holds independently
+       for the m sides. Both are NECESSARY, cheap, and false for almost every candidate.
+
+       Layout: two uint64 columns, eight 8-bit lanes each (n and m both fit a byte - the parser
+       rejects anything above 255), so one candidate is a 16-byte read and the test is two
+       vector byte-compares instead of a backtracking match. Facts are sorted by
+       (np, largest n, mass), which turns "np <= np(s) and maxn <= maxn(s)" into a range and keeps
+       the mass break inside each group. */
+    uint64_t *pn, *pm;       /* per fact: N_1..N_8 and M_1..M_8, descending, 0-padded */
+    int *b2;                 /* b2[np * 257 + x] = first index with np and largest-n >= x */
 } Level;
+
+typedef unsigned char u8x8 __attribute__((vector_size(8)));
+
+/* every lane of a <= corresponding lane of b */
+static inline int prof_le(uint64_t a, uint64_t b) {
+    u8x8 va, vb, gt;
+    uint64_t r;
+    memcpy(&va, &a, 8); memcpy(&vb, &b, 8);
+    gt = (u8x8)(va > vb);
+    memcpy(&r, &gt, 8);
+    return r == 0;
+}
+
+/* N_1..N_8 and M_1..M_8, each descending and 0-padded. p[] is sorted by (n desc, m desc), so the
+   n side is already ordered; the m side is not and must be sorted separately. */
+static void prof_of(const Part *p, int np, uint64_t *pn, uint64_t *pm) {
+    unsigned char bn[8] = {0}, bm[8] = {0}, ms[MAXP];
+    int i, j, lim = np < 8 ? np : 8;
+    for (i = 0; i < lim; i++) bn[i] = p[i].n;
+    for (i = 0; i < np; i++) ms[i] = p[i].m;
+    for (i = 1; i < np; i++) {                       /* insertion sort, descending */
+        unsigned char v = ms[i];
+        for (j = i - 1; j >= 0 && ms[j] < v; j--) ms[j + 1] = ms[j];
+        ms[j + 1] = v;
+    }
+    for (i = 0; i < lim; i++) bm[i] = ms[i];
+    memcpy(pn, bn, 8); memcpy(pm, bm, 8);
+}
 
 static int fact_cmp(const void *A, const void *B) {
     const Fact *a = A, *b = B;
     if (a->np != b->np) return a->np - b->np;
+    { int an = a->np ? a->p[0].n : 0, bn = b->np ? b->p[0].n : 0;   /* largest n */
+      if (an != bn) return an - bn; }
     if (a->mass != b->mass) return a->mass - b->mass;
     return memcmp(a->p, b->p, (a->np < b->np ? a->np : b->np) * sizeof(Part));
 }
@@ -221,6 +268,25 @@ static void level_freeze(Level *L) {
         int s = (int)(h & L->hmask);
         while (L->hslot[s] >= 0) s = (s + 1) & L->hmask;
         L->hslot[s] = i; L->hkey[s] = h;
+    }
+    L->pn = malloc((L->n ? L->n : 1) * sizeof(uint64_t));
+    L->pm = malloc((L->n ? L->n : 1) * sizeof(uint64_t));
+    for (i = 0; i < L->n; i++) prof_of(L->f[i].p, L->f[i].np, &L->pn[i], &L->pm[i]);
+    L->b2 = malloc((MAXP + 2) * 257 * sizeof(int));
+    { int np, x;
+      for (np = 0; np <= MAXP + 1; np++)
+          for (x = 0; x <= 256; x++) L->b2[np * 257 + x] = L->bstart[np < MAXP + 1 ? np + 1 : np];
+      for (np = 0; np <= MAXP; np++) {
+          int lo = L->bstart[np], hi = L->bstart[np + 1];
+          for (x = 256; x >= 0; x--) L->b2[np * 257 + x] = hi;
+          for (i = hi - 1; i >= lo; i--) {
+              int an = L->f[i].np ? L->f[i].p[0].n : 0;
+              L->b2[np * 257 + an] = i;
+          }
+          for (x = 255; x >= 0; x--)                       /* first index with largest-n >= x */
+              if (L->b2[np * 257 + x] > L->b2[np * 257 + x + 1])
+                  L->b2[np * 257 + x] = L->b2[np * 257 + x + 1];
+      }
     }
     L->sdom = calloc(NPART, 1);
     for (i = L->bstart[1]; i < L->bstart[2]; i++)          /* the 1-part facts */
@@ -324,11 +390,26 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
         for (i = 0; i < s->np; i++)
             if (L->sdom[(s->p[i].n << 8) | s->p[i].m]) return 1;
     }
-    for (np = 2; np <= lim; np++)
-        for (i = L->bstart[np]; i < L->bstart[np + 1]; i++) {
-            if (L->f[i].mass > s->mass) break;
-            if (dominates(&L->f[i], s)) return 1;
-        }
+    { uint64_t qn, qm;
+      int maxn = s->np ? s->p[0].n : 0;
+      prof_of(s->p, s->np, &qn, &qm);
+      for (np = 2; np <= lim; np++) {
+          /* only facts with largest n <= maxn can inject, so the candidates are the range below
+             b2[np][maxn+1]; mass is ordered inside each largest-n group, so break per group */
+          int end = L->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+          for (i = L->bstart[np]; i < end; i++) {
+              if (L->f[i].mass > s->mass) {          /* skip to the next largest-n group */
+                  int an = L->f[i].p[0].n;
+                  int nxt = L->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+                  if (nxt <= i) break;
+                  i = nxt - 1;
+                  continue;
+              }
+              if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) continue;
+              if (dominates(&L->f[i], s)) return 1;
+          }
+      }
+    }
     /* DERIVE. Nothing in the fact set refutes s, so try to PROVE it instead of citing it: run
        the same SPLITS check on s itself, one level down. This closes the bottom of the DAG
        without anyone having to ship it. It matters because a resumed solver run carries facts in
@@ -655,6 +736,7 @@ static int splits_rec(int i, int s2, int s0, int s1) {
 static int g_fcen = 1, g_fcmin = 3;
 static int g_minp = 0, g_maxp = 999, g_stride = 1, g_mink = 1;
 static long long sel = 0;
+static int g_bench = 0;
 static int g_order = 0;                  /* 0 desc (canonical) 1 asc 2 fewest-options-first */
 static long long np_nodes[MAXP + 1], np_facts[MAXP + 1];
 static Fact g_perm;
@@ -781,6 +863,7 @@ int main(int argc, char **argv) {
     if (argc < 2) { printf("usage: %s <log>[,<log>...] [maxk]\n", argv[0]); return 2; }
     int maxk = argc > 2 ? atoi(argv[2]) : MAXK;
     if (argc > 3) g_order = atoi(argv[3]);
+    { char *e = getenv("BENCH_K"); if (e) g_bench = atoi(e); }
     if (argc > 4) g_fcen = atoi(argv[4]);
     if (argc > 5) g_fcmin = atoi(argv[5]);
     if (argc > 6) g_minp = atoi(argv[6]);
@@ -863,6 +946,32 @@ int main(int argc, char **argv) {
         level_freeze(&L[k]);
     }
 
+    if (g_bench) {
+        /* Isolate the dominance index: issue one refuted() query per fact at level BENCH_K
+           against the level below, in file order, and time it. Same queries for any build, so
+           the difference is the lookup structure and nothing else. */
+        /* The real workload: build the live-split table for every distinct part occurring at
+           level bk. That issues three queries per candidate option against the level below, and
+           those are genuine misses - the states are split children, not logged facts. This is
+           exactly the work a per-(part,k) hint file would replace. */
+        int bk = g_bench, q, j;
+        static unsigned char seen[NPART];
+        long long nparts = 0, nopts = 0;
+        clock_t t0 = clock();
+        for (q = 0; q < L[bk].n; q++)
+            for (j = 0; j < L[bk].f[q].np; j++) {
+                Part pp = L[bk].f[q].p[j];
+                int idx = (pp.n << 8) | pp.m;
+                if (seen[idx]) continue;
+                seen[idx] = 1; nparts++;
+                int cnt; live_get(&L[bk - 1], bk, pp, 0, &cnt);
+                nopts += cnt;
+            }
+        printf("BENCH k=%d: %lld distinct parts, %lld live options, %.3f s (%.1f ms/part)\n",
+               bk, nparts, nopts, (double)(clock() - t0) / CLOCKS_PER_SEC,
+               1e3 * (clock() - t0) / CLOCKS_PER_SEC / (nparts ? nparts : 1));
+        return 0;
+    }
     printf("%3s %10s %10s %8s %9s %14s %8s\n",
            "k", "facts", "verified", "unver", "sec", "nodes", "live");
     long long tot_ver = 0, tot_un = 0, tot_nodes = 0;

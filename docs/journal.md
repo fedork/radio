@@ -2014,3 +2014,89 @@ What this leaves open, in priority order:
 Also fixed: the subtree DP was left enabled by default after being measured as a 2.4x loss, which
 silently changed node counts between builds and briefly made the `sdom` change look like a win.
 Defaults now match what the measurements support.
+
+## 2026-08-04 — hints for the verifier: sound, tiny, and aimed at 0.24 seconds
+
+The proposal was to precompute hints telling the verifier which rule to check for which branch of
+which split, or a statistical priority order. Both halves were measured. Neither is worth building,
+and finding out why finally localised the k=7 cost.
+
+### The statistics are real and the ordering is still wrong
+
+Instrumented over the 2023 k=5 level, testing all three children of every option regardless of
+order: of 9,565 dead options, the mixed child `c1` fires **59.2%** and is the **sole** killer 41% of
+the time, against 17.3% for `c2`. Cheapest-first checks `c1` last, so 41% of dead options pay all
+three checks. Reordering to most-likely-first should save ~1.14x in child-checks.
+
+It loses. On the k=9 ladder at k=4 with derivation off, node counts are **byte-identical**
+(1,418,099,928 both ways — so this is a pure cost measurement) and the time goes **89.9 s -> 101.1 s,
+a 1.12x loss**. `c1` is a two-part state: `canon` and hash over two parts, and dominance with
+`lim=2` scans both the np=1 and np=2 buckets. Frequency of firing is not cost. Same error shape as
+the balance-line ordering — a real statistic optimised against the wrong objective.
+
+**Second, independent reason to keep cheapest-first:** check order determines how much *derivation*
+gets triggered. On the 2023 k=5 level with derivation on, reordering took nodes from 5,582,381 to
+15,238,267 and time from 12.5 s to 32.8 s, because querying `c1` first derives states that
+cheapest-first never asks about — `c2` or `c0` had already killed the option. Derivation is not free
+and the check order gates it.
+
+### Per-(part,k) hints are sound and tiny, and would save a quarter of a second
+
+The right form is not guidance but certification: *this option is dead, child c_i, rule R, witness
+fact N*. The verifier confirms the witness injects componentwise and is present, so hints add no
+trust — LRAT, not DRAT — and, decisively, **the verifier then never has to compute a negative**.
+Options not claimed dead are simply treated as live; under-claiming costs enumeration, never
+soundness. That matters because "not refuted" is the expensive answer: half the memo misses at k=4
+return it.
+
+Volume is small, because hints key on `(part, k)` and there are almost no distinct parts:
+
+| k | distinct parts | part-slots served | reuse |
+|---|---|---|---|
+| 4 | 48 | 6,837 | 142x |
+| 5 | 167 | 513,156 | 3,073x |
+| 6 | 387 | 23,761 | 61x |
+| 7 | **667** | **12,324,390** | **18,477x** |
+| 8 | 497 | 3,758 | 7.6x |
+| 9 | 16 | 16 | 1x |
+
+About 1.8 M option records across all levels, ~15 MB against a certificate sized at 0.3-1 GB.
+
+**And it is pointless.** Benchmarked directly: building the live-split table for *every* distinct
+part at k=7 — 1,444 parts, 249,128 live options — takes **0.24 s for the whole level**, in both the
+old and new builds. Hints replace that 0.24 s. The 18,477x reuse that makes the hint file small is
+exactly what makes the hints unnecessary.
+
+### Where k=7 actually spends its time
+
+Four hypotheses have now failed: live_get table builds (amortise 18,477x), the np=1 dominance
+bucket (indexed, no change), the memo miss rate (74% is dominated by live_get's cheap queries), and
+per-option hints. What the benchmarks *exclude* points at the answer:
+
+`live_get`'s queries are cheap because its children are small — one or two parts, low mass — so the
+`mass > s->mass` break cuts the scan immediately. The expensive queries are the **prefix children
+inside `splits_rec`**: 3-4 parts with mass just under the cap, where the mass break does nothing and
+`lim=4` sweeps the whole 2.38 M-fact `np<=4` range of the k=6 level. Those never appear in a
+live_get benchmark.
+
+Also measured: the k=7 per-fact cost is wildly skewed. Facts early in sort order take ~5 s; three
+facts drawn from across the level did not finish in 590 s, i.e. **~200 s each**. The "5 s per fact"
+figure recorded earlier today is the cheap end of the distribution, not a mean.
+
+### The columnar dominance index
+
+Built anyway, because it is the structure the above diagnosis needs. A dominance query is an exact
+orthogonal range query, so the useful content is a monotone signature plus a sort order that makes
+the answer contiguous:
+
+- **Signature.** If `f <= s`, then f's j largest parts by n map to j distinct parts of s with larger
+  n, so `N_j(f) <= N_j(s)` for every j, and independently `M_j(f) <= M_j(s)`. Necessary, cheap, and
+  false for nearly every candidate. Packed as eight 8-bit lanes in two `uint64` columns, so a
+  candidate is a 16-byte read and two vector byte-compares instead of a backtracking match.
+- **Order.** Facts sorted by `(np, largest n, mass)`, with a per-(np, largest-n) offset table, so
+  `np <= np(s)` and `maxn <= maxn(s)` become a range and the mass break survives inside each group.
+
+Provably equivalent — byte-identical node counts on every regression (167,001 / 41,616 /
+1,418,099,928). Neutral at k=4 (95.0-97.7 s against 95.6-96.2 s for the baseline, within noise),
+which is expected: the memo intercepts 99.996% of queries there, so the index never runs. An A/B on
+hard k=7 facts was still running when this was written.
