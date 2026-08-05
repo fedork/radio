@@ -184,18 +184,31 @@ while :; do
     DONE=$(printf '%s\n' "$S" | awk '/top-level states done/ {print $4}')
     NOW=$(date +%s)
 
-    # Milestones worth an email: another of the sixteen is done, the control reported, the final
-    # answer landed, or the solver died. Plus a heartbeat so silence is never ambiguous.
-    if [[ "$DONE" != "$LAST_DONE" && "$LAST_DONE" != "-1" ]]; then
-        notify "Sa(193): $DONE of 16 done" "$S"
+    # Exactly one email per cycle at most. The previous version sent TWO on every watchdog start:
+    # LAST_BEAT began at 0, so `NOW - LAST_BEAT >= HEARTBEAT` was immediately true and fired the
+    # heartbeat, and then the unconditional LAST_DONE == -1 line fired "run started" as well. With
+    # the watchdog restarted a dozen times to patch it, that was a dozen duplicate pairs.
+    if [[ "$LAST_DONE" == "-1" ]]; then
+        # First cycle of THIS process. Start the heartbeat clock here, and distinguish a genuine
+        # start from a reattach - the solver outlives the watchdog, so most starts are reattaches.
+        LAST_BEAT=$NOW
+        AGE=$(ps -o etimes= -p "$PID" 2>/dev/null | tr -d ' ')
+        [[ "$AGE" =~ ^[0-9]+$ ]] || AGE=0
+        if (( AGE < 2 * INTERVAL )); then
+            notify "Sa(193): run started" "$S"
+        else
+            notify "Sa(193): watchdog reattached, $DONE of 16" "$S"
+        fi
     elif grep -q '^result Sa(193)' "$LOG" 2>/dev/null; then
-        notify "Sa(193): FINISHED" "$S"
-    elif ! kill -0 "$PID" 2>/dev/null; then
-        notify "Sa(193): solver process is GONE" "$S"
+        # Once only. Without the flag this repeats every cycle for as long as the process lives.
+        if [[ -z "${SENT_FINAL:-}" ]]; then SENT_FINAL=1; notify "Sa(193): FINISHED" "$S"; fi
+    elif [[ "$DONE" != "$LAST_DONE" ]]; then
+        notify "Sa(193): $DONE of 16 done" "$S"
     elif (( NOW - LAST_BEAT >= HEARTBEAT )); then
         notify "Sa(193): $DONE of 16, still running" "$S"; LAST_BEAT=$NOW
     fi
-    [[ "$LAST_DONE" == "-1" ]] && { LAST_BEAT=$NOW; notify "Sa(193): run started" "$S"; }
+    # No "solver is GONE" branch: the exit path below already mails "run ended", and having both
+    # meant two emails for one event.
     LAST_DONE="$DONE"
 
     if ! kill -0 "$PID" 2>/dev/null; then
