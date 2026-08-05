@@ -2490,10 +2490,14 @@ match because of backslash escaping, and one of them — raising a truncation li
 because a different change had brought the lines under the old limit. Print the `repr()` of the target
 lines and assert the match, rather than trusting that a replacement landed.
 
-### The stack now shows in-progress states, which is what progress actually looks like
+### The stack shows, per level, whichever is newer: in-progress or completed
 
-Replaced the "last completed verdict per level" stack with the most recent **`still solving`** line per
-level. Those carry what a completed verdict cannot: `left=<remaining>/<total>` splits at that level and
+Final form: for each level, take the **newer** of the most recent `still solving` line and the most
+recent completed verdict, and label which it is. Either can be the informative one — a level mid-search
+wants `left=`/`elapsed=`, a level that just finished wants `took=`/`totalsplits=` — and which is current
+changes as the search moves between levels. Comparing recorded log positions is the only way to know.
+The first version showed only `still solving`, which meant a level that had just completed something
+displayed a line from before it. Those carry what a completed verdict cannot: `left=<remaining>/<total>` splits at that level and
 `elapsed=<used>/<budget>` against the deadline. A completed verdict says only what finished, which at
 high k can be hours stale. Each line also carries how far back in the log it is, so a level the solver
 has not revisited is marked `(stale)` rather than silently misread as current.

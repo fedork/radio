@@ -84,8 +84,7 @@ status() {
                 if (match(rest, / took .*$/)) tail = substr(rest, RSTART)
                 line = head "  [+witness]" tail
             }
-            last[k] = line
-            curk = k               # the level the search is on right now
+            last[k] = line; lastnr[k] = NR
         }
         # "still solving" lines are the real progress signal: they carry left=<remaining>/<total>
         # splits at that level and elapsed=<used>/<budget> against the deadline, so they say how far
@@ -113,10 +112,22 @@ status() {
             # ago, so their "most recent" verdict is stale and placing it would mean scrolling
             # back through the whole log. Higher levels are the enclosing context: the path
             # from where the search is now toward the root.
+            # Per level, take whichever is NEWER: the in-progress line or the completed verdict.
+            # Either can be the more informative one - a level mid-search wants left=/elapsed=, a
+            # level that just finished wants took=/totalsplits= - and which is current changes as the
+            # search moves. Comparing log positions is the only way to know which.
+            best = 0
+            for (k = 12; k >= 1; k--) {
+                sn = (k in stillnr) ? stillnr[k] : 0
+                ln = (k in lastnr)  ? lastnr[k]  : 0
+                if (sn == 0 && ln == 0) continue
+                if (sn >= ln) { pick[k] = still[k]; picknr[k] = sn; kind[k] = "solving" }
+                else          { pick[k] = last[k];  picknr[k] = ln; kind[k] = "done" }
+                if (picknr[k] > best) { best = picknr[k]; curk = k }
+            }
             printf "CURK %d\n", curk + 0
-            for (k = 12; k >= 1; k--) if (k in still)
-                printf "STILL %d %d %s\n", k, nr - stillnr[k], substr(still[k], 1, 200)
-            if (curk in last) printf "LASTONE %d %s\n", curk, substr(last[curk], 1, 220)
+            for (k = 12; k >= curk; k--) if (k in pick)
+                printf "ACT %d %s %d %s\n", k, kind[k], nr - picknr[k], substr(pick[k], 1, 200)
         }' "$LOG" 2>/dev/null)
 
     printf 'Sa(193) cold re-derivation\n'
@@ -138,11 +149,12 @@ status() {
         "$(awk '/^CNT/{printf "k%s:%s  ", $2, $3}' <<<"$scan")"
     printf '  control                 %s\n' \
         "$(grep -m1 'result CONTROL' "$LOG" 2>/dev/null || echo 'not yet reported')"
-    printf '\n  in-progress state at each level (left=<splits remaining>/<total> is the real progress):\n'
-    awk '/^STILL/ { k=$2; age=$3; $1=""; $2=""; $3=""; sub(/^   /,"")
-                    printf "    k=%-2s %s%s\n", k, $0, (age > 200000 ? "   (stale)" : "") }' <<<"$scan"
-    awk '/^LASTONE/ { k=$2; $1=""; $2=""; sub(/^  /,"")
-                      printf "\n    last completed verdict (k=%s): %s\n", k, $0 }' <<<"$scan"
+    printf '\n  latest activity per level, from the level the search is on (k=%s) up to the root\n' \
+        "$(awk '/^CURK/{print $2}' <<<"$scan")"
+    printf '  (solving: left=<splits remaining>/<total>, elapsed=<used>/<deadline budget>)\n'
+    awk '/^ACT/ { k=$2; kind=$3; age=$4; $1=""; $2=""; $3=""; $4=""; sub(/^    /,"")
+                  printf "    k=%-2s %-7s %s%s\n", k, kind, $0,
+                         (age > 200000 ? "   (stale)" : "") }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
 
