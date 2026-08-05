@@ -906,6 +906,7 @@ typedef struct {
     int fc; const uint64_t *row[MAXP][MAXP]; int wj[MAXP];
     Chi s2[MAXP + 1], s0[MAXP + 1], s1[MAXP + 1];
     long long fact_nodes;
+    clock_t fact_t0;              /* a nested derive must not reset the enclosing fact's budget */
 } SaveCtx;
 
 static int g_dderive = 0;                 /* recursion depth, for a sanity bound */
@@ -917,7 +918,7 @@ static int derive(const Fact *s, int k) {
     SaveCtx *c = malloc(sizeof(SaveCtx));
     if (!c) return 0;
     c->below = g_below; c->k = g_k; c->cap = g_cap; c->s = g_s; c->perm = g_perm;
-    c->fc = g_fc; c->fact_nodes = g_fact_nodes;
+    c->fc = g_fc; c->fact_nodes = g_fact_nodes; c->fact_t0 = g_fact_t0;
     memcpy(c->live, g_live, sizeof g_live); memcpy(c->ln, g_ln, sizeof g_ln);
     memcpy(c->last, g_last, sizeof g_last);
     memcpy(c->row, g_row, sizeof g_row);  memcpy(c->wj, g_wj, sizeof g_wj);
@@ -930,7 +931,7 @@ static int derive(const Fact *s, int k) {
     g_dderive--;
 
     g_below = c->below; g_k = c->k; g_cap = c->cap; g_s = c->s; g_perm = c->perm;
-    g_fc = c->fc; g_fact_nodes = c->fact_nodes;
+    g_fc = c->fc; g_fact_nodes = c->fact_nodes; g_fact_t0 = c->fact_t0;
     memcpy(g_live, c->live, sizeof g_live); memcpy(g_ln, c->ln, sizeof g_ln);
     memcpy(g_last, c->last, sizeof g_last);
     memcpy(g_row, c->row, sizeof g_row);  memcpy(g_wj, c->wj, sizeof g_wj);

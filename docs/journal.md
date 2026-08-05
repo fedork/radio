@@ -2283,3 +2283,36 @@ thing being measured:**
 - Painting needs the witness index carried *through* the memos. At k=4, 99.996% of queries are memo
   hits, so a memo that records only the verdict and not which fact produced it leaves nearly every
   citation unpainted — and under-reports silently, which is the failure mode that matters.
+
+## 2026-08-05 — the 2023 corpus cannot be closed by derivation; the sixteen need real compute
+
+Direct test, and it is decisive. Fed `Sb(74:40, 41:38)` — the single k=8 fact `Sb(112:81)` needs —
+to the verifier as a target against the 2023 k=7 level plus `out_k8.txt`:
+
+```
+GAP split 74:40->(23,20) 41:38->(27,26)
+  c2: 27:26 23:20        [1162]
+  c0: 51:20 14:12        [1188]
+  c1: 51:20 27:12 26:14 23:20  [2168]
+verdict: unverified, 227 nodes, 0.01 s
+```
+
+It fails on the **first** split tried, in 227 nodes. Not expensive — **unsupported**. All three
+children are k=7 states absent from the fact set and dominated by nothing in it: two of them 2-part,
+which is exactly the shape the corpus is thin on (6,655 two-part against 3,048,745 four-part).
+
+So the on-demand `derive` path cannot close the gap. Deriving that fact requires k=7 facts that must
+themselves be derived, which require k=6 facts, and so on — the recursion *is* the original search.
+Measured the expensive way first: `TOPDOWN=9` with a derive threshold of 8 ran 25 minutes without
+finishing even the 16-fact k=9 level.
+
+**Consequence for the plan.** The certified-from-2023 route does not avoid new compute; it only
+*localises* it. What the corpus gives is still substantial — the sixteen k=9 facts each reduced to a
+single missing k=8 child, k=4 and k=5 verifying clean, and the k=7 level painted down to 16,347
+reachable facts — but the sixteen k=8 states have to be proved by the solver, warm-started from
+`out_k8.txt` (2026-era, audited clean). That is the AWS job, and it is unsized.
+
+Also fixed: `derive()` restored every global except the per-fact budget clock, so a nested
+derivation reset the enclosing fact's timer and the time budget silently stopped bounding anything.
+That is why a 300 s per-fact cap let one k=9 fact run 1,500 s. Third instance today of the same
+failure shape — an inner mechanism quietly disabling the instrument measuring the outer one.
