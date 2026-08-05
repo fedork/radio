@@ -2100,3 +2100,37 @@ Provably equivalent — byte-identical node counts on every regression (167,001 
 1,418,099,928). Neutral at k=4 (95.0-97.7 s against 95.6-96.2 s for the baseline, within noise),
 which is expected: the memo intercepts 99.996% of queries there, so the index never runs. An A/B on
 hard k=7 facts was still running when this was written.
+
+### Addendum: the columnar index is worth >=8x, and k=7 nodes cost 134 us each
+
+A/B on the same four hard k=7 facts (P=4, drawn from across the level), same database, same flags:
+
+| build | result |
+|---|---|
+| before the index | **TIMEOUT at 2,103 s** |
+| columnar index | **276 s** (258 s of level time, 1,941,651 nodes) |
+
+So **>=8.1x**, a lower bound because the baseline never finished. The memo hit rate on those facts
+is **56.8%**, against 99.996% at k=4 — which is why the index is invisible at low k and decisive
+here, and why "bucketing by part count is irrelevant" was a k=4 artifact.
+
+The absolute number matters more than the ratio. At k=7 the verifier runs at **7,458 nodes/s**
+against roughly **15,000,000 nodes/s at k=4** — a 2,000x difference in *per-node* cost, i.e. ~134 us
+per node, ~45 us per dominance query. Node counts at k=7 are small; the queries are enormous.
+
+Two consequences:
+
+- **A node budget cannot bound k=7 cost.** A 30 M-node cap was never approached in 40 minutes of
+  wall clock. Cost-distribution sampling needs a *time* budget per fact. The cost-histogram run
+  produced nothing for a second reason worth fixing: the histogram prints only in the end-of-level
+  summary, and the level never ends.
+- **The remaining lever is the size of the candidate set, not the code around it.** ~45 us per query
+  is tens of thousands of candidates surviving the range restriction, out of the 2,379,918-fact
+  `np=4` bucket at k=6.
+
+That bucket is 99.85% `out_k8.txt` — 2,520,118 facts from the 77-coin problem against 4,541 from the
+193-coin run — because `out_k8.txt` was merged in to close the `(0,b)` gaps at k=9. It cannot simply
+be dropped: with the 2023 logs alone, the same four k=7 facts fail in 0.76 s with 0 verified. Those
+small-coin facts legitimately dominate 193-coin children. So the fix is not curation but
+**minimalization** — the refuted set is upward-closed, so only the minimal antichain can ever be the
+reason a query succeeds, and everything else is pure scan cost.

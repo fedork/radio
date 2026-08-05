@@ -592,7 +592,9 @@ static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part
    Exact confirmation, not hashing alone: the 64-bit rolling hashes only pick the slot. A
    probabilistic match is not acceptable in a checker whose only product is trust. */
 
-static int g_dpen = 0;      /* measured a net 2.4x loss - see the journal; off by default */
+static int g_dpen = 0;
+static long long g_nodecap = 0;
+static int g_budget_hit = 0;      /* measured a net 2.4x loss - see the journal; off by default */
 static int g_diag = 0, g_diag_left, g_srcmask = 0;
 
 #define DPBITS 20
@@ -656,6 +658,11 @@ static uint64_t g_dom[MAXP + 1][MAXP][FCW];        /* live domain of each group,
 
 static int splits_rec(int i, int s2, int s0, int s1) {
     g_nodes++; g_fact_nodes++;
+    /* Per-fact node budget. Aborting a fact makes its verdict UNKNOWN, never "verified", so this
+       is only ever used to measure the cost distribution - which is the quantity that decides
+       whether a level is feasible, and which a mean cannot express when per-fact costs span four
+       orders of magnitude. */
+    if (g_nodecap && g_fact_nodes > g_nodecap) { g_budget_hit = 1; return 1; }
     DpEnt *dpe = NULL;
     int lo0 = (i && g_s->p[i].n == g_s->p[i - 1].n && g_s->p[i].m == g_s->p[i - 1].m)
               ? g_last[i - 1] + 1 : 0;
@@ -739,6 +746,7 @@ static long long sel = 0;
 static int g_bench = 0;
 static int g_order = 0;                  /* 0 desc (canonical) 1 asc 2 fewest-options-first */
 static long long np_nodes[MAXP + 1], np_facts[MAXP + 1];
+static long long cost_hist[24], cost_sum, budget_out;
 static Fact g_perm;
 
 static int verify(const Level *below, const Fact *s, int k) {
@@ -795,6 +803,7 @@ static int verify(const Level *below, const Fact *s, int k) {
     st2[0].mass = st0[0].mass = st1[0].mass = 0;
     st2[0].h = st0[0].h = st1[0].h = 0;
     g_fact_nodes = 0;
+    g_budget_hit = 0;
     g_diag_left = g_diag;
     dp_gen++;
     int r = splits_rec(0, 0, 0, 0);
@@ -864,6 +873,7 @@ int main(int argc, char **argv) {
     int maxk = argc > 2 ? atoi(argv[2]) : MAXK;
     if (argc > 3) g_order = atoi(argv[3]);
     { char *e = getenv("BENCH_K"); if (e) g_bench = atoi(e); }
+    { char *e = getenv("NODECAP"); if (e) g_nodecap = atoll(e); }
     if (argc > 4) g_fcen = atoi(argv[4]);
     if (argc > 5) g_fcmin = atoi(argv[5]);
     if (argc > 6) g_minp = atoi(argv[6]);
@@ -946,6 +956,48 @@ int main(int argc, char **argv) {
         level_freeze(&L[k]);
     }
 
+    if (getenv("MINIMAL_K")) {
+        /* How much of a level is redundant? The refuted set is upward-closed, so only the minimal
+           antichain carries information for dominance queries: if g <= f and both are present, f
+           can never be the reason a query succeeds that g would not already have answered.
+           Everything non-minimal is pure scan cost. */
+        int mk = atoi(getenv("MINIMAL_K")), q, np, i;
+        long long minimal[MAXP + 2] = {0}, total[MAXP + 2] = {0};
+        clock_t t0 = clock();
+        const Level *L2 = &L[mk];
+        for (q = 0; q < L2->n; q++) {
+            const Fact *f = &L2->f[q];
+            int dominated = 0, lim = f->np < MAXP ? f->np : MAXP;
+            uint64_t qn, qm;
+            int maxn = f->np ? f->p[0].n : 0;
+            prof_of(f->p, f->np, &qn, &qm);
+            for (np = 1; np <= lim && !dominated; np++) {
+                int end = L2->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+                for (i = L2->bstart[np]; i < end; i++) {
+                    if (i == q) continue;                       /* not itself */
+                    if (L2->f[i].mass > f->mass) {
+                        int an = L2->f[i].p[0].n;
+                        int nxt = L2->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+                        if (nxt <= i) break;
+                        i = nxt - 1; continue;
+                    }
+                    if (!prof_le(L2->pn[i], qn) || !prof_le(L2->pm[i], qm)) continue;
+                    if (dominates(&L2->f[i], f)) { dominated = 1; break; }
+                }
+            }
+            total[f->np]++;
+            if (!dominated) minimal[f->np]++;
+        }
+        printf("MINIMALITY of level k=%d (%.1f s)\n", mk, (double)(clock()-t0)/CLOCKS_PER_SEC);
+        { long long tt = 0, mm = 0;
+          for (np = 0; np <= MAXP; np++) if (total[np]) {
+              printf("  np=%-2d  %9lld facts  %9lld minimal  (%.1f%% redundant)\n",
+                     np, total[np], minimal[np], 100.0*(total[np]-minimal[np])/total[np]);
+              tt += total[np]; mm += minimal[np]; }
+          printf("  TOTAL %9lld facts  %9lld minimal  (%.1f%% redundant)\n",
+                 tt, mm, 100.0*(tt-mm)/(tt?tt:1)); }
+        return 0;
+    }
     if (g_bench) {
         /* Isolate the dominance index: issue one refuted() query per fact at level BENCH_K
            against the level below, in file order, and time it. Same queries for any build, so
@@ -994,7 +1046,13 @@ int main(int argc, char **argv) {
             if (L[k].f[i].np < g_minp || L[k].f[i].np > g_maxp) continue;
             if (g_srcmask && !(L[k].f[i].src & g_srcmask)) continue;   /* not a target fact */
             if (g_stride > 1 && (sel++ % g_stride)) continue;
-            if (verify(&L[k - 1], &L[k].f[i], k)) ver++;
+            if (verify(&L[k - 1], &L[k].f[i], k)) {
+                if (g_budget_hit) { budget_out++; }
+                else { ver++;
+                    int b = 0; long long v = g_fact_nodes;
+                    while (v > 1 && b < 23) { v >>= 1; b++; }
+                    cost_hist[b]++; cost_sum += g_fact_nodes; }
+            }
             else { un++; if (un <= 3) {
                 printf("    UNVERIFIED k=%d Sb(", k);
                 int j; for (j = 0; j < L[k].f[i].np; j++)
@@ -1028,6 +1086,13 @@ int main(int argc, char **argv) {
            dp_hit, dp_miss, dp_skip,
            100.0 * dp_hit / (dp_hit + dp_miss ? dp_hit + dp_miss : 1),
            (double)DPSZ * sizeof(DpEnt) / 1e9);
+    { int q; long long done = 0;
+      for (q = 0; q < 24; q++) done += cost_hist[q];
+      printf("COST DISTRIBUTION: %lld completed, %lld exceeded budget (%.1f%%), mean %.0f nodes\n",
+             done, budget_out, 100.0 * budget_out / (done + budget_out ? done + budget_out : 1),
+             (double)cost_sum / (done ? done : 1));
+      for (q = 0; q < 24; q++) if (cost_hist[q])
+          printf("   <=2^%-2d nodes: %lld\n", q, cost_hist[q]); }
     printf("live-split tables: %lld built, %lld reused (%.0fx)\n",
            live_built, live_reused, live_reused / (double)(live_built ? live_built : 1));
     return tot_un ? 1 : 0;
