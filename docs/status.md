@@ -205,23 +205,28 @@ Two design claims that stood here are **withdrawn**:
 ### What the certificate needs next, in order
 
 1. **Prove one of the sixteen k=8 facts** — `./radio_one <cache> 8 74 40 41 38`. The only genuinely
-   new compute on the critical path, and sixteen independent jobs. Cold is hopeless: even the
-   single part `Sb(74:41)` at k=8 does not resolve in 10 minutes. Warm-start from
+   new compute on the critical path, sixteen independent jobs, and **still unsized**. Cold is
+   hopeless: even the single part `Sb(74:41)` at k=8 does not resolve in 10 minutes. Warm-start from
    `k8-2026-05-12:out_k8.txt`, which is 2026-era and audited clean — the warm-start prohibition is
-   specific to `cache-2025:parsed_260.txt` and its sixteen suspect verdicts.
-2. **The k=7 cost distribution.** 3.1 M facts is 96% of the DAG. Hard facts cost ~65 s each with the
-   columnar index, so the mean decides everything: at 65 s it is 6.4 core-years, which parallelises
-   to weeks; if the bulk is cheap it is far less. A mean is useless here — per-fact costs span four
-   orders of magnitude — so measure the distribution.
-3. **Minimalize each level.** The refuted set is upward-closed, so only the minimal antichain
-   matters for dominance, and the k=6 `np=4` bucket holds 2,379,918 facts which cannot be one. This
-   is the largest remaining structural lever and it is principled rather than a guess.
-4. **Parallelise.** Facts are independent and levels are independent. Deliberately after 2 and 3,
-   so it does not hide inefficiency.
+   specific to `cache-2025:parsed_260.txt` and its sixteen suspect verdicts. Beware the cache size:
+   the `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, about 25 GB
+   of trie before the search begins. Being tried first as a verifier *derivation*, which is minutes
+   rather than instance-hours if the k=7 level covers the children.
+2. **Verify the painted k=7 sub-DAG** — 16,347 facts, order 100-300 core-hours, hours on 24 cores.
+   Parallelise here: facts are independent and levels are independent, and the resident set is one
+   level rather than the certificate.
+3. **Re-ask whether painting shrinks at k=7 -> k=6.** Preferring already-painted witnesses gave
+   2.07x in speed and **no** size reduction at k=9 -> k=8, because 1,910 of 1,932 k=8 facts are
+   cited and there is nothing to trade against. At k=7 -> k=6, 16,347 facts fan out into a 2.5 M
+   level, where slack is far likelier.
+4. **Minimalize each level** — measured at only **1.84x** (46.4% of the k=6 level is redundant, 45.6%
+   of the `np=4` bucket that dominates). Deprioritised accordingly; it is not the lever the
+   upward-closure argument suggested.
 
-Cost scales with **part count**, not fact count — ~4.5x per added part. But the realised part count
-on the actual `Sa(193)` logs never exceeds 10, and the bulk sits at k=7 with P=4, so the binding
-constraint is the 3.1 M facts at that level, not the exponent.
+Ranked by measured effect at k=7: **top-down painting 190x**, columnar dominance index >=8.1x,
+minimalization 1.84x. Cost scales with **part count**, not fact count, but the realised part count
+on the actual `Sa(193)` logs never exceeds 10 — so the binding constraint was never the exponent,
+it was how many facts the proof actually reaches.
 
 ## Immediate next steps
 
