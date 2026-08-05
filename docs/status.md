@@ -202,8 +202,26 @@ Two design claims that stood here are **withdrawn**:
   `Sa(113)` solve. The value is the trust base, arbitrary parallelism, one-level memory
   residency, and spot-checkability.
 
-The open question is how `SPLITS` cost scales with **part count**, not fact count: ~4.5x per added
-part, with 93% of nodes in 6- and 7-part facts. That exponent sizes the `MAX_N=193` run.
+### What the certificate needs next, in order
+
+1. **Prove one of the sixteen k=8 facts** — `./radio_one <cache> 8 74 40 41 38`. The only genuinely
+   new compute on the critical path, and sixteen independent jobs. Cold is hopeless: even the
+   single part `Sb(74:41)` at k=8 does not resolve in 10 minutes. Warm-start from
+   `k8-2026-05-12:out_k8.txt`, which is 2026-era and audited clean — the warm-start prohibition is
+   specific to `cache-2025:parsed_260.txt` and its sixteen suspect verdicts.
+2. **The k=7 cost distribution.** 3.1 M facts is 96% of the DAG. Hard facts cost ~65 s each with the
+   columnar index, so the mean decides everything: at 65 s it is 6.4 core-years, which parallelises
+   to weeks; if the bulk is cheap it is far less. A mean is useless here — per-fact costs span four
+   orders of magnitude — so measure the distribution.
+3. **Minimalize each level.** The refuted set is upward-closed, so only the minimal antichain
+   matters for dominance, and the k=6 `np=4` bucket holds 2,379,918 facts which cannot be one. This
+   is the largest remaining structural lever and it is principled rather than a guess.
+4. **Parallelise.** Facts are independent and levels are independent. Deliberately after 2 and 3,
+   so it does not hide inefficiency.
+
+Cost scales with **part count**, not fact count — ~4.5x per added part. But the realised part count
+on the actual `Sa(193)` logs never exceeds 10, and the bulk sits at k=7 with P=4, so the binding
+constraint is the 3.1 M facts at that level, not the exponent.
 
 ## Immediate next steps
 
