@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-04**.
+don't know it. Last refreshed **2026-08-05**.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -204,14 +204,18 @@ Two design claims that stood here are **withdrawn**:
 
 ### What the certificate needs next, in order
 
-1. **Prove one of the sixteen k=8 facts** — `./radio_one <cache> 8 74 40 41 38`. The only genuinely
-   new compute on the critical path, sixteen independent jobs, and **still unsized**. Cold is
-   hopeless: even the single part `Sb(74:41)` at k=8 does not resolve in 10 minutes. Warm-start from
-   `k8-2026-05-12:out_k8.txt`, which is 2026-era and audited clean — the warm-start prohibition is
+1. **Prove the sixteen k=8 facts with the solver** — `./radio_one <cache> 8 74 40 41 38` and its
+   fifteen siblings. The only genuinely new compute, sixteen independent jobs, **still unsized**.
+   Cold is hopeless: even the single part `Sb(74:41)` at k=8 does not resolve in 10 minutes.
+   Warm-start from `k8-2026-05-12:out_k8.txt`, 2026-era and audited clean — the prohibition is
    specific to `cache-2025:parsed_260.txt` and its sixteen suspect verdicts. Beware the cache size:
    the `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, about 25 GB
-   of trie before the search begins. Being tried first as a verifier *derivation*, which is minutes
-   rather than instance-hours if the k=7 level covers the children.
+   of trie before the search begins.
+
+   **Deriving them in the verifier does not work (tested 2026-08-05).** `Sb(74:40, 41:38)` fails on
+   its first split in 227 nodes: all three children are k=7 states absent from the corpus and
+   dominated by nothing in it. Deriving it needs k=7 facts that must themselves be derived, and
+   the recursion is the original search.
 2. **Verify the painted k=7 sub-DAG** — 16,347 facts, order 100-300 core-hours, hours on 24 cores.
    Parallelise here: facts are independent and levels are independent, and the resident set is one
    level rather than the certificate.
