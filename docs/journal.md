@@ -2220,3 +2220,25 @@ This is good news rather than bad: **low part count is the cheap direction**. A 
 `SPLITS` check is a two-deep product, not a four-deep one, and `live_get` for an entire level costs
 0.24 s. So the missing facts are the ones derivation can supply, which is what the on-demand
 `derive` path is for. Whether it closes k=8, and at what cost, was measuring when this was written.
+
+### The k=7 projection, with painting
+
+Cost distribution at k=7, sampled 1-in-500 with a 20 s per-fact time budget: **48 of 51 facts
+complete (94%)**, mean **41,015 nodes**; 3 exceed the budget. So the four facts used in the index
+A/B — 485 K nodes each — were about 12x costlier than typical. They were drawn by a wide stride to
+spread across the level, which selected for the tail; quoting them as a per-fact cost overstated it,
+and the corrected projection is:
+
+| | k=7 level |
+|---|---|
+| all 3,098,762 facts at the A/B rate | **6.3 core-years** |
+| 16,347 painted facts at the A/B rate | 293 core-hours — **0.5 days on 24 cores** |
+| 16,347 painted facts at the typical rate | 91 core-hours — **0.16 days on 24 cores** |
+
+The level stops being the obstacle. Ranking the three levers measured today on their effect at k=7:
+**top-down painting 190x**, columnar index >=8.1x, minimalization 1.84x. The first is worth more
+than the other two together, and it was the cheapest to build.
+
+Note the two figures bracket rather than bound: 16,347 is a lower bound on the painted set (failed
+verifications stop early and cite less), and the 20 s budget truncates the tail at 6% of facts. Both
+move the estimate up, neither by an order of magnitude.
