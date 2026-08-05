@@ -2242,3 +2242,44 @@ than the other two together, and it was the cheapest to build.
 Note the two figures bracket rather than bound: 16,347 is a lower bound on the painted set (failed
 verifications stop early and cite less), and the 20 s budget truncates the tail at 6% of facts. Both
 move the estimate up, neither by an order of magnitude.
+
+### Economical painting: 2.07x faster, same size — and why the size did not move
+
+When a split can be discharged several ways, painting whichever witness the scan reaches first grows
+the certificate for no reason: an already-painted fact is free, since it is in the artifact and
+verified regardless. So a later pass searches the previously painted facts first, and only falls
+back to the full level. `radio_verify.c` builds that painted set as a `Level` in its own right
+(`sub`, with an `orig` map back to the parent), so it reuses the same index and the same code path.
+
+| pass | k=8 verification | cites at k=7 | preference hits |
+|---|---|---|---|
+| 1 — greedy, first witness found | 17.2 s | 16,347 | — |
+| 2 — prefer already painted | **8.3 s** | 16,347 | 521,226 / 697,967 (74.7%) |
+| 3 | 8.3 s | 16,347 | fixpoint |
+
+- **2.07x faster.** The preferred set is 0.5% of the level, so the preferred lookup is the small
+  one. Economy and speed point the same way here, which is not the usual shape of a set-cover
+  heuristic.
+- **Size unchanged, for a structural reason.** The preference set *is* the previous pass's painting,
+  so a later pass can only re-select facts already in it; the set shrinks only if some painted fact
+  becomes redundant. None did, so pass 1 had no slack at these levels — every painted fact is the
+  sole available witness for at least one query. At k=9 that is expected: 1,910 of 1,932 k=8 facts
+  are cited, nearly the whole level, with nothing to trade against. Re-ask at k=7 -> k=6, where
+  16,347 facts fan out into a 2.5 M-fact level and slack is far likelier.
+
+Not implemented: preferring a *child* whose witness is already painted, as opposed to a *witness*
+for a given child. `splits_rec` still takes the first refuted child in cheapest-first order.
+Choosing among children needs all three evaluated, and cheapest-first was measured to beat
+most-likely-first by 1.12x precisely because evaluating the expensive child costs more than it
+saves — so that variant trades speed for size in the direction the measurement says loses.
+
+**Two bugs found by building this, both of the same kind — a memo that silently suppresses the
+thing being measured:**
+
+- The first multi-pass run painted nothing below the top level, because `live_get` memoises on
+  `(part, k)`: pass 2 reused pass 1's tables, issued no refutation queries, and painting only
+  happens where a query happens. The live tables are now dropped between passes; rebuilding a whole
+  level costs 0.24 s.
+- Painting needs the witness index carried *through* the memos. At k=4, 99.996% of queries are memo
+  hits, so a memo that records only the verdict and not which fact produced it leaves nearly every
+  citation unpainted — and under-reports silently, which is the failure mode that matters.

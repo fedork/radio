@@ -178,7 +178,7 @@ static int feq(const Fact *a, const Fact *b) {
 }
 
 /* A frozen, read-only fact set for ONE level. */
-typedef struct {
+typedef struct Level_ {
     int n;
     Fact *f;                 /* sorted by (np, mass) */
     int bstart[MAXP + 2];    /* first index with np >= i */
@@ -198,6 +198,17 @@ typedef struct {
     unsigned char *sdom;
     int32_t *sdom_i;         /* index of a 1-part fact witnessing sdom[(n<<8)|m] */
     unsigned char *cited;    /* painted when this fact is used to discharge something */
+    /* A split can usually be discharged several ways. Painting whichever witness the scan happens
+       to reach first grows the certificate for no reason: an already-painted fact is free, since
+       it is in the artifact and verified regardless. So a later pass searches the previously
+       painted facts FIRST, and only falls back to the full level if none of them answers.
+
+       This is greedy set cover, and it is also cheaper rather than more expensive: the painted set
+       is ~0.5% of the level, so the preferred lookup is the small one. `sub` is that set as a
+       Level in its own right - same index, same code path - and `orig` maps its facts back so a
+       hit paints the parent. */
+    struct Level_ *sub;
+    int32_t *orig;           /* only in a sub: index of each fact in the parent level */
 
     /* Columnar dominance index. A dominance query is an exact orthogonal range query, not a
        similarity search, so the useful structure is a monotone signature plus a sort order that
@@ -310,6 +321,36 @@ static void level_freeze(Level *L) {
     }
 }
 
+static void level_freeze(Level *L);
+
+/* the painted facts of L, as a Level of their own */
+static Level *level_sub_cited(Level *L) {
+    int i, c = 0;
+    for (i = 0; i < L->n; i++) c += L->cited[i] ? 1 : 0;
+    if (!c) return NULL;
+    Level *S = calloc(1, sizeof(Level));
+    S->f = malloc((size_t)c * sizeof(Fact));
+    S->orig = malloc((size_t)c * sizeof(int32_t));
+    int w = 0;
+    for (i = 0; i < L->n; i++)
+        if (L->cited[i]) { S->f[w] = L->f[i]; S->orig[w] = i; w++; }
+    S->n = w;
+    /* level_freeze sorts, so the orig mapping must be permuted with it: tag each fact by writing
+       its parent index into a side array keyed on identity after the sort. Simplest correct way is
+       to sort a paired array ourselves, so freeze sees an already-sorted input and leaves it. */
+    { int a, b;
+      for (a = 1; a < S->n; a++) {                        /* insertion sort keeps pairs together */
+          Fact fv = S->f[a]; int32_t ov = S->orig[a];
+          for (b = a - 1; b >= 0 && fact_cmp(&S->f[b], &fv) > 0; b--) {
+              S->f[b + 1] = S->f[b]; S->orig[b + 1] = S->orig[b];
+          }
+          S->f[b + 1] = fv; S->orig[b + 1] = ov;
+      }
+    }
+    level_freeze(S);
+    return S;
+}
+
 static int level_find(const Level *L, const Fact *q) {
     uint64_t h = fhash(q);
     int s = (int)(h & L->hmask);
@@ -365,7 +406,7 @@ static int maj_refutes(const Fact *s, int k) {
 typedef struct { uint64_t h; int32_t wit; unsigned char np, k; signed char res; Part p[MEMOP]; } MemoEnt;
 static int g_wit = -1;
 static int g_paint = 0;
-static long long paint_hits = 0;
+static long long paint_hits = 0, pref_hits = 0, pref_miss = 0;
 static MemoEnt *memo;
 #define C_REF
 #define MEMO_HIT memo_hit++
@@ -401,6 +442,15 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
     g_wit = -1;
     if (s->mass > pow3[k]) return 1;                 /* COUNT - a rule, no fact to paint */
     if (s->np == 0) return 0;                        /* solved */
+    if (L->sub) {                                    /* prefer a witness already in the artifact */
+        if (refuted_raw(L->sub, s, k)) {
+            if (g_wit >= 0) g_wit = L->sub->orig[g_wit];   /* back to the parent's numbering */
+            pref_hits++;
+            return 1;
+        }
+        g_wit = -1;
+        pref_miss++;
+    }
     { int ix = level_find(L, s);
       if (ix >= 0) { g_wit = ix; return 1; } }
     if (maj_refutes(s, k)) return 1;                 /* MAJ (singleton sub-multiset) */
@@ -1070,30 +1120,63 @@ int main(int argc, char **argv) {
            Still well-founded induction on k, so soundness is untouched - every cited fact is
            itself verified before the certificate closes. What changes is that both the artifact
            and the verification work shrink to what the proof needs. */
-        int topk = atoi(getenv("TOPDOWN")), kk;
+        int topk = atoi(getenv("TOPDOWN")), kk, pass;
+        int npass = getenv("PASSES") ? atoi(getenv("PASSES")) : 1;
         g_paint = 1;
-        printf("%3s %10s %10s %10s %8s %10s %12s\n",
-               "k", "in level", "targets", "verified", "unver", "sec", "cited k-1");
-        for (kk = topk; kk >= 2; kk--) {
-            if (!L[kk].n) continue;
-            { int z; for (z = 0; z < MEMOSZ; z++) memo[z].res = -1; }
-            clock_t t0 = clock();
-            int tgt = 0, ver = 0, un = 0, budg = 0, q;
-            for (q = 0; q < L[kk].n; q++) {
-                if (kk != topk && !L[kk].cited[q]) continue;    /* nothing depends on it */
-                tgt++;
-                if (verify(&L[kk - 1], &L[kk].f[q], kk)) {
-                    if (g_budget_hit) budg++; else ver++;    /* a budget abort is not a proof */
-                } else un++;
+        for (pass = 1; pass <= npass; pass++) {
+            printf("--- pass %d%s ---\n", pass,
+                   pass > 1 ? " (preferring witnesses already in the artifact)" : "");
+            printf("%3s %10s %10s %10s %8s %10s %12s\n",
+                   "k", "in level", "targets", "verified", "unver", "sec", "cited k-1");
+            for (kk = topk; kk >= (g_mink > 2 ? g_mink : 2); kk--) {
+                if (!L[kk].n) continue;
+                { int z; for (z = 0; z < MEMOSZ; z++) memo[z].res = -1; }
+                clock_t t0 = clock();
+                int tgt = 0, ver = 0, un = 0, budg = 0, q;
+                /* target list: everything at the top, otherwise what the level above painted.
+                   On a later pass that list is the previous pass's painting, held in `sub`. */
+                int use_sub = (kk != topk && pass > 1 && L[kk].sub);
+                int nt = use_sub ? L[kk].sub->n : L[kk].n;
+                for (q = 0; q < nt; q++) {
+                    int fi = use_sub ? L[kk].sub->orig[q] : q;
+                    if (!use_sub && kk != topk && !L[kk].cited[fi]) continue;
+                    tgt++;
+                    if (verify(&L[kk - 1], &L[kk].f[fi], kk)) {
+                        if (g_budget_hit) budg++; else ver++;
+                    } else un++;
+                }
+                int cited = 0;
+                for (q = 0; q < L[kk - 1].n; q++) cited += L[kk - 1].cited[q];
+                printf("%3d %10d %10d %10d %8d %10.1f %12d  (budget %d, prefer hit %lld/%lld)\n",
+                       kk, L[kk].n, tgt, ver, un, (double)(clock() - t0) / CLOCKS_PER_SEC, cited,
+                       budg, pref_hits, pref_hits + pref_miss);
+                fflush(stdout);
             }
-            int cited = 0;
-            for (q = 0; q < L[kk - 1].n; q++) cited += L[kk - 1].cited[q];
-            printf("%3d %10d %10d %10d %8d %10.1f %12d  (budget %d, derived %lld/%lld)\n",
-                   kk, L[kk].n, tgt, ver, un, (double)(clock() - t0) / CLOCKS_PER_SEC, cited,
-                   budg, derived_ok, derived_ok + derived_no);
-            fflush(stdout);
-            if (un) printf("    (level %d has %d unverified - the certificate is not closed there)\n",
-                           kk, un);
+            if (pass == npass) break;
+            /* Drop the live-split tables. They are memoised on (part, k) and were built during
+               the previous pass, so replaying a level would reuse them and issue no refutation
+               queries at all - and painting only happens where a query happens. Rebuilding costs
+               0.24 s for a whole level, against silently painting nothing. */
+            { int a, b;
+              for (a = 0; a <= MAXK; a++)
+                  for (b = 0; b < 2; b++)
+                      if (live_tab[a][b]) {
+                          int z;
+                          for (z = 0; z < NPART; z++)
+                              if (live_tab[a][b][z].n >= 0) {
+                                  free(live_tab[a][b][z].s);
+                                  live_tab[a][b][z].n = -1; live_tab[a][b][z].s = NULL;
+                              }
+                      }
+            }
+            /* freeze this pass's painting as the next pass's preference set, then repaint */
+            for (kk = topk; kk >= 1; kk--) {
+                if (!L[kk].n) continue;
+                Level *ns = level_sub_cited(&L[kk]);
+                if (ns) L[kk].sub = ns;
+                memset(L[kk].cited, 0, L[kk].n);
+            }
+            pref_hits = pref_miss = 0;
         }
         return 0;
     }
