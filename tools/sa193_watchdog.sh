@@ -71,7 +71,19 @@ status() {
             # and keep the line intact. Negatives have no witness and keep their took/pass tail,
             # which is the useful part: it shows what each level is costing.
             line = $0
-            if (match(line, / with \[/)) line = substr(line, 1, RSTART - 1) "  [+witness]"
+            # Elide only the witness, and keep the cost tail that FOLLOWS it. The layout is
+            #   can solve <state> in <k> with <witness...> took <s> totalsplits=<n> pass=<p> ...
+            # so cutting from " with " to end-of-line also discards took/totalsplits/pass - which is
+            # the most useful part: the k=9 control line reads "took 1745", i.e. 29 minutes for that
+            # one state. Sb verdicts say "with [a:b] ..." and Sa verdicts "with following:...", so
+            # match " with " for both.
+            if (match(line, / with /)) {
+                head = substr(line, 1, RSTART - 1)
+                rest = substr(line, RSTART)
+                tail = ""
+                if (match(rest, / took .*$/)) tail = substr(rest, RSTART)
+                line = head "  [+witness]" tail
+            }
             last[k] = line
             curk = k               # the level the search is on right now
         }

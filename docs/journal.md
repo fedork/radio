@@ -2458,7 +2458,15 @@ The verdict stack now runs **from the level the search is on upward to the root*
 Levels below were last touched arbitrarily long ago, so their "most recent" verdict is stale and
 placing it means scrolling back through the whole log; levels above are the enclosing context.
 Positive verdicts carry their entire witness tree inline, so they are shown as `[+witness]` — a flat
-truncation cut them mid-token and lost the trailing cost fields with it.
+truncation cut them mid-token. The first elision then had the same bug in a subtler form: it cut from
+` with ` to end-of-line, and the cost tail comes **after** the witness
+
+    can solve <state> in <k> with <witness...> took <s> totalsplits=<n> pass=<p> fast_solve=<f>
+
+so every positive lost its timing. That is the most useful field on the line: the k=9 control state
+reads `took 1745`, i.e. 29 minutes, and `k=8 ... took 1121`. Now only the witness itself is elided.
+Note `Sa(...)` verdicts say `with following:` rather than `with [`, so matching ` with ` covers both —
+the first version silently left Sa lines unelided.
 
 Two bugs in the reporting made healthy things look broken, which is the failure mode that matters
 most in a status line:
