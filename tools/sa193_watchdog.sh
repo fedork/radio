@@ -87,6 +87,19 @@ status() {
             last[k] = line
             curk = k               # the level the search is on right now
         }
+        # "still solving" lines are the real progress signal: they carry left=<remaining>/<total>
+        # splits at that level and elapsed=<used>/<budget> against the deadline, so they say how far
+        # through a level the search is. A completed verdict only says what finished, which at high k
+        # can be hours stale. Record the log position too, so staleness is visible - the k=9 line can
+        # still be the one from the control long after the control finished.
+        /still solving in/ {
+            match($0, /in [0-9]+/); sk = substr($0, RSTART + 3, RLENGTH - 3) + 0
+            sline = $0
+            sub(/^still solving in [0-9]+ /, "", sline)
+            sub(/ trying .*elapsed /, "  elapsed ", sline)
+            still[sk] = sline; stillnr[sk] = NR
+        }
+        { nr = NR }
         # the sixteen: distinct n1 with a printed k=9 verdict on a 193-coin state
         /\[[0-9]+,193\] in 9/ {
             if (match($0, /Sb\([0-9]+:/)) seen[substr($0, RSTART + 3, RLENGTH - 4)] = 1
@@ -101,7 +114,9 @@ status() {
             # back through the whole log. Higher levels are the enclosing context: the path
             # from where the search is now toward the root.
             printf "CURK %d\n", curk + 0
-            for (k = 12; k >= curk; k--) if (k in last) printf "LAST %d %s\n", k, substr(last[k], 1, 220)
+            for (k = 12; k >= 1; k--) if (k in still)
+                printf "STILL %d %d %s\n", k, nr - stillnr[k], substr(still[k], 1, 200)
+            if (curk in last) printf "LASTONE %d %s\n", curk, substr(last[curk], 1, 220)
         }' "$LOG" 2>/dev/null)
 
     printf 'Sa(193) cold re-derivation\n'
@@ -123,9 +138,11 @@ status() {
         "$(awk '/^CNT/{printf "k%s:%s  ", $2, $3}' <<<"$scan")"
     printf '  control                 %s\n' \
         "$(grep -m1 'result CONTROL' "$LOG" 2>/dev/null || echo 'not yet reported')"
-    printf '\n  most recent verdict from the level the search is on (k=%s) up to the root:\n' \
-        "$(awk '/^CURK/{print $2}' <<<"$scan")"
-    awk '/^LAST/ { k=$2; $1=""; $2=""; sub(/^  /,""); printf "    k=%-2s %s\n", k, $0 }' <<<"$scan"
+    printf '\n  in-progress state at each level (left=<splits remaining>/<total> is the real progress):\n'
+    awk '/^STILL/ { k=$2; age=$3; $1=""; $2=""; $3=""; sub(/^   /,"")
+                    printf "    k=%-2s %s%s\n", k, $0, (age > 200000 ? "   (stale)" : "") }' <<<"$scan"
+    awk '/^LASTONE/ { k=$2; $1=""; $2=""; sub(/^  /,"")
+                      printf "\n    last completed verdict (k=%s): %s\n", k, $0 }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
 

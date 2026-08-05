@@ -2489,3 +2489,34 @@ Method note worth keeping: three of my `python .replace()` patches to this scrip
 match because of backslash escaping, and one of them — raising a truncation limit — *appeared* to work
 because a different change had brought the lines under the old limit. Print the `repr()` of the target
 lines and assert the match, rather than trusting that a replacement landed.
+
+### The stack now shows in-progress states, which is what progress actually looks like
+
+Replaced the "last completed verdict per level" stack with the most recent **`still solving`** line per
+level. Those carry what a completed verdict cannot: `left=<remaining>/<total>` splits at that level and
+`elapsed=<used>/<budget>` against the deadline. A completed verdict says only what finished, which at
+high k can be hours stale. Each line also carries how far back in the log it is, so a level the solver
+has not revisited is marked `(stale)` rather than silently misread as current.
+
+First reading of it, two hours into the run, is immediately diagnostic:
+
+```
+k=7  Sb(33:16,32:15,45:10,23:19)[1895,193]  elapsed 1742/2000  left=577/578   totalsplits=664031
+k=6  Sb(23:6,17:8,16:8,22:4,13:6,17:4,26:2,19:2)[726,193]
+                                            elapsed 3963/3973  left=59/168    totalsplits=307871277349
+```
+
+The k=6 node has enumerated **308 billion** split combinations, is at 99.7% of its deadline budget, and
+has 59 of 168 splits left. Its state is 8 parts at mass **726 against 3^6 = 729** — 99.6% saturated, so
+the counting bound prunes nothing. That is the same pathology recorded on 2026-08-04 (a 13-part k=5 node
+of mass 243 = 3^5 that trapped a run for 43 minutes), and it is exactly what deadlines exist for: it will
+bail with `MAYBE` and be retried with a larger budget rather than sit there. k=7 shows the same shape one
+level up — 1 of 578 splits cleared with 87% of its budget gone.
+
+Also note `totalsplits=307871277349` against `k=6`: the saturated multi-part states at k=5-6 are where
+this run will spend its time, which matches the 2026-08-04 finding that realised part count peaks near
+k=4-5 and that those states are the expensive ones.
+
+Shell trap worth recording: an apostrophe inside an awk comment terminates the single-quoted awk program.
+`# ... the control's ...` broke the whole script with "unexpected EOF while looking for matching )", 60
+lines from the actual cause.
