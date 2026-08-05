@@ -196,6 +196,8 @@ typedef struct {
        options per part and issues ~6,700 refutation queries, ~1,700 of which fall through to a
        bucket scan over a 2.5 M-fact level. The enumeration is 25,700 nodes; the scans were 5 s. */
     unsigned char *sdom;
+    int32_t *sdom_i;         /* index of a 1-part fact witnessing sdom[(n<<8)|m] */
+    unsigned char *cited;    /* painted when this fact is used to discharge something */
 
     /* Columnar dominance index. A dominance query is an exact orthogonal range query, not a
        similarity search, so the useful structure is a monotone signature plus a sort order that
@@ -289,27 +291,33 @@ static void level_freeze(Level *L) {
       }
     }
     L->sdom = calloc(NPART, 1);
-    for (i = L->bstart[1]; i < L->bstart[2]; i++)          /* the 1-part facts */
-        L->sdom[(L->f[i].p[0].n << 8) | L->f[i].p[0].m] = 1;
-    { int n, m;                                             /* 2-D prefix OR */
+    L->sdom_i = malloc(NPART * sizeof(int32_t));
+    L->cited = calloc(L->n ? L->n : 1, 1);
+    for (i = 0; i < NPART; i++) L->sdom_i[i] = -1;
+    for (i = L->bstart[1]; i < L->bstart[2]; i++) {         /* the 1-part facts */
+        int ix = (L->f[i].p[0].n << 8) | L->f[i].p[0].m;
+        L->sdom[ix] = 1; L->sdom_i[ix] = i;
+    }
+    { int n, m;                                             /* 2-D prefix OR, carrying a witness */
       for (n = 0; n < 256; n++)
           for (m = 0; m < 256; m++) {
-              unsigned char v = L->sdom[(n << 8) | m];
-              if (n) v |= L->sdom[((n - 1) << 8) | m];
-              if (m) v |= L->sdom[(n << 8) | (m - 1)];
-              L->sdom[(n << 8) | m] = v;
+              int ix = (n << 8) | m;
+              if (!L->sdom[ix] && n && L->sdom[((n - 1) << 8) | m]) {
+                  L->sdom[ix] = 1; L->sdom_i[ix] = L->sdom_i[((n - 1) << 8) | m]; }
+              if (!L->sdom[ix] && m && L->sdom[(n << 8) | (m - 1)]) {
+                  L->sdom[ix] = 1; L->sdom_i[ix] = L->sdom_i[(n << 8) | (m - 1)]; }
           }
     }
 }
 
-static int level_has(const Level *L, const Fact *q) {
+static int level_find(const Level *L, const Fact *q) {
     uint64_t h = fhash(q);
     int s = (int)(h & L->hmask);
     while (L->hslot[s] >= 0) {
-        if (L->hkey[s] == h && feq(&L->f[L->hslot[s]], q)) return 1;
+        if (L->hkey[s] == h && feq(&L->f[L->hslot[s]], q)) return L->hslot[s];
         s = (s + 1) & L->hmask;
     }
-    return 0;
+    return -1;
 }
 
 /* Subgraph Monotonicity: is there an injection a -> b with each part componentwise <= ? */
@@ -351,7 +359,13 @@ static int maj_refutes(const Fact *s, int k) {
 #define MEMOBITS 24
 #define MEMOSZ (1 << MEMOBITS)
 #define MEMOP 16
-typedef struct { uint64_t h; unsigned char np, k; signed char res; Part p[MEMOP]; } MemoEnt;
+/* `wit` is the index of the fact that answered this query, or -1 for a rule (COUNT, MAJ) or a
+   derivation. Carrying it through the memo is what makes top-down painting possible: 99.996% of
+   queries at k=4 are memo hits, so without it almost every citation would go unrecorded. */
+typedef struct { uint64_t h; int32_t wit; unsigned char np, k; signed char res; Part p[MEMOP]; } MemoEnt;
+static int g_wit = -1;
+static int g_paint = 0;
+static long long paint_hits = 0;
 static MemoEnt *memo;
 #define C_REF
 #define MEMO_HIT memo_hit++
@@ -371,24 +385,31 @@ static int refuted(const Level *L, const Fact *s, int k) {
     if (e->res >= 0 && e->h == h && e->k == (unsigned char)k && e->np == s->np
             && memcmp(e->p, s->p, s->np * sizeof(Part)) == 0) {
         memo_hit++;
+        if (g_paint && e->res && e->wit >= 0) { L->cited[e->wit] = 1; paint_hits++; }
         return e->res;
     }
     memo_miss++;
     int r = refuted_raw(L, s, k);
     e->h = h; e->k = (unsigned char)k; e->np = s->np; e->res = (signed char)r;
+    e->wit = (int32_t)(r ? g_wit : -1);
     memcpy(e->p, s->p, s->np * sizeof(Part));
+    if (g_paint && r && g_wit >= 0) { L->cited[g_wit] = 1; paint_hits++; }
     return r;
 }
 
 static int refuted_raw(const Level *L, const Fact *s, int k) {
-    if (s->mass > pow3[k]) return 1;                 /* COUNT */
+    g_wit = -1;
+    if (s->mass > pow3[k]) return 1;                 /* COUNT - a rule, no fact to paint */
     if (s->np == 0) return 0;                        /* solved */
-    if (level_has(L, s)) return 1;
+    { int ix = level_find(L, s);
+      if (ix >= 0) { g_wit = ix; return 1; } }
     if (maj_refutes(s, k)) return 1;                 /* MAJ (singleton sub-multiset) */
     int lim = s->np < MAXP ? s->np : MAXP, np, i;    /* DOM */
     if (L->sdom) {                                   /* one-part dominance, O(np) */
-        for (i = 0; i < s->np; i++)
-            if (L->sdom[(s->p[i].n << 8) | s->p[i].m]) return 1;
+        for (i = 0; i < s->np; i++) {
+            int ix = (s->p[i].n << 8) | s->p[i].m;
+            if (L->sdom[ix]) { g_wit = L->sdom_i[ix]; return 1; }
+        }
     }
     { uint64_t qn, qm;
       int maxn = s->np ? s->p[0].n : 0;
@@ -406,7 +427,7 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
                   continue;
               }
               if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) continue;
-              if (dominates(&L->f[i], s)) return 1;
+              if (dominates(&L->f[i], s)) { g_wit = i; return 1; }
           }
       }
     }
@@ -440,13 +461,19 @@ static int chi_refuted(const Level *L, const Chi *c, int k) {
         uint64_t h = c->h + 0x51ULL * (uint64_t)k;
         MemoEnt *e = &memo[h & (MEMOSZ - 1)];
         if (e->res >= 0 && e->h == h && e->k == (unsigned char)k && e->np == c->np
-                && memcmp(e->p, c->p, c->np * sizeof(Part)) == 0) { MEMO_HIT; return e->res; }
+                && memcmp(e->p, c->p, c->np * sizeof(Part)) == 0) {
+            MEMO_HIT;
+            if (g_paint && e->res && e->wit >= 0) { L->cited[e->wit] = 1; paint_hits++; }
+            return e->res;
+        }
         MEMO_MISS;
         if (c->np > MAXP) return 0;
         t.np = c->np; t.mass = c->mass;
         memcpy(t.p, c->p, c->np * sizeof(Part));
         int r = refuted_raw(L, &t, k);
         e->h = h; e->k = (unsigned char)k; e->np = c->np; e->res = (signed char)r;
+        e->wit = (int32_t)(r ? g_wit : -1);
+        if (g_paint && r && g_wit >= 0) { L->cited[g_wit] = 1; paint_hits++; }
         memcpy(e->p, c->p, c->np * sizeof(Part));
         return r;
     }
@@ -1032,6 +1059,42 @@ int main(int argc, char **argv) {
         printf("BENCH k=%d: %lld distinct parts, %lld live options, %.3f s (%.1f ms/part)\n",
                bk, nparts, nopts, (double)(clock() - t0) / CLOCKS_PER_SEC,
                1e3 * (clock() - t0) / CLOCKS_PER_SEC / (nparts ? nparts : 1));
+        return 0;
+    }
+    if (getenv("TOPDOWN")) {
+        /* Top-down reachability. The certificate is not "every fact the solver logged" - it is the
+           sub-DAG reachable from the roots. Verify level k, painting each fact at k-1 that was
+           actually used to discharge something, then descend and verify only the painted ones.
+           Unpainted facts are discarded: nothing cites them, so nothing depends on them.
+
+           Still well-founded induction on k, so soundness is untouched - every cited fact is
+           itself verified before the certificate closes. What changes is that both the artifact
+           and the verification work shrink to what the proof needs. */
+        int topk = atoi(getenv("TOPDOWN")), kk;
+        g_paint = 1;
+        printf("%3s %10s %10s %10s %8s %10s %12s\n",
+               "k", "in level", "targets", "verified", "unver", "sec", "cited k-1");
+        for (kk = topk; kk >= 2; kk--) {
+            if (!L[kk].n) continue;
+            { int z; for (z = 0; z < MEMOSZ; z++) memo[z].res = -1; }
+            clock_t t0 = clock();
+            int tgt = 0, ver = 0, un = 0, budg = 0, q;
+            for (q = 0; q < L[kk].n; q++) {
+                if (kk != topk && !L[kk].cited[q]) continue;    /* nothing depends on it */
+                tgt++;
+                if (verify(&L[kk - 1], &L[kk].f[q], kk)) {
+                    if (g_budget_hit) budg++; else ver++;    /* a budget abort is not a proof */
+                } else un++;
+            }
+            int cited = 0;
+            for (q = 0; q < L[kk - 1].n; q++) cited += L[kk - 1].cited[q];
+            printf("%3d %10d %10d %10d %8d %10.1f %12d  (budget %d, derived %lld/%lld)\n",
+                   kk, L[kk].n, tgt, ver, un, (double)(clock() - t0) / CLOCKS_PER_SEC, cited,
+                   budg, derived_ok, derived_ok + derived_no);
+            fflush(stdout);
+            if (un) printf("    (level %d has %d unverified - the certificate is not closed there)\n",
+                           kk, un);
+        }
         return 0;
     }
     printf("%3s %10s %10s %8s %9s %14s %8s\n",

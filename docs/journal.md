@@ -2172,3 +2172,51 @@ more chances to contain a smaller refuted sub-multiset than an 8-part one has to
 
 Both are the same mistake in different clothes — instrumenting the quantity that was expensive at
 k=4 rather than the one that is expensive at k=7.
+
+## 2026-08-04 — top-down painting: the certificate is the reachable sub-DAG, and it is 190x smaller
+
+The certificate is not "every fact the solver logged". It is the sub-DAG reachable from the sixteen
+roots. Verify level k, **paint** each fact at k-1 that was actually used to discharge something, then
+descend and verify only the painted ones. Everything unpainted is discarded: nothing cites it, so
+nothing depends on it. Still well-founded induction on k, so soundness is untouched — every cited
+fact is itself verified before the certificate closes.
+
+Implemented in `radio_verify.c` (`TOPDOWN=<k>`). The plumbing that makes it work is carrying the
+**witness index through the memos**: at k=4, 99.996% of queries are memo hits, so without recording
+which fact answered a cached query almost every citation would go unpainted.
+
+### Measured, from the sixteen `Sa(193)` roots
+
+| k | facts in level | targets (painted) | verified | unverified | cited at k-1 |
+|---|---|---|---|---|---|
+| 9 | 16 | 16 | 0 | 16 | **1,910** |
+| 8 | 1,932 | 1,910 | 35 | 1,875 | **16,347** |
+
+- **k=8 is essentially all reachable** — 1,910 of 1,932. Expected: the level is tiny and each root
+  has thousands of splits to discharge.
+- **k=7 collapses to 16,347 of 3,098,762 — 0.53%, a 190x cut.** That is the whole cost problem for
+  that level. At ~35 s per hard fact it takes the k=7 term from ~3.4 core-years to order 160
+  core-hours. Even allowing 10x for the undercount below, it is days rather than years.
+- The count is a **lower bound**: a failed verification returns at the first split with no refuted
+  child, so it cites less than a complete one would. Re-measure once k=8 closes.
+
+### Why k=8 does not verify: the warm cache ate the low-part-count facts
+
+1,875 of 1,910 fail, and the reason is structural rather than a bug. Every `Sa(193)` k=8 fact has
+**two parts**, so its children have 2 and 4 parts. The merged k=7 level:
+
+| np | facts |
+|---|---|
+| 1 | 339 |
+| **2** | **6,655** |
+| 3 | 43,042 |
+| 4 | 3,048,745 |
+
+The 4-part children are richly covered and the 2-part ones are not, because low-part-count states
+are exactly what a warm cache dispatches by dominance without printing. Same mechanism as the
+sixteen k=9 gaps, one level down.
+
+This is good news rather than bad: **low part count is the cheap direction**. A 2-part state's
+`SPLITS` check is a two-deep product, not a four-deep one, and `live_get` for an entire level costs
+0.24 s. So the missing facts are the ones derivation can supply, which is what the on-demand
+`derive` path is for. Whether it closes k=8, and at what cost, was measuring when this was written.
