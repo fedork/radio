@@ -2419,3 +2419,35 @@ Watchdog bug found and fixed live: the milestone count read awk field `$5` of
 bug, since the heartbeat keeps the channel looking healthy. Patched over SSM without touching the
 solver. Also added `tools/sa193_status.sh`, which prints the snapshot's **age**: the watchdog writes
 every ten minutes, so a six-minute-old snapshot is healthy, and I misread exactly that as a hang.
+
+### Monitoring, corrected three times over — 2026-08-05
+
+The run is **confirmed completely cold**: `cache=(none, cold)`, no `parse_file`, no "reading file"
+line. No checkpoint existed in S3 at launch, so nothing was picked up.
+
+That created a trap for later, now closed: `run/sa193.checkpoint` exists now, and the launcher's
+user-data would have picked it up on any relaunch, silently producing a warm run. `--resume` is now
+opt-in and the default prints `COLD run: any checkpoint in S3 is deliberately ignored`. Resuming is
+for catastrophic failure only — a cold single session is what makes the log closed, and a warm start
+also hides work rather than doing it, so a resumed run cannot answer "was 2023 right" on its own.
+
+Three fixes to the status report, all worth recording because each was reporting confidently and
+wrongly:
+
+- **Per-k counts were sorted by count, not by k.** `uniq -c` emits `count ] in K`, so k is field 4;
+  sorting on field 3 (`in`, constant) falls through to a lexical whole-line compare, i.e. by count
+  as a string. k=9 — the only level where a verdict means 1/16 of the job — was buried mid-list.
+- **`elapsed` was the watchdog's uptime, not the solver's.** The watchdog gets restarted to patch it;
+  its own uptime then reports minutes for a run that is days old, which is backwards for the single
+  field a reader uses to judge whether anything is wrong. Now `ps -o etimes=` on the solver.
+- **Four full scans per cycle became one.** The log reaches gigabytes; the status now makes a single
+  awk pass computing counts, totals, the sixteen, and the most recent verdict at each level.
+
+That last one paid for a real improvement: the status now shows **the most recent verdict at every
+level**, which is the progress context a single counter cannot give — you can see the search working
+at k=6 while k=8 and k=9 sit still.
+
+It also corrected an earlier claim of mine. **Positives are printed, with witnesses** — the k=9 line
+currently reads `can solve Sb(112:80)[8960,192] in 9 with [64:48] ...`. My "zero positives at any k"
+finding was a property of that pure-refutation `Sb(97:96)` run, where no solvable state arises at all,
+not a property of the engine. One more reason that measurement could not see what FAST does.

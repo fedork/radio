@@ -4,7 +4,13 @@
 # 2023 run's later states were affordable at all. Sixteen parallel cold jobs would each pay the
 # shared low-k cost from scratch.
 #
-#   tools/sa193_launch.sh [--days 7] [--type r7iz.4xlarge] [--dry-run]
+#   tools/sa193_launch.sh [--days 60] [--type r7iz.4xlarge] [--resume] [--dry-run]
+#
+# **Cold by default.** A checkpoint in S3 is NOT picked up unless --resume is passed. That default is
+# the whole point of this run: a cold single session produces a log that is closed under SPLITS, and
+# resuming makes it multi-segment, verifiable only if every segment survives. Warm-starting also
+# hides work rather than doing it, so a resumed run cannot answer "was 2023 right" on its own.
+# Reserve --resume for catastrophic failure, where the alternative is starting over.
 #
 # --days is a BACKSTOP, not a schedule. It defaults to 60 because the point of this run is a single
 # cold session: an interruption makes the log multi-segment, which is only closed if every segment
@@ -18,12 +24,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DAYS=60 TYPE=r7iz.4xlarge DRY=0
+DAYS=60 TYPE=r7iz.4xlarge DRY=0 RESUME=0
 while (( $# )); do
     case "$1" in
         --days) DAYS="$2"; shift 2 ;;
         --type) TYPE="$2"; shift 2 ;;
         --dry-run) DRY=1; shift ;;
+        --resume) RESUME=1; shift ;;
         *) echo "unknown arg $1" >&2; exit 2 ;;
     esac
 done
@@ -54,9 +61,15 @@ clang -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o radio_sa193
 # solvable. Resume: if a checkpoint exists, pass it - warm-starting a negative from this run's OWN
 # output is sound, unlike cache-2025:parsed_260.txt.
 CACHE=""
-if aws s3 cp s3://$BUCKET/run/sa193.checkpoint /root/run/resume.txt 2>/dev/null; then
-    CACHE=/root/run/resume.txt
-    echo "resuming from checkpoint (\$(wc -l < \$CACHE) facts)"
+if [ "$RESUME" = "1" ]; then
+    if aws s3 cp s3://$BUCKET/run/sa193.checkpoint /root/run/resume.txt 2>/dev/null; then
+        CACHE=/root/run/resume.txt
+        echo "RESUMING from checkpoint (\$(wc -l < \$CACHE) facts) - this run is NOT cold"
+    else
+        echo "--resume was requested but no checkpoint exists; running cold"
+    fi
+else
+    echo "COLD run: any checkpoint in S3 is deliberately ignored"
 fi
 
 ( tools/capped_run.sh --seconds $SECS --rss-gb 110 --label sa193 -- \\

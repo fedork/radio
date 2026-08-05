@@ -43,29 +43,54 @@ notify() {   # never let a failed AWS call kill the watchdog - the run matters m
 }
 
 status() {
-    local now elapsed rss done16 v last
-    now=$(date +%s); elapsed=$(( now - START ))
+    local now elapsed rss
+    now=$(date +%s)
+    # The SOLVER's age, not the watchdog's. The watchdog can be restarted (to patch it, or after a
+    # crash) and its own uptime then reports minutes for a run that is days old - which is exactly
+    # backwards for the one field people read to judge whether anything is wrong.
+    elapsed=$(ps -o etimes= -p "$PID" 2>/dev/null | tr -d ' ')
+    [[ -z "$elapsed" ]] && elapsed=$(( now - START ))
     rss=$(ps -o rss= -p "$PID" 2>/dev/null | awk '{printf "%.2f", $1/1048576}')
     [[ -z "$rss" ]] && rss="-"
-    # the sixteen: distinct n1 with a printed k=9 verdict on a 193-coin state
-    done16=$(grep -o "Sb([0-9]*:[0-9]*)\[[0-9]*,193\] in 9" "$LOG" 2>/dev/null \
-             | sed 's/Sb(\([0-9]*\):.*/\1/' | sort -u | wc -l | tr -d ' ')
-    v=$(grep -c "solve" "$LOG" 2>/dev/null || echo 0)
-    last=$(grep "solve" "$LOG" 2>/dev/null | tail -1 | cut -c1-120)
+
+    # ONE pass over the log for everything. The log reaches gigabytes, so the previous four
+    # independent greps meant four full scans every cycle; this is strictly cheaper and it is what
+    # makes a per-level "most recent verdict" affordable at all.
+    local scan
+    scan=$(awk '
+        /solve/ { v++ }
+        match($0, /\] in [0-9]+ /) {
+            k = substr($0, RSTART + 5, RLENGTH - 6) + 0
+            cnt[k]++; last[k] = $0
+        }
+        # the sixteen: distinct n1 with a printed k=9 verdict on a 193-coin state
+        /\[[0-9]+,193\] in 9/ {
+            if (match($0, /Sb\([0-9]+:/)) seen[substr($0, RSTART + 3, RLENGTH - 4)] = 1
+        }
+        END {
+            n = 0; for (x in seen) n++
+            printf "SIXTEEN %d\n", n
+            printf "VERDICTS %d\n", v + 0
+            for (k = 12; k >= 1; k--) if (k in cnt) printf "CNT %d %d\n", k, cnt[k]
+            for (k = 12; k >= 1; k--) if (k in last) printf "LAST %d %s\n", k, substr(last[k], 1, 118)
+        }' "$LOG" 2>/dev/null)
+
     printf 'Sa(193) cold re-derivation\n'
-    printf '  top-level states done   %s of 16\n' "$done16"
-    printf '  elapsed                 %dd %02dh %02dm\n' $((elapsed/86400)) $((elapsed%86400/3600)) $((elapsed%3600/60))
-    printf '  verdicts                %s\n' "$v"
+    printf '  top-level states done   %s of 16\n' "$(awk '/^SIXTEEN/{print $2}' <<<"$scan")"
+    printf '  solver running for      %dd %02dh %02dm\n' $((elapsed/86400)) $((elapsed%86400/3600)) $((elapsed%3600/60))
+    printf '  verdicts                %s\n' "$(awk '/^VERDICTS/{print $2}' <<<"$scan")"
     printf '  resident memory         %s GB\n' "$rss"
     printf '  log size                %s\n' "$(du -h "$LOG" 2>/dev/null | cut -f1)"
     printf '  solver process          %s\n' "$(kill -0 "$PID" 2>/dev/null && echo alive || echo GONE)"
-    printf '  per-k verdicts          %s\n' \
-        "$(grep -o '\] in [0-9]*' "$LOG" 2>/dev/null | sort | uniq -c | sort -k3 -n \
-           | awk '{printf "k%s:%s ", $4, $1}')"
+    # by k descending, so the levels nearest the root - where progress actually means something -
+    # come first. Sorting these by COUNT, as an earlier version did, buried k=9 in the middle.
+    printf '  verdicts by level       %s\n' \
+        "$(awk '/^CNT/{printf "k%s:%s  ", $2, $3}' <<<"$scan")"
     printf '  control                 %s\n' \
         "$(grep -m1 'result CONTROL' "$LOG" 2>/dev/null || echo 'not yet reported')"
-    printf '  last verdict            %s\n' "$last"
-    grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '  *** FINAL ANSWER ABOVE ***\n'
+    printf '\n  most recent verdict at each level (k=9 is a top-level state, 1 of the 16):\n'
+    awk '/^LAST/ { k=$2; $1=""; $2=""; sub(/^  /,""); printf "    k=%-2s %s\n", k, $0 }' <<<"$scan"
+    grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
 
 while :; do
