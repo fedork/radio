@@ -2451,3 +2451,33 @@ It also corrected an earlier claim of mine. **Positives are printed, with witnes
 currently reads `can solve Sb(112:80)[8960,192] in 9 with [64:48] ...`. My "zero positives at any k"
 finding was a property of that pure-refutation `Sb(97:96)` run, where no solvable state arises at all,
 not a property of the engine. One more reason that measurement could not see what FAST does.
+
+### Status refinements, and two reporting bugs that looked like disasters
+
+The verdict stack now runs **from the level the search is on upward to the root** and stops there.
+Levels below were last touched arbitrarily long ago, so their "most recent" verdict is stale and
+placing it means scrolling back through the whole log; levels above are the enclosing context.
+Positive verdicts carry their entire witness tree inline, so they are shown as `[+witness]` — a flat
+truncation cut them mid-token and lost the trailing cost fields with it.
+
+Two bugs in the reporting made healthy things look broken, which is the failure mode that matters
+most in a status line:
+
+- **The log appeared to shrink**, 249M then 122M, for a file that only ever grows. `du` was the
+  culprit: the volume is XFS, which speculatively preallocates blocks for a growing file and trims
+  them later, so `du` fluctuates while the apparent size climbs monotonically. Now reported from
+  `stat -c%s`. A status line falsely suggesting the run's one irreplaceable artifact is being
+  truncated is worse than no status line.
+- **`pgrep -fc 'sa193_watchdog.sh --log'` reported two watchdogs** when there was one: `status()`
+  uses command substitution, and the transient subshell carries the parent's argv. Verified with
+  `ps` before killing anything.
+
+Also fixed: `elapsed` was the watchdog's uptime rather than the solver's, so patching the watchdog
+made a days-old run report minutes. Now `ps -o etimes=` on the solver, guarded to be numeric —
+BSD `ps` has no `etimes` and prints its usage to *stdout*, so a non-empty check passes and the
+arithmetic then fails on a page of option names.
+
+Method note worth keeping: three of my `python .replace()` patches to this script silently failed to
+match because of backslash escaping, and one of them — raising a truncation limit — *appeared* to work
+because a different change had brought the lines under the old limit. Print the `repr()` of the target
+lines and assert the match, rather than trusting that a replacement landed.

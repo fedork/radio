@@ -73,6 +73,7 @@ status() {
             line = $0
             if (match(line, / with \[/)) line = substr(line, 1, RSTART - 1) "  [+witness]"
             last[k] = line
+            curk = k               # the level the search is on right now
         }
         # the sixteen: distinct n1 with a printed k=9 verdict on a 193-coin state
         /\[[0-9]+,193\] in 9/ {
@@ -83,7 +84,12 @@ status() {
             printf "SIXTEEN %d\n", n
             printf "VERDICTS %d\n", v + 0
             for (k = 12; k >= 1; k--) if (k in cnt) printf "CNT %d %d\n", k, cnt[k]
-            for (k = 12; k >= 1; k--) if (k in last) printf "LAST %d %s\n", k, substr(last[k], 1, 118)
+            # Only from the current level UP. Levels below were last touched arbitrarily long
+            # ago, so their "most recent" verdict is stale and placing it would mean scrolling
+            # back through the whole log. Higher levels are the enclosing context: the path
+            # from where the search is now toward the root.
+            printf "CURK %d\n", curk + 0
+            for (k = 12; k >= curk; k--) if (k in last) printf "LAST %d %s\n", k, substr(last[k], 1, 220)
         }' "$LOG" 2>/dev/null)
 
     printf 'Sa(193) cold re-derivation\n'
@@ -91,7 +97,13 @@ status() {
     printf '  solver running for      %dd %02dh %02dm\n' $((elapsed/86400)) $((elapsed%86400/3600)) $((elapsed%3600/60))
     printf '  verdicts                %s\n' "$(awk '/^VERDICTS/{print $2}' <<<"$scan")"
     printf '  resident memory         %s GB\n' "$rss"
-    printf '  log size                %s\n' "$(du -h "$LOG" 2>/dev/null | cut -f1)"
+    # Apparent size, not `du`. The log is on XFS, which speculatively preallocates blocks for a
+    # growing file and trims them later, so `du` fluctuates and the log APPEARS TO SHRINK - 249M then
+    # 122M for a file that only ever grows. That reads as truncation, which for the run's one
+    # irreplaceable artifact is the most alarming thing a status line could say falsely.
+    printf '  log size                %s\n' \
+        "$(awk -v b="$(stat -c%s "$LOG" 2>/dev/null || stat -f%z "$LOG" 2>/dev/null)" \
+             'BEGIN{ if (b >= 1073741824) printf "%.2f GB", b/1073741824; else printf "%.0f MB", b/1048576 }')"
     printf '  solver process          %s\n' "$(kill -0 "$PID" 2>/dev/null && echo alive || echo GONE)"
     # by k descending, so the levels nearest the root - where progress actually means something -
     # come first. Sorting these by COUNT, as an earlier version did, buried k=9 in the middle.
@@ -99,7 +111,8 @@ status() {
         "$(awk '/^CNT/{printf "k%s:%s  ", $2, $3}' <<<"$scan")"
     printf '  control                 %s\n' \
         "$(grep -m1 'result CONTROL' "$LOG" 2>/dev/null || echo 'not yet reported')"
-    printf '\n  most recent verdict at each level (k=9 is a top-level state, 1 of the 16):\n'
+    printf '\n  most recent verdict from the level the search is on (k=%s) up to the root:\n' \
+        "$(awk '/^CURK/{print $2}' <<<"$scan")"
     awk '/^LAST/ { k=$2; $1=""; $2=""; sub(/^  /,""); printf "    k=%-2s %s\n", k, $0 }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
