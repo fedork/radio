@@ -2316,3 +2316,61 @@ Also fixed: `derive()` restored every global except the per-fact budget clock, s
 derivation reset the enclosing fact's timer and the time budget silently stopped bounding anything.
 That is why a 300 s per-fact cap let one k=9 fact run 1,500 s. Third instance today of the same
 failure shape — an inner mechanism quietly disabling the instrument measuring the outer one.
+
+## 2026-08-05 — sizing the cold re-derivation, and a 4.3x gate on pass 1
+
+Decision: re-derive `Sa(193)` **cold, in one session**, rather than certify the 2023 corpus. The
+reasoning is settled by yesterday's work — every gap in that corpus traces to warm-cache resumption,
+and a cold single session cannot have that defect, so its log is closed and checkable end to end.
+Driver written: `radio_sa193.c`, which runs the `Sa(192)` positive control **first** and aborts if it
+does not reproduce, then asks `canSolveA(193, 10)`.
+
+### Memory is not the constraint. That changes the shape of the run.
+
+Cold `Sb(97:96)` in 9 at `MAX_N=193` peaked at **1.36 GB**. The 2023 run reached ~90 GB, and the
+whole AWS plan was built around needing 128 GB. At this footprint **the sixteen can run in parallel**
+— sixteen cold single-session processes, each producing its own closed log, and a union of closed
+logs is still a valid fact set. Wall clock becomes the cost of the *hardest* state rather than the
+sum. That was impossible under the 90 GB assumption.
+
+### Cold is expensive, and the cheapest of the sixteen is the evidence
+
+| | |
+|---|---|
+| `Sb(97:96)` in 9, 2023, **warm** | 1,290 s |
+| `Sb(97:96)` in 9, 2026 engine, **cold** | **did not finish in 2,700 s** (356,433 verdicts) |
+
+So the cold penalty on the easiest of the sixteen is at least 2x, on an engine that is otherwise
+faster. For scale, in 2023 `Sb(112:81)` cost 1,337x what `Sb(97:96)` did. Do not read a total off
+that ratio — the 1,725,456 s for `Sb(112:81)` includes 12 passes, and the current engine does at
+most 2 — but the run is weeks, not days.
+
+### Pass 1 is nearly pure overhead below k=7
+
+Every one of the 356,433 verdicts in that cold run is a **negative**; pass 1 printed no positive at
+any level. Share of verdicts pass 1 actually resolved:
+
+| k | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|
+| pass-1 share | 100% | 5.4% | **0.2%** | **0.4%** | **0.5%** | 26.3% | 100% |
+
+Pass 1 earns its keep high in the tree and is close to waste low in it, which is where nearly all the
+verdicts are. `FAST_MIN_K` now gates it (0 = the old unconditional behaviour). With `FAST_MIN_K=7`,
+the same cold `Sb(97:96)` reached **1,258 k=8 verdicts in 10:21 — the count the ungated run needed
+the full 45 minutes to reach**. About **4.3x**, consistent with the 3.84x FAST cost measured on the
+k=9 ladder.
+
+This is a heuristic and cannot affect correctness: pass 2 is exhaustive either way. What it can
+affect is whether a *solvable* state is found before a deadline fires, which is exactly the failure
+the FAST restoration was for.
+
+### The solvable control is inconclusive, and that is the open question
+
+`Sb(112:80)` in 9 — solvable, with a verified witness tree — did **not** conclude in 45 minutes cold
+*with* the gate. That is not yet evidence against the gate: no cold ungated time for that state
+exists either, so there is nothing to compare against. Running it. Until that comparison exists,
+**`FAST_MIN_K` stays defaulted to 0** and the gate is not recommended.
+
+Note what this measurement is not: pass-share by k is an artifact of the current ordering, as is
+verdict count. The progress marker used above (k=8 verdicts, the direct children of the k=9 root) is
+the one quantity here that means the same thing in both builds.

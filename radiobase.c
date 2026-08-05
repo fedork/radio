@@ -716,9 +716,22 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         // ladder is refutation-dominated, and without this the search sank into single
         // prefixes on solvable states (Sb(112:80) in 9 spent 43 minutes on one k=5 node,
         // clearing 1 of its 52 splits). Do not remove it on a refutation-only benchmark.
+        // Gate measured 2026-08-05 on a COLD Sb(97:96) in 9, 45 minutes, 356,433 verdicts, every
+        // one of them a negative - pass 1 printed no positive at any level. Share of verdicts that
+        // pass 1 resolved: 100% at k=8, 26.3% at k=7, then 0.5% at k=6, 0.4% at k=5, 0.2% at k=4.
+        // So on a refutation workload pass 1 earns its keep high in the tree and is close to pure
+        // overhead low in it, which is where nearly all the verdicts are. FAST_MIN_K skips it below
+        // a level; 0 restores the old unconditional behaviour.
+        //
+        // This is a heuristic and cannot affect correctness - pass 2 is exhaustive either way. What
+        // it CAN affect is whether a solvable state gets found before a deadline fires, which is why
+        // the k=9 solvable control Sb(112:80) must be re-run whenever this is changed.
+#ifndef FAST_MIN_K
+#define FAST_MIN_K 0
+#endif
         fast_solve = FALSE;
         if (pass==1) {
-            fast_solve = TRUE && size > 2;
+            fast_solve = TRUE && size > 2 && k >= FAST_MIN_K;
         }
         
         // Deadlines restored 2026-08-04 after disabling them trapped a real run. They are
