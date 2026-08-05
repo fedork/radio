@@ -175,8 +175,7 @@ while :; do
     printf '=== %s ===\n%s\n\n' "$(date -u +%FT%TZ)" "$S"      # also to stdout, for the instance log
     if [[ -n "$BUCKET" ]]; then
         printf '%s\n' "$S" | aws s3 cp - "s3://$BUCKET/run/STATUS" --content-type text/plain >/dev/null 2>&1 || true
-        { date -u +%FT%TZ; printf '%s\n\n' "$S"; } | aws s3 cp - "s3://$BUCKET/run/STATUS-$(date -u +%F).log" \
-            --content-type text/plain >/dev/null 2>&1 || true
+
     fi
 
     # $4 is the count: the line is "  top-level states done   N of 16", so $5 is the word "of".
@@ -219,9 +218,12 @@ while :; do
     if (( NOW - LAST_UPLOAD >= 3600 )) && [[ -n "$BUCKET" ]]; then
         LAST_UPLOAD=$NOW
         head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -3 -c | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
+        # Both keys from ONE parse, via tee - an S3-to-S3 `cp` needs s3:GetObjectTagging, which the
+        # run role deliberately does not have, and the failure was invisible behind `|| true`.
         { echo "# radio-cert v1 sa193 cold segment $SEG, generated $(date -u +%FT%TZ)";
-          head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1 || true
-        aws s3 cp "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
+          head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } \
+          | tee >(aws s3 cp - "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \
+          | aws s3 cp - "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
     fi
     sleep "$INTERVAL"
 done

@@ -2548,3 +2548,28 @@ lines from the actual cause.
 k=7 refutations are expected to take a long time; **weeks for `Sa(193)` overall is the expectation, not a
 symptom.** A k=7 node sitting at `left=577/578` for hours is the normal shape of this problem, so do not
 read it as a stuck run — and do not read `left=` as a rate, per above.
+
+### S3 layout, and a silent AccessDenied
+
+Live artifacts, all under `s3://radio-sa193-393287594714/`:
+
+| key | what |
+|---|---|
+| `run/STATUS` | current snapshot, every 10 min |
+| `run/seg-<stamp>/out_sa193.txt.zst` | raw log, hourly — the archival artifact |
+| `run/seg-<stamp>/sa193.checkpoint` | parsed form, hourly |
+| `run/sa193.checkpoint` | latest checkpoint, the `--resume` path |
+| `src/sa193_src_<sha>.tgz` | the running build |
+| `src/{rss_guard,sa193_watchdog}.sh` | live scripts, fetched by SSM to patch in place |
+
+**`run/sa193.checkpoint` had silently stopped refreshing** — 90 minutes stale while the segment copy
+was current. `aws s3 cp` between two S3 keys calls `s3:GetObjectTagging` to preserve tags, which the
+run role deliberately does not grant, so it failed with AccessDenied behind a `|| true`. Fixed by
+writing both keys from one parse through `tee` rather than copying, which also avoids widening the
+policy. The failure mode is worth remembering: `|| true` on every AWS call keeps a broken report from
+killing the run, and equally keeps a broken report from being noticed.
+
+Deleted as superseded (~177 MB): the 2026-08-03 failed run's checkpoint, log and source bundle; the
+truncated fixed-key `out_sa193.txt.zst` from before per-segment keys; and `run/STATUS-<date>.log`,
+which was broken by design — S3 has no append, so each cycle overwrote it and it was never more than
+a stale duplicate of `STATUS`.
