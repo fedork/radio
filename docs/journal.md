@@ -2497,8 +2497,13 @@ recent completed verdict, and label which it is. Either can be the informative o
 wants `left=`/`elapsed=`, a level that just finished wants `took=`/`totalsplits=` — and which is current
 changes as the search moves between levels. Comparing recorded log positions is the only way to know.
 The first version showed only `still solving`, which meant a level that had just completed something
-displayed a line from before it. Those carry what a completed verdict cannot: `left=<remaining>/<total>` splits at that level and
-`elapsed=<used>/<budget>` against the deadline. A completed verdict says only what finished, which at
+displayed a line from before it. Those carry what a completed verdict cannot: `left=<remaining>/<total>` and `elapsed=<used>/<budget>`.
+
+**`left=` is not a fraction of the work.** It counts splits of the FIRST GROUP only, for simplicity, so
+it is an ordering position rather than a percentage, and the cost behind each unit is wildly non-linear
+(2026-08-05, from the author). `left=577/578` means one first-group split has been cleared; it does not
+mean 0.2% of the node is done, and the remaining 577 are not comparable to each other. Useful as a
+liveness signal and for spotting a stuck node; useless as an ETA. A completed verdict says only what finished, which at
 high k can be hours stale. Each line also carries how far back in the log it is, so a level the solver
 has not revisited is marked `(stale)` rather than silently misread as current.
 
@@ -2526,8 +2531,8 @@ already collected said so plainly — `3963/3973` then `4231/4241`, gap constant
 constant gap as a nearly-exhausted budget.
 
 The consequence is the opposite of reassuring: **below a pass-2 node there is no deadline protection at
-all.** It is progressing (`left` went 59/168 -> 43/168 in four minutes, so this node should finish in
-~10), but nothing bounds it if it does not. The status now detects the case (Y - X <= 12) and labels it
+all.** It was progressing (`left` went 59/168 -> 43/168 in four minutes) and did finish — but `left` counts
+first-group splits only and is non-linear, so no rate can be extrapolated from it. The status now detects the case (Y - X <= 12) and labels it
 `(no deadline: auto-extends)` rather than implying a countdown.
 
 Also note `totalsplits=307871277349` against `k=6`: the saturated multi-part states at k=5-6 are where
@@ -2537,3 +2542,9 @@ k=4-5 and that those states are the expensive ones.
 Shell trap worth recording: an apostrophe inside an awk comment terminates the single-quoted awk program.
 `# ... the control's ...` broke the whole script with "unexpected EOF while looking for matching )", 60
 lines from the actual cause.
+
+### Expected scale, from the author (2026-08-05)
+
+k=7 refutations are expected to take a long time; **weeks for `Sa(193)` overall is the expectation, not a
+symptom.** A k=7 node sitting at `left=577/578` for hours is the normal shape of this problem, so do not
+read it as a stuck run — and do not read `left=` as a rate, per above.
