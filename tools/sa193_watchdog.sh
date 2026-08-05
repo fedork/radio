@@ -48,8 +48,11 @@ status() {
     # The SOLVER's age, not the watchdog's. The watchdog can be restarted (to patch it, or after a
     # crash) and its own uptime then reports minutes for a run that is days old - which is exactly
     # backwards for the one field people read to judge whether anything is wrong.
+    # Must be validated as numeric, not merely non-empty: BSD ps has no `etimes` and prints its
+    # usage to STDOUT, so an emptiness check passes and the arithmetic below then fails on a page of
+    # option names. Linux ps supports it, which is what the instance runs.
     elapsed=$(ps -o etimes= -p "$PID" 2>/dev/null | tr -d ' ')
-    [[ -z "$elapsed" ]] && elapsed=$(( now - START ))
+    [[ "$elapsed" =~ ^[0-9]+$ ]] || elapsed=$(( now - START ))
     rss=$(ps -o rss= -p "$PID" 2>/dev/null | awk '{printf "%.2f", $1/1048576}')
     [[ -z "$rss" ]] && rss="-"
 
@@ -61,7 +64,15 @@ status() {
         /solve/ { v++ }
         match($0, /\] in [0-9]+ /) {
             k = substr($0, RSTART + 5, RLENGTH - 6) + 0
-            cnt[k]++; last[k] = $0
+            cnt[k]++
+            # A positive verdict carries its whole witness tree inline ("with [a:b] Sb(...)Sb(...)"),
+            # which is hundreds of characters and was being cut mid-token by a flat truncation. The
+            # witness is not progress context - the state, the level and the cost are - so elide it
+            # and keep the line intact. Negatives have no witness and keep their took/pass tail,
+            # which is the useful part: it shows what each level is costing.
+            line = $0
+            if (match(line, / with \[/)) line = substr(line, 1, RSTART - 1) "  [+witness]"
+            last[k] = line
         }
         # the sixteen: distinct n1 with a printed k=9 verdict on a 193-coin state
         /\[[0-9]+,193\] in 9/ {
