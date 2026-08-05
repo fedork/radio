@@ -594,6 +594,8 @@ static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part
 
 static int g_dpen = 0;
 static long long g_nodecap = 0;
+static double g_timecap = 0;
+static clock_t g_fact_t0;
 static int g_budget_hit = 0;      /* measured a net 2.4x loss - see the journal; off by default */
 static int g_diag = 0, g_diag_left, g_srcmask = 0;
 
@@ -663,6 +665,12 @@ static int splits_rec(int i, int s2, int s0, int s1) {
        whether a level is feasible, and which a mean cannot express when per-fact costs span four
        orders of magnitude. */
     if (g_nodecap && g_fact_nodes > g_nodecap) { g_budget_hit = 1; return 1; }
+    /* Time budget. At k=7 a node costs ~134 us against ~0.07 us at k=4, so a node cap cannot
+       bound the work - 30 M nodes was never approached in 40 minutes. Cost is per-query. */
+    if (g_timecap && !(g_fact_nodes & 0x3FF)
+            && (double)(clock() - g_fact_t0) / CLOCKS_PER_SEC > g_timecap) {
+        g_budget_hit = 1; return 1;
+    }
     DpEnt *dpe = NULL;
     int lo0 = (i && g_s->p[i].n == g_s->p[i - 1].n && g_s->p[i].m == g_s->p[i - 1].m)
               ? g_last[i - 1] + 1 : 0;
@@ -804,6 +812,7 @@ static int verify(const Level *below, const Fact *s, int k) {
     st2[0].h = st0[0].h = st1[0].h = 0;
     g_fact_nodes = 0;
     g_budget_hit = 0;
+    g_fact_t0 = clock();
     g_diag_left = g_diag;
     dp_gen++;
     int r = splits_rec(0, 0, 0, 0);
@@ -874,6 +883,7 @@ int main(int argc, char **argv) {
     if (argc > 3) g_order = atoi(argv[3]);
     { char *e = getenv("BENCH_K"); if (e) g_bench = atoi(e); }
     { char *e = getenv("NODECAP"); if (e) g_nodecap = atoll(e); }
+    { char *e = getenv("TIMECAP"); if (e) g_timecap = atof(e); }
     if (argc > 4) g_fcen = atoi(argv[4]);
     if (argc > 5) g_fcmin = atoi(argv[5]);
     if (argc > 6) g_minp = atoi(argv[6]);
@@ -1039,9 +1049,13 @@ int main(int argc, char **argv) {
         for (i = 0; i < L[k].n; i++) {
             if (clock() - tick > 10 * CLOCKS_PER_SEC) {
                 tick = clock();
-                fprintf(stderr, "    k=%d  %d/%d  nodes=%.3g  max/fact=%.3g  memo=%.2f%%\n",
-                        k, i, L[k].n, (double)(g_nodes - n0), (double)g_max_fact_nodes,
-                        100.0 * memo_hit / (memo_hit + memo_miss ? memo_hit + memo_miss : 1));
+                { long long done = 0; int z;
+                  for (z = 0; z < 24; z++) done += cost_hist[z];
+                  fprintf(stderr, "    k=%d  %d/%d  nodes=%.3g  memo=%.1f%%  "
+                          "| done %lld, over budget %lld, mean %.0f nodes\n",
+                          k, i, L[k].n, (double)(g_nodes - n0),
+                          100.0 * memo_hit / (memo_hit + memo_miss ? memo_hit + memo_miss : 1),
+                          done, budget_out, (double)cost_sum / (done ? done : 1)); }
             }
             if (L[k].f[i].np < g_minp || L[k].f[i].np > g_maxp) continue;
             if (g_srcmask && !(L[k].f[i].src & g_srcmask)) continue;   /* not a target fact */

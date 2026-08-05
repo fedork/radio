@@ -2134,3 +2134,41 @@ be dropped: with the 2023 logs alone, the same four k=7 facts fail in 0.76 s wit
 small-coin facts legitimately dominate 193-coin children. So the fix is not curation but
 **minimalization** — the refuted set is upward-closed, so only the minimal antichain can ever be the
 reason a query succeeds, and everything else is pure scan cost.
+
+### Addendum: minimalization is worth 1.84x, not 20x
+
+Measured exactly, on the merged k=6 level (2023 `Sa(193)` logs plus `out_k8.txt`), by testing every
+fact against the level with itself excluded — 2.52 M dominance queries in 939 s:
+
+| bucket | facts | minimal | redundant |
+|---|---|---|---|
+| np=1 | 135 | 19 | 85.9% |
+| np=2 | 3,113 | 1,261 | 59.5% |
+| np=3 | 137,626 | 53,706 | 61.0% |
+| **np=4** (what `lim=4` sweeps) | **2,381,059** | **1,295,983** | **45.6%** |
+| np=5..8 | 2,670 | 2,656 | ~0% |
+| **total** | **2,524,603** | **1,353,625** | **46.4%** |
+
+So the antichain is **1.84x** smaller, not the order of magnitude the upward-closure argument
+invited. Combined with the columnar index that is ~15x on k=7, which is real and still leaves the
+level expensive: extrapolating the A/B (485 K nodes and 64.5 s per hard fact) to ~35 s post-
+minimalization gives **~3.4 core-years** for 3.1 M facts — weeks on a large machine, not hours.
+
+Worth recording as a corrected expectation: "the refuted set is upward-closed so only the antichain
+matters" is true and does not imply the antichain is small. Most logged facts are already minimal.
+
+The redundancy is concentrated where part counts are low, which makes sense — a 4-part fact has far
+more chances to contain a smaller refuted sub-multiset than an 8-part one has to contain a smaller
+8-part one, and the np>=5 buckets are essentially pure antichains already.
+
+### Two instrumentation bugs, both of which cost a run
+
+- **The cost histogram printed only in the end-of-level summary.** A level that never finishes
+  reports nothing, so a 40-minute sampling run produced no data at all. Progress output now carries
+  the running histogram.
+- **A node budget cannot bound k=7 cost.** Cost there is per-query, not per-node: 30 M nodes was
+  never approached in 40 minutes at 7,458 nodes/s. Replaced with a per-fact *time* budget, checked
+  every 1,024 nodes.
+
+Both are the same mistake in different clothes — instrumenting the quantity that was expensive at
+k=4 rather than the one that is expensive at k=7.
