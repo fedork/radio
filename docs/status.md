@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-05**.
+don't know it. Last refreshed **2026-08-06**.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -163,6 +163,23 @@ verdict — removing deadlines trapped it in an intractable subtree. Deadlines a
 3,100,961 verdicts of the control survive as a checkpoint in
 `s3://radio-sa193-393287594714/run/112_80.cache`, so a relaunch resumes rather than repeats.
 See [aws-run.md](aws-run.md) and the 2026-08-04 journal entry.
+
+## The `Sa(193)` cold run is live
+
+`i-0005d74f985c52ae1`, started 2026-08-05, serialized single process, **completely cold**
+(`cache=(none, cold)`). The `Sa(192)` control passed in 2,209 s. Details and how to follow it without
+logging in: [aws-run.md](aws-run.md); `tools/sa193_status.sh`.
+
+At 26 h: `0 of 16` top-level states, ~1.9 M verdicts, **5.76 GB** peak against a 110 GB guard. The
+memory profile (`run/seg-*/memprofile.csv`) shows essentially the whole footprint was allocated in a
+40-minute window during the control, and +900k verdicts since cost +0.48 GB — so **memory is not the
+binding constraint after all**, contrary to the earlier expectation drawn from 2023's ~90 GB. Wall
+clock is: there is no time bound anywhere below a pass-2 node, because
+`child_deadline = pass<2 ? deadline : NO_DEADLINE` and such a node bumps its deadline 10 s rather than
+returning `MAYBE`. Weeks is the expectation, not a symptom.
+
+The run's binary **predates** the majorization corollary below; not worth restarting for a 3-16%
+pruning gain against 27 h of accumulated cache.
 
 ## The Sa(193) certificate
 
