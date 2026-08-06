@@ -17,9 +17,9 @@ INSTANCE=i-0005d74f985c52ae1
 
 show() {
     local mod age now
-    mod=$(aws-vault exec default -- aws s3api head-object --bucket "$BUCKET" --key run/STATUS \
+    mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" --key run/STATUS \
             --query LastModified --output text 2>/dev/null)
-    aws-vault exec default -- aws s3 cp "s3://$BUCKET/run/STATUS" - 2>/dev/null
+    aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/run/STATUS" - 2>/dev/null
     if [[ -n "$mod" ]]; then
         now=$(date -u +%s)
         age=$(( now - $(date -u -j -f "%Y-%m-%dT%H:%M:%S" "${mod%%+*}" +%s 2>/dev/null || echo "$now") ))
@@ -27,7 +27,7 @@ show() {
             "$( (( age > 1800 )) && printf ', STALE - watchdog may be dead' )"
     fi
     printf '  instance           %s\n' \
-        "$(aws-vault exec default -- aws ec2 describe-instances --instance-ids "$INSTANCE" \
+        "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$INSTANCE" \
              --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null)"
 }
 

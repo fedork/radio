@@ -22,7 +22,7 @@ BUCKET=radio-sa193-393287594714
 TOPIC=arn:aws:sns:us-west-2:393287594714:radio-sa193-progress
 INSTANCE=${INSTANCE:-i-0005d74f985c52ae1}
 
-aws-vault exec default -- aws s3 cp tools/sa193_watchdog.sh "s3://$BUCKET/src/sa193_watchdog.sh" >/dev/null
+aws-vault exec --server default -- aws s3 cp tools/sa193_watchdog.sh "s3://$BUCKET/src/sa193_watchdog.sh" >/dev/null
 echo "staged watchdog to s3"
 
 cat > /tmp/sa193_restart.json <<JSON
@@ -42,9 +42,9 @@ cat > /tmp/sa193_restart.json <<JSON
 ]}
 JSON
 
-CID=$(aws-vault exec default -- aws ssm send-command --instance-ids "$INSTANCE" \
+CID=$(aws-vault exec --server default -- aws ssm send-command --instance-ids "$INSTANCE" \
         --document-name AWS-RunShellScript --parameters file:///tmp/sa193_restart.json \
         --timeout-seconds 120 --query 'Command.CommandId' --output text)
 sleep 35
-aws-vault exec default -- aws ssm get-command-invocation --command-id "$CID" \
+aws-vault exec --server default -- aws ssm get-command-invocation --command-id "$CID" \
     --instance-id "$INSTANCE" --query '[Status,StandardOutputContent]' --output text
