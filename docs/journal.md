@@ -2609,3 +2609,57 @@ Two bugs fixed on the way, both mine: `status()` runs inside a command substitut
 sets survives and the profile row has to parse the status *text*; and I wrote `ps -o etimes=`
 unguarded a second time, which on BSD prints its usage to stdout and put a page of option names in the
 CSV. Both call sites now go through one `solver_age()` helper.
+
+## 2026-08-06 — downgrade every part to a singleton before majorizing, and a latent unsoundness it exposed
+
+Suggested improvement: instead of applying Singleton Majorization only to the parts that are already
+singletons, **downgrade every part `(n:m)` to `(n:1)`** and majorize that. Sound because `(n:1) <= (n:m)`
+componentwise, so the downgraded state injects into the original and Subgraph Monotonicity carries
+unsolvability upward. Strictly dominates the old rule: prefix sums of a sorted-nonincreasing multiset
+only grow as elements are added. Written up as a corollary in
+[theorems/singleton-majorization.md](theorems/singleton-majorization.md).
+
+Applied in all three places that implement the rule: `radiobase.c`, `radio_verify.c`, `tools/certify.py`.
+
+### It exposed an over-refutation in the verifier
+
+`radio_verify.c` treated `i >= len(G_k)` as a majorization violation. It is not: the theorem
+**zero-pads**, so past `len(G_k) = 2^k` the bound is the constant `sum G_k = 3^k`, and the left side is
+at most the mass, which COUNT has already bounded by `3^k`. No violation can arise there.
+
+Latent while only the singleton sub-multiset was fed in — no logged state has more than `2^k` singleton
+parts. Downgrading every part makes it routine at low `k`: a mixed child of a 13-part state has 26
+parts against `len(G_3) = 8`. Instrumented on the k=4 level of the `Sa(113)` ladder:
+
+```
+MAJ: 225,625 calls
+  old rule: 433 hits, of which 79 from the buggy i>=len(G_k) clause
+  new rule: 381 hits
+```
+
+So 354 of the old hits were legitimate, the corollary adds **+27** (+7.6%), and **79 refutations were
+unjustified**. `radiobase.c` was already correct here — it stops at `min(size, len(G_k))`, which is the
+equivalent clamp.
+
+**The affected results were re-checked and all stand:** ladder k=2/3/4 (5, 487, 216,580 facts) and
+`Sa(193)` k=4 (940) and sampled k=5 (4,859) all still verify with **0 unverified**. None of the 79 was
+load-bearing. Worth stating plainly though: those earlier "0 unverified" runs did rely on an unsound
+rule, and only re-running showed the conclusions survive without it.
+
+### What the corollary buys
+
+| state | states searched, old | new | cut |
+|---|---|---|---|
+| `Sb(85:12)` in 7 | 1,055 | 888 | **15.8%** |
+| `Sb(77:16)` in 7 | 900 | 853 | 5.2% |
+| `Sb(69:22)` in 7 | 331 | 322 | 2.7% |
+
+Verdicts unchanged, and all 43 proven-solvable Pareto cells at k<=6 still come back solvable, so it is
+not over-refuting. A smaller emitted certificate falls out of it too, since fewer states are searched
+to conclusion.
+
+**The live `Sa(193)` run does not have this.** Its binary predates the change, and restarting to pick up
+a 3-16% pruning improvement would discard 27 hours of accumulated cache. Not worth it; the next run gets
+it. Wall-clock timing of the change is unmeasurable per-query at k=7 because `init` for
+`MAX_K=7 MAX_N=220` dominates a single invocation at ~6.4 s regardless of the state — hence counting
+states searched instead.

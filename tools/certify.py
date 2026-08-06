@@ -86,14 +86,20 @@ def maj_refutes(s, k: int) -> bool:
     An earlier version only handled the all-singleton case and therefore could not reproduce
     25% of the k=4 facts in a frontier walk - they were not a closure gap at all, just a rule
     the verifier was missing."""
-    singles = sorted((n for n, m in s if m == 1), reverse=True)
-    if not singles:
+    if not s:
         return False
+    # Downgrade EVERY part to its own singleton: (n:1) <= (n:m) componentwise, so the downgraded
+    # state injects into s and Subgraph Monotonicity carries unsolvability upward. Strictly stronger
+    # than using only the parts already at m==1.
+    ns = sorted((n for n, _ in s), reverse=True)
     pref = gprefix(k)
     run = 0
-    for i, n in enumerate(singles):
+    for i, n in enumerate(ns):
         run += n
-        if i >= len(pref) or run > pref[i]:
+        # Past len(G_k) the bound is the CONSTANT sum G_k = 3^k - the theorem pads with trailing
+        # zeros - not a violation. An earlier version returned True there, which over-refutes; it
+        # fired 79 times in one k=4 level once every part was being downgraded.
+        if run > (pref[i] if i < len(pref) else pref[-1]):
             return True
     return False
 

@@ -260,3 +260,36 @@ If the parts of a singleton state form a **sub-multiset** of `G_k`, its prefix s
 dominated termwise by those of `G_k`, so it is weakly majorized by `G_k` and hence solvable
 in `k`. A witness tree all of whose leaves are such states is therefore a complete proof,
 independent of the solver. `tools/check_witness.py` checks exactly this condition.
+
+## Corollary: downgrade every part to its own singleton (2026-08-06)
+
+The theorem decides all-singleton states. It can be applied to **any** state, not only to the parts
+that happen to be singletons already.
+
+> For a state `s = {(n_1:m_1), ..., (n_p:m_p)}`, let `s' = {(n_1:1), ..., (n_p:1)}`. If the sequence
+> `(n_1, ..., n_p)` sorted nonincreasing is **not** weakly majorized by `G_k`, then `s` is unsolvable
+> in `k`.
+
+*Proof.* `(n:1) <= (n:m)` componentwise for every `m >= 1`, so the identity map is an injection of
+`s'` into `s` with each part componentwise no larger — i.e. `s' <= s` in the subgraph order. The
+theorem makes `s'` unsolvable in `k`, and [Subgraph Monotonicity](subgraph-monotonicity.md) carries
+unsolvability upward to `s`. ∎
+
+This strictly dominates applying the theorem to the singleton **sub**-multiset: prefix sums of a
+sorted-nonincreasing multiset are nondecreasing under adding elements, so feeding every part instead
+of a subset can only make a violation easier to reach. Measured on the verifier, it adds 7.6% more
+majorization refutations (354 -> 381 in one k=4 level); on the solver it cut states searched by
+2.7-15.8% on three k=7 refutations, with verdicts unchanged.
+
+### The tail must be clamped, not treated as a violation
+
+Sequences are **zero-padded**, so for `t > len(G_k) = 2^k` the right-hand side is the constant
+`sum G_k = 3^k`. The left-hand side is at most the state's mass, which the counting bound has already
+bounded by `3^k`. So **no violation can arise past `len(G_k)`**, and code that reports one there
+over-refutes.
+
+This matters specifically because of the corollary: with only the singleton sub-multiset, exceeding
+`2^k` parts is rare enough never to have been observed; downgrading every part makes it routine at low
+`k`, where `2^k` is small. `radio_verify.c` had exactly this defect, and it fired **79 times** in a
+single k=4 level once every part was downgraded. `radiobase.c` was already correct — it stops the
+comparison at `min(size, len(G_k))`, which is equivalent.

@@ -609,11 +609,18 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         // Singleton states are decided exactly by majorization against G_k.
         return singleton_majorization_can_solve(tmp, size, k);
     }
-    if (singleton_size > 0) {
-        // If singleton subset already violates majorization, whole state is unsolvable.
-        if (singleton_size > 1) sort1(singletons, singleton_size);
-        if (!singleton_majorization_can_solve(singletons, singleton_size, k)) return FALSE;
-    }
+    // Downgrade EVERY part (n:m) to its own singleton (n:1), then test majorization. Sound because
+    // (n:1) <= (n:m) componentwise, so the downgraded state injects into this one and Subgraph
+    // Monotonicity carries unsolvability upward. Strictly stronger than testing only the parts that
+    // are ALREADY singletons, since prefix sums of a sorted-descending multiset only grow as elements
+    // are added. Suggested and added 2026-08-06; measured on the verifier at +7.6% more majorization
+    // refutations, so a small win, as expected.
+    //
+    // sbb ids are handed out in increasing order of n1*n2, so for m=1 they are monotone in n and
+    // sorting the ids descending sorts n descending - which is what the test reads.
+    for (i = 0; i < size; i++) singletons[i] = getSbb(sbb_to_n1[tmp[i]], 1);
+    if (size > 1) sort1(singletons, size);
+    if (!singleton_majorization_can_solve(singletons, size, k)) return FALSE;
     //check cache
     int ck = checkCache(tmp, size, k);
     //	printf("got from cache %d\n", ck);

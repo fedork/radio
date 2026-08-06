@@ -380,15 +380,28 @@ static int dominates(const Fact *a, const Fact *b) {
 }
 
 /* Singleton Majorization applied to the singleton sub-multiset (parts with m == 1). */
+/* Singleton Majorization, applied to EVERY part downgraded to its own singleton.
+   (n:1) <= (n:m) componentwise for any m >= 1, so mapping each part (n:m) to (n:1) is an injection
+   into the original state, and Subgraph Monotonicity carries unsolvability upward: if the downgraded
+   all-singleton state violates majorization against G_k, the original is unsolvable.
+
+   This strictly dominates the earlier version, which used only the parts that were ALREADY singletons.
+   Prefix sums of a sorted-descending multiset only grow when elements are added, so feeding every
+   part instead of a subset can only make the violation easier to reach. Suggested 2026-08-06.
+
+   The right-hand side must be CLAMPED past len(G_k), not treated as a violation. The theorem pads
+   with trailing zeros, so for t > len(G_k) the bound is the constant sum G_k = 3^k, and the
+   downgraded n-sum is at most the mass, which COUNT has already bounded by 3^k - hence no violation
+   can occur there. An earlier version returned "refuted" once i reached len(G_k); that was latent
+   only because no logged state has more than 2^k singleton parts, and downgrading every part would
+   have made it fire and produce wrong refutations. */
 static int maj_refutes(const Fact *s, int k) {
-    int i, run = 0, c = 0;
-    static int sing[MAXP];
-    for (i = 0; i < s->np; i++) if (s->p[i].m == 1) sing[c++] = s->p[i].n;
-    if (!c) return 0;
-    /* parts are sorted descending, so the singletons already are */
-    for (i = 0; i < c; i++) {
-        run += sing[i];
-        if (i >= glen[k] || run > gpref[k][i]) return 1;
+    int i, run = 0, cap = gpref[k][glen[k] - 1];
+    if (!s->np) return 0;
+    /* parts are sorted descending by (n,m), so the n values are already nonincreasing */
+    for (i = 0; i < s->np; i++) {
+        run += s->p[i].n;
+        if (run > (i < glen[k] ? gpref[k][i] : cap)) return 1;
     }
     return 0;
 }
