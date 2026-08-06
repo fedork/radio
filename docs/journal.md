@@ -2573,3 +2573,39 @@ Deleted as superseded (~177 MB): the 2026-08-03 failed run's checkpoint, log and
 truncated fixed-key `out_sa193.txt.zst` from before per-segment keys; and `run/STATUS-<date>.log`,
 which was broken by design — S3 has no append, so each cycle overwrote it and it was never more than
 a stale duplicate of `STATUS`.
+
+### Memory profile: the whole footprint was allocated in 40 minutes, during the control
+
+`tools/sa193_watchdog.sh` now writes a row per cycle to `memprofile.csv`, archived hourly to
+`run/seg-<stamp>/memprofile.csv`. Columns: `iso, solver_secs, rss_kb, vmdata_kb, vmpeak_kb, verdicts,
+curk, by_level`. The 164 cycles already in the instance's watchdog log were backfilled, so the series
+starts 2026-08-05T16:03Z.
+
+`VmData` alongside `VmRSS` is what makes attribution possible, and it makes it trivial: measured
+2026-08-06, `VmData` is 6,042,908 kB against `VmRSS` 6,043,704 kB and `Pss_File` is **98 kB**. The
+entire footprint is the solver's own anonymous heap — the result cache — with nothing file-backed or
+shared. `VmPeak == VmSize` and `VmHWM == VmRSS`, so it has never been higher and never swapped.
+
+Steps in the series:
+
+| time | RSS GB | verdicts | dRSS | dverdicts |
+|---|---|---|---|---|
+| 16:13 | 0.80 | 464,545 | +276 MB | +117k |
+| 16:23 | 2.97 | 652,794 | **+2,222 MB** | +188k |
+| 16:33 | 4.64 | 847,782 | **+1,710 MB** | +195k |
+| 16:43 | 5.05 | 980,450 | +420 MB | +133k |
+| 16:53 | 5.28 | 998,682 | +236 MB | +18k |
+
+**Essentially all of it was allocated in a 40-minute window during the `Sa(192)` control**, at ~11-12
+KB per verdict while the cache filled. In the 25 hours since: +900k verdicts for +0.48 GB. So the k=7
+refutation is re-walking cached states rather than discovering new ones — which is also why throughput
+fell to ~2 verdicts/min while RSS sat flat at 5.73 GB for hours.
+
+Peak 5.76 GB against the 110 GB guard, so the earlier expectation that memory would be the first
+failure mode looks wrong: at this rate it will not approach the cap. That prediction came from the
+2023 run's ~90 GB, on an engine that visited far more states.
+
+Two bugs fixed on the way, both mine: `status()` runs inside a command substitution, so nothing it
+sets survives and the profile row has to parse the status *text*; and I wrote `ps -o etimes=`
+unguarded a second time, which on BSD prints its usage to stdout and put a page of option names in the
+CSV. Both call sites now go through one `solver_age()` helper.

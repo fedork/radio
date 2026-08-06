@@ -42,6 +42,15 @@ notify() {   # never let a failed AWS call kill the watchdog - the run matters m
         --subject "$(echo "$subject" | cut -c1-99)" --message "$body" >/dev/null 2>&1 || true
 }
 
+# Seconds since the solver started, or 0. BSD ps has no `etimes` and prints its usage to STDOUT, so
+# every caller must validate numerically - not merely check for empty. This existed inline in status()
+# and was then written again, unguarded, into the profile row; hence a function.
+solver_age() {
+    local a
+    a=$(ps -o etimes= -p "$PID" 2>/dev/null | tr -d ' ')
+    [[ "$a" =~ ^[0-9]+$ ]] && printf '%s' "$a" || printf '0'
+}
+
 status() {
     local now elapsed rss
     now=$(date +%s)
@@ -51,8 +60,8 @@ status() {
     # Must be validated as numeric, not merely non-empty: BSD ps has no `etimes` and prints its
     # usage to STDOUT, so an emptiness check passes and the arithmetic below then fails on a page of
     # option names. Linux ps supports it, which is what the instance runs.
-    elapsed=$(ps -o etimes= -p "$PID" 2>/dev/null | tr -d ' ')
-    [[ "$elapsed" =~ ^[0-9]+$ ]] || elapsed=$(( now - START ))
+    elapsed=$(solver_age)
+    (( elapsed > 0 )) || elapsed=$(( now - START ))
     rss=$(ps -o rss= -p "$PID" 2>/dev/null | awk '{printf "%.2f", $1/1048576}')
     [[ -z "$rss" ]] && rss="-"
 
@@ -173,6 +182,28 @@ status() {
 while :; do
     S=$(status)
     printf '=== %s ===\n%s\n\n' "$(date -u +%FT%TZ)" "$S"      # also to stdout, for the instance log
+
+    # Memory profile, one row per cycle, so consumption can be attributed after the fact rather than
+    # only watched live. VmData alongside VmRSS is what makes the attribution possible: measured
+    # 2026-08-06, VmData is ~100% of VmRSS and Pss_File is 98 kB, so the whole footprint is the
+    # solver's own heap - the result cache - and nothing else. Paired with verdict counts and the
+    # current level, a step in RSS can be pinned to the subtree that caused it.
+    #
+    # Fields are parsed back out of the status TEXT rather than reusing status()'s internals: it runs
+    # inside a command substitution, so nothing it sets survives, local or not.
+    if [[ -n "${PROFILE:-}" ]]; then
+        read -r _ vmrss _ < <(grep -m1 '^VmRSS:'  /proc/$PID/status 2>/dev/null || echo "x 0 kB")
+        read -r _ vmdata _ < <(grep -m1 '^VmData:' /proc/$PID/status 2>/dev/null || echo "x 0 kB")
+        read -r _ vmpeak _ < <(grep -m1 '^VmPeak:' /proc/$PID/status 2>/dev/null || echo "x 0 kB")
+        [[ -s "$PROFILE" ]] || echo "iso,solver_secs,rss_kb,vmdata_kb,vmpeak_kb,verdicts,curk,by_level" > "$PROFILE"
+        printf '%s,%s,%s,%s,%s,%s,%s,"%s"\n' \
+            "$(date -u +%FT%TZ)" \
+            "$(solver_age)" \
+            "$vmrss" "$vmdata" "$vmpeak" \
+            "$(sed -n 's/^  verdicts  *\([0-9][0-9]*\)$/\1/p' <<<"$S")" \
+            "$(sed -n 's/.*search is on (k=\([0-9]*\)).*/\1/p' <<<"$S")" \
+            "$(sed -n 's/^  verdicts by level  *//p' <<<"$S")" >> "$PROFILE"
+    fi
     if [[ -n "$BUCKET" ]]; then
         printf '%s\n' "$S" | aws s3 cp - "s3://$BUCKET/run/STATUS" --content-type text/plain >/dev/null 2>&1 || true
 
@@ -192,8 +223,7 @@ while :; do
         # First cycle of THIS process. Start the heartbeat clock here, and distinguish a genuine
         # start from a reattach - the solver outlives the watchdog, so most starts are reattaches.
         LAST_BEAT=$NOW
-        AGE=$(ps -o etimes= -p "$PID" 2>/dev/null | tr -d ' ')
-        [[ "$AGE" =~ ^[0-9]+$ ]] || AGE=0
+        AGE=$(solver_age)
         if (( AGE < 2 * INTERVAL )); then
             notify "Sa(193): run started" "$S"
         else
@@ -231,6 +261,7 @@ while :; do
     if (( NOW - LAST_UPLOAD >= 3600 )) && [[ -n "$BUCKET" ]]; then
         LAST_UPLOAD=$NOW
         head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -3 -c | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
+        [[ -n "${PROFILE:-}" && -s "$PROFILE" ]] && aws s3 cp "$PROFILE" "s3://$BUCKET/run/seg-$SEG/memprofile.csv" >/dev/null 2>&1 || true
         # Both keys from ONE parse, via tee - an S3-to-S3 `cp` needs s3:GetObjectTagging, which the
         # run role deliberately does not have, and the failure was invisible behind `|| true`.
         { echo "# radio-cert v1 sa193 cold segment $SEG, generated $(date -u +%FT%TZ)";

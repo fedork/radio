@@ -34,7 +34,7 @@ cat > /tmp/sa193_restart.json <<JSON
  "sleep 3",
  "N=\$(ps -eo args | grep -E 'sa193_watchdog|wd-[0-9]+[.]sh' | grep -v grep | wc -l); test \\"\$N\\" -eq 0 || { echo \\"ABORT: \$N watchdogs still alive\\"; exit 1; }",
  "S=\$(pgrep -x radio_sa193 | head -1); test -n \\"\$S\\" || { echo 'ABORT: no solver'; exit 1; }",
- "setsid nohup env SEG=\${SEG:-seg1-detached} \\"tools/\$V\\" --log /root/run/out_sa193.txt --pid \\"\$S\\" --bucket $BUCKET --topic $TOPIC --interval 600 --heartbeat 21600 >> /var/log/sa193-watchdog.log 2>&1 < /dev/null &",
+ "setsid nohup env SEG=\${SEG:-seg1-detached} PROFILE=/root/run/memprofile.csv \\"tools/\$V\\" --log /root/run/out_sa193.txt --pid \\"\$S\\" --bucket $BUCKET --topic $TOPIC --interval 600 --heartbeat 21600 >> /var/log/sa193-watchdog.log 2>&1 < /dev/null &",
  "sleep 12",
  "N=\$(ps -eo args | grep -E 'wd-[0-9]+[.]sh' | grep -v grep | wc -l); test \\"\$N\\" -eq 1 || { echo \\"ABORT: \$N watchdogs after start\\"; exit 1; }",
  "ps -eo pid,ppid,etimes,args --sort=pid | grep -E 'wd-[0-9]+[.]sh' | grep -v grep | cut -c1-75",
