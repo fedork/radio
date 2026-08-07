@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-06**.
+don't know it. Last refreshed **2026-08-07**.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -170,7 +170,14 @@ See [aws-run.md](aws-run.md) and the 2026-08-04 journal entry.
 (`cache=(none, cold)`). The `Sa(192)` control passed in 2,209 s. Details and how to follow it without
 logging in: [aws-run.md](aws-run.md); `tools/sa193_status.sh`.
 
-At 26 h: `0 of 16` top-level states, ~1.9 M verdicts, **5.76 GB** peak against a 110 GB guard. The
+At 47 h: `0 of 16` top-level states, ~2.1 M verdicts, **5.8 GB** peak against a 110 GB guard.
+
+**Where the time goes (2026-08-07):** `self(k) = inclusive(k) - inclusive(k-1)`, valid because `took`
+is inclusive and each state is computed exactly once (2,065,670 distinct `(state,k)`, zero duplicates).
+**k=6 is 93.2% of CPU**, k=5 is 2.4%, k=4 is 0.2%; k>=7 is unknowable mid-run because their ancestors
+have not completed. One k=6 state at mass 728 of 729 took 16,603 s — **9.9% of the whole run** — and the
+92 k=6 states over 60 s are ~96% of all CPU. The near-saturated 8-part k=6 states are the whole cost.
+`tools/sa193_status.sh` reports this every cycle. The
 memory profile (`run/seg-*/memprofile.csv`) shows essentially the whole footprint was allocated in a
 40-minute window during the control, and +900k verdicts since cost +0.48 GB — so **memory is not the
 binding constraint after all**, contrary to the earlier expectation drawn from 2023's ~90 GB. Wall
