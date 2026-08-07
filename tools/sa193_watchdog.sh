@@ -205,6 +205,26 @@ status() {
     awk -v cpu="$(awk '{print int(($14+$15)/100)}' /proc/$PID/stat 2>/dev/null || echo 0)" \
         -v FIG="$(printf '\342\200\207')" '
         function fpad(s, w,   r, i) { r = ""; for (i = length(s); i < w; i++) r = r FIG; return r s }
+        # Full precision, grouped in threes - and grouped with FIG, not a comma. A comma is about
+        # half a digit wide, so rows with different comma counts would shift relative to each other
+        # and undo the alignment; FIG is exactly a digit wide, so every character in the field has the
+        # same advance and right-alignment holds. %.0f rather than %d: the values reach 1.5e13, which
+        # a double holds exactly (< 2^53) but awk %d may narrow.
+        # Width is computed from the DIGIT count, never with length() on the result: awk length() is
+        # byte-based on a multibyte FIG in BSD awk and character-based in gawk under a UTF-8 locale,
+        # so measuring the assembled string aligns on one machine and not the other.
+        function fnum(x, w,   t, r, i, c, cells, pad) {
+            t = sprintf("%.0f", x)
+            cells = length(t) + int((length(t) - 1) / 3)      # digits plus group separators
+            r = ""; c = 0
+            for (i = length(t); i >= 1; i--) {
+                r = substr(t, i, 1) r
+                if (++c % 3 == 0 && i > 1) r = FIG r
+            }
+            pad = ""
+            for (i = cells; i < w; i++) pad = pad FIG
+            return pad r
+        }
         /^TIME/ { k=$2; n=$3; incl=$4; self=$5; sp=$6
                   # if/else, not a multi-line ternary: BSD awk ends the statement at the newline
                   # after `(self >= 0` and errors; gawk accepts it, so that only failed locally.
@@ -213,8 +233,8 @@ status() {
                       pc = (cpu > 0 ? sprintf("%.1f%%", 100 * self / cpu) : "")
                   } else { st = "unknown"; pc = "" }
                   printf "    k=%s%s%s%s%s%s\n", k,
-                         fpad(n, 10), fpad(incl "s", 10), fpad(st, 10),
-                         fpad(pc, 7), fpad(sprintf("%.3g", sp), 11) }
+                         fnum(n, 11), fpad(incl "s", 10), fpad(st, 10),
+                         fpad(pc, 7), fnum(sp, 20) }
         END { if (cpu > 0) printf "    cpu %ds\n", cpu }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
