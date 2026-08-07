@@ -2709,3 +2709,33 @@ Also fixed: `sa193_restart_watchdog.sh` asserted exactly one watchdog after star
 runs a command-substitution subshell carrying the parent argv, so the count saw two and aborted after
 a perfectly good start. The assertion that matters is the pre-start `== 0` — leaving an OLD watchdog
 behind is the real failure — so the post-start check is now `>= 1`.
+
+### Making the status readable in email (2026-08-07)
+
+SNS's `email` protocol delivers **text/plain only** — no content-type control, no HTML — so the mail
+client picks the font, and Gmail picks a proportional one. Every padded column in the status was
+therefore collapsing into unreadable ragged text, while the `label   value` block at the top stayed
+readable for exactly that reason.
+
+Tested four layouts by mailing all of them to the live topic and looking at the result:
+
+| | result in Gmail |
+|---|---|
+| A: space padding | does not align (the original problem) |
+| B: **tabs** | **does not align** — flattened when the client converts to HTML |
+| C: **U+2007 FIGURE SPACE** | **aligns** |
+| D: labelled, pipe-separated | reads fine, but wastes width and buries the numbers |
+
+C works because FIGURE SPACE has the same advance as a digit in a proportional font, so a
+right-aligned numeric column lines up without monospace. B is the one worth recording as a negative:
+tabs are theoretically the right answer — CSS tab stops are multiples of `tab-size x space-width`, a
+grid independent of glyph widths — but the client does not preserve them, so the theory never applies.
+
+Adopted C, with one adjustment: **the column names go in a legend line, not a header row.** Header
+labels are letters, letters do not share the digit advance, so a figure-space-padded header cannot line
+up with the digits beneath it — visible in the test mail, where C's data aligned and its header did
+not.
+
+Implementation note: awk's `%10s` pads with ASCII spaces and counts bytes, so it cannot be used here;
+padding is built by repeating the FIG string in a helper (`fpad`), and FIG reaches awk via
+`-v FIG="$(printf '\\342\\200\\207')"` rather than a `$'\\u2007'` escape, for shell portability.

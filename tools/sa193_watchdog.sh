@@ -193,22 +193,28 @@ status() {
                          (age > 200000 ? " (stale)" : ""), $0 }' <<<"$scan"
     # Self time is only meaningful where the level above has completed; while an ancestor is still
     # running its inclusive time is missing from the log and the subtraction goes negative.
-    printf '\n  time by level, self = inclusive minus the level below:\n'
-    awk -v cpu="$(awk '{print int(($14+$15)/100)}' /proc/$PID/stat 2>/dev/null || echo 0)" '
+    # Columns are padded with U+2007 FIGURE SPACE, which has the same advance as a digit in a
+    # proportional font, so numeric columns line up even though the mail client renders text/plain
+    # proportionally. Tested against Gmail 2026-08-07: space padding does not align, and TABS DO NOT
+    # EITHER (flattened when the client converts to HTML). Figure space does.
+    #
+    # Column names live in this legend, not a header row: header labels are letters, letters do not
+    # share the digit advance, so a padded header cannot line up with the digits beneath it.
+    printf '\n  time by level - k, verdicts, inclusive, self, %%cpu, splits\n'
+    printf '  (self = inclusive minus the level below; unknown = ancestor still running)\n'
+    awk -v cpu="$(awk '{print int(($14+$15)/100)}' /proc/$PID/stat 2>/dev/null || echo 0)" \
+        -v FIG="$(printf '\342\200\207')" '
+        function fpad(s, w,   r, i) { r = ""; for (i = length(s); i < w; i++) r = r FIG; return r s }
         /^TIME/ { k=$2; n=$3; incl=$4; self=$5; sp=$6
-                  # No column alignment: SNS delivers text/plain and the mail client renders it in a
-                  # proportional font, which destroys padded columns. Each field carries its own label
-                  # and the separator is a pipe, so the line reads the same in any font.
-                  # self < 0 means the level above has not finished, so its inclusive time is missing
-                  # from the log; self == 0 is a real zero (sub-millisecond, rounded).
-                  # if/else, not a multi-line ternary: BSD awk treats the newline after `(self >= 0`
-                  # as a statement end and errors. gawk accepts it, so this only failed locally.
+                  # if/else, not a multi-line ternary: BSD awk ends the statement at the newline
+                  # after `(self >= 0` and errors; gawk accepts it, so that only failed locally.
                   if (self >= 0) {
                       st = sprintf("%ds", self)
-                      if (cpu > 0) st = st sprintf(" = %.1f%% of cpu", 100 * self / cpu)
-                  } else st = "unknown, ancestor still running"
-                  printf "    k=%s: self %s | incl %ds | %d verdicts | %.3g splits\n",
-                         k, st, incl, n, sp }
+                      pc = (cpu > 0 ? sprintf("%.1f%%", 100 * self / cpu) : "")
+                  } else { st = "unknown"; pc = "" }
+                  printf "    k=%s%s%s%s%s%s\n", k,
+                         fpad(n, 10), fpad(incl "s", 10), fpad(st, 10),
+                         fpad(pc, 7), fpad(sprintf("%.3g", sp), 11) }
         END { if (cpu > 0) printf "    cpu %ds\n", cpu }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
