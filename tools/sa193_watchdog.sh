@@ -74,6 +74,18 @@ status() {
         match($0, /\] in [0-9]+ /) {
             k = substr($0, RSTART + 5, RLENGTH - 6) + 0
             cnt[k]++
+            # Per-level inclusive time and split count, folded into THIS match so the log is still
+            # scanned once. took is inclusive of descendants, so self time at k is
+            # inclusive(k) - inclusive(k-1): every level-(k-1) state is first computed while
+            # evaluating some level-k state, and each state is computed exactly once (verified: 2.07 M
+            # distinct (state,k) pairs, zero duplicates). Extracted with index() rather than fields -
+            # referencing $NF would force awk to split every line, which measured 9.2 s against 3.3 s
+            # on a 233 MB log.
+            p = index($0, " took "); q = index($0, " totalsplits="); w = index($0, " pass=")
+            if (p && q && w) {
+                tot[k] += substr($0, p + 6, q - p - 6) + 0
+                spl[k] += substr($0, q + 13, w - q - 13) + 0
+            }
             # A positive verdict carries its whole witness tree inline ("with [a:b] Sb(...)Sb(...)"),
             # which is hundreds of characters and was being cut mid-token by a flat truncation. The
             # witness is not progress context - the state, the level and the cost are - so elide it
@@ -148,6 +160,9 @@ status() {
             printf "CURK %d\n", curk + 0
             for (k = 12; k >= curk; k--) if (k in pick)
                 printf "ACT %d %s %d %s\n", k, kind[k], nr - picknr[k], substr(pick[k], 1, 200)
+            for (k = 12; k >= 1; k--) if (k in cnt)
+                printf "TIME %d %d %.0f %.0f %.0f\n", k, cnt[k], tot[k],
+                       tot[k] - (((k-1) in tot) ? tot[k-1] : 0), spl[k]
         }' "$LOG" 2>/dev/null)
 
     printf 'Sa(193) cold re-derivation\n'
@@ -176,6 +191,18 @@ status() {
     awk '/^ACT/ { k=$2; kind=$3; age=$4; $1=""; $2=""; $3=""; $4=""; sub(/^    /,"")
                   printf "    k=%-2s %-7s %s%s\n", k, kind, $0,
                          (age > 200000 ? "   (stale)" : "") }' <<<"$scan"
+    # Self time is only meaningful where the level above has completed; while an ancestor is still
+    # running its inclusive time is missing from the log and the subtraction goes negative.
+    printf '\n  time by level (self = inclusive - level below; * = ancestor still running):\n'
+    awk -v cpu="$(awk '{print int(($14+$15)/100)}' /proc/$PID/stat 2>/dev/null || echo 0)" '
+        /^TIME/ { k=$2; n=$3; incl=$4; self=$5; sp=$6
+                  # self < 0 means the level above has not finished, so its inclusive time is
+                  # missing from the log; self == 0 is a real zero (sub-millisecond, rounded).
+                  printf "    k=%-2s %9d verdicts   incl %8ds   self %8s %6s   %9.3g splits\n",
+                         k, n, incl,
+                         (self >= 0 ? sprintf("%ds", self) : "*"),
+                         (self >= 0 && cpu > 0 ? sprintf("%.1f%%", 100*self/cpu) : ""), sp }
+        END { if (cpu > 0) printf "    cpu %ds\n", cpu }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
 

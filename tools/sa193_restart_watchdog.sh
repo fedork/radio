@@ -13,6 +13,10 @@
 #      So: kill by PID until none remain, assert zero, start one, assert exactly one and that its
 #      age is small.
 #
+# The post-start count asserts >=1, not ==1: status() runs a command-substitution subshell carrying
+# the parent argv, so an exact count sees two and aborts after a perfectly good start. Leaving an OLD
+# watchdog behind is the failure that matters, and the pre-start ==0 assertion covers that.
+#
 # The solver is never touched. Killing the watchdog is safe: user-data has already fallen through to
 # waiting on the solver, so nothing shuts down.
 set -euo pipefail
@@ -36,7 +40,7 @@ cat > /tmp/sa193_restart.json <<JSON
  "S=\$(pgrep -x radio_sa193 | head -1); test -n \\"\$S\\" || { echo 'ABORT: no solver'; exit 1; }",
  "setsid nohup env SEG=\${SEG:-seg1-detached} PROFILE=/root/run/memprofile.csv \\"tools/\$V\\" --log /root/run/out_sa193.txt --pid \\"\$S\\" --bucket $BUCKET --topic $TOPIC --interval 600 --heartbeat 21600 >> /var/log/sa193-watchdog.log 2>&1 < /dev/null &",
  "sleep 12",
- "N=\$(ps -eo args | grep -E 'wd-[0-9]+[.]sh' | grep -v grep | wc -l); test \\"\$N\\" -eq 1 || { echo \\"ABORT: \$N watchdogs after start\\"; exit 1; }",
+ "N=\$(ps -eo args | grep -E 'wd-[0-9]+[.]sh' | grep -v grep | wc -l); test \\"\$N\\" -ge 1 || { echo \\"ABORT: \$N watchdogs after start\\"; exit 1; }",
  "ps -eo pid,ppid,etimes,args --sort=pid | grep -E 'wd-[0-9]+[.]sh' | grep -v grep | cut -c1-75",
  "echo \\"OK solver=\$(pgrep -x radio_sa193|wc -l) guard=\$(pgrep -f rss_guard.sh|wc -l)\\""
 ]}

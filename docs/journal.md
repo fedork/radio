@@ -2663,3 +2663,49 @@ a 3-16% pruning improvement would discard 27 hours of accumulated cache. Not wor
 it. Wall-clock timing of the change is unmeasurable per-query at k=7 because `init` for
 `MAX_K=7 MAX_N=220` dominates a single invocation at ~6.4 s regardless of the state — hence counting
 states searched instead.
+
+## 2026-08-07 — where the time goes: 93% at k=6, and one state is 10% of the run
+
+One-time analysis, then folded into the live status. `took` is inclusive of descendants
+(`clock()-start` per `canSolveB` call), and each state is computed exactly once — verified: 2,065,670
+distinct `(state,k)` pairs in the log, **zero duplicates**. Every level-(k-1) state is first computed
+while evaluating some level-k state, so **self time at k = inclusive(k) - inclusive(k-1)**.
+
+At 46.9 h of CPU (168,994 s; elapsed identical, so ~100% CPU-bound):
+
+| k | verdicts | inclusive s | self s | % CPU | splits |
+|---|---|---|---|---|---|
+| 9 | 1 | 1,745 | * | — | 443 |
+| 8 | 329 | 2,192 | 87 | 0.1% | 7.0e4 |
+| 7 | 4,926 | 2,104 | * | — | 2.21e6 |
+| **6** | 246,281 | 161,847 | **157,485** | **93.2%** | **1.50e13** |
+| 5 | 1,708,227 | 4,362 | 4,075 | 2.4% | 2.32e11 |
+| 4 | 146,928 | 287 | 287 | 0.2% | 9.02e9 |
+
+`*` = the level above has not completed, so its inclusive time is missing from the log and the
+subtraction goes negative (k=7 reads -160,806 s). That is the one real limitation of the method: it
+needs completed ancestors, so mid-run the top levels are unknowable this way.
+
+**The concentration is extreme.** One k=6 state — `Sb(16:9,25:5,17:7,20:5,13:5,16:4,19:3,27:2)`, mass
+**728 of 729** — took 16,603 s, **9.9% of the entire run by itself**. The 92 k=6 states over 60 s
+account for ~96% of all CPU; the other 2.06 M verdicts are ~4%. All 92 are 8-part and within 5 of
+saturation, i.e. exactly where the counting bound prunes nothing.
+
+Rounding is not the limiting factor, contrary to the initial worry: only 110 k=6 verdicts are >= 1 s
+(integer-second resolution), so the quantization error is +/-55 s against 157,485 — 0.03%.
+`totalsplits`, an exact integer, corroborates.
+
+### Cost of computing it every cycle
+
+The status already made one awk pass over the log, so this is two extra accumulators in that pass:
+**1.98 s -> 3.31 s** on a 233 MB log, i.e. +1.3 s per 10-minute cycle, 0.2% of one core. It grows with
+the log; at a few GB expect tens of seconds, still under 10% duty.
+
+Getting to 3.31 s mattered and was not obvious. Referencing `$NF` forces awk to field-split **every**
+line: 9.2 s. Splitting only the matched substring: 5.3 s. `index()` plus `substr()` with no field
+access at all: 3.3 s.
+
+Also fixed: `sa193_restart_watchdog.sh` asserted exactly one watchdog after starting, and `status()`
+runs a command-substitution subshell carrying the parent argv, so the count saw two and aborted after
+a perfectly good start. The assertion that matters is the pre-start `== 0` — leaving an OLD watchdog
+behind is the real failure — so the post-start check is now `>= 1`.
