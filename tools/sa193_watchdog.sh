@@ -189,19 +189,26 @@ status() {
     printf '  (solving: left=<splits remaining>/<total> is the progress; a deadline marked\n'
     printf '   auto-extends is NOT expiring - pass-2 descendants get NO_DEADLINE and bump it 10s)\n'
     awk '/^ACT/ { k=$2; kind=$3; age=$4; $1=""; $2=""; $3=""; $4=""; sub(/^    /,"")
-                  printf "    k=%-2s %-7s %s%s\n", k, kind, $0,
-                         (age > 200000 ? "   (stale)" : "") }' <<<"$scan"
+                  printf "    k=%s [%s]%s %s\n", k, kind,
+                         (age > 200000 ? " (stale)" : ""), $0 }' <<<"$scan"
     # Self time is only meaningful where the level above has completed; while an ancestor is still
     # running its inclusive time is missing from the log and the subtraction goes negative.
-    printf '\n  time by level (self = inclusive - level below; * = ancestor still running):\n'
+    printf '\n  time by level, self = inclusive minus the level below:\n'
     awk -v cpu="$(awk '{print int(($14+$15)/100)}' /proc/$PID/stat 2>/dev/null || echo 0)" '
         /^TIME/ { k=$2; n=$3; incl=$4; self=$5; sp=$6
-                  # self < 0 means the level above has not finished, so its inclusive time is
-                  # missing from the log; self == 0 is a real zero (sub-millisecond, rounded).
-                  printf "    k=%-2s %9d verdicts   incl %8ds   self %8s %6s   %9.3g splits\n",
-                         k, n, incl,
-                         (self >= 0 ? sprintf("%ds", self) : "*"),
-                         (self >= 0 && cpu > 0 ? sprintf("%.1f%%", 100*self/cpu) : ""), sp }
+                  # No column alignment: SNS delivers text/plain and the mail client renders it in a
+                  # proportional font, which destroys padded columns. Each field carries its own label
+                  # and the separator is a pipe, so the line reads the same in any font.
+                  # self < 0 means the level above has not finished, so its inclusive time is missing
+                  # from the log; self == 0 is a real zero (sub-millisecond, rounded).
+                  # if/else, not a multi-line ternary: BSD awk treats the newline after `(self >= 0`
+                  # as a statement end and errors. gawk accepts it, so this only failed locally.
+                  if (self >= 0) {
+                      st = sprintf("%ds", self)
+                      if (cpu > 0) st = st sprintf(" = %.1f%% of cpu", 100 * self / cpu)
+                  } else st = "unknown, ancestor still running"
+                  printf "    k=%s: self %s | incl %ds | %d verdicts | %.3g splits\n",
+                         k, st, incl, n, sp }
         END { if (cpu > 0) printf "    cpu %ds\n", cpu }' <<<"$scan"
     grep -m1 '^result Sa(193)' "$LOG" 2>/dev/null && printf '\n  *** FINAL ANSWER ABOVE ***\n'
 }
