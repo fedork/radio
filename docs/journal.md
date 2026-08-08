@@ -2961,3 +2961,23 @@ A+B. Both monsters return UNSOLVABLE as before. And a broader replay against the
 covers ordinary multi-part states rather than only frontier cells and the six monsters. Note the
 positives matter more than the negatives here: A reorders iteration, so a bug would most likely show as
 a *missed* solution, and 100 known-solvable states all still solve.
+
+### Production hardening of A+B (2026-08-08, still scratch)
+
+Three gaps closed, all in `/tmp/k6lab/impl`:
+
+- **Release on every exit path.** Only two real early returns exist after the build point (both
+  `return MAYBE`; three others in that span are commented out), so an explicit `rb_release()` at each
+  is enough. Previously the release sat only on the printing path, so an early return leaked the tables
+  *and* left `rb_on` set, silently disabling the prune for the remainder of the process — a lost
+  optimisation rather than a wrong answer, but invisible.
+- **Adaptive trigger replaces the shape gate.** The prune now arms once a state has spent
+  `RB_TRIGGER = 10M` candidate evaluations, instead of matching `size>=7 && sat>=0.99`. A state that
+  expensive has earned the ~1-2 ms the tables cost, cheap states never pay, and no state shape is
+  privileged — anything that turns out expensive gets the prune. Measured identical: **43.4 s** against
+  43.9 s shape-gated, same 53.4% prune rate.
+- **Nesting left as outermost-only, deliberately.** A gated state's own descendants cannot arm the
+  prune. They are k=5 states, which are 2.4% of total time, so the complexity of per-invocation tables
+  buys almost nothing.
+
+Re-validated after the changes: 43 proven k<=6 Pareto cells, both directions, 0 mismatches.
