@@ -2781,3 +2781,58 @@ has to attack 8-part near-saturated states specifically.
 Caveat on the measure: `totalsplits` is reset per pass, so a `pass=2` verdict reports pass-2 splits only
 and pass-1 work is invisible. All 166 monsters are pass=2, so their true cost is slightly higher than
 recorded.
+
+## 2026-08-08 — exploring optimisations for the 8-part near-saturated k=6 states
+
+Scratch work in `/tmp/k6lab` (not committed): a copy of the solver instrumented to count, never to
+prune, plus a standalone DP. Warm cache = the run's own checkpoint filtered to k<=5 (2,201,187 facts),
+so a k=6 solve does no recursion below itself. Baseline reproduces the run: the cheapest monster is
+110.7 s / 6.81e9 totalsplits locally against 105 s / 7.38e9 in the run.
+
+### What the mass constraint actually costs, measured on the real solver
+
+Two monsters, 110.7 s and 676.7 s, counting every candidate the split loop touches:
+
+| | state 1 | state 2 |
+|---|---|---|
+| candidates visited | 6.82e9 | 4.27e10 |
+| **killed by the cap check** | **82.7%** | **83.7%** |
+| survive the cap (these do 3 cache probes) | 17.3% | 16.3% |
+| **of survivors, provably uncompletable** | **61.8%** | **65.9%** |
+
+So ~93% of everything the loop touches is doomed on mass grounds alone: 83% cannot fit, and most of
+the rest cannot be completed. Two independent optimisations follow, both provable and both
+enumerating exactly the same split set:
+
+- **A. Iterate only cap-feasible options.** `k0+k1+k2` is the part's mass, a constant, so the three
+  cap constraints define a 2-D region in `(k0,k2)`. Indexing each part's option list by `(k0,k2)` and
+  walking only that region replaces the scan-and-reject. Ceiling **5.8x / 6.1x fewer iterations**.
+  The existing `ordmono` cut already does this for ONE child; the 83% are the other two.
+- **B. Joint suffix reachability.** `R[i]` = the set of `(r0,r2)` the remaining parts can still
+  contribute; a prefix is dead if no reachable `r` keeps all three children within cap. Answered in
+  O(1) per node from a 2-D running max. Ceiling **2.6x / 2.9x fewer probe sets**.
+
+Cost model from the measured 16.2 ns per candidate: with a probe around 12 ns, iteration is ~10 ns and
+the two halves are roughly equal, so A removes ~half the time and B ~30% of the rest. **Estimate 4-5x
+on the monsters, hence ~3.5-4x on the whole run** since they are ~90% of it.
+
+### Three negative results, recorded so they are not retried
+
+- **Meet-in-the-middle on mass is pointless.** The idealised DP shows the cap-pruned DFS already
+  visits only ~4 nodes per completed split, so there is almost no dead-end structure for MITM to skip.
+- **One-dimensional mass bounds are provably vacuous.** Per child independently, `max r_c` is the
+  entire remaining mass (take `a=n, b=m` everywhere), so `r_c >= mass-2cap-s_c` is always satisfiable.
+  That is exactly why the lower-bound prune measured 0.0% on 2026-08-04. The power is in the **joint**
+  `(r0,r2)` reachability - you cannot maximise two children at once - which is why it needs a 2-D table.
+- **My own DP over-estimated B by ~30x.** It predicted 3.2-18.5x from an idealised tree; against the
+  real solver the prune touches 10.7% of nodes. The model ignored live-option lists and the
+  partial-child cache probes, which already remove most of what it counted. The honest figure is the
+  probe-weighted one (62-66% of survivors), not the node-weighted one.
+
+### If this is implemented
+
+Gate to the monster signature (`P >= 7`, `mass >= 0.99 * 3^k`, `k <= 7` so the table stays small): the
+reachability table is `(cap+1)^2` bytes per suffix - 476 KB at k=6 - and ~1e7 ops to build, which is
+nothing against a 110 s state but would swamp the 2 M cheap ones. Both changes are in the hottest loop,
+so validation must be identical verdicts on all 43 proven k<=6 Pareto cells plus the six monsters.
+**The live run cannot benefit without a restart**, which would discard four days of accumulated cache.
