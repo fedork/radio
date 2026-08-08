@@ -2907,6 +2907,26 @@ there, and A optimises for the opposite objective: it picks whichever ordering m
 The log measures how often this happens: `NOTFAST` marks a winning split that FAST would have skipped,
 and **2,603 of 47,783 solutions (5.4%)** contain one — concentrated at k=5 (887) and k=6 (1,083),
 exactly where the time goes. Not a corner case.
+
+**Measured on exactly those states, A+B is faster, not slower**, comparing splits-to-witness:
+
+| | states | baseline | A+B | |
+|---|---|---|---|---|
+| k=5, FAST-missed, solvable | 60 | 248,501 | 101,757 | **2.44x better**, 0 worse |
+| k=6, FAST-missed, solvable | 25 | 37,218 | 12,499 | **2.98x better**, 1 worse (19 -> 28 splits) |
+
+Two reasons, and the second is the reassuring one. First, the ordering choice does not change *which*
+options are considered: each of the three cap bounds is a necessary condition, so terminating on any one
+of them still visits every option satisfying all three — only the count of infeasible ones waded through
+changes. What genuinely changes is the order *within* the feasible set, which is where the risk lives.
+Second, **FAST-missed solvable states are cheap** — those 25 k=6 states average ~1,500 splits — so even
+a real ordering regression there costs almost nothing, while the states A+B speeds up by 2.5-2.75x are
+the expensive refutations.
+
+So the risk is real in principle and small in magnitude, because it lands on the cheap population. It
+is not eliminated: a larger or differently-drawn sample could find a costly solvable state that pass 2
+reaches. Improving FAST is the better fix, and would remove the tension rather than bound it — every
+miss currently costs a full pass-2 search on a state that had a solution all along.
 Also never picks a `_DESC` ordering, which have `ORDER_MONO_P = -1` and so get no early termination at
 all - the old heuristic chose them often.
 
