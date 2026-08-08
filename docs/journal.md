@@ -2878,3 +2878,53 @@ descent scans **20-51** options, not 3-12. The tightest-key idea was nearly disc
 Static per part (in `ensure_splits`, keyed by sbb, so once ever): three `cnt_le` arrays of `mass+1` ints,
 and for the emptiness test a `(mass+1)^2` short table - build it only for parts under a mass threshold,
 which is a property of the part, not a gate on the state.
+
+## 2026-08-08 — the two optimisations built and benchmarked: 2.5-2.75x
+
+Both implemented in scratch (`/tmp/k6lab/impl`), not in the repo. Warm k<=5 cache from the run's own
+checkpoint so a k=6 solve does no recursion below itself.
+
+| | monster 1 | monster 2 |
+|---|---|---|
+| baseline | 110.7 s / 6.81e9 splits | 676.7 s / 4.27e10 |
+| **A** ordering chosen by measured count | 89.2 s / 1.91e9 (**1.24x**) | 532.3 s / 1.20e10 (**1.27x**) |
+| **A+B** with joint reachability | **43.9 s (2.52x)** | **246.5 s (2.75x)** |
+
+Peak RSS also fell, 2.63 GB -> 1.62 GB. Verdicts unchanged throughout.
+
+**A - pick the split ordering by measured count.** `BY_SP2/BY_SP1/BY_SP0` are monotone in p0/p1/p2 and
+the counting-bound cut retires the level at the first option exceeding the budget, so a level runs for
+exactly `cle[j][budget_j]` options. Choose the smallest of the three instead of guessing from the gap
+between p0, p1 and p2. `cle` is a static per-part prefix-summed histogram, built once per sbb in
+`ensure_splits`. Gated to `pass >= 2`, where iteration order carries no solution-finding value.
+Also never picks a `_DESC` ordering, which have `ORDER_MONO_P = -1` and so get no early termination at
+all - the old heuristic chose them often.
+
+**B - joint suffix reachability.** `R[i]` as a bitmap of the `(r0,r2)` the remaining parts can
+contribute, built by convolution (shift-and-OR, ~1-2 ms for a whole state), plus a 2-D running max so
+the completability test is one lookup. Inserted between the cap check and the cache probes. It fires on
+**53.4% / 51.5%** of cap-survivors.
+
+### The candidate count is not the speedup, and the gap is the whole story
+
+A cut candidates **3.57x** and wall clock only **1.24x**. Back-solving, iteration was **27% of runtime,
+not the 60% I assumed** - because A removes precisely the options that would have been *cap-killed*,
+which are the cheap ones (a few ns), while the expensive ones (surviving, three cache probes) remain.
+That inverted the ranking: B, which removes wasted *probes*, is the more valuable of the two, and A
+alone would not have been worth the change.
+
+### Not production-ready
+
+- **Cleanup only happens on one exit path.** `rb_free()` and clearing `rb_on` sit at the print site, but
+  `canSolveB` has many early returns. Consequence is a leak plus B silently disabling itself for the rest
+  of the process - not a wrong answer, but it must be fixed before this is real.
+- **Only the outermost gated state gets B**, by design of the prototype. Nested application needs
+  per-invocation tables.
+- **The gate is still the monster signature** (`size>=7`, `sat>=0.99`, `cap<800`) rather than the
+  adaptive node-budget trigger discussed.
+
+### Validation so far
+
+All 43 proven k<=6 Pareto cells reproduce in both directions (n1 solvable, n1+1 not), with A and with
+A+B. Both monsters return UNSOLVABLE as before. A broader replay of 350 logged k=5 verdicts (250
+negative, 100 positive) was still running when this was written.
