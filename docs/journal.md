@@ -2981,3 +2981,43 @@ Three gaps closed, all in `/tmp/k6lab/impl`:
   buys almost nothing.
 
 Re-validated after the changes: 43 proven k<=6 Pareto cells, both directions, 0 mismatches.
+
+## 2026-08-08 — what FAST actually misses
+
+`NOTFAST` in a solution line marks a winning split that FAST would have skipped, so the run's own log
+is a labelled dataset of the heuristic's false negatives: **2,603 of 47,783 solutions (5.4%)** contain
+one, concentrated at k=5 (887) and k=6 (1,083).
+
+Measuring each winning split's deviation `d` from the balance line `m1*n2 = n1*m2`:
+
+| | count | median \|d\| | mean | p90 | max |
+|---|---|---|---|---|---|
+| FAST-admitted winners | 223,754 | 0.25 | 0.32 | 0.80 | 2.33 |
+| **NOTFAST winners** | 3,006 | **0.88** | 0.91 | 1.50 | 5.00 |
+
+So the misses are farther from the line but not far — p90 of 1.50 against an admitted max of 2.33. The
+line itself is not the problem; the local-optimality test around it is.
+
+**Two-fifths of the misses are boundary splits:**
+
+| | share of misses |
+|---|---|
+| `m2 == n2` | 21.3% |
+| `m2 == 0` | 15.7% |
+| `m1 == n1` / `m1 == 0` | 3.9% |
+| interior | 59.2% |
+
+The `m2` boundary cases are structural, not accidental. The test is
+
+    if ((m2==0  || compare_solvability(sbb1, ...m2-1) <= 0) &&
+        (m2==n2 || compare_solvability(sbb1, ...m2+1) <= 0))
+
+At `m2==0` the first clause auto-passes but the second must still hold, and symmetrically at `m2==n2`.
+So on a boundary the two-sided local optimality test degenerates to a one-sided one that can still
+reject. The source comment claiming it "admits the diagonal AND the corners" overstates what the code
+does — it admits the corners only if the one applicable comparison also passes.
+
+Two distinct repairs, then, and they are independent: **admit boundary splits unconditionally** (37% of
+misses, and cheap to state), and **relax the interior comparison** to accept near-ties rather than
+strict `<= 0` (the remaining 59%). Neither is implemented; the cost side — how many extra splits pass 1
+would then try — is unmeasured and is what decides whether either is worth it.
