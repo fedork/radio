@@ -2896,7 +2896,17 @@ Peak RSS also fell, 2.63 GB -> 1.62 GB. Verdicts unchanged throughout.
 the counting-bound cut retires the level at the first option exceeding the budget, so a level runs for
 exactly `cle[j][budget_j]` options. Choose the smallest of the three instead of guessing from the gap
 between p0, p1 and p2. `cle` is a static per-part prefix-summed histogram, built once per sbb in
-`ensure_splits`. Gated to `pass >= 2`, where iteration order carries no solution-finding value.
+`ensure_splits`. Gated to `pass >= 2`.
+
+**The stated reason for that gate was wrong.** I claimed pass 2 is exhaustive so iteration order carries
+no solution-finding value. Pass 2 is exhaustive only when the state is *unsolvable*. FAST is imperfect
+and sometimes misses an existing solution, and pass 2 then has to find it — so ordering still matters
+there, and A optimises for the opposite objective: it picks whichever ordering makes the level
+**shortest**, which is ideal for retiring a level and could be poor for reaching a witness.
+
+The log measures how often this happens: `NOTFAST` marks a winning split that FAST would have skipped,
+and **2,603 of 47,783 solutions (5.4%)** contain one — concentrated at k=5 (887) and k=6 (1,083),
+exactly where the time goes. Not a corner case.
 Also never picks a `_DESC` ordering, which have `ORDER_MONO_P = -1` and so get no early termination at
 all - the old heuristic chose them often.
 
