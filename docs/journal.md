@@ -2836,3 +2836,45 @@ reachability table is `(cap+1)^2` bytes per suffix - 476 KB at k=6 - and ~1e7 op
 nothing against a 110 s state but would swamp the 2 M cheap ones. Both changes are in the hottest loop,
 so validation must be identical verdicts on all 43 proven k<=6 Pareto cells plus the six monsters.
 **The live run cannot benefit without a restart**, which would discard four days of accumulated cache.
+
+### Prototype measurements: the ordering choice is the lever, and it is a small change
+
+Measured on the real solver (scratch `/tmp/k6lab`, instrumentation only, verdicts untouched), cheapest
+monster, 110.2 s baseline.
+
+**Two ideas measured, one dead, one large.**
+
+*Per-key emptiness test.* Dead as first conceived: `min k0 = 0` always (take `a=n`), likewise k1 and k2,
+so no single-key minimum ever fires, and `A+B+C >= mass_i` is vacuous by mass conservation. It only
+works as a **joint** test - a per-part 2-D running max of `k0+k2` over the achievable set. So measured
+that instead: it fires on **56.5% of level-6 descents and 71.3% of level-7**, 0% at levels 1-5 (the
+bounds are still loose up there), 24.4% overall.
+
+*Tightest-key walk.* The three cap constraints are `k0<=A, k1<=B, k2<=C`; walking whichever order the
+bound cuts soonest, rather than a statically chosen one:
+
+| level | full list | tightest-key walk | shorter |
+|---|---|---|---|
+| 4 | 1.60e9 | 3.34e8 | 4.8x |
+| 5 | 9.71e9 | 1.05e9 | 9.3x |
+| 6 | 3.19e9 | 2.37e8 | 13.5x |
+
+Full lists total 1.46e10; `ordmono` already gets the solver down to 6.82e9 (2.1x); the tightest-key
+walk plus the emptiness test reaches **1.66e9 - 4.1x fewer candidate evaluations than the current code**.
+
+**And the implementation is much smaller than expected.** `BY_SP0/BY_SP1/BY_SP2` *are* the orderings by
+these three keys, and `ordmono` already terminates the level on whichever key was chosen. `splitincr[i]`
+picks between them with a gap heuristic (`p0 > p1 ? ...`). The change is to replace that guess with a
+**measured count** - one lookup per key into a static per-part `cnt_le` array - and use the count as the
+walk bound. No new iteration machinery.
+
+**Combined estimate.** With iteration ~60% of the 110 s and probes ~40%: A gives 4.1x on the iteration
+half, B removes 62-66% of the probe half, so roughly **3.4x on this state**.
+
+**Corrected along the way.** I first computed scan lengths as 3-12 options per prefix and concluded
+indexing could not pay. Wrong denominator: descents additionally require passing the child probes, so a
+descent scans **20-51** options, not 3-12. The tightest-key idea was nearly discarded on that error.
+
+Static per part (in `ensure_splits`, keyed by sbb, so once ever): three `cnt_le` arrays of `mass+1` ints,
+and for the emptiness test a `(mass+1)^2` short table - build it only for parts under a mass threshold,
+which is a property of the part, not a gate on the state.
