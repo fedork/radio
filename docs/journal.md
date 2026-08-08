@@ -2926,5 +2926,8 @@ alone would not have been worth the change.
 ### Validation so far
 
 All 43 proven k<=6 Pareto cells reproduce in both directions (n1 solvable, n1+1 not), with A and with
-A+B. Both monsters return UNSOLVABLE as before. A broader replay of 350 logged k=5 verdicts (250
-negative, 100 positive) was still running when this was written.
+A+B. Both monsters return UNSOLVABLE as before. And a broader replay against the run's own log —
+**350 logged k=5 verdicts, 250 negative and 100 positive, 0 mismatches** — which is the check that
+covers ordinary multi-part states rather than only frontier cells and the six monsters. Note the
+positives matter more than the negatives here: A reorders iteration, so a bug would most likely show as
+a *missed* solution, and 100 known-solvable states all still solve.
