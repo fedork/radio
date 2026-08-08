@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-07**.
+don't know it. Last refreshed **2026-08-08**.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -177,7 +177,15 @@ is inclusive and each state is computed exactly once (2,065,670 distinct `(state
 **k=6 is 93.2% of CPU**, k=5 is 2.4%, k=4 is 0.2%; k>=7 is unknowable mid-run because their ancestors
 have not completed. One k=6 state at mass 728 of 729 took 16,603 s — **9.9% of the whole run** — and the
 92 k=6 states over 60 s are ~96% of all CPU. The near-saturated 8-part k=6 states are the whole cost.
-`tools/sa193_status.sh` reports this every cycle. The
+`tools/sa193_status.sh` reports this every cycle.
+
+**And within k=6 it is 166 states (2026-08-08).** Work per verdict is bimodal with an empty gap:
+249,913 verdicts below 1e8 splits hold 0.31% of k=6, while 164 at 1e10-1e12 hold 99.63%. The gap is
+structural — a mixed child doubles the part count while the other two preserve it, so k=6 states exist
+at 4 parts and 8 parts and nowhere between, and the two cost modes are those two shapes. **99.57% of
+k=6 work is one cell: 8 parts at mass >= 0.99 of 3^6**, i.e. ~90% of the entire run in 166 states.
+They have no cheap refutation — the counting bound is vacuous at saturation and majorization is not
+close — so any optimisation that matters must attack 8-part near-saturated states specifically. The
 memory profile (`run/seg-*/memprofile.csv`) shows essentially the whole footprint was allocated in a
 40-minute window during the control, and +900k verdicts since cost +0.48 GB — so **memory is not the
 binding constraint after all**, contrary to the earlier expectation drawn from 2023's ~90 GB. Wall
