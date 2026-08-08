@@ -2739,3 +2739,45 @@ not.
 Implementation note: awk's `%10s` pads with ASCII spaces and counts bytes, so it cannot be used here;
 padding is built by repeating the FIG string in a helper (`fpad`), and FIG reaches awk via
 `-v FIG="$(printf '\\342\\200\\207')"` rather than a `$'\\u2007'` escape, for shell portability.
+
+## 2026-08-08 — where the solver's time goes: 166 states, and the bimodality is structural
+
+Distribution of per-verdict work by level, using `totalsplits` rather than `took`. `took` quantizes to
+integer seconds above 1 s and to `0.000` below 1 ms, so ~99% of verdicts fall in one degenerate bucket;
+`totalsplits` is an exact integer spanning 14 orders of magnitude and it measures **self** work (splits
+enumerated at that node), which is what attribution needs. It converts to time at a nearly constant rate
+per level: 10.5 ns/split at k=6, 17.6 at k=5, 31.8 at k=4.
+
+Weighted by work, k=6 is **bimodal with an empty gap**:
+
+| per-verdict splits | verdicts | % of k=6 splits |
+|---|---|---|
+| 1e0 - 1e7 | 249,913 | 0.31% |
+| 1e8 | 0 | 0 |
+| 1e9 | 2 | 0.06% |
+| 1e10 - 1e12 | **164** | **99.63%** |
+
+Splitting the two populations:
+
+| | verdicts | parts | mass / 729 | pass |
+|---|---|---|---|---|
+| **>= 1e9 splits** | **166** | 7-8, median 8 | **0.993 - 1.000** | all pass=2 |
+| the rest | 249,913 | 1-4, **max 4** | 0.387 - 1.000 | mostly pass=2 |
+
+**The gap is structural, not statistical.** A split's mixed child has two parts per parent part while the
+other two children have one, so part count either doubles or is preserved. k=6 states therefore exist at
+4 parts and at 8 parts and **nowhere in between** — the cross-tab has entries only at 4, 7 and 8 parts.
+The two cost modes are those two shapes, and the missing decade of cost is the missing part counts.
+
+Cross-tabulated by (parts, saturation), **99.57% of all k=6 work is one cell: 8 parts, mass >= 0.99 of
+3^6**. Since k=6 is ~90% of the run, **166 states are ~90% of everything**.
+
+What this rules out: the 2026-08-06 majorization strengthening cannot touch them. Downgrading
+`Sb(25:6,19:7,14:9,20:4,13:5,16:4,19:3,27:2)` to singletons gives `sum n = 153` against
+`sum G_6 = 729` — nowhere near a majorization violation. The counting bound is vacuous at saturation by
+construction. These states have no cheap refutation and must be enumerated; any optimisation that matters
+has to attack 8-part near-saturated states specifically.
+
+Caveat on the measure: `totalsplits` is reset per pass, so a `pass=2` verdict reports pass-2 splits only
+and pass-1 work is invisible. All 166 monsters are pass=2, so their true cost is slightly higher than
+recorded.
