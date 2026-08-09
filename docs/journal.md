@@ -3441,9 +3441,9 @@ parts, 53 628 pairs) exists. Tables grow with k, and building them at k>=8 means
 2-part states, so apply the filter at the low levels where enumeration actually concentrates rather
 than everywhere.
 
-**Next, untested:** the size-3 subset filter is the obvious continuation, but the table is
-102^3/6 ~ 177 K entries and the marginal return is unknown. Also untested: scoring children
-recursively with the same function one level down.
+**Subsequently tested later on 2026-08-09:** the size-3 subset filter is the large missing
+constraint, and size 4 adds a smaller but useful second step. See the latest entry below. Scoring
+children recursively with the same function one level down remains untested.
 
 **Method note, twice burned in one day:** a holdout must differ in *construction*, not just in which
 states were drawn. The 40-state sample and the same-family holdout both overstated results that the
@@ -3497,3 +3497,110 @@ and 6.9 GB), in `/root/run2`, binary `radio_sa193_ab`, `--rss-gb 40`, S3 prefix 
 
 **Two open risks.** The incumbent's user-data ends in `shutdown -h now`, so if it finishes or trips a
 cap the instance stops and takes run2 with it. And run2's 40 GB cap is a guess - 2023 reached ~90 GB.
+
+## 2026-08-09 (latest) - size-3 subsets make the positive heuristic nearly perfect
+
+The next untested idea from the previous entry was the right one. Exact solvability of every
+**three-part subset** of each child is a strong sound constraint by Subgraph Monotonicity, despite
+only 9-11% of pair-compatible triples themselves being unsolvable. Requiring the condition many
+times across a 4- or 8-part child compounds sharply.
+
+### The tables are tiny and cheap to build
+
+`tools/tripletab.c` and `tools/quadtab.c` build the exact tables with the current solver, using the
+lower-dimensional table as a necessary gate. Fresh runs under `tools/capped_run.sh`:
+
+| child level | table | solvable | prior-gate feasible | all combinations | wall |
+|---|---:|---:|---:|---:|---:|
+| k=4 | triples | 104,473 | 117,940 pair-feasible | 182,104 | 5 s |
+| k=4 | quads | 1,570,834 | 2,344,892 triple-feasible | 4,780,230 | 5 s |
+| k=5 | triples | 3,700,630 | 4,076,613 pair-feasible | 5,881,204 | 20 s |
+
+The k=4 and k=5 single-part universes have 102 and 327 oriented parts respectively. The text
+tables are 1.5/25/50 MB only because they spell out coordinates; combinatorial bitsets need about
+23 KB, 598 KB and 735 KB. So table size and construction time are not obstacles.
+
+**Trust boundary:** "exact" here means exhaustive according to the current C solver, not an
+independent certificate. The independent `tools/refsolve.py` confirmed five sampled k=4 negative
+triples, but the first k=5 negative did not finish in two minutes and that audit was stopped. The
+tables are safe immediately as an ordering/admission heuristic followed by exhaustive fallback.
+Using their negative entries to prune an exhaustive pass should wait for a stronger audit or be
+validated by the eventual certificate; otherwise a table-generation false negative could become a
+solver false negative.
+
+### Complete k=5 four-part corpus
+
+The experiment starts *after* the already-established per-part and exact pair filters. It checks all
+triples incrementally; the quad extension checks every four-part subset. Both complete construction
+families were regenerated and relabelled from their full winner logs by
+`tools/label_split_features.c`; `tools/filter_triples.c` verified that no known winner was removed.
+
+| family | states | pair survivors | + triples | + quads | winners retained |
+|---|---:|---:|---:|---:|---:|
+| Pareto descent | 308 | 1,443,192 | 300,798 (4.80x) | 214,964 (1.40x) | 4,684 / 4,684 |
+| greedy upgrade | 190 | 1,019,842 | 291,622 (3.50x) | 166,724 (1.75x) | 1,906 / 1,906 |
+| **total** | **498** | **2,463,034** | **592,420 (4.16x)** | **381,688 (1.55x)** | **6,590 / 6,590** |
+
+From the cap-feasible space before the existing per-part check, the combined reductions are 12.16x
+to pairs, 50.54x to triples, and 78.45x to quads. Unlike the earlier mistaken 200x headline, each
+baseline is stated explicitly here.
+
+### The ordering becomes almost perfect after the structural filter
+
+Refitting the same 12 shape features on only 55 states (30 descent + 25 upgrade), after subset
+filtering, changed the useful regime. The triple-filter weights are
+
+    dev .20, imbalance .10, maxchild 1.00, fmean 1.00,
+    majtight 4.00, topheavy .50, mixmaj 2.50, meanratio .35
+
+and the quad-filter weights are
+
+    dev .20, imbalance .05, maxchild .75, fmean 1.00,
+    majtight 4.00, topheavy .35, meanratio .20.
+
+Unlisted weights are zero. These are orderings, never correctness conditions. Absolute first-hit
+rank, shown as median / p90 / worst / mean:
+
+| evaluation family | old shape + pairs | new score + triples | new score + quads |
+|---|---:|---:|---:|
+| all 308 descent states | 35 / 221 / 2,785 / 101 | **1 / 9 / 77 / 3** | **1 / 5 / 59 / 3** |
+| all 190 upgrade states | 33 / 189 / 1,343 / 98 | **1 / 9 / 33 / 3** | **1 / 5 / 35 / 2** |
+| third family, 35 wholly unseen states | 37 / 225 / 685 / 102 | **5 / 35 / 49 / 10** | **1 / 9 / 17 / 2** |
+
+The third family was constructed after fitting: take 30 evenly spaced states from the 34,259
+distinct solvable k=5 four-part states encountered under the separate k=6 corpus, greedily upgrade
+them to the Pareto frontier, and remove the 498 existing states. This produced 35 new critical
+states and 124 winners after testing 11,321,026 candidates in 5 s. It uses the same upgrade
+procedure, so it is not a wholly unrelated generative process, but neither its states nor its
+winners participated in fitting. The quad result - median rank 1, worst 17 - is the closest this
+thread has come to a perfect positive heuristic.
+
+### Transfer to the real eight-part bottleneck
+
+`tools/sample_subsets.c` sampled 100 million per-part-valid take vectors on each of the six actual
+warm-benchmark monsters in `/tmp/k6lab/bench.txt`. The pair filter's marginal factors were
+8.56, 7.06, 4.34, 4.11, 4.09 and 4.03. Conditional on surviving pairs, triples added factors
+31.5, 31.0, 17.9, **more than about 49 at 95% confidence** (0 of 146 survived; rule of three),
+22.5 and 22.9. On the five samples with a nonzero triple survivor, the cumulative reduction from
+cap-feasible candidates was **77.6x to 269.5x**.
+
+Naive lexicographic triple checking is already cheap: failures took about 30-39 bit lookups on
+average, 98.7-100% failed within 100, and after weighting by the pair-survival rate the cost is only
+about 6-16 triple lookups per cap-feasible candidate. Ranking constraints by incompatibility may
+improve this, but is no longer prerequisite to a first implementation.
+
+### What this does and does not establish
+
+- It is a **large structural improvement**, not another fit to the same five saturated features.
+- For positive k=5 four-part states, subset filtering plus the new whole-split score is empirically
+  near-perfect across all known states and one post-fit family.
+- For negative k=6 eight-part states, triples appear much stronger than pairs in standalone sampling.
+- It is **not yet a solver speedup**. `radiobase.c` probes cached solvability of every partial child,
+  which overlaps subset filtering when the cache is warm, and the rank experiment globally sorts
+  complete surviving candidates rather than implementing the solver's Cartesian walk. A wall-clock
+  benchmark against `radiobase.c` is still mandatory.
+
+**Next implementation experiment:** load the k=5 pair/triple bitsets, check triples before the three
+leaf cache probes on the six warm monsters, and measure marginal wall time against the exact A+B
+baseline. Start as fallback-safe ordering/admission; promote it to an exhaustive prune only after the
+negative table receives an adequate independent trust story.

@@ -22,7 +22,7 @@ preferred entry points.
 | `(n1:n2)` pair -> `sbb` integer id; split tables built lazily | `init()`, `ensure_splits()` at `radiobase.c:1227` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: a trie over sorted `sbb` ids, closed downward for can-solve and upward for can't-solve | `cacheCanSolve` `:206`, `cacheCantSolve` `:276` |
-| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, deadlines, single pass (`fast_solve` removed 2026-08-03) | `canSolveB` |
+| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST-restricted first pass, exhaustive second pass, deadlines | `canSolveB` |
 | Unit-group stripping before search | `radiobase.c:538` |
 | Exact decision for singleton states via majorization against `G_k` | `radiobase.c:464-506` |
 | `Sa` recursion | `canSolveA` `:1011` |
@@ -84,17 +84,12 @@ Two behaviours to be aware of:
 - **`MAYBE` is a real answer.** Deadlines cause `canSolveB` to give up and return `MAYBE`
   rather than `FALSE`. A `can't solve` line in the output is a genuine negative; the absence
   of a line is not.
-- **The search is deterministic (since 2026-08-03).** It used to self-tune - on success
-  `canSolveB` wrote `s[FAST] = 1` back into the split table, so search order differed between
-  runs. The `fast_solve` pass and the whole `FAST` mechanism are gone, and two independent
-  k=9 ladder runs now produce **byte-identical verdicts** (154,337 lines). So `diff` is a
-  valid regression gate again, provided you strip two things: the ` took N` fields, and the
-  `still solving` progress lines, which fire on a 60-second wall-clock heartbeat and so land
-  at different points.
-
-  Caveat: this holds while no deadline fires. Deadlines make results wall-clock dependent, and
-  the budget cascade is 1000s at a `NO_DEADLINE` root, then `/DEADLINE_RATIO` per level down to
-  a `MIN_DEADLINE` floor of 3s. The Sa ladder never gets near that; a Pareto walk can.
+- **The search is not byte-deterministic.** The FAST pass was briefly removed on 2026-08-03 and
+  restored on 2026-08-04 after the solver sank into known-solvable branches. On a solution,
+  `canSolveB` can promote a previously non-FAST option with `s[FAST] = 1`, so later search order
+  depends on which states the process has already solved. Deadlines add a second wall-clock
+  dependency. Compare verdicts and exact counters on controlled warm/cold baselines; do not use a
+  raw output `diff` as the only regression gate.
 
 ## Choosing a driver
 
@@ -172,3 +167,34 @@ there is a venv at `.venv` for that.
 
 **Run `check_witness.py` before recording any new result.** A tree that passes is a proof
 that does not depend on the solver being correct; a solver log is not.
+
+## Split-heuristic research tools
+
+The 2026-08-09 long-state experiments use exact solvability of small child subsets. These are lab
+tools, not yet part of `radiobase.c`:
+
+| tool | purpose |
+|---|---|
+| `tools/tripletab.c` | build every solver-solvable three-part state at one child level, gated by the exact pair table |
+| `tools/quadtab.c` | build every solver-solvable four-part state, gated by pair and triple tables |
+| `tools/subset_census.c` | count per-part, pair and triple survivors on complete k=5 four-part state lists |
+| `tools/filter_triples.c` | apply triple and optional quad tables to an existing split-feature/label dataset |
+| `tools/label_split_features.c` | join `WIN ... state=... take=...` logs to feature rows without relying on row samples |
+| `tools/sample_subsets.c` | sample pair/triple rejection and lookup cost on k=6 states too large to enumerate |
+
+Example table builds (the stated `MAX_N` includes all parts in a table entry):
+
+```
+clang -O3 -DMAX_K=4 -DMAX_N=96 tools/tripletab.c -o /tmp/tripletab4
+/tmp/tripletab4 4 16 pairs_k4.txt > /tmp/triples_k4.txt
+
+clang -O3 -DMAX_K=4 -DMAX_N=128 tools/quadtab.c -o /tmp/quadtab4
+/tmp/quadtab4 4 16 pairs_k4.txt /tmp/triples_k4.txt > /tmp/quads_k4.txt
+
+clang -O3 -DMAX_K=5 -DMAX_N=100 tools/tripletab.c -o /tmp/tripletab5
+/tmp/tripletab5 5 32 pairs_k5.txt > /tmp/triples_k5.txt
+```
+
+The tables' positive and negative entries are exhaustive according to the current C solver. That is
+enough for a fallback-safe heuristic experiment, but it is not an independent certificate. Do not
+let a table negative prune an exhaustive proof search until the table has an adequate audit.

@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-02.
+entries. Last revised 2026-08-09.
 
 ## High-level goals
 
@@ -104,6 +104,30 @@ pursue it at all.
 **Done when** the draft passes `tools/check_tables.py` with no stale generated blocks and
 contains no number absent from `data/*.csv`.
 
+### P6 - Turn the long-state subset heuristic into a real solver improvement
+
+Current user priority. The 2026-08-09 lab result is strong: exact three-part child subsets plus
+the refitted shape score give median first-hit rank 1 on both complete k=5 four-part families, and
+three-part filtering removes roughly another 18-31x after pairs on five of six sampled k=6
+eight-part monsters. Four-part subsets make the positive ordering more robust on a post-fit third
+family. See the latest [journal entry](journal.md).
+
+The immediate task is deliberately narrower than production deployment:
+
+1. encode the k=5 pair/triple tables as compact bitsets and load them in an experimental build;
+2. check triples before the three leaf cache probes, initially in a fallback-safe pass;
+3. benchmark the six warm monsters against the exact A+B baseline, including lookup overhead;
+4. replay known positive k=5/k=6 states so the ordering path is exercised;
+5. only then decide whether incremental prefix checks and the whole-split score are worth the
+   additional implementation complexity.
+
+The table negatives come from the current C solver, not an independent certificate. They may order
+a fallback-safe heuristic now; they must not prune the exhaustive pass until their trust story is
+strong enough to preserve solver correctness.
+
+**Done when** there is a baseline-matched wall-clock result on both negative monsters and positive
+states, plus a documented decision to land, revise, or reject the method.
+
 ## Ordering
 
 P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed
@@ -113,6 +137,9 @@ record of what has been attempted, and re-deriving from scratch is what costs mo
 Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not contend. P3 follows
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
+
+P6 is the active optimisation experiment while the two cold `Sa(193)` runs continue remotely. It
+uses seconds-to-minutes local benchmarks and does not contend with P2's canonical searches.
 
 H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
 "probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is

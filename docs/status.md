@@ -292,14 +292,22 @@ it was how many facts the proof actually reaches.
    k=6 verdicts at matched wall clock, the incumbent can be killed; until then leave it running.
    The 2026-08-09 journal entry has the full launch detail.
 
-The split-heuristic thread (2026-08-09) is at a natural pause and is written up in the journal:
-a 498-state corpus of critical 4-segment states at k=5 from two constructions; a sound per-part
-filter and a sound cross-part **pair** filter (13.11x at k=5, ~5-7x on the live bottleneck, though
-the solver's `CACHE_ONLY` prefix check already covers much of this when the cache is warm); an
-ordering score built on majorization *shape* against `G_j` that cuts median first-hit rank from
-~11 000 to 31; and a proof that **no scalar metric** can generalise the Singleton Majorization
-Theorem, so do not look for one. Corpus and tools are in `~/radio-corpus/` (not archived to
-`radio-data`).
+The split-heuristic thread made a large step later on 2026-08-09. Exact **three-part subset** checks
+cut the pair-filter survivors by another 4.16x over all 498 critical k=5 four-part states; exact
+four-part subsets add 1.55x. All 6,590 known winners survive. After refitting the existing shape
+score *behind* those structural filters, median first-hit rank is 1 in both full families; on a
+35-state post-fit third family triples+quads score 1 / 9 / 17 / 2 (median / p90 / worst / mean).
+On six actual k=6 eight-part monsters, 100 M-sample censuses put the triple filter at roughly
+18-31x beyond pairs in five states, with 0 of 146 pair survivors passing in the sixth. Tables build
+in 5-20 seconds and compact to under 1.4 MB total. Full methods, baselines and caveats are in the
+latest journal entry; new generators/evaluators are in `tools/`.
+
+**Do not call that a solver speedup yet.** These are complete-candidate censuses and global rank
+experiments. The real solver's warm `CACHE_ONLY` prefix probes overlap the filters, and the new
+ordering is not implemented in its Cartesian walk. Also, the negative subset tables are exhaustive
+according to the current C solver but not independently certified. The next experiment is a
+fallback-safe, leaf-level warm benchmark against the exact A+B baseline; exhaustive pruning waits
+for an adequate table audit.
 
 1. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
