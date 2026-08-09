@@ -31,7 +31,7 @@ solver, so `Sa(192)` in 10 is not in doubt.
 ### Sa(10): 192 achievable, maximality NOT established
 
 `Sa(n)` in `k` splits into a taken group of `n1` and the rest, requiring `Sa(n1)` solvable
-in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA`, `radiobase.c:1041`). Since
+in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA` in `radiobase.c`). Since
 `Sa(n1)` in 9 forces `n1 <= 112`, `Sa(193)` in 10 comes down to **16 states**:
 
 ```

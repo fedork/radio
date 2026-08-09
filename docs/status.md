@@ -19,7 +19,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Bound by `MAX_N` and cell selection at *compile* time; to detect it live, watch `vm_stat` swapins, not RSS. |
 | **The k≤7 oracle does not fit in 24 GB at full coin range.** | The cache trie scales ~`MAX_N²`: 4.04 GB at `MAX_N=132`, ~20 GB at `MAX_N=262`. A k=8-rooted run spent 3 h 50 m loading and never finished. Loading that looks like it is "decelerating" is swapping. Mapping a *known* k=5 state needs only k=4 solving, so obtain states some other way and skip the large oracle entirely. |
-| **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented (`radiobase.c:947-962`), and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
+| **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 
@@ -286,36 +286,54 @@ minimalization 1.84x. Cost scales with **part count**, not fact count, but the r
 on the actual `Sa(193)` logs never exceeds 10 — so the binding constraint was never the exponent,
 it was how many facts the proof actually reaches.
 
+## Where P6 stands — full star expansion is the structural rule
+
+The long-state work has a theorem-backed improvement, not another fitted heuristic. The
+**Vertex-Splitting Pullback Lemma** says that `(n:m)`, `n>=m`, may be lifted to `m` disjoint copies of
+`(n:1)` by cloning the wide shore. Pulling tests back to all clones preserves edge transcripts, so
+every solvable state must have its mass-preserving profile
+
+    sort(n_1 repeated m_1 times, n_2 repeated m_2 times, ...) <=_w G_k.
+
+`radiobase.c` now applies this full star-expansion majorization before the cache; the independent C
+verifier and Python certificate prototype apply the same lemma separately. This **corrects** the
+earlier claim that the `majtight>1` cutoff was heuristic-only. The cutoff is sound; its continuous
+value below 1 remains only an ordering score.
+
+Measured effect: the hard 8-part positive moved from a matched 300-second timeout to **5.3 CPU
+seconds**. The A+B monster is now refuted at the root by the prefix certificate `714>705`, instead of
+237.4 CPU seconds / 8.1 billion candidate evaluations. The filter directly proves 822,537 of
+2,024,705 recorded k=5 negatives and hits zero of 20,780 positives. All 62,366 negative facts in
+`out_k7.txt` still verify independently with zero gaps. Full proof and benchmarks are in the latest
+[journal entry](journal.md).
+
+The condition is not sufficient: `Sb(16:1,12:2)` passes it but is unsolvable in 4. The residual is
+now precise. Singleton Majorization may test clones of one original coin independently, while a legal
+rectangle strategy must keep them synchronised. If P6 continues, work on a bundled/synchronised
+version of the Three-Way Majorization Decomposition Lemma; do not return to scalar scores or warm-cache
+subset tables.
+
 ## Immediate next steps
 
 0. **Watch the two runs** (`tools/sa193_status.sh --both`). If `run2` overtakes the incumbent on
    k=6 verdicts at matched wall clock, the incumbent can be killed; until then leave it running.
-   The 2026-08-09 journal entry has the full launch detail.
+   The 2026-08-09 journal entry has the full launch detail. Both remote runs predate full star
+   expansion and do not benefit from it; do not restart either without a separate matched decision.
 
-The long-state subset result later on 2026-08-09 is now operationally **rejected**. Its offline facts
-remain true - triples/quads sharply filter complete candidates and make global positive rank nearly
-perfect - but the warm prefix cache already carries the same low-dimensional negative information.
-On the exact A+B monster, 5,200,097 complete candidates reached the three real cache probes and zero
-passed all three. A 1/256 sample found 11,064 triple-table rejections among 20,312 candidates
-(54.47%), but every one was already cache-rejected: **zero marginal rejection**. Do not implement a
-second subset oracle in `radiobase.c`.
+The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
+facts are real, but the warm upward-closed prefix cache already contains the subset information; the
+former added zero marginal rejections on the A+B monster, and the latter regressed negatives. Full
+star expansion is different: it is an arbitrary-part-count global theorem and is now deployed.
 
-Limited-discrepancy FAST passes are also rejected as a throughput change. Radius 2 found a solution
-for all 400 replayed 7/8-part positives (ordinary fresh FAST missed 184), but radius 1 cost +13.6% on
-sampled 7-part negatives and +3.2% on all logged 8-part negatives; mass/progress gates were neutral.
-The useful new benchmark is instead the hard positive
-`Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)` in 5. It historically took 12,585 seconds despite its
-winning split being entirely FAST, and still timed out after 300 seconds against the end-warm k<=4
-cache. A root-only cache-`TRUE`-first pass also timed out at 300 seconds. The remaining target is
-**value ordering inside FAST**, not wider admission or duplicate rejection. Full method, costs and
-caveats are in the latest journal entry; `tools/fast_replay.c` is the isolated replay harness.
-
-1. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
+1. For further P6 work, find a residual expensive state that **passes** full star expansion, then
+   attack the clone-synchronisation constraint. The old hard positive and A+B monster are solved
+   benchmarks now, not useful stress tests.
+2. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
-2. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
+3. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
    invariant from a fit into a derivation, and needs no new compute.
-3. `... 432 9` — discriminates the profile model (432) from the closed form (431).
-4. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
+4. `... 432 9` — discriminates the profile model (432) from the closed form (431).
+5. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
    here needing no compute at all. An exchange argument is the natural shape; the surviving
    obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).

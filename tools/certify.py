@@ -6,9 +6,9 @@ It is Python and therefore slow; a production verifier would be C. The point is 
 reduction ratios and the verification cost on real logs at small k before anything expensive
 depends on them.
 
-The trust base is exactly: Singleton Majorization, Unit-Group Elimination, Subgraph
-Monotonicity, and the split semantics of docs/problem.md. Nothing about the solver - not its
-orderings, not FAST, not deadlines, not its cache.
+The trust base is exactly: Singleton Majorization, the Vertex-Splitting Pullback Lemma,
+Unit-Group Elimination, Subgraph Monotonicity, and the split semantics of docs/problem.md.
+Nothing about the solver - not its orderings, not FAST, not deadlines, not its cache.
 
     tools/certify.py <log> [--maxk K] [--budget SECONDS]
 
@@ -28,7 +28,7 @@ POW3 = [3 ** i for i in range(16)]
 NEG = re.compile(r"^can't solve (?:size=\S+ )?Sb\((.*?)\)\[(\d+),(\d+)\] in (\d+)")
 
 
-# ---------------------------------------------------------------- the three theorems
+# ---------------------------------------------------------------- the four theorems
 
 def G(k: int) -> list[int]:
     """The singleton base sequence G_k, non-increasing.
@@ -75,30 +75,26 @@ def mass(s) -> int:
 
 
 def maj_refutes(s, k: int) -> bool:
-    """Refute s using the SINGLETON SUB-MULTISET, not only the all-singleton case.
+    """Refute s using its full star expansion and Singleton Majorization.
 
-    Singleton Majorization decides all-singleton states exactly: unsolvable iff the n-sides are
-    not weakly majorized by G_k. Combined with Subgraph Monotonicity that extends to any state -
-    the singleton parts form a subgraph, so if *they* violate majorization the whole state is
-    unsolvable. radiobase.c does exactly this (the `singleton_size > 0` branch of canSolveB) and
-    returns FALSE without printing, which is why such facts never appear in a log.
+    The Vertex-Splitting Pullback Lemma replaces every oriented part (n:m) by m disjoint copies
+    of (n:1). Pulling a strategy back to all vertex clones preserves the transcript of every edge,
+    so solvability of s implies solvability of this singleton lift. The lift is therefore weakly
+    majorized by G_k whenever s is solvable.
 
-    An earlier version only handled the all-singleton case and therefore could not reproduce
-    25% of the k=4 facts in a frontier walk - they were not a closure gap at all, just a rule
-    the verifier was missing."""
+    This strictly dominates the former Subgraph-Monotonicity downgrade, which retained only one
+    (n:1) per part and discarded the other (m-1)n edges."""
     if not s:
         return False
-    # Downgrade EVERY part to its own singleton: (n:1) <= (n:m) componentwise, so the downgraded
-    # state injects into s and Subgraph Monotonicity carries unsolvability upward. Strictly stronger
-    # than using only the parts already at m==1.
-    ns = sorted((n for n, _ in s), reverse=True)
+    ns = sorted((n for n, m in s for _ in range(m)), reverse=True)
     pref = gprefix(k)
     run = 0
     for i, n in enumerate(ns):
         run += n
         # Past len(G_k) the bound is the CONSTANT sum G_k = 3^k - the theorem pads with trailing
         # zeros - not a violation. An earlier version returned True there, which over-refutes; it
-        # fired 79 times in one k=4 level once every part was being downgraded.
+        # fired 79 times in one k=4 level under the former one-copy downgrade; full star expansion
+        # makes ranks past len(G_k) substantially more common.
         if run > (pref[i] if i < len(pref) else pref[-1]):
             return True
     return False

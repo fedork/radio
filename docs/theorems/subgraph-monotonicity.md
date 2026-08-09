@@ -2,7 +2,7 @@
 
 Written up 2026-08-03. The theorem is elementary, but it had never been stated, and it is
 what the solver's entire result cache rests on — `cacheCanSolve` closes downward and
-`cacheCantSolve` closes upward (`radiobase.c:206`, `:276`) over the relation built in
+`cacheCantSolve` closes upward over the relation built in
 `sbb_lesser` / `sbb_greater`. It is also the lemma a negative certificate needs in order to
 store only minimal elements rather than whole closures.
 
@@ -53,7 +53,7 @@ one exhibited need not be optimal for `G'`.
 
 2. **Componentwise part dominance.** If `n_i' ≤ n_i` and `m_i' ≤ m_i` for every part, then
    `K_{n_i',m_i'}` embeds in `K_{n_i,m_i}`, so the whole state is a subgraph. This is
-   exactly the relation `sbb_greater` enumerates (`radiobase.c:1605`: all `j` with
+   exactly the relation `sbb_greater` enumerates in `radiobase.c`: all `j` with
    `n1_j ≥ n1_i` **and** `n2_j ≥ n2_i`), and it is therefore sound.
 
 3. **Certificates may store antichains.** A downward-closed set of solvable states is

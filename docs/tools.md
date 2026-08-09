@@ -2,7 +2,7 @@
 
 ## Layout
 
-`radiobase.c` (~1560 lines) is the entire engine. Every other `.c` at the repo root is a
+`radiobase.c` (~1950 lines) is the entire engine. Every other `.c` at the repo root is a
 `main()` wrapped around it, selected by `#include "radiobase.c"`. There is no build system;
 each driver is a single `clang` invocation.
 
@@ -19,15 +19,15 @@ preferred entry points.
 
 | what | where |
 |---|---|
-| `(n1:n2)` pair -> `sbb` integer id; split tables built lazily | `init()`, `ensure_splits()` at `radiobase.c:1227` |
+| `(n1:n2)` pair -> `sbb` integer id; split tables built lazily | `init`, `ensure_splits` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
-| Result cache: a trie over sorted `sbb` ids, closed downward for can-solve and upward for can't-solve | `cacheCanSolve` `:206`, `cacheCantSolve` `:276` |
+| Result cache: a trie over sorted `sbb` ids, closed downward for can-solve and upward for can't-solve | `cacheCanSolve`, `cacheCantSolve` |
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST-restricted first pass, exhaustive second pass, deadlines | `canSolveB` |
-| Unit-group stripping before search | `radiobase.c:538` |
-| Exact decision for singleton states via majorization against `G_k` | `radiobase.c:464-506` |
-| `Sa` recursion | `canSolveA` `:1011` |
-| Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` `:1295` |
-| Warm the cache from a previous run's parsed output | `parse_file` `:1431` |
+| Unit-group stripping before search | start of `canSolveB` |
+| Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
+| `Sa` recursion | `canSolveA` |
+| Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` |
+| Warm the cache from a previous run's parsed output | `parse_file` |
 
 ### Memory: `radio_canon_search_generic` will eat your machine
 

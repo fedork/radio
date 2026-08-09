@@ -137,6 +137,7 @@ void ensure_splits(int sbb);
 int minK(int);
 void init_singleton_majorization(void);
 int singleton_majorization_can_solve(int *sb, int size, int k);
+int star_expansion_majorization_can_solve(int *sb, int size, int k);
 
 int min(int a,int b){
     return a<b?a:b;
@@ -567,6 +568,43 @@ int singleton_majorization_can_solve(int *sb, int size, int k) {
     return TRUE;
 }
 
+/* Necessary condition for an arbitrary Sb state.  Replace each oriented part (n:m), n >= m,
+   by m disjoint singleton stars (n:1).  This is a vertex-splitting lift of the original graph:
+   pulling every test back to all clones preserves every edge transcript, so a strategy for the
+   original would solve the lift.  The Singleton Majorization Theorem then decides the lift.
+
+   Sort only the distinct input parts by n, not the expanded sequence.  Long states have many
+   repeated stars but few distinct parts, so this avoids making the stronger theorem expensive. */
+int star_expansion_majorization_can_solve(int *sb, int size, int k) {
+    int by_n[size];
+    int i;
+    for (i = 0; i < size; i++) by_n[i] = sb[i];
+    for (i = 1; i < size; i++) {
+        int v = by_n[i], j = i - 1;
+        while (j >= 0 && sbb_to_n1[by_n[j]] < sbb_to_n1[v]) {
+            by_n[j + 1] = by_n[j];
+            j--;
+        }
+        by_n[j + 1] = v;
+    }
+
+    long long left_prefix = 0;
+    int rank = 0;
+    int right_len = singleton_base_len[k];
+    int right_total = singleton_base_prefix[k][right_len - 1];
+    for (i = 0; i < size; i++) {
+        int copies = sbb_to_n2[by_n[i]];
+        int n = sbb_to_n1[by_n[i]];
+        while (copies-- > 0) {
+            left_prefix += n;
+            int right_prefix = rank < right_len ? singleton_base_prefix[k][rank] : right_total;
+            if (left_prefix > right_prefix) return FALSE;
+            rank++;
+        }
+    }
+    return TRUE;
+}
+
 int get_max_sbb(int n1, int n2, int n3, int n4) {
     int sbb1 = getSbb(n1, n2);
     int sbb2 = getSbb(n3, n4);
@@ -706,18 +744,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         // Singleton states are decided exactly by majorization against G_k.
         return singleton_majorization_can_solve(tmp, size, k);
     }
-    // Downgrade EVERY part (n:m) to its own singleton (n:1), then test majorization. Sound because
-    // (n:1) <= (n:m) componentwise, so the downgraded state injects into this one and Subgraph
-    // Monotonicity carries unsolvability upward. Strictly stronger than testing only the parts that
-    // are ALREADY singletons, since prefix sums of a sorted-descending multiset only grow as elements
-    // are added. Suggested and added 2026-08-06; measured on the verifier at +7.6% more majorization
-    // refutations, so a small win, as expected.
-    //
-    // sbb ids are handed out in increasing order of n1*n2, so for m=1 they are monotone in n and
-    // sorting the ids descending sorts n descending - which is what the test reads.
-    for (i = 0; i < size; i++) singletons[i] = getSbb(sbb_to_n1[tmp[i]], 1);
-    if (size > 1) sort1(singletons, size);
-    if (!singleton_majorization_can_solve(singletons, size, k)) return FALSE;
+    // Apply Singleton Majorization to the full star expansion: (n:m) becomes m copies of (n:1).
+    // This strictly dominates the old one-copy downgrade, because it contains that downgraded
+    // singleton sequence and adds only nonnegative entries.  It is a necessary condition, not an
+    // ordering heuristic; see docs/theorems/singleton-majorization.md.
+    if (!star_expansion_majorization_can_solve(tmp, size, k)) return FALSE;
     //check cache
     int ck = checkCache(tmp, size, k);
     //	printf("got from cache %d\n", ck);

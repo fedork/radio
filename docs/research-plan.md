@@ -104,38 +104,39 @@ pursue it at all.
 **Done when** the draft passes `tools/check_tables.py` with no stale generated blocks and
 contains no number absent from `data/*.csv`.
 
-### P6 - Turn the long-state subset heuristic into a real solver improvement
+### P6 - Full star-expansion majorization for long states
 
-Current user priority, but the target changed after the mandatory warm-cache measurement. Exact
-pair/triple/quad filters are duplicate information: on the exact A+B monster the triple table rejected
-54.47% of a complete-candidate sample and added zero rejections after the real prefix cache. Limited
-discrepancy made FAST cover all 400 replayed long positives within radius 2, but negative overhead made
-it slower overall. Both deployment ideas are rejected; see the latest [journal entry](journal.md).
+**Delivered 2026-08-09.** The useful child-profile feature was not merely an ordering score. The
+[Vertex-Splitting Pullback Lemma](theorems/singleton-majorization.md#vertex-splitting-pullback-lemma-2026-08-09)
+proves that every part `(n:m)`, `n>=m`, may be lifted to `m` disjoint singleton stars `(n:1)`.
+Therefore the mass-preserving block profile of every solvable state must be weakly majorized by
+`G_k`. `radiobase.c` now applies this sound filter before its cache lookup; `radio_verify.c` and
+`tools/certify.py` implement it independently.
 
-The active benchmark is the expensive *solvable* 8-part state
-`Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)` in 5. Its historical witness was entirely FAST, yet took
-12,585 seconds; both the current warm baseline and a cache-`TRUE`-first variant timed out at 300
-seconds. This isolates the remaining problem as value order and recursive-child cost **inside** the
-already-admitted FAST set.
+This supersedes the value-order experiment. Against the same warm lower cache, the hard positive
+`Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)` in 5 moved from a 300-second timeout to 5.3 CPU seconds.
+The exact A+B negative monster is refuted at the root by `714 > 705` at prefix 40 of its expanded
+profile, so its previous 237.4-second / 8.1-billion-candidate search is no longer a search problem.
+Broad replay and independent-verifier results are in the latest [journal entry](journal.md).
 
-Immediate work:
+Reproduce the two controls after compiling `radio_one.c` at the stated bounds:
 
-1. instrument the hard state by full candidate: cache statuses, which child is solved recursively,
-   child CPU, and prefix path; retain the known historical winner as the positive control;
-2. compare the expensive failed candidates with the winner using only information available before
-   recursion - especially `TRUE`/`MAYBE` pattern, the existing shape score, and child-profile features;
-3. implement value ordering only if it reorders already-admitted FAST choices without another full
-   pass or duplicate subset lookup;
-4. benchmark it on this hard positive, several expensive 4-part k=6 positives from `out_k8.txt`, and
-   the exact negative A+B monster. Cheap replay positives are a coverage check, not the speed metric.
+```
+tools/capped_run.sh --seconds 300 --rss-gb 8 --label star-hard -- \
+  ./radio_one /tmp/k6lab/warm_k4.txt 5 15 3 14 3 17 2 8 4 11 2 10 2 19 1 15 1
+tools/capped_run.sh --seconds 300 --rss-gb 8 --label star-monster -- \
+  ./radio_one /tmp/k6lab/warm_k5.txt 6 18 8 22 6 15 8 13 9 23 4 23 2 21 2 17 2
+```
 
-`tools/fast_replay.c` provides isolated lower-cache replay with FAST self-training disabled. Keep the
-negative subset-table trust caveat: those tables may safely order a fallback, but must not prune an
-exhaustive proof without an independent audit.
+The old pair/triple/quad deployment remains rejected: its information is already present in the warm
+upward-closed prefix cache. The full star filter is different—it is a global arbitrary-part-count
+theorem and directly proves 40.6% of the recorded k=5 negatives.
 
-**Done when** a value-order proposal either beats the hard positive under a matched cap without
-regressing the negative monster, or is rejected with its measured cost and the next session does not
-repeat it.
+If a residual long state is still expensive, the next theoretical target is **synchronised
+majorization**. Ordinary Singleton Majorization may test the cloned copies of one original coin
+differently; an original rectangle requires all those clones to move together. Characterise or relax
+that bundled three-way decomposition before fitting another score. `Sb(16:1,12:2)` in 4 is the first
+small counterexample to the converse and a useful regression case.
 
 ## Ordering
 

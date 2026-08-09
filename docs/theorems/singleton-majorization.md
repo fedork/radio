@@ -261,25 +261,60 @@ dominated termwise by those of `G_k`, so it is weakly majorized by `G_k` and hen
 in `k`. A witness tree all of whose leaves are such states is therefore a complete proof,
 independent of the solver. `tools/check_witness.py` checks exactly this condition.
 
-## Corollary: downgrade every part to its own singleton (2026-08-06)
+## Vertex-Splitting Pullback Lemma (2026-08-09)
 
-The theorem decides all-singleton states. It can be applied to **any** state, not only to the parts
-that happen to be singletons already.
+Subgraph Monotonicity is not the only way to transfer a strategy between graphs. A graph may also be
+made easier by **splitting a vertex into clones**.
 
-> For a state `s = {(n_1:m_1), ..., (n_p:m_p)}`, let `s' = {(n_1:1), ..., (n_p:1)}`. If the sequence
-> `(n_1, ..., n_p)` sorted nonincreasing is **not** weakly majorized by `G_k`, then `s` is unsolvable
-> in `k`.
+> Let `H` and `G` be graphs and let `pi: V(H) -> V(G)` be a vertex map whose induced map on edges is
+> injective: distinct edges `{x,y}` of `H` have distinct images `{pi(x),pi(y)}` in `G`. If `G` is
+> solvable in `k` tests, then `H` is solvable in `k` tests.
 
-*Proof.* `(n:1) <= (n:m)` componentwise for every `m >= 1`, so the identity map is an injection of
-`s'` into `s` with each part componentwise no larger — i.e. `s' <= s` in the subgraph order. The
-theorem makes `s'` unsolvable in `k`, and [Subgraph Monotonicity](subgraph-monotonicity.md) carries
-unsolvability upward to `s`. ∎
+*Proof.* At every node of a strategy for `G`, replace its tested vertex set `T` by the preimage
+`pi^-1(T)`. An edge of `H` then gives exactly the same `0/1/2` response as its image edge in `G`, at
+this node and recursively at every node it reaches. The strategy for `G` assigns distinct transcripts
+to distinct image edges. Edge-injectivity therefore gives distinct transcripts to distinct edges of
+`H`. ∎
 
-This strictly dominates applying the theorem to the singleton **sub**-multiset: prefix sums of a
-sorted-nonincreasing multiset are nondecreasing under adding elements, so feeding every part instead
-of a subset can only make a violation easier to reach. Measured on the verifier, it adds 7.6% more
-majorization refutations (354 -> 381 in one k=4 level); on the solver it cut states searched by
-2.7-15.8% on three k=7 refutations, with verdicts unchanged.
+The vertex map need not be injective: several clones in `H` may map to one vertex of `G`. This is why
+the lemma is not a restatement of Subgraph Monotonicity.
+
+## Corollary: full star-expansion majorization
+
+Orient every part so `n_i >= m_i`. Define the **full star expansion**
+
+```
+Phi({(n_i:m_i)}_i) = ( n_1 repeated m_1 times,
+                        n_2 repeated m_2 times, ... )^downarrow.
+```
+
+Equivalently, replace each `K_{n_i,m_i}` by `m_i` vertex-disjoint copies of `K_{n_i,1}`.
+
+> If `Sb(n_1:m_1, ..., n_p:m_p)` is solvable in `k`, then
+>
+> `Phi({(n_i:m_i)}_i) <=_w G_k`.
+
+*Proof.* For one `K_{n,m}`, name its sides `x_1,...,x_n` and `y_1,...,y_m`. In the expanded graph,
+star `j` has centre `y_j` and leaves `x_(1,j),...,x_(n,j)`. Map `y_j` to `y_j` and every clone
+`x_(i,j)` to `x_i`. This maps the edge `{x_(i,j),y_j}` bijectively to the original edge
+`{x_i,y_j}`. Taking the disjoint union of these maps over all parts satisfies the pullback lemma, so
+solvability of the original state implies solvability of its all-singleton expansion. The Singleton
+Majorization Theorem now gives the displayed condition. ∎
+
+This supersedes the 2026-08-06 one-copy downgrade `(n:m) -> (n:1)`. The full expansion contains that
+sequence and another `m-1` copies of `n`, so every old violation remains a new violation; unlike the
+old downgrade, it also preserves the full mass `sum n_i m_i`.
+
+The choice of orientation is strongest. Expanding the other shore gives `n` copies of `m`; for
+`n >= m`, that flatter equal-mass sequence is weakly majorized by `m` copies of `n`, so it cannot add
+a violation after the displayed test passes.
+
+In fact this is the strongest edge-bijective singleton lift of one part. The centre of any lifted
+star maps to one original vertex, so its degree is at most `n`; the lifted stars must carry all `nm`
+distinct edges. Among sequences with total `nm` and largest entry at most `n`, the sequence of `m`
+copies of `n` weakly majorizes every other one. Any stronger structural condition must therefore
+retain information that ordinary singleton majorization forgets, such as the requirement that clones
+of one original vertex be tested together.
 
 ### The tail must be clamped, not treated as a violation
 
@@ -288,8 +323,7 @@ Sequences are **zero-padded**, so for `t > len(G_k) = 2^k` the right-hand side i
 bounded by `3^k`. So **no violation can arise past `len(G_k)`**, and code that reports one there
 over-refutes.
 
-This matters specifically because of the corollary: with only the singleton sub-multiset, exceeding
-`2^k` parts is rare enough never to have been observed; downgrading every part makes it routine at low
-`k`, where `2^k` is small. `radio_verify.c` had exactly this defect, and it fired **79 times** in a
-single k=4 level once every part was downgraded. `radiobase.c` was already correct — it stops the
-comparison at `min(size, len(G_k))`, which is equivalent.
+This matters specifically because of the corollary: full star expansion routinely has more than
+`2^k` entries. `radio_verify.c` once had exactly this defect, and it fired **79 times** in a single
+k=4 level even under the weaker one-copy downgrade. `radiobase.c` was already correct — it stops the
+comparison at `min(size, len(G_k))`, which is equivalent when the counting bound has passed.

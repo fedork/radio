@@ -2519,7 +2519,8 @@ The k=6 node has enumerated **308 billion** split combinations on an 8-part stat
 3^6 = 729** — 99.6% saturated, so the counting bound prunes nothing.
 
 **I then misread its deadline, and the correction matters.** I wrote that it was "at 99.7% of its budget"
-and "about to bail with MAYBE" — it is not, and it never will. `radiobase.c:795` gives every descendant
+and "about to bail with MAYBE" — it is not, and it never will. The deadline setup in `canSolveB`
+gives every descendant
 of a pass-2 node `NO_DEADLINE`:
 
     clock_t child_deadline = pass<2 ? deadline : NO_DEADLINE;
@@ -2611,6 +2612,10 @@ unguarded a second time, which on BSD prints its usage to stdout and put a page 
 CSV. Both call sites now go through one `solver_age()` helper.
 
 ## 2026-08-06 — downgrade every part to a singleton before majorizing, and a latent unsoundness it exposed
+
+**Superseded 2026-08-09:** the one-copy downgrade was sound but unnecessarily weak. The
+Vertex-Splitting Pullback Lemma upgrades `(n:m)` to `m` copies of `(n:1)`, preserving all mass. See
+the latest entry.
 
 Suggested improvement: instead of applying Singleton Majorization only to the parts that are already
 singletons, **downgrade every part `(n:m)` to `(n:1)`** and majorize that. Sound because `(n:1) <= (n:m)`
@@ -3212,12 +3217,13 @@ multiplies by ~1.5 per level.
 **Retracted: "winners are tight".** Only 22.7% of the 4,684 winners are tight. The 137/137 result
 recorded earlier came from witness trees in the sat>=0.95 band and does not generalise to 0.63-0.91.
 
-**Negative: majorization adds nothing here.** On a 40-state sample, 17,280,206 cap-feasible
-candidates, 17,280,206 survive singleton majorization on all three children - 1.0x. The `(n:m)->(n:1)`
-downgrade discards too much mass to fire at k=4 children.
+**Superseded: the one-copy majorization check adds nothing here.** On a 40-state sample, 17,280,206
+cap-feasible candidates, 17,280,206 survive the then-current check on all three children - 1.0x. The
+measurement was correct for `(n:m)->(n:1)`, which discards too much mass to fire at k=4 children. It
+does not apply to the full star expansion `(n:m)->m copies of (n:1)`, discovered on 2026-08-09.
 
 **CORRECTION (same day): the per-part filter is ALREADY IN THE SOLVER, so the 15.3x below is not
-new headroom.** `radiobase.c:947-962` caches, per split of each part, the minimal level at which
+new headroom.** The per-split `s[4]` / `s[5]` loop in `canSolveB` caches, for each part, the minimal level at which
 `s[0]` alone, `s[3]` alone, *and the pair `{s[1],s[2]}` jointly* are solvable, and skips the split
 when that exceeds `k-1`. That subsumes both the per-part test and the intra-part self-check. The
 15.3x was measured against a baseline enumerator that lacked it - a property of my measuring tool,
@@ -3297,8 +3303,11 @@ away what majorization actually constrains. Three features built on the block *p
 (part `(a:b)` expanded, mass-preservingly, to `min(a,b)` copies of `max(a,b)`, sorted descending):
 
 - `majtight` = `max_i prefix_i / Gprefix_i` against `G_j`. Large blocks blow the early prefixes
-  first, so this measures distance to the majorization wall. **Not sound** - it exceeds 1 on
-  candidates that pass the provable per-part filter, so it is a heuristic feature only.
+  first, so this measures distance to the majorization wall. **Correction 2026-08-09: the cutoff
+  `majtight > 1` is sound.** The profile is the full star expansion, and Vertex-Splitting Pullback
+  proves that every solvable state must pass Singleton Majorization. Exceeding 1 on candidates that
+  pass the weaker per-part filter showed additional pruning power, not unsoundness. Using the
+  continuous value below 1 as an ordering score remains heuristic.
 - `meanratio` = the same prefix ratio averaged over all ranks rather than maxed.
 - `l2shape` = mean squared deviation of the profile from `G_j`'s own blocks at the same rank,
   normalised by `G_j[0]` - literally "how far is this branch's shape from the extremal shape".
@@ -3714,3 +3723,105 @@ instrument which uncertain full candidates consume the time, compare their prefi
 with the known winning split, and order already-admitted choices without adding another pass. This is
 also the correct benchmark discipline: a proposal that only improves the millisecond positives has no
 chance to move total runtime.
+
+## 2026-08-09 — full star-expansion majorization: the shape heuristic was a theorem
+
+The user proposed attacking long states from their eventual singleton leaves rather than adding
+another low-dimensional cache. The first static route has a sharp limit: singleton **subgraphs** of
+`K_{n,m}` cannot use `m`. Several vertex-disjoint stars inside one component must partition the same
+wide shore, so their sizes sum to at most `n`; checking every such subgraph collapses to the existing
+one-copy downgrade `(n:m)->(n:1)`.
+
+The missing relation is not subgraph inclusion but **vertex splitting**.
+
+### Vertex-Splitting Pullback Lemma
+
+Let `pi:V(H)->V(G)` induce an injective map from the edges of `H` into the edges of `G`. If `G` is
+solvable in `k`, then `H` is: at each strategy node test `pi^-1(T)` where `T` is the original test.
+Every edge of `H` receives exactly the transcript of its image, and edge injectivity preserves
+separation.
+
+Apply this to `K_{n,m}`, `n>=m`: clone every wide-side vertex once for each short-side vertex. The
+result is `m` disjoint copies of `K_{n,1}`, with edges in bijection with the original rectangle.
+Therefore every solvable state satisfies
+
+    Phi(S) = sort(n_1 repeated m_1 times, n_2 repeated m_2 times, ... ) <=_w G_k.
+
+This is the **full star-expansion majorization** condition. It preserves the entire mass
+`sum n_i*m_i`, strictly dominates the 2026-08-06 one-copy downgrade, and is the strongest static
+singleton lift of this kind: within `K_{n,m}`, a lifted star has at most `n` edges and all `nm` edges
+must appear, so no singleton lift can majorize `m` copies of `n`. Proof is now in
+[theorems/singleton-majorization.md](theorems/singleton-majorization.md).
+
+### This corrects the strongest earlier shape feature
+
+The offline `majtight` feature was already computing exactly `Phi(child)` and comparing it with
+`G_{k-1}`. The journal called it unsound because it exceeded 1 on candidates that passed the exact
+per-part filter. That inference was backwards: those candidates are jointly impossible even though
+each part is possible alone. The cutoff `majtight>1` is a sound refutation; only using its continuous
+value below 1 as an ordering score is heuristic. The stale statement above has been corrected in
+place.
+
+The condition is not sufficient. In the exact k=4 pair universe,
+`Sb(16:1,12:2)` is unsolvable although `Phi=(16,12,12)` passes the first three prefixes of
+`G_4`: `16<=16`, `28<=31`, `40<=42`. Of the 885 unsolvable pairs whose 102 individual parts are
+solvable, full star expansion catches 257 (29.0%); the exact pair table catches all 885. This locates
+the residual obstruction: Singleton Majorization may solve the cloned stars by testing clones of one
+original coin differently. A strategy that descends to the unsplit rectangle must keep those clones
+**synchronised at every node**.
+
+Equivalently, a part `(n:m)` is a bundle of `m` singleton rows of length `n`. Ordinary majorization
+may decompose each row independently. A legal original test must use one common wide-side cut `a`
+across the whole bundle, then choose `b` row centres: `b` rows route `(a,n-a)` to outcomes `(2,1)`,
+and `m-b` rows route them to `(1,0)`. A future stronger theory is therefore a
+**synchronised/bundled majorization decomposition**, not another scalar metric or subset table.
+
+### Validation before deployment
+
+- Every one of the 349,827 printed solvable roots in the audited 2026 logs `out_k7.txt`,
+  `out_k8.txt`, and `out_radio_1.txt` passes full star expansion; so do all three printed children of
+  every winning split. Zero observed violations.
+- Exhaustively rebuilding the k=4 pair table gives the unchanged 4,368 solvable pairs of 5,253.
+- In `warm_k5.txt`, zero of 20,780 positive k=5 facts violate the condition. It directly refutes
+  822,537 of 2,024,705 recorded negative k=5 facts (40.6%). At k=4 it refutes 91,627 of 138,065
+  negatives, again with zero positive hits.
+- The independent `radio_verify.c`, separately upgraded to the pullback lemma, verifies all 62,366
+  negative facts in `out_k7.txt` through k=6 with zero gaps (12.89 s, 0.80 GB peak). The Python
+  certificate prototype was upgraded independently as well.
+
+### Solver result
+
+`radiobase.c` now applies the condition before its cache lookup. It sorts only the distinct parts by
+wide-side size and streams each repeated entry, rather than materialising the expanded state. The
+filter is sound and active in every pass and recursive call; it is not an extra heuristic pass.
+
+Matched warm-cache benchmarks:
+
+| workload | prior | full star expansion | result |
+|---|---:|---:|---:|
+| hard 8-part positive in k=5 | >300 s timeout | **5.3 s** | >56x, now solves |
+| exact A+B 8-part negative in k=6 | 237.4 CPU s | **0.0 solve CPU s** | refuted at root |
+| 200 sampled 7-part k=5 negatives | 2.15856 s | **1.249594 s** | 42.1% faster |
+| all 82 logged 8-part k=5 negatives | 77.7626 s | **0.060670 s** | about 1,280x faster |
+| 200 sampled 7-part k=5 positives | 0.314847 s | **0.247027 s** | 21.5% faster |
+| all 200 logged 8-part k=5 positives | 0.247179 s | 0.369208 s | 49.4% slower, +0.122 s total |
+
+The A+B state now has a short proof independent of the solver and cache. Its 41-entry profile first
+violates at prefix 40: `sum Phi[1..40]=714 > sum G_6[1..40]=705`; total mass is 727 against 729.
+
+Three historically expensive 4-part k=6 positives were also rerun against the same warm k<=5 cache.
+These are historical-to-current comparisons, not matched engine builds, but they exercise the deep
+recursive cost the replay corpus misses: `15,864 -> 43.4 s`, `14,712 -> 52.8 s`, and
+`13,326 -> 0.2 s`. All three remain solvable.
+
+No local solver was left running; the two separately monitored remote `Sa(193)` runs remain alive and
+still use the pre-star-expansion builds. The benchmark outputs are small and reproducible from the
+commands in P6; no raw artifact was archived.
+
+### Decision
+
+Deploy the theorem-backed filter. It solves the active positive benchmark, eliminates the negative
+monster, and improves the expensive negative population; the only measured regression is 0.122 s
+spread over 200 already-cheap positives. The pair/triple/quad deployment and discrepancy-pass
+rejections from the preceding entry still stand. If long states remain expensive after this change,
+the next theoretical target is the synchronisation constraint inside the cloned singleton bundles.

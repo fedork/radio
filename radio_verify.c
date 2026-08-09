@@ -7,8 +7,8 @@
 //   * the split semantics of docs/problem.md: a test on (n:m) taking (a,b) yields children
 //     (a:b), (n-a:m-b) and the mixed pair {(a:m-b), (n-a:b)}
 //   * Singleton Majorization: an all-singleton state is unsolvable iff its n-sides are not
-//     weakly majorized by G_k -- applied to the singleton SUB-multiset, which combined with
-//     Subgraph Monotonicity refutes any state whose singleton parts already violate it
+//     weakly majorized by G_k -- applied to the full star expansion of every state through
+//     the Vertex-Splitting Pullback Lemma
 //   * Unit-Group Elimination: (1:1) parts never affect solvability
 //   * Subgraph Monotonicity: a <= b as sub-multisets with componentwise-smaller parts, and a
 //     unsolvable, implies b unsolvable
@@ -379,29 +379,33 @@ static int dominates(const Fact *a, const Fact *b) {
     return dom_rec(a, b, 0, 0);
 }
 
-/* Singleton Majorization applied to the singleton sub-multiset (parts with m == 1). */
-/* Singleton Majorization, applied to EVERY part downgraded to its own singleton.
-   (n:1) <= (n:m) componentwise for any m >= 1, so mapping each part (n:m) to (n:1) is an injection
-   into the original state, and Subgraph Monotonicity carries unsolvability upward: if the downgraded
-   all-singleton state violates majorization against G_k, the original is unsolvable.
+/* Singleton Majorization applied to the full star expansion.  Replace each oriented part
+   (n:m), n >= m, by m disjoint copies of (n:1).  This lift has one edge for every original edge:
+   map every cloned n-side vertex back to its source and pull each original test back to all clones.
+   Corresponding edges then have identical transcripts, so solvability of the original state implies
+   solvability of the lift.  A majorization violation in the lift therefore refutes the original.
 
-   This strictly dominates the earlier version, which used only the parts that were ALREADY singletons.
-   Prefix sums of a sorted-descending multiset only grow when elements are added, so feeding every
-   part instead of a subset can only make the violation easier to reach. Suggested 2026-08-06.
+   This strictly dominates the 2026-08-06 one-copy downgrade, which kept only one (n:1) per part.
+   Parts are sorted by n already, so repeat n exactly m times while scanning the prefixes; no expanded
+   state needs to be materialised.
 
    The right-hand side must be CLAMPED past len(G_k), not treated as a violation. The theorem pads
    with trailing zeros, so for t > len(G_k) the bound is the constant sum G_k = 3^k, and the
-   downgraded n-sum is at most the mass, which COUNT has already bounded by 3^k - hence no violation
+   expanded n-sum is at most the mass, which COUNT has already bounded by 3^k - hence no violation
    can occur there. An earlier version returned "refuted" once i reached len(G_k); that was latent
-   only because no logged state has more than 2^k singleton parts, and downgrading every part would
-   have made it fire and produce wrong refutations. */
+   only because no logged state had more than 2^k singleton parts; star expansion makes the tail
+   routine, so retaining that bug would produce wrong refutations. */
 static int maj_refutes(const Fact *s, int k) {
-    int i, run = 0, cap = gpref[k][glen[k] - 1];
+    int i, rank = 0, run = 0, cap = gpref[k][glen[k] - 1];
     if (!s->np) return 0;
-    /* parts are sorted descending by (n,m), so the n values are already nonincreasing */
+    /* parts are sorted descending by (n,m), so repeated n values are already nonincreasing */
     for (i = 0; i < s->np; i++) {
-        run += s->p[i].n;
-        if (run > (i < glen[k] ? gpref[k][i] : cap)) return 1;
+        int copies = s->p[i].m;
+        while (copies-- > 0) {
+            run += s->p[i].n;
+            if (run > (rank < glen[k] ? gpref[k][rank] : cap)) return 1;
+            rank++;
+        }
     }
     return 0;
 }
@@ -466,7 +470,7 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
     }
     { int ix = level_find(L, s);
       if (ix >= 0) { g_wit = ix; return 1; } }
-    if (maj_refutes(s, k)) return 1;                 /* MAJ (singleton sub-multiset) */
+    if (maj_refutes(s, k)) return 1;                 /* MAJ (full star expansion) */
     int lim = s->np < MAXP ? s->np : MAXP, np, i;    /* DOM */
     if (L->sdom) {                                   /* one-part dominance, O(np) */
         for (i = 0; i < s->np; i++) {
