@@ -3282,6 +3282,39 @@ Refitting on both families gained ~25% on the tail and *nothing* on the median. 
 and adding a second construction did not move it. The limit is the five features, not the weights or
 the data - reaching rank ~1 needs a structural rule, not more fitting.
 
+**Shape features - the largest gain of the session.** Describing a child by its pair count throws
+away what majorization actually constrains. Three features built on the block *profile* of a child
+(part `(a:b)` expanded, mass-preservingly, to `min(a,b)` copies of `max(a,b)`, sorted descending):
+
+- `majtight` = `max_i prefix_i / Gprefix_i` against `G_j`. Large blocks blow the early prefixes
+  first, so this measures distance to the majorization wall. **Not sound** - it exceeds 1 on
+  candidates that pass the provable per-part filter, so it is a heuristic feature only.
+- `meanratio` = the same prefix ratio averaged over all ranks rather than maxed.
+- `l2shape` = mean squared deviation of the profile from `G_j`'s own blocks at the same rank,
+  normalised by `G_j[0]` - literally "how far is this branch's shape from the extremal shape".
+
+On the 165 held-out upgraded states:
+
+| score | median | p90 | worst | mean |
+|---|---|---|---|---|
+| 12 features | **115** | 1 037 | 7 627 | 422 |
+| minus `l2shape` | 229 | 1 609 | 12 743 | 669 |
+| minus `meanratio` + `l2shape` | 531 | 2 465 | 8 079 | 1 006 |
+| 8 features (pre-shape best) | 477 | 2 443 | 9 547 | 991 |
+| `dev + imbalance` baseline | 1 375 | 8 739 | 21 801 | 3 059 |
+
+12x over baseline. Fitted weights: `dev .35, imbal .20, fmean .75, majtight .35, meanratio 1.50,
+l2shape 2.50`; `maxchild`, `fmax`, `topheavy`, `budget`, `blocks`, `mixmaj` all fit to **zero**.
+
+`topheavy` (largest block's share of child mass) fitting to zero while `majtight` does not is the
+useful detail: "a few large blocks is bad" is a real effect, but the majorization prefix ratio is its
+correct formalisation and a crude largest-block share captures none of it. Likewise a per-part
+"level requirement" budget (`sum 3^r / 3^j`, with `r(a,b)` the minimum level solving the part alone)
+carried no signal once the profile features were present.
+
+Cumulative for one valid split at k=5: ~11 000 probes unfiltered under deviation ordering, 1 375
+with the per-part filter, **115** with the filter and the shape score - about 95x.
+
 **Method note, twice burned in one day:** a holdout must differ in *construction*, not just in which
 states were drawn. The 40-state sample and the same-family holdout both overstated results that the
 full set and the second family then corrected.
