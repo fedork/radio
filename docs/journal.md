@@ -3347,6 +3347,47 @@ Cumulative for one valid split at k=5: ~11 000 probes -> 1 375 (per-part filter)
 score) -> **31** (pair filter). About 350x, and both filters are provable; only the ordering is
 fitted.
 
+**Can the Singleton Majorization Theorem be generalised to a metric on non-singleton parts?
+A scalar metric provably cannot do it.** The question: is there `phi(n,m)` such that a state is
+solvable in K iff `(phi(n_i,m_i))` sorted descending is weakly majorized by some base sequence?
+For two parts that rule reduces to `phi_a + phi_b <= T`, which forces the jointly-solvable graph on
+parts to be a **threshold graph**. It is not. At k=4 the vicinal preorder has **52 incomparable
+pairs**, with explicit contradictions:
+
+    {(1:15),(5:7)} solvable and {(4:7),(2:13)} solvable,
+    {(1:15),(2:13)} NOT and {(4:7),(5:7)} NOT
+
+Summing the two solvable constraints gives `<= 2T` over the same four values that the two unsolvable
+ones force `> 2T`. This rules out **every** scalar `phi` at once - including any linear combination
+of part features, any power law, and any learned scalar. Recorded as a negative result: do not go
+looking for one.
+
+**Why: every part at its own frontier collapses to the same scalar.** With `phi` anchored at `2^k`
+on the level-k single-part frontier and interpolated linearly between anchors - which does reduce
+correctly, `phi(n,1) = n`, so the rule becomes the theorem - `(16:1)`, `(7:6)`, `(9:5)` and `(4:10)`
+all map to `phi = 16` while carrying masses 16, 42, 45 and 40. One number cannot separate the
+strip regime from the bulk regime. Sound (0 false rejections) but catches only 9.7% of unsolvable
+pairs.
+
+**Two coordinates, and both have sound base sequences.** The mass coordinate has its own analogue of
+`G_K`: `C_K(t)` = max mass of a *solvable* t-part state at level K. Every t-subset of a solvable
+state is solvable, so `mass of the t largest parts <= C_K(t)` is sound. Measured at k=4:
+
+| coordinate | base sequence (prefix) | catches of 885 unsolvable pairs |
+|---|---|---|
+| strip, `phi` majorized by `G_K` | 16, 31, 42, 53, 58, ... 81 | 78 (8.8%) |
+| mass, majorized by `C_K(t)` | 45, 63, ... 81 | 440 (49.7%) |
+| either | | **466 (52.7%)**, 0 unsound |
+
+`C_4(1) = 45` (attained by `(9:5)`), `C_4(2) = 63` (by `{(7:3),(7:6)}`). Both curves saturate at
+`3^K`, and they are tight in different regimes - `G_K` for singletons, `C_K` for balanced parts.
+
+So a 2-coordinate majorization rule **exists, is sound, and is general** (any part count, any k, no
+table), but captures only about half of what the exact k=4 pair table captures. The 445 pairs it
+misses all have mass `<= C_4(2)`, so no mass bound can ever see them; 364 of those 445 have at least
+one thin member (`min side <= 2`). A useful third coordinate would have to separate thin-by-balanced
+combinations, which is exactly where the residual sits.
+
 **Next, untested:** the size-3 subset filter is the obvious continuation, but the table is
 102^3/6 ~ 177 K entries and the marginal return is unknown. Also untested: scoring children
 recursively with the same function one level down.
