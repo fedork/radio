@@ -3152,3 +3152,37 @@ than a consequence of it. Worth trying to prove, and worth testing against the c
 Untested as a heuristic: enforcing it would mean tracking the running max child during enumeration and
 requiring it to reach cap - which composes naturally with the reachability tables from A+B, since those
 already carry the achievable `(r0,r2)` per suffix and can answer "can any completion still reach cap".
+
+### Building a comprehensive corpus: full maps from the k=8 Pareto frontier
+
+The witness-tree corpus above is 415 winners but only one winning split per state — the one that
+construction happened to use. To elicit a rule properly one wants **every** winning split of **every**
+critical state, which means full solvability maps from the k=8 Pareto frontier downward.
+
+`/tmp/k6lab/mapper.c` does this: enumerate every split of a state, ask the oracle whether all three
+children are solvable one level down, record the winners, recurse into their children. The only prune
+is the counting bound, which is exact (a child over `3^(k-1)` is unsolvable by COUNT), so the recorded
+set is exactly the winning set — nothing heuristic is applied to the corpus that the corpus is meant to
+test.
+
+The oracle is `out_k8.txt` (2026-era, audited clean) parsed into facts. Loading all 11.4 M at
+`MAX_N=257` would be ~26 GB of trie, so each cell gets a cache filtered to facts whose every part fits
+**componentwise** inside the root part — sound, because dominance only ever appeals to smaller states.
+That is a large reduction: `Sb(256:1)` needs 6,440 facts rather than 11.4 M.
+
+First results, and they are the right shape for eliciting a rule — the solution sets are tiny:
+
+| cell | cap-feasible splits | winners |
+|---|---|---|
+| `Sb(56:55)` k=8 | 2,504 | **6** (3 up to complement symmetry) |
+| `Sb(256:1)` k=8 | — | 2 |
+| `Sb(255:2)` k=8 | — | 4 |
+
+`Sb(56:55)` sits at saturation 0.469 and none of its winners is tight, consistent with the saturation
+gradient found above (10.7% tight below 0.80). One of them, `take=25:21`, is **3.55 from the balance
+line** — beyond the 2.33 maximum seen among FAST-admitted winners, so FAST would reject it. It is not
+a `NOTFAST` case only because two of its siblings are admitted.
+
+Depth 1 over all 55 cells is running, ~3-4 hours, dominated by the per-cell filter pass over 503 MB and
+by loading caches up to ~1.1 M facts. Depth 2 is the interesting one and will cost more; depth 3 is
+likely infeasible by full enumeration at 4 parts, where a single state has 30 M+ cap-feasible splits.
