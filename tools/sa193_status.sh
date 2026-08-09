@@ -14,12 +14,26 @@
 set -uo pipefail
 BUCKET=radio-sa193-393287594714
 INSTANCE=i-0005d74f985c52ae1
+# Two runs share the instance from 2026-08-09: `run` is the original build, `run2` carries the A+B
+# k=6 optimisations. Pass `--prefix run2` to read the second one.
+PREFIX=run
+BOTH=0
+WATCH=0
+while (( $# )); do
+    case "$1" in
+        --prefix) PREFIX="$2"; shift 2 ;;
+        --both)   BOTH=1; shift ;;
+        --watch)  WATCH=1; shift ;;
+        *) echo "usage: $0 [--prefix run2] [--both] [--watch]" >&2; exit 2 ;;
+    esac
+done
 
 show() {
+    local PREFIX="$1"
     local mod age now
-    mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" --key run/STATUS \
+    mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" --key "$PREFIX/STATUS" \
             --query LastModified --output text 2>/dev/null)
-    aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/run/STATUS" - 2>/dev/null
+    aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$PREFIX/STATUS" - 2>/dev/null
     if [[ -n "$mod" ]]; then
         now=$(date -u +%s)
         age=$(( now - $(date -u -j -f "%Y-%m-%dT%H:%M:%S" "${mod%%+*}" +%s 2>/dev/null || echo "$now") ))
@@ -31,8 +45,27 @@ show() {
              --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null)"
 }
 
-if [[ "${1:-}" == "--watch" ]]; then
-    while :; do clear; show; sleep 60; done
+# `run` is the original build; `run2` carries the A+B k=6 optimisations. --both prints them one
+# after the other so the comparison the second run exists to make can be read at a glance.
+banner() {
+    local p="$1" label="$2"
+    printf '\n===== %s  (s3://%s/%s/) =====\n' "$label" "$BUCKET" "$p"
+    if ! aws-vault exec --server default -- aws s3 ls "s3://$BUCKET/$p/STATUS" >/dev/null 2>&1; then
+        printf '  no STATUS object yet - run not started, or watchdog has not written its first cycle\n'
+        return
+    fi
+    show "$p"
+}
+render() {
+    if (( BOTH )); then
+        banner run  "original build"
+        banner run2 "A+B optimisations"
+    else
+        show "$PREFIX"
+    fi
+}
+if (( WATCH )); then
+    while :; do clear; render; sleep 60; done
 else
-    show
+    render
 fi

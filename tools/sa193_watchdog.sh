@@ -3,7 +3,12 @@
 # WITHOUT logging into AWS: an SNS email on every milestone plus a heartbeat, and a STATUS object
 # in S3 for detail.
 #
-#   tools/sa193_watchdog.sh --log FILE --pid PID [--bucket B] [--topic ARN]
+#   tools/sa193_watchdog.sh --log FILE --pid PID [--bucket B] [--topic ARN] [--prefix run]
+#
+# --prefix separates concurrent runs in the same bucket. The A+B run started 2026-08-09 shares the
+# instance with the original, so it writes under run2/ and its status is fetched with
+# `tools/sa193_status.sh --prefix run2`. Without this, the second watchdog silently overwrites the
+# first one's STATUS and checkpoint, and the comparison the second run exists to make is destroyed.
 #                           [--interval 600] [--heartbeat 21600]
 #
 # The useful progress metric is not verdicts or elapsed time, it is **how many of the sixteen**
@@ -12,12 +17,13 @@
 # Everything else here is context for that fraction.
 set -uo pipefail
 
-LOG= PID= BUCKET= TOPIC= INTERVAL=600 HEARTBEAT=21600
+LOG= PID= BUCKET= TOPIC= INTERVAL=600 HEARTBEAT=21600 PREFIX=run
 while (( $# )); do
     case "$1" in
         --log) LOG="$2"; shift 2 ;;
         --pid) PID="$2"; shift 2 ;;
         --bucket) BUCKET="$2"; shift 2 ;;
+        --prefix) PREFIX="$2"; shift 2 ;;
         --topic) TOPIC="$2"; shift 2 ;;
         --interval) INTERVAL="$2"; shift 2 ;;
         --heartbeat) HEARTBEAT="$2"; shift 2 ;;
@@ -37,7 +43,10 @@ LAST_UPLOAD=0
 SEG=${SEG:-$(date -u +%Y%m%dT%H%M%SZ)}
 echo "segment $SEG"
 notify() {   # never let a failed AWS call kill the watchdog - the run matters more than the report
+    # Two runs share one SNS topic since 2026-08-09; without the prefix in the subject the two
+    # streams are indistinguishable in a mailbox and one silently looks like a duplicate of the other.
     local subject="$1" body="$2"
+    [[ "$PREFIX" != "run" ]] && subject="[$PREFIX] $subject"
     [[ -n "$TOPIC" ]] && aws sns publish --topic-arn "$TOPIC" \
         --subject "$(echo "$subject" | cut -c1-99)" --message "$body" >/dev/null 2>&1 || true
 }
@@ -265,7 +274,7 @@ while :; do
             "$(sed -n 's/^  verdicts by level  *//p' <<<"$S")" >> "$PROFILE"
     fi
     if [[ -n "$BUCKET" ]]; then
-        printf '%s\n' "$S" | aws s3 cp - "s3://$BUCKET/run/STATUS" --content-type text/plain >/dev/null 2>&1 || true
+        printf '%s\n' "$S" | aws s3 cp - "s3://$BUCKET/$PREFIX/STATUS" --content-type text/plain >/dev/null 2>&1 || true
 
     fi
 
@@ -305,10 +314,10 @@ while :; do
         # Final upload: the raw log is the archival artifact, and its parsed form is the restart
         # checkpoint. Warm-starting a negative from a run's OWN output is sound.
         if [[ -n "$BUCKET" ]]; then
-            head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -19 -c | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
+            head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -19 -c | aws s3 cp - "s3://$BUCKET/$PREFIX/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
             { echo "# radio-cert v1 sa193 cold segment $SEG, final, generated $(date -u +%FT%TZ)";
-              head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } | tee >(aws s3 cp - "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \
-              | aws s3 cp - "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
+              head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } | tee >(aws s3 cp - "s3://$BUCKET/$PREFIX/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \
+              | aws s3 cp - "s3://$BUCKET/$PREFIX/sa193.checkpoint" >/dev/null 2>&1 || true
         fi
         notify "Sa(193): run ended" "$(status)"
         exit 0
@@ -320,14 +329,14 @@ while :; do
     # so a modulo window silently skips hours.
     if (( NOW - LAST_UPLOAD >= 3600 )) && [[ -n "$BUCKET" ]]; then
         LAST_UPLOAD=$NOW
-        head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -3 -c | aws s3 cp - "s3://$BUCKET/run/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
-        [[ -n "${PROFILE:-}" && -s "$PROFILE" ]] && aws s3 cp "$PROFILE" "s3://$BUCKET/run/seg-$SEG/memprofile.csv" >/dev/null 2>&1 || true
+        head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -3 -c | aws s3 cp - "s3://$BUCKET/$PREFIX/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
+        [[ -n "${PROFILE:-}" && -s "$PROFILE" ]] && aws s3 cp "$PROFILE" "s3://$BUCKET/$PREFIX/seg-$SEG/memprofile.csv" >/dev/null 2>&1 || true
         # Both keys from ONE parse, via tee - an S3-to-S3 `cp` needs s3:GetObjectTagging, which the
         # run role deliberately does not have, and the failure was invisible behind `|| true`.
         { echo "# radio-cert v1 sa193 cold segment $SEG, generated $(date -u +%FT%TZ)";
           head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } \
-          | tee >(aws s3 cp - "s3://$BUCKET/run/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \
-          | aws s3 cp - "s3://$BUCKET/run/sa193.checkpoint" >/dev/null 2>&1 || true
+          | tee >(aws s3 cp - "s3://$BUCKET/$PREFIX/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \
+          | aws s3 cp - "s3://$BUCKET/$PREFIX/sa193.checkpoint" >/dev/null 2>&1 || true
     fi
     sleep "$INTERVAL"
 done
