@@ -3186,3 +3186,81 @@ a `NOTFAST` case only because two of its siblings are admitted.
 Depth 1 over all 55 cells is running, ~3-4 hours, dominated by the per-cell filter pass over 503 MB and
 by loading caches up to ~1.1 M facts. Depth 2 is the interesting one and will cost more; depth 3 is
 likely infeasible by full enumeration at 4 parts, where a single state has 30 M+ cap-feasible splits.
+
+## 2026-08-09 - critical 4-segment corpus, a provable per-part filter, and a memory wall
+
+**Corpus redefined.** The target is the *critical 4-segment* states two levels below a Pareto root,
+not a recursive map from the roots. 1- and 2-segment states defer to the lower-level Pareto column
+and teach nothing; 4-segment is where the split heuristic is weak. From a 1-part root, 4-part states
+appear exactly two levels down, so this is `mapper.c` at depth 3 recording only the target level.
+
+**Supersedes the 2026-08-08 entry below:** depth 3 is *not* infeasible. The "30 M+ cap-feasible
+splits at 4 parts" figure was measured on an *off*-critical state. Near the frontier the counting
+bound kills almost everything, and critical 4-part states at k=5 have a median of 548 K cap-feasible
+candidates, not tens of millions.
+
+**k=5 corpus, complete.** 32 k=7 Pareto roots -> 479 4-segment states at k=5, 335 critical
+(Pareto-maximal in every part), 308 mapped, 4,684 winning splits. 27 states exceeded the 3 M
+candidate guard and are logged `SKIP big`, not dropped silently. Cost 49 m 43 s wall - of which the
+*mapping was 68 seconds*. The oracle load is 97% of the cost, so analysis iterates free and only
+re-running the corpus is expensive.
+
+Saturation note: Pareto roots sit at 0.04-0.47 saturation but their two-level descendants sit at
+0.63-0.91, because the mixed child keeps ~half the mass with a third of the cap, so saturation
+multiplies by ~1.5 per level.
+
+**Retracted: "winners are tight".** Only 22.7% of the 4,684 winners are tight. The 137/137 result
+recorded earlier came from witness trees in the sat>=0.95 band and does not generalise to 0.63-0.91.
+
+**Negative: majorization adds nothing here.** On a 40-state sample, 17,280,206 cap-feasible
+candidates, 17,280,206 survive singleton majorization on all three children - 1.0x. The `(n:m)->(n:1)`
+downgrade discards too much mass to fire at k=4 children.
+
+**Positive: a provable per-part filter, 15.3x.** By Subgraph Monotonicity every sub-part of every
+child must be solvable standalone at k-1, so for part `(n:m)` and take `(x,y)` all four of
+`(x:y)`, `(n-x:m-y)`, `(x:m-y)`, `(n-x:y)` must be. This is a table lookup applied *per part, before*
+the cartesian product. Across the 308 states it cuts 2.897e8 cap-feasible candidates to 1.892e7
+(median 12.1x, max 67x). Exact single-part tables, computed by `ptab`, not assumed symmetric:
+  k=4: 16 15 12 10 9 7 6 5 5 4 3 3 2 2 2 1
+  k=5: 32 31 27 24 22 19 17 15 14 12 11 10 9 9 8 7 7 6 6 5 5 5 4 4 3 3 3 2 2 2 2 1
+
+**Ordering score.** Fitted against ground truth, not guessed. With `f = x/P_{k-1}[y]` per sub-part,
+  score = fmean + 0.286 * (dev + imbalance)
+where `dev = sum|x*m - y*n| / (mass/2)` and `imbalance = 1 - minchild/cap`. `maxchild/cap` and
+`fmax` both fit to weight zero. It is an *ordering*, never a filter, so it cannot miss a solution.
+Absolute first-hit rank (the metric that matters - one valid split is all that is needed):
+
+| set | median | p90 | worst | mean |
+|---|---|---|---|---|
+| k=5 train (30 states) | 267 | 1 491 | 2 417 | 476 |
+| k=5 holdout (30 disjoint) | 233 | 2 505 | 3 311 | 692 |
+| k=5 holdout, dev+imbal only | 523 | 8 183 | 12 705 | 2 458 |
+| k=6 (17 states), k=5 weights | 2 221 | 32 031 | 143 945 | 13 567 |
+| k=6, dev+imbal only | 15 245 | 72 269 | 100 567 | 23 624 |
+
+The weights transfer across k without refitting (6.9x over baseline at k=6). Relative to the space
+the heuristic *sharpens* with k - 0.38% of 60 730 at k=5, 0.057% of 3 901 959 at k=6 - but absolute
+rank grows, and absolute rank is the cost. `fmean` alone is far worse than the baseline (median
+6 963); only the combination works.
+
+**Memory wall - the expensive lesson.** This machine has 24 GB. The k<=7 oracle at `MAX_N=262`
+needs ~20 GB of trie (it scales ~`MAX_N^2`; `MAX_N=132` peaks at 4.04 GB). The k=8-rooted run
+loaded for **3 h 50 m** and never finished - the "deceleration" from 8.6 to 0.9 dots/min was swap,
+not trie growth. Abandoned. A follow-up bounded to `n1<=128` (35 of 55 cells) reached only
+2 of 35 roots in **9 h 20 m** before being killed: `RSS 0.21 GB, VSZ 424 GB`, 6 395 swapins in 45 s.
+The result-cache trie grows unboundedly as it solves, so a long mapping run swaps itself out.
+
+**`tools/capped_run.sh --rss-gb` does not catch this.** Pages get swapped out rather than staying
+resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. Bound these runs by
+`MAX_N` and by cell selection at compile time, or watch `vm_stat` swapins - not RSS.
+
+**Consequence for future k=6+ corpus work:** do not descend from k=8 Pareto roots on this machine.
+Mapping a *known* k=5 state needs only k=4 solving, so states obtained some other way can be mapped
+cheaply with no large oracle at all.
+
+**Not done:** the 144 non-critical (`crit=0`) states were discarded rather than upgraded to
+criticality, which would grow the corpus by ~47%.
+
+Artifacts kept in `~/radio-corpus/` (off `/tmp`): `c7.out` (k=5 corpus, 1.7 MB), `c6.out` (17 k=6
+states), `crit_k5_states.txt`, `crit_k6_states.txt`, and the tools `mapper.c`, `cands3.c`,
+`majcens.c`. Not pushed to `radio-data`.
