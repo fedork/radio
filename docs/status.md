@@ -292,22 +292,23 @@ it was how many facts the proof actually reaches.
    k=6 verdicts at matched wall clock, the incumbent can be killed; until then leave it running.
    The 2026-08-09 journal entry has the full launch detail.
 
-The split-heuristic thread made a large step later on 2026-08-09. Exact **three-part subset** checks
-cut the pair-filter survivors by another 4.16x over all 498 critical k=5 four-part states; exact
-four-part subsets add 1.55x. All 6,590 known winners survive. After refitting the existing shape
-score *behind* those structural filters, median first-hit rank is 1 in both full families; on a
-35-state post-fit third family triples+quads score 1 / 9 / 17 / 2 (median / p90 / worst / mean).
-On six actual k=6 eight-part monsters, 100 M-sample censuses put the triple filter at roughly
-18-31x beyond pairs in five states, with 0 of 146 pair survivors passing in the sixth. Tables build
-in 5-20 seconds and compact to under 1.4 MB total. Full methods, baselines and caveats are in the
-latest journal entry; new generators/evaluators are in `tools/`.
+The long-state subset result later on 2026-08-09 is now operationally **rejected**. Its offline facts
+remain true - triples/quads sharply filter complete candidates and make global positive rank nearly
+perfect - but the warm prefix cache already carries the same low-dimensional negative information.
+On the exact A+B monster, 5,200,097 complete candidates reached the three real cache probes and zero
+passed all three. A 1/256 sample found 11,064 triple-table rejections among 20,312 candidates
+(54.47%), but every one was already cache-rejected: **zero marginal rejection**. Do not implement a
+second subset oracle in `radiobase.c`.
 
-**Do not call that a solver speedup yet.** These are complete-candidate censuses and global rank
-experiments. The real solver's warm `CACHE_ONLY` prefix probes overlap the filters, and the new
-ordering is not implemented in its Cartesian walk. Also, the negative subset tables are exhaustive
-according to the current C solver but not independently certified. The next experiment is a
-fallback-safe, leaf-level warm benchmark against the exact A+B baseline; exhaustive pruning waits
-for an adequate table audit.
+Limited-discrepancy FAST passes are also rejected as a throughput change. Radius 2 found a solution
+for all 400 replayed 7/8-part positives (ordinary fresh FAST missed 184), but radius 1 cost +13.6% on
+sampled 7-part negatives and +3.2% on all logged 8-part negatives; mass/progress gates were neutral.
+The useful new benchmark is instead the hard positive
+`Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)` in 5. It historically took 12,585 seconds despite its
+winning split being entirely FAST, and still timed out after 300 seconds against the end-warm k<=4
+cache. A root-only cache-`TRUE`-first pass also timed out at 300 seconds. The remaining target is
+**value ordering inside FAST**, not wider admission or duplicate rejection. Full method, costs and
+caveats are in the latest journal entry; `tools/fast_replay.c` is the isolated replay harness.
 
 1. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.

@@ -3498,7 +3498,7 @@ and 6.9 GB), in `/root/run2`, binary `radio_sa193_ab`, `--rss-gb 40`, S3 prefix 
 **Two open risks.** The incumbent's user-data ends in `shutdown -h now`, so if it finishes or trips a
 cap the instance stops and takes run2 with it. And run2's 40 GB cap is a guess - 2023 reached ~90 GB.
 
-## 2026-08-09 (latest) - size-3 subsets make the positive heuristic nearly perfect
+## 2026-08-09 (earlier) - size-3 subsets make the positive heuristic nearly perfect
 
 The next untested idea from the previous entry was the right one. Exact solvability of every
 **three-part subset** of each child is a strong sound constraint by Subgraph Monotonicity, despite
@@ -3600,7 +3600,117 @@ improve this, but is no longer prerequisite to a first implementation.
   complete surviving candidates rather than implementing the solver's Cartesian walk. A wall-clock
   benchmark against `radiobase.c` is still mandatory.
 
-**Next implementation experiment:** load the k=5 pair/triple bitsets, check triples before the three
-leaf cache probes on the six warm monsters, and measure marginal wall time against the exact A+B
-baseline. Start as fallback-safe ordering/admission; promote it to an exhaustive prune only after the
-negative table receives an adequate independent trust story.
+**Subsequently performed below:** the fallback-safe leaf measurement found zero marginal triple
+rejections after the warm cache. The proposed bitset deployment is therefore withdrawn; the table's
+independent-trust caveat would still apply if it were ever used for exhaustive pruning elsewhere.
+
+## 2026-08-09 (latest) - the warm prefix cache subsumes subset filters; FAST misses are not the bottleneck
+
+The proposed deployment experiment falsified the operational interpretation of the preceding entry.
+The user pointed out the missing baseline before more code landed: the real solver already asks the
+warm result cache about all three partial children after every parent part, and the negative cache is
+upward-closed. An unsolvable triple in a child should therefore already refute every prefix containing
+it. That is exactly what happens.
+
+### Zero marginal information after the real cache probes
+
+Lab-only instrumentation sampled the exact A+B monster
+
+    Sb(18:8,22:6,15:8,13:9,23:4,23:2,21:2,17:2) in 6
+
+against the same 2,201,187-fact `warm_k5.txt` as its retained baseline. It never pruned or changed
+candidate order. At complete candidates, after the counting/reachability checks but before the three
+real `CACHE_ONLY` calls:
+
+| measure | result |
+|---|---:|
+| complete candidates reaching the cache | 5,200,097 |
+| candidates passing all three cache probes | **0** |
+| systematic 1/256 sample | 20,312 |
+| sample rejected by the exact triple table | 11,064 (54.47%) |
+| sampled cache-pass candidates rejected by triples | **0** |
+
+So the attractive standalone 54.5% rejection has **zero marginal rejection** on this warm workload:
+every sampled triple rejection was already covered by the cache. The verdict and
+`totalsplits=8,132,403,495` matched the baseline exactly. Cost was 237.4 CPU seconds, 256 seconds wall,
+2.53 GB peak RSS; the extra 19 wall seconds are measurement overhead, not a speed comparison.
+
+The cache composition explains the result. It contains 2,163,272 negative `Sb` facts and 37,894
+positive `Sb` facts (plus small `Sa` tables); the exact k=5 triple universe has 2,180,574 negatives.
+These are essentially the same low-dimensional frontier, and loading a negative fact expands it
+upward in the trie. The triple table is a second encoding of information the warm prefix lookup already
+has. The offline subset censuses and global ranks in the preceding entry remain correctly measured,
+but they are not production headroom.
+
+A follow-up tried to use pair incompatibility only to reorder parent parts, leaving the cache as the
+sole rejection mechanism. On the same monster the maximum-density edge was the existing first pair,
+and the greedy order was exactly the incumbent descending order for all eight parts. Across all six
+monsters the first three or four parts were already in the greedy order; differences occurred only in
+the weak late edges. The redundant exact run was stopped after 33 seconds once its traversal order was
+known to be unchanged. This agrees with the independent verifier's earlier result that canonical
+descending group order beat ascending and fewest-options-first.
+
+### Limited discrepancy makes FAST empirically complete, but slower overall
+
+The next experiment addressed FAST itself rather than adding another rejection oracle. Current pass 1
+allows zero early non-FAST choices and pass 2 jumps straight to exhaustive search. Limited-discrepancy
+passes allow one, then two, non-FAST choices before that fallback.
+
+`tools/fast_replay.c` replays logged k=5 roots against the same k<=4 cache, clears root-level influence,
+and disables FAST's `s[FAST]=1` self-training. The committed version forks each target from one pristine
+warm-cache image; the measurements below used the preceding root-clear version, so lower-level cache
+facts accumulated during a run. Baseline and variants used the same target order, but the small timing
+differences are corpus-run measurements rather than isolated per-state timings. The forked smoke replay
+reproduced the first two cases exactly.
+
+Positive hit coverage, with fresh FAST for each split table:
+
+| k=5 corpus | cases | ordinary FAST / exhaustive | radius 0 / 1 / 2 | baseline CPU | radius-2 CPU |
+|---|---:|---:|---:|---:|---:|
+| 7 parts, stride-17 sample | 200 | 135 / 65 | 135 / 57 / 8 | 0.314847 s | 0.293546 s |
+| 8 parts, complete logged set | 200 | 81 / 119 | 81 / 115 / 4 | 0.247179 s | 0.247794 s |
+
+Thus every one of these 400 positive states has a solution within two deviations of FAST. This is the
+closest result yet to a perfect *admission* heuristic, and it also repeats an earlier lesson: the first
+exhaustive winner is not the nearest winner. The initial 7-part control printed two `NOTFAST` choices,
+but radius 1 found a different solution.
+
+It is nevertheless not a speedup. Failed discrepancy passes cannot prove a negative:
+
+| negative corpus | cases | baseline CPU | radius-1 CPU | radius-2 CPU |
+|---|---:|---:|---:|---:|
+| 7 parts, stride-31 sample | 200 | 2.15856 s | 2.45308 s (**+13.6%**) | 3.13204 s (**+45.1%**) |
+| 8 parts, complete logged set | 82 | 77.7626 s | 80.2865 s (**+3.2%**) | not run |
+
+Radius 1 recovers 172 of 184 ordinary-FAST misses, but under the logged class mix it is about 5% slower
+for 7-part states and 3% slower for 8-part states. Mass and pass-1-progress gates do not change the
+decision. At 8 parts, gating to mass <=230 recovers 115/119 misses and avoids virtually all negative
+overhead, but the aggregate remains neutral because the recovered positives are already cheap. At 7
+parts, missed positives reach mean pass-1 depth 2.80 after 2,351 candidate evaluations, versus depth
+5.09 and 5,073 evaluations for negatives. Simple depth/count gates recover 30-48 of 65 misses at
+roughly -0.06% to +0.2% total time: useful prediction, no material speedup.
+
+### The real positive target is value order, not admission
+
+Searching the audited 2026 logs found the benchmark the cheap corpus hid:
+
+    Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1) in 5
+
+It historically took **12,585 CPU seconds** and 18,857,614 candidate evaluations to find a solution.
+Crucially, it succeeded in pass 1 and every choice in the printed winning split was already FAST. The
+heuristic admitted the right answer; it simply reached it late after expensive recursive child work.
+
+The state remains hard against the end-warm k<=4 cache: the current baseline timed out at the explicit
+300-second cap. A cache-native proposal then added a narrower first pass that accepts a FAST prefix
+only when all three probes return `TRUE`, rather than treating `TRUE` and `MAYBE` alike. The first build
+accidentally enabled that pass recursively at k=4 and was stopped after 34 seconds; it is not evidence.
+The corrected root-only build also timed out at 300 seconds (303 seconds wall), matching the baseline's
+300-second timeout (304 seconds wall). There is no complete cache-certified route to the hard witness.
+
+**Decision.** Do not deploy the pair/triple/quad filters, discrepancy passes, or `TRUE`-only pass. They
+improve offline classification or positive hit rate but not the runtime the solver pays. The next
+heuristic experiment must target **value ordering within the existing FAST set** on this hard positive:
+instrument which uncertain full candidates consume the time, compare their prefix/cache-status traces
+with the known winning split, and order already-admitted choices without adding another pass. This is
+also the correct benchmark discipline: a proposal that only improves the millisecond positives has no
+chance to move total runtime.

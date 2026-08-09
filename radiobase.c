@@ -126,6 +126,13 @@ int singleton_base_prefix[MAX_K+1][1 << MAX_K];
 
 splits *sbb_splits;
 
+#ifdef MEASURE_FAST_REPLAY
+int fast_replay_capture, fast_replay_pass, fast_replay_fast;
+unsigned long long fast_replay_splits;
+unsigned long long fast_replay_first_splits, fast_replay_first_ok[32];
+int fast_replay_first_depth;
+#endif
+
 void ensure_splits(int sbb);
 int minK(int);
 void init_singleton_majorization(void);
@@ -922,6 +929,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                 //                if (splitindex[i] > 0) skipped_some = 1;
                 if (i==0) {
                     // can't solve
+#ifdef MEASURE_FAST_REPLAY
+                    if (fast_replay_capture && k == 5 && parent_deadline == NO_DEADLINE && pass == 1) {
+                        fast_replay_first_splits = totalsplits;
+                        fast_replay_first_depth = max_solvable_maybe;
+                    }
+#endif
                     cont=0;
                     if (!skipped_some) {
                         cont2=0; // really can't solve
@@ -1045,6 +1058,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                             ))
                         )
                     {
+#ifdef MEASURE_FAST_REPLAY
+                        if (fast_replay_capture && k == 5 && parent_deadline == NO_DEADLINE && pass == 1 && i < 32)
+                            fast_replay_first_ok[i]++;
+#endif
                         debug_printf("can solve\n");
                         if (i == size_1) {
                             // do not bail out until you make at least some progress
@@ -1179,7 +1196,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             if (!s[FAST]) {
                 printf(":NOTFAST");
                 if (size>2 && i<size_1) {
+#ifndef NO_FAST_LEARN
                     s[FAST]=1;
+#endif
                     printf("-ADDED");
                 }
             }
@@ -1220,6 +1239,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printf(" took 0.%03ld", t * 1000/CLOCKS_PER_SEC);
     if (rb_here) rb_release();
     printf(" totalsplits=%llu pass=%d fast_solve=%d", totalsplits, pass, fast_solve);
+#ifdef MEASURE_FAST_REPLAY
+    if (fast_replay_capture && k == 5 && parent_deadline == NO_DEADLINE) {
+        fast_replay_pass = pass;
+        fast_replay_fast = fast_solve;
+        fast_replay_splits = totalsplits;
+        fast_replay_capture = 0;
+    }
+#endif
     
 #ifdef DEBUG1
     fflush(stdout);

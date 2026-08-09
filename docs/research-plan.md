@@ -106,27 +106,36 @@ contains no number absent from `data/*.csv`.
 
 ### P6 - Turn the long-state subset heuristic into a real solver improvement
 
-Current user priority. The 2026-08-09 lab result is strong: exact three-part child subsets plus
-the refitted shape score give median first-hit rank 1 on both complete k=5 four-part families, and
-three-part filtering removes roughly another 18-31x after pairs on five of six sampled k=6
-eight-part monsters. Four-part subsets make the positive ordering more robust on a post-fit third
-family. See the latest [journal entry](journal.md).
+Current user priority, but the target changed after the mandatory warm-cache measurement. Exact
+pair/triple/quad filters are duplicate information: on the exact A+B monster the triple table rejected
+54.47% of a complete-candidate sample and added zero rejections after the real prefix cache. Limited
+discrepancy made FAST cover all 400 replayed long positives within radius 2, but negative overhead made
+it slower overall. Both deployment ideas are rejected; see the latest [journal entry](journal.md).
 
-The immediate task is deliberately narrower than production deployment:
+The active benchmark is the expensive *solvable* 8-part state
+`Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)` in 5. Its historical witness was entirely FAST, yet took
+12,585 seconds; both the current warm baseline and a cache-`TRUE`-first variant timed out at 300
+seconds. This isolates the remaining problem as value order and recursive-child cost **inside** the
+already-admitted FAST set.
 
-1. encode the k=5 pair/triple tables as compact bitsets and load them in an experimental build;
-2. check triples before the three leaf cache probes, initially in a fallback-safe pass;
-3. benchmark the six warm monsters against the exact A+B baseline, including lookup overhead;
-4. replay known positive k=5/k=6 states so the ordering path is exercised;
-5. only then decide whether incremental prefix checks and the whole-split score are worth the
-   additional implementation complexity.
+Immediate work:
 
-The table negatives come from the current C solver, not an independent certificate. They may order
-a fallback-safe heuristic now; they must not prune the exhaustive pass until their trust story is
-strong enough to preserve solver correctness.
+1. instrument the hard state by full candidate: cache statuses, which child is solved recursively,
+   child CPU, and prefix path; retain the known historical winner as the positive control;
+2. compare the expensive failed candidates with the winner using only information available before
+   recursion - especially `TRUE`/`MAYBE` pattern, the existing shape score, and child-profile features;
+3. implement value ordering only if it reorders already-admitted FAST choices without another full
+   pass or duplicate subset lookup;
+4. benchmark it on this hard positive, several expensive 4-part k=6 positives from `out_k8.txt`, and
+   the exact negative A+B monster. Cheap replay positives are a coverage check, not the speed metric.
 
-**Done when** there is a baseline-matched wall-clock result on both negative monsters and positive
-states, plus a documented decision to land, revise, or reject the method.
+`tools/fast_replay.c` provides isolated lower-cache replay with FAST self-training disabled. Keep the
+negative subset-table trust caveat: those tables may safely order a fallback, but must not prune an
+exhaustive proof without an independent audit.
+
+**Done when** a value-order proposal either beats the hard positive under a matched cap without
+regressing the negative monster, or is rejected with its measured cost and the next session does not
+repeat it.
 
 ## Ordering
 
@@ -138,8 +147,9 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 is the active optimisation experiment while the two cold `Sa(193)` runs continue remotely. It
-uses seconds-to-minutes local benchmarks and does not contend with P2's canonical searches.
+P6 is the active optimisation experiment while the two cold `Sa(193)` runs continue remotely. Its
+cheap replay corpus is seconds, but the newly identified hard-positive control needs explicit
+5-30-minute caps and must run one at a time.
 
 H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
 "probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is

@@ -181,6 +181,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/filter_triples.c` | apply triple and optional quad tables to an existing split-feature/label dataset |
 | `tools/label_split_features.c` | join `WIN ... state=... take=...` logs to feature rows without relying on row samples |
 | `tools/sample_subsets.c` | sample pair/triple rejection and lookup cost on k=6 states too large to enumerate |
+| `tools/fast_replay.c` | replay logged long k=5 states from one forked warm-cache image, clearing all per-target cache/self-training effects |
 
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
@@ -198,3 +199,17 @@ clang -O3 -DMAX_K=5 -DMAX_N=100 tools/tripletab.c -o /tmp/tripletab5
 The tables' positive and negative entries are exhaustive according to the current C solver. That is
 enough for a fallback-safe heuristic experiment, but it is not an independent certificate. Do not
 let a table negative prune an exhaustive proof search until the table has an adequate audit.
+
+FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
+split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees
+the identical parent image:
+
+```
+clang -O3 -DMAX_K=5 -DMAX_N=128 -DMEASURE_FAST_REPLAY -DNO_FAST_LEARN \
+      tools/fast_replay.c -o /tmp/fast_replay
+/tmp/fast_replay /tmp/warm_k4.txt /tmp/warm_k5.txt 5 7 + 17 200
+```
+
+The final arguments are target level, part count, expected sign, deterministic input stride and case
+limit. The facts file uses parsed-cache `+ b ... t ... k` / `- b ... t ... k` lines. This is a search
+heuristic benchmark, not independent evidence for any verdict.
