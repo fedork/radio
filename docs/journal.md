@@ -3452,3 +3452,48 @@ full set and the second family then corrected.
 Artifacts kept in `~/radio-corpus/` (off `/tmp`): `c7.out` (k=5 corpus, 1.7 MB), `c6.out` (17 k=6
 states), `crit_k5_states.txt`, `crit_k6_states.txt`, and the tools `mapper.c`, `cands3.c`,
 `majcens.c`. Not pushed to `radio-data`.
+
+
+## 2026-08-09 (later) - A+B landed, second cold run started alongside the first
+
+**Landed `efadab0`.** The two k=6 optimisations measured on 2026-08-08 had never been committed -
+they sat in `/tmp` for a day while the live run used the 2026-08-05 build. Nothing else had shipped
+either: every commit from 2026-08-07 to 2026-08-09 touched docs only, and the 2026-08-06 majorization
+change post-dates the run's launch, so it is not in the incumbent binary.
+
+**Validation reproduced the benchmark exactly** - same verdict, `totalsplits=8132403495` to the
+digit, 51.5% of prefixes pruned, 237 s against 246.5 s - plus 43 proven Pareto cells at k<=6 with 0
+mismatches.
+
+**The measurement trap, again, and worth writing down.** A first validation run took 27+ minutes
+against that 246.5 s benchmark. I diagnosed a race on `rb_on` and changed the arming test from `==`
+to `>=` before checking the premise. The arming site and all three release paths were in fact
+correct; the real cause was that **the benchmark loaded a 2.2 M-fact warm k=5 cache
+(`warm_k5.txt`, visible as 224 progress dots in `impl/ab2.out`) and my validation ran cold.** Two
+different problems, not variance. Re-run warm, it matched immediately.
+
+The `==` -> `>=` change was kept: `rb_on` is global, so with equality a state whose trigger instant
+falls while another holds the tables never arms at all, and arming late is never worse than never
+arming since the prune cannot affect correctness. But the source now says plainly that the fragility
+has not been observed to fire. **Third measurement error of the same shape in one day** - after the
+40-state sample and the same-construction holdout. All three were "I compared against the wrong
+baseline"; the fix each time was a genuinely independent comparison, not more data.
+
+**Consequence for reading the new run:** both A+B figures were measured warm, and the reachability
+prune arms on candidate *count*, which accumulates far more slowly cold because every child solve is
+uncached. The cold speedup should not be assumed to be 2.75x.
+
+**Second run.** Started cold on the same `r7iz.4xlarge` (16 vCPU, 123 GB; the incumbent uses one core
+and 6.9 GB), in `/root/run2`, binary `radio_sa193_ab`, `--rss-gb 40`, S3 prefix `run2/`.
+
+- Separate binary name is load-bearing: the original launcher finds its solver with
+  `pgrep -x radio_sa193 | head -1`, which with two runs would have aimed the new watchdog at the
+  incumbent.
+- `tools/sa193_watchdog.sh --prefix` and `tools/sa193_status.sh --both` (commit `5ad854e`) keep the
+  two apart in S3 and in the mailbox; without it the second watchdog would have overwritten the
+  first's STATUS and checkpoint.
+- Launched over SSM. Note `--parameters commands=` takes a JSON **array**; passing the script as one
+  string silently mangles newlines into literal `n` and the command "succeeds" having run garbage.
+
+**Two open risks.** The incumbent's user-data ends in `shutdown -h now`, so if it finishes or trips a
+cap the instance stops and takes run2 with it. And run2's 40 GB cap is a guess - 2023 reached ~90 GB.
