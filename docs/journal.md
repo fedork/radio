@@ -3021,3 +3021,37 @@ Two distinct repairs, then, and they are independent: **admit boundary splits un
 misses, and cheap to state), and **relax the interior comparison** to accept near-ties rather than
 strict `<= 0` (the remaining 59%). Neither is implemented; the cost side — how many extra splits pass 1
 would then try — is unmeasured and is what decides whether either is worth it.
+
+### Widening FAST is decisively wrong — tested and rejected
+
+The obvious repair from the analysis above, admitting boundary splits unconditionally, was implemented
+and measured. It is **430x worse**.
+
+| 60 solvable k=5 states that FAST currently misses | totalsplits |
+|---|---|
+| baseline | 248,501 |
+| boundary splits admitted | **107,006,357** |
+
+and it removed only **11%** of the `NOTFAST` hits. Verdicts unchanged, so this is purely a performance
+result.
+
+The mechanism: for a part `(n1:n2)` the boundary is `m2 = 0` or `m2 = n2` for *every* `m1`, i.e.
+`2(n1+1)` extra options, against the handful the local-optimality test admits. FAST stops being a
+filter, and pass 1 becomes a second near-exhaustive pass.
+
+**The cost probe I ran first was invalid, and the way it was invalid is worth remembering.** I measured
+the cost on a monster and got 0.9%, concluding the change was nearly free. But
+
+    no_deadline = (pass==1 && size <= 4) || parent_deadline == NO_DEADLINE;
+
+so pass 1 is **deadline-bounded for large states and unbounded for small ones**. The monsters have
+size 8, bail out of pass 1 early, and hide the entire cost. The states that pay are the small ones,
+which is exactly the population I had not measured. Choosing a benchmark that cannot exhibit the
+failure is the same mistake as the earlier "a mechanism never firing on your benchmark".
+
+**What this implies about the direction.** FAST's value is in being *narrow*; widening it costs far more
+than the 5.4% of solutions it recovers. So the repair is not a wider admission rule. Two directions that
+remain open, neither measured: **rank** rather than admit - try likely winners first inside the existing
+narrow set - or give pass 1 a deadline for small states too, so a FAST miss costs a bounded pass rather
+than an unbounded one. The second is a change to deadline semantics and would need the same care as the
+2026-08-04 deadline episode.
