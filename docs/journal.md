@@ -3233,10 +3233,15 @@ Absolute first-hit rank (the metric that matters - one valid split is all that i
 | set | median | p90 | worst | mean |
 |---|---|---|---|---|
 | k=5 train (30 states) | 267 | 1 491 | 2 417 | 476 |
-| k=5 holdout (30 disjoint) | 233 | 2 505 | 3 311 | 692 |
+| k=5 holdout (30 disjoint, *same construction*) | 233 | 2 505 | 3 311 | 692 |
 | k=5 holdout, dev+imbal only | 523 | 8 183 | 12 705 | 2 458 |
 | k=6 (17 states), k=5 weights | 2 221 | 32 031 | 143 945 | 13 567 |
 | k=6, dev+imbal only | 15 245 | 72 269 | 100 567 | 23 624 |
+
+**The 233 holdout figure is optimistic - superseded below.** Those 30 states were independent
+*states* but not an independent *construction*: they were reached by the same two-level descent as
+the training set. On a genuinely independent family (see the upgrade result) the same weights give
+median 631, 2.7x worse.
 
 The weights transfer across k without refitting (6.9x over baseline at k=6). Relative to the space
 the heuristic *sharpens* with k - 0.38% of 60 730 at k=5, 0.057% of 3 901 959 at k=6 - but absolute
@@ -3258,8 +3263,28 @@ resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. 
 Mapping a *known* k=5 state needs only k=4 solving, so states obtained some other way can be mapped
 cheaply with no large oracle at all.
 
-**Not done:** the 144 non-critical (`crit=0`) states were discarded rather than upgraded to
-criticality, which would grow the corpus by ~47%.
+**Upgrade done, and it is cheap.** The 144 slack (`crit=0`) states were bumped to Pareto-maximal -
+greedy, from each starting part in turn, so one slack state can yield several maximal ones - then
+fully mapped: **190 new critical states, 1,906 winners, in 75 s at 0.08 GB peak**. No oracle load at
+all, because mapping a *known* k=5 state needs only k=4 solving. Corpus is now 498 states from two
+constructions. `upgrade.c`, kept in `~/radio-corpus/`.
+
+**The upgraded states are harder, and the feature set is saturated.** On the 165 held-out upgraded
+states (9.6 M candidates, median space 58 354):
+
+| score | median | p90 | worst | mean |
+|---|---|---|---|---|
+| refit across both families | 671 | 3 323 | 8 301 | 1 334 |
+| descent-only fit | 631 | 4 423 | 9 485 | 1 459 |
+| dev + imbalance baseline | 1 375 | 8 739 | 21 801 | 3 059 |
+
+Refitting on both families gained ~25% on the tail and *nothing* on the median. Doubling the corpus
+and adding a second construction did not move it. The limit is the five features, not the weights or
+the data - reaching rank ~1 needs a structural rule, not more fitting.
+
+**Method note, twice burned in one day:** a holdout must differ in *construction*, not just in which
+states were drawn. The 40-state sample and the same-family holdout both overstated results that the
+full set and the second family then corrected.
 
 Artifacts kept in `~/radio-corpus/` (off `/tmp`): `c7.out` (k=5 corpus, 1.7 MB), `c6.out` (17 k=6
 states), `crit_k5_states.txt`, `crit_k6_states.txt`, and the tools `mapper.c`, `cands3.c`,
