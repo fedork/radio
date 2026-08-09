@@ -3388,6 +3388,18 @@ misses all have mass `<= C_4(2)`, so no mass bound can ever see them; 364 of tho
 one thin member (`min side <= 2`). A useful third coordinate would have to separate thin-by-balanced
 combinations, which is exactly where the residual sits.
 
+**The filters apply to refutation, which is where the money is.** Both filters prune the
+*cap-feasible enumeration*, and cap-feasible enumeration is exactly what pass 2 does. Measured by
+sampling on the two 8-segment k=6 states the live `Sa(193)` run is actually stuck on (the level
+burning 97% of its CPU), the pair filter alone removes 78.5% and 85.6% of cap-feasible candidates -
+**4.7x and 7.0x**. Small samples (93 and 320 cap-feasible hits; ~3.4-7.7x and 5.5-9.5x at 95%), and
+this is on top of a base that already includes the per-part filter, whose own k=6 contribution is
+unmeasured. Weaker than the 13.11x at k=5 4-segment, but the k=6 states have 8 parts and 28 pairs
+per child, so the direction was not obvious in advance.
+
+Tables needed to deploy: `P_k` and the pair table per level. Sizes so far - k=4: 102 parts, 5 253
+pairs; k=5: 327 parts, 53 628 pairs (85.9% solvable). Both cheap. `pairtab.c` builds them.
+
 **Next, untested:** the size-3 subset filter is the obvious continuation, but the table is
 102^3/6 ~ 177 K entries and the marginal return is unknown. Also untested: scoring children
 recursively with the same function one level down.
