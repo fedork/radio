@@ -3315,6 +3315,42 @@ carried no signal once the profile features were present.
 Cumulative for one valid split at k=5: ~11 000 probes unfiltered under deviation ordering, 1 375
 with the per-part filter, **115** with the filter and the shape score - about 95x.
 
+**Two-dimensional majorization: the pair filter.** Subgraph Monotonicity says *every* sub-multiset
+of a solvable state is solvable. The per-part filter uses only subsets of size 1 - collapsing each
+part to a scalar and testing it flat. Size 2 is the 2-D step: **every pair of parts in every child
+must be jointly solvable at k-1**, including the two halves `(a:m-b)` and `(n-a:b)` of the same
+parent part, which both land in the mixed child.
+
+The table is small and exact: at k=4 there are 102 solvable single parts and **4 368 of their 5 253
+pairs are solvable - 16.8% of pairs fail while both members individually pass**. That 16.8% is
+precisely the 2-D information a flat per-part test discards.
+
+Effect on the k=5 corpus: a further **13.11x** on top of the per-part filter, 18 921 200 -> 1 443 192
+candidates over the 308 states, so ~200x off the cap-feasible space in total. Sound by construction,
+and verified empirically: **all 2 556 known winners survive it**. Computed by `pairtab.c`, applied
+incrementally during the cartesian product (`cpair.c`, `dumpz.c`).
+
+Combined with the shape score, on the 165 held-out states:
+
+| configuration | median | p90 | worst | mean |
+|---|---|---|---|---|
+| shape score + pair filter | **31** | 189 | 1 343 | 97 |
+| refit on pair-filtered training data | 35 | 299 | 3 805 | 156 |
+| `dev+imbal` baseline + pair filter | 163 | 1 711 | 5 177 | 574 |
+| shape score, per-part filter only | 115 | 1 037 | 7 627 | 422 |
+
+Refitting *after* adding the pair filter made holdout **worse** (31 -> 35, mean 97 -> 156): 55
+training states cannot re-tune 12 weights against a 13x smaller space. Keep the pre-pair weights
+`dev .35, imbal .20, fmean .75, majtight .35, meanratio 1.50, l2shape 2.50`.
+
+Cumulative for one valid split at k=5: ~11 000 probes -> 1 375 (per-part filter) -> 115 (shape
+score) -> **31** (pair filter). About 350x, and both filters are provable; only the ordering is
+fitted.
+
+**Next, untested:** the size-3 subset filter is the obvious continuation, but the table is
+102^3/6 ~ 177 K entries and the marginal return is unknown. Also untested: scoring children
+recursively with the same function one level down.
+
 **Method note, twice burned in one day:** a holdout must differ in *construction*, not just in which
 states were drawn. The 40-state sample and the same-family holdout both overstated results that the
 full set and the second family then corrected.
