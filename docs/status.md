@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-09**.
+don't know it. Last refreshed **2026-08-09** (two live runs; see Running now).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -19,6 +19,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Bound by `MAX_N` and cell selection at *compile* time; to detect it live, watch `vm_stat` swapins, not RSS. |
 | **The k≤7 oracle does not fit in 24 GB at full coin range.** | The cache trie scales ~`MAX_N²`: 4.04 GB at `MAX_N=132`, ~20 GB at `MAX_N=262`. A k=8-rooted run spent 3 h 50 m loading and never finished. Loading that looks like it is "decelerating" is swapping. Mapping a *known* k=5 state needs only k=4 solving, so obtain states some other way and skip the large oracle entirely. |
+| **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented (`radiobase.c:947-962`), and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 
@@ -160,16 +161,30 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**The `Sa(193)` cold run is live** on `i-0005d74f985c52ae1` — see the section below; at
-2026-08-09 it was 3 d 12 h in, still `0 of 16` top-level states, grinding a 4-segment k=7 state
-with an 8-segment k=6 child taking 97% of CPU. Nothing else is running; the local 4-segment corpus
-runs of 2026-08-08/09 were all stopped and are accounted for in the journal.
+**Two cold runs are live on one instance** `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).
 
-The first AWS attempt (2026-08-04) was killed after six hours with no
-verdict — removing deadlines trapped it in an intractable subtree. Deadlines are restored;
-3,100,961 verdicts of the control survive as a checkpoint in
-`s3://radio-sa193-393287594714/run/112_80.cache`, so a relaunch resumes rather than repeats.
-See [aws-run.md](aws-run.md) and the 2026-08-04 journal entry.
+| | `run/` — original | `run2/` — A+B |
+|---|---|---|
+| build | 2026-08-05, pre-A+B | `efadab0` (2026-08-09) |
+| started | 2026-08-05 ~13:44 UTC | 2026-08-09 ~19:40 UTC |
+| at last check | 4 d 03 h, **0 of 16**, 2.56 M verdicts, 6.86 GB | just started |
+| memory cap | 110 GB | 40 GB |
+| binary | `radio_sa193` | `radio_sa193_ab` |
+
+Watch both with `tools/sa193_status.sh --both [--watch]`. Notification subjects for the second run
+are prefixed `[run2]`. Separate binary names matter: the original launcher locates its solver with
+`pgrep -x radio_sa193 | head -1`, which with two runs would aim the new watchdog at the incumbent.
+
+**The comparison to read** is `verdicts by level` at matched wall clock, specifically the k=6 line -
+that level is 97% of the incumbent's CPU and is exactly what A+B targets. Do not expect the measured
+2.75x: both A+B benchmarks were run *warm*, and the reachability prune arms on candidate **count**,
+which accumulates far more slowly cold because every child solve is uncached.
+
+The incumbent is not stuck. Its k=7 state `Sb(33:16,32:15,45:10,23:19)` was at `left=331/578`; per
+the project owner, based on prior experience it is a few hours from done.
+
+**Two risks.** The incumbent's user-data ends in `shutdown -h now`, so if it finishes or trips a cap
+the instance stops and takes `run2` with it. And `run2`'s 40 GB cap is a guess - 2023 reached ~90 GB.
 
 ## The `Sa(193)` cold run is live
 
@@ -272,6 +287,19 @@ on the actual `Sa(193)` logs never exceeds 10 — so the binding constraint was 
 it was how many facts the proof actually reaches.
 
 ## Immediate next steps
+
+0. **Watch the two runs** (`tools/sa193_status.sh --both`). If `run2` overtakes the incumbent on
+   k=6 verdicts at matched wall clock, the incumbent can be killed; until then leave it running.
+   The 2026-08-09 journal entry has the full launch detail.
+
+The split-heuristic thread (2026-08-09) is at a natural pause and is written up in the journal:
+a 498-state corpus of critical 4-segment states at k=5 from two constructions; a sound per-part
+filter and a sound cross-part **pair** filter (13.11x at k=5, ~5-7x on the live bottleneck, though
+the solver's `CACHE_ONLY` prefix check already covers much of this when the cache is warm); an
+ordering score built on majorization *shape* against `G_j` that cuts median first-hit rank from
+~11 000 to 31; and a proof that **no scalar metric** can generalise the Singleton Majorization
+Theorem, so do not look for one. Corpus and tools are in `~/radio-corpus/` (not archived to
+`radio-data`).
 
 1. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
