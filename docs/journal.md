@@ -3055,3 +3055,44 @@ remain open, neither measured: **rank** rather than admit - try likely winners f
 narrow set - or give pass 1 a deadline for small states too, so a FAST miss costs a bounded pass rather
 than an unbounded one. The second is a change to deadline semantics and would need the same care as the
 2026-08-04 deadline episode.
+
+### Where FAST can possibly help, from the solvability census
+
+Before refining FAST's admission rule, the prior question: where do solvable states even exist? From
+the run's log, by (k, part count), restricted to cells with >= 50 samples:
+
+| k | parts | solvable | unsolvable | solvable % |
+|---|---|---|---|---|
+| 6 | **8** | **0** | 165 | **0.00%** |
+| 6 | 4 | 8,434 | 214,627 | 3.78% |
+| 6 | 3 | 519 | 33,134 | 1.54% |
+| 5 | 4 | 7,183 | 230,027 | 3.03% |
+| 5 | **5** | 1,975 | 1,332,118 | **0.15%** |
+| 5 | 6 | 2,164 | 431,182 | 0.50% |
+| 5 | 7 | 5,288 | 8,819 | 37.48% |
+| 5 | 8 | 200 | 82 | 70.92% |
+| 4 | 5 | 7,399 | 42,190 | 14.92% |
+
+**Solvability is rare in the middle and common at the extremes.** At k=5 with 5 parts it is 0.15%; at
+k=5 with 8 parts it is 71%. And **8-part k=6 states are never solvable** — 0 of 165, with exactly one
+solvable >=7-part k=6 state in the entire log (a 7-part case at mass 705).
+
+That reframes the problem. On the 166 monsters FAST cannot help *at any precision*, because there is
+nothing to find; pass 1 there is pure overhead. And on the huge k=5 cells at 0.15-0.5% solvable, FAST's
+job is almost entirely to fail cheaply.
+
+So the lever may not be FAST's admission rule but **whether pass 1 runs at all**. The relevant cost:
+pass 1 on an unsolvable state cannot conclude — it skips non-FAST splits, so `skipped_some` is set and
+pass 2 repeats the work — so it is wasted whenever the state is unsolvable, which is 96-99.85% of the
+time in the big cells. The 2026-08-03 measurement of removing FAST entirely (k=9 ladder 1521 s -> 266 s,
+5.7x) is the scale of that waste on a refutation-dominated workload, and the reason it was restored is
+that it is *not* waste on the minority that are solvable.
+
+A (k, parts, saturation) prior is cheap and strongly predictive, so gating pass 1 on it - rather than
+widening or narrowing what FAST admits - is the version of "skip pass 1" that does not lose the
+solvable cases. Untested. It also interacts with the earlier finding that pass 1 is deadline-bounded
+only for `size > 4`, which is why removing it looked free on monsters and catastrophic on small states.
+
+**Not yet done, and the right next step per the method:** full solution maps for the cells where
+solutions actually live - k=6 with 4 parts (3.78%) and k=5 with 7-8 parts - to elicit a precise rule
+from complete data rather than from the winners that happened to be logged.
