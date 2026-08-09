@@ -3096,3 +3096,59 @@ only for `size > 4`, which is why removing it looked free on monsters and catast
 **Not yet done, and the right next step per the method:** full solution maps for the cells where
 solutions actually live - k=6 with 4 parts (3.78%) and k=5 with 7-8 parts - to elicit a precise rule
 from complete data rather than from the winners that happened to be logged.
+
+## 2026-08-08 — a precise, joint condition on winning splits: tightness
+
+Elicited from the critical corpus rather than the refutation log — the five verified witness trees
+(`sa192_k10_a/b`, `sa112_k9_a/b/c`), 415 winning splits, every one of them a *critical solvable* state.
+
+Call a split **tight** when its largest child has mass exactly `3^(k-1)`, i.e. some child is pushed to
+the information limit. Fraction of winners that are tight, by the parent's saturation `mass/3^k`:
+
+| saturation | winners | tight | within 1 of cap |
+|---|---|---|---|
+| < 0.80 | 103 | 10.7% | 17.5% |
+| 0.80-0.90 | 100 | 51.0% | 70.0% |
+| 0.90-0.95 | 75 | 88.0% | 96.0% |
+| **0.95-0.999** | **73** | **100.0%** | 100.0% |
+| = 1.000 | 64 | 100.0% | 100.0% |
+
+**Above saturation 0.95 every winner is tight, 137 of 137** — and the 0.95-0.999 band, where tightness
+is not automatic, is 73 of 73. At `sat = 1.000` it is forced (all three children must be exactly cap),
+so that row carries no information; the signal is the band below it.
+
+And tightness is selective. Counting all cap-feasible splits by DP:
+
+| state | sat | cap-feasible | tight | share |
+|---|---|---|---|---|
+| `Sb(36:8,14:12,15:7,5:1)` k=6 | 0.776 | 8,296,906 | 390,536 | 4.7% |
+| `Sb(27:13,18:8,9:8,9:2)` k=6 | 0.802 | 6,251,106 | 391,898 | 6.3% |
+| `Sb(15:13,19:9,19:8,24:5)` k=6 | 0.875 | 30,327,694 | 2,070,002 | 6.8% |
+| `Sb(18:7,...,27:1)` k=6, 8 parts | 0.963 | 2.34e13 | 4.74e12 | 20.3% |
+
+So requiring tightness discards 80-95% of the search space and, above sat 0.95, loses no winner in the
+corpus.
+
+**Why FAST cannot express this.** Tightness is a property of the *whole* split - the three child masses
+summed across every part - whereas FAST marks each part's options independently. No per-part rule can
+say "some child reaches exactly `3^(k-1)`". That is a structural limit of the current heuristic's shape,
+not a matter of tuning its threshold, and it is the concrete sense in which the heuristic can be made
+more *precise* rather than wider.
+
+The earlier per-part observation dissolves into this one. The `m1/n1` histogram over winners is bimodal
+with 30% at the extremes (0 or 1) - parts taken whole or left out - which looked like a second pattern
+but is just how a split reaches a tight child: the balance line passes exactly through `(0,0)` and
+`(n1,n2)`, so all-or-nothing parts sit on the diagonal at zero deviation while contributing their whole
+mass to one child.
+
+### Status: an empirical regularity, not a theorem
+
+137 of 137 is from one construction family (`Sa(192)` and `Sa(112)`), so the trees are not independent
+samples. A counting argument does not immediately give it: `max child >= mass/3`, so at `sat >= 0.95`
+the max already lies in `[0.95 cap, cap]`, and tightness is a restriction *within* that band rather
+than a consequence of it. Worth trying to prove, and worth testing against the canonical trees
+(`canon_*.tree`) which come from a different construction.
+
+Untested as a heuristic: enforcing it would mean tracking the running max child during enumeration and
+requiring it to reach cap - which composes naturally with the reachability tables from A+B, since those
+already carry the achievable `(r0,r2)` per suffix and can answer "can any completion still reach cap".
