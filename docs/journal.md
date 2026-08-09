@@ -3400,6 +3400,37 @@ per child, so the direction was not obvious in advance.
 Tables needed to deploy: `P_k` and the pair table per level. Sizes so far - k=4: 102 parts, 5 253
 pairs; k=5: 327 parts, 53 628 pairs (85.9% solvable). Both cheap. `pairtab.c` builds them.
 
+**How to apply the pair filter without paying for it.** All-pairs is the wrong implementation: a
+p-part state needs `2*C(p,2) + C(2p,2)` checks per candidate - 176 at p=8. Three measurements on the
+two live-bottleneck k=6 states settle the design.
+
+- *Arc consistency is useless here.* AC-3 over the pair constraints removed **zero** options (1.00x):
+  with ~150 options per part every option finds some partner. The pruning lives in the joint
+  assignment, not the arcs. The per-part self-check (the two halves of one parent part, which share
+  the mixed child) also removed nothing.
+- *A third of the pairs can never fire.* 9 of 28 and 11 of 28 parent pairs have an all-compatible
+  bitmap, so they are detectable once per state and skipped for free.
+- *The rest is steeply concentrated.* Ranking parent pairs by incompatibility density:
+
+| checks (of 28) | rejection of cap-feasible | share of full benefit |
+|---|---|---|
+| top 1 | 13.9% / 13.2% | ~16% |
+| top 5 | 54.0% / 54.7% | ~64% |
+| top 9 | 73.7% / 76.9% | ~89% |
+| top 13 | 81.0% / 85.2% | ~97% |
+| top 17+ | 83.9% / 86.3% | 100% (nothing beyond) |
+
+So: rank the parent pairs once per state by incompatibility density, keep the top ~half, check
+densest-first with early exit. **~97% of the pruning for ~46% of the checks**, and the ranking costs
+`p^2 * options^2 * 6` lookups (~3.8 M) against an enumeration of 10^10 candidates. Per-parent-pair
+compatibility bitmaps make each check one bit test rather than six table lookups.
+
+**Deployment note:** the tables needed are per level, and the level that matters is already built.
+The live run spends 97% of CPU at k=6, whose children sit at k=5 - and the k=5 pair table (327
+parts, 53 628 pairs) exists. Tables grow with k, and building them at k>=8 means solving millions of
+2-part states, so apply the filter at the low levels where enumeration actually concentrates rather
+than everywhere.
+
 **Next, untested:** the size-3 subset filter is the obvious continuation, but the table is
 102^3/6 ~ 177 K entries and the marginal return is unknown. Also untested: scoring children
 recursively with the same function one level down.
