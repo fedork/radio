@@ -60,6 +60,13 @@ typedef struct {
     int size;
     int (*splitsl)[SPLIT_FIELD_COUNT];
     int *ind[INDEX_COUNT];
+    /* cle[j][x] = how many of this part's options have key j <= x, where the keys are the three
+       children's pair counts: j=0 is k0 (the key BY_SP2 is sorted by), j=1 is k1 (BY_SP1), j=2 is
+       k2 (BY_SP0). Static per part, so built once per sbb and shared by every state using it.
+       It answers "how far will the level run before the counting bound retires it?" in one load,
+       which is what lets the ordering be chosen by measurement instead of by a gap heuristic. */
+    int *cle[3];
+    int clen;
 } splits;
 
 // The three _DESC orderings were materialised by indexDesc as exact reversals of their
@@ -561,6 +568,89 @@ int get_max_sbb(int n1, int n2, int n3, int n4) {
 
 long long cant_solve_count=0;
 
+
+/* ---- Joint suffix reachability -------------------------------------------------------------
+   A prefix can satisfy the counting bound on all three children so far and still be impossible to
+   complete: the parts that remain simply cannot distribute their mass so that every child lands
+   within 3^(k-1). Such a prefix currently proceeds to three cache probes that can only fail.
+
+   R[i] = the set of (r0,r2) the remaining parts i..P-1 can contribute, as a bitmap; r1 follows from
+   mass conservation. A prefix at (p0,p1,p2) is completable iff some reachable (r0,r2) satisfies
+     r0 <= cap-p0,  r2 <= cap-p2,  r0+r2 >= p1 + Mrem - cap
+   the last being the c1 bound. Answered in O(1) from a 2-D running max of r0+r2 over the box.
+
+   Note the one-dimensional version of this is provably vacuous: taken alone each child can absorb
+   the entire remaining mass, so per-child bounds never fire. It has to be joint.
+
+   Built by bitmap convolution - R[i] = union over options of R[i+1] shifted by (k0,k2) - which is
+   a few million word-ops for a whole state, ~1-2 ms. */
+#define RB_MAXCAP 800
+#define RB_TRIGGER 10000000LL      /* arm the prune once a state has cost this many candidates */
+static int rb_on = 0, rb_cap = 0, rb_words = 0, rb_P = 0;
+static unsigned long long *rb_bits[17];
+static short *rb_mx[17];
+static int rb_mrem[17];
+static long long rb_tested = 0, rb_pruned = 0;
+
+static void rb_free(void) {
+    int i;
+    for (i = 0; i <= rb_P; i++) { free(rb_bits[i]); free(rb_mx[i]); rb_bits[i] = NULL; rb_mx[i] = NULL; }
+}
+static void rb_build(splits **sa, int *tmpp, int P, int cap) {
+    int i, c, r0, w, W = cap + 1;
+    rb_cap = cap; rb_P = P; rb_words = (W + 63) / 64;
+    rb_mrem[P] = 0;
+    for (i = P - 1; i >= 0; i--) rb_mrem[i] = rb_mrem[i+1] + sb_pairs[tmpp[i]];
+    for (i = 0; i <= P; i++) {
+        rb_bits[i] = (unsigned long long *)calloc((size_t)W * rb_words, sizeof(unsigned long long));
+        rb_mx[i] = (short *)malloc((size_t)W * W * sizeof(short));
+    }
+    rb_bits[P][0] = 1ULL;                                  /* (0,0) reachable by the empty suffix */
+    for (i = P - 1; i >= 0; i--) {
+        for (c = 0; c < sa[i]->size; c++) {
+            int *sp = sa[i]->splitsl[c];
+            int k0 = sb_pairs[sp[0]], k2 = sb_pairs[sp[3]];
+            if (k0 > cap || k2 > cap) continue;
+            int ws = k2 >> 6, bs = k2 & 63;                /* shift along r2, within each row */
+            for (r0 = 0; r0 + k0 <= cap; r0++) {
+                unsigned long long *src = rb_bits[i+1] + (size_t)r0 * rb_words;
+                unsigned long long *dst = rb_bits[i]   + (size_t)(r0 + k0) * rb_words;
+                for (w = rb_words - 1; w >= 0; w--) {
+                    int sw = w - ws;
+                    if (sw < 0) break;
+                    unsigned long long v = src[sw] << bs;
+                    if (bs && sw > 0) v |= src[sw-1] >> (64 - bs);
+                    dst[w] |= v;
+                }
+            }
+        }
+    }
+    for (i = 0; i <= P; i++) {
+        int r2;
+        for (r0 = 0; r0 <= cap; r0++) for (r2 = 0; r2 <= cap; r2++) {
+            unsigned long long bit = rb_bits[i][(size_t)r0*rb_words + (r2>>6)] >> (r2 & 63) & 1ULL;
+            short b = bit ? (short)(r0 + r2) : -1;
+            if (r0 && rb_mx[i][(size_t)(r0-1)*W + r2] > b) b = rb_mx[i][(size_t)(r0-1)*W + r2];
+            if (r2 && rb_mx[i][(size_t)r0*W + r2-1] > b) b = rb_mx[i][(size_t)r0*W + r2-1];
+            rb_mx[i][(size_t)r0*W + r2] = b;
+        }
+    }
+}
+static void rb_release(void) {
+    fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%)\n",
+            rb_tested, rb_pruned, rb_tested ? 100.0*rb_pruned/rb_tested : 0.0);
+    rb_free(); rb_on = 0; rb_tested = rb_pruned = 0;
+}
+static inline int rb_dead(int nexti, int p0, int p1, int p2) {
+    int W = rb_cap + 1;
+    int a = rb_cap - p0, cc = rb_cap - p2;
+    long long need = (long long)p1 + rb_mrem[nexti] - rb_cap;
+    rb_tested++;
+    if (a < 0 || cc < 0) { rb_pruned++; return 1; }
+    if (rb_mx[nexti][(size_t)a*W + cc] >= need) return 0;
+    rb_pruned++; return 1;
+}
+
 int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #ifdef DEBUG1
     if(k>7) {
@@ -684,6 +774,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     clock_t start = clock();
     clock_t progress = start + PROGRESS_INTERVAL;
     
+    /* Reachability is armed by observed cost, not by a shape signature. A state that has already
+       burned RB_TRIGGER candidate evaluations has earned the ~1-2 ms the tables take to build, and
+       cheap states - the overwhelming majority - never pay anything. That also avoids privileging
+       the 8-part near-saturated shape: any state that turns out expensive gets the prune. */
+    int rb_here = 0;
     long long cant_solve_count_min = cant_solve_count + 1; // min progress before bailing out
     clock_t deadline = 0;
     if (parent_deadline == NO_DEADLINE) {
@@ -913,6 +1008,18 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     skipped_some = 1;
                 } else {
                     totalsplits++;
+                    /* `>=`, not `==`. rb_on is global, so only one state holds the tables at a time; with
+                       equality a state whose trigger instant fell while another was armed lost its
+                       only chance and ran the rest unpruned. Arming later is never worse than never
+                       arming - the prune is a performance device, not a correctness one - so this
+                       is safe. NOTE: this was originally changed while chasing a 27-minute cold
+                       monster run that turned out to be a cold-vs-warm comparison error, not a
+                       race. The fragility is real but has not been observed to fire. */
+                    if (!rb_here && !rb_on && totalsplits >= RB_TRIGGER
+                        && size >= 4 && power3[k_1] < RB_MAXCAP) {
+                        rb_on = rb_here = 1;
+                        rb_build(splitsarr, tmp, size, power3[k_1]);
+                    }
                     int p0 = sb0p[i] = sb_pairs[sb0[i] = s[0]] + (i>0?sb0p[i-1]:0);
                     int p1 = sb1p[i] = sb_pairs[sb1[i*2] = s[1]] + sb_pairs[sb1[i*2+1] = s[2]] + (i>0?sb1p[i-1]:0);
                     int p2 = sb2p[i] = sb_pairs[sb2[i] = s[3]] + (i>0?sb2p[i-1]:0);
@@ -927,6 +1034,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     debug_printf(" i=%d p0=%d p1=%d p2=%d\n", i, p0,p1,p2);
 #endif
                     if ((p0 <= max_pairs_1) && (p1 <= max_pairs_1) && (p2 <= max_pairs_1)
+                        && !(rb_here && i + 1 < size && rb_dead(i + 1, p0, p1, p2))
                         && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY))
                         && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY))
                         && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
@@ -958,7 +1066,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                                        cont=0;
 //                                        break;
                                     } else {
-                                        return MAYBE;
+                                        { if (rb_here) rb_release(); return MAYBE; }
                                     }
                                 }
                                 if (t >= progress) {
@@ -998,6 +1106,34 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             }
                             splitindex[i] = splitsarr[i]->size;
                             {
+                                /* Pass 2 is exhaustive, so iteration order carries no
+                                   solution-finding value and can be chosen purely to retire the
+                                   level as early as possible. BY_SP2/BY_SP1/BY_SP0 are monotone in
+                                   p0/p1/p2 respectively, and the counting-bound cut ends the level
+                                   at the first option whose key exceeds the remaining budget - so
+                                   the level runs for exactly cle[j][budget_j] options. Pick the
+                                   smallest. The _DESC variants are never chosen here: they have
+                                   ORDER_MONO_P = -1, so they get no early termination at all.
+                                   Measured 2026-08-08 on the cheapest monster: 3.5x fewer candidate
+                                   evaluations than the gap heuristic below. */
+                                int chosen = -1;
+                                if (pass >= 2 && size > 3) {
+                                    splits *sp_ = splitsarr[i];
+                                    int M = sp_->clen, best = 1 << 30, j;
+                                    int bnd[3];
+                                    bnd[0] = max_pairs_1 - p0;   /* BY_SP2 is monotone in p0 */
+                                    bnd[1] = max_pairs_1 - p1;   /* BY_SP1 in p1 */
+                                    bnd[2] = max_pairs_1 - p2;   /* BY_SP0 in p2 */
+                                    static const int ORD_FOR_KEY[3] = { BY_SP2, BY_SP1, BY_SP0 };
+                                    for (j = 0; j < 3; j++) {
+                                        int b = bnd[j]; int cc;
+                                        if (b < 0) cc = 0; else cc = sp_->cle[j][b > M ? M : b];
+                                        if (cc < best) { best = cc; chosen = ORD_FOR_KEY[j]; }
+                                    }
+                                }
+                                if (chosen >= 0) {
+                                    splitincr[i] = chosen;
+                                } else
                                 // confusingly enough p0 corresponds to BY_SP2 and p2 to BY_SP0
                                 if (size<=3) {
                                     splitincr[i] = BY_SP1; // special case for size== 2 or 3
@@ -1057,6 +1193,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         //        fflush(stdout);
         
     } else if (skipped_some) {
+        if (rb_here) rb_release();
         return MAYBE;
     } else {
         cant_solve_count++;
@@ -1081,6 +1218,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printf(" took %ld", s);
     else
         printf(" took 0.%03ld", t * 1000/CLOCKS_PER_SEC);
+    if (rb_here) rb_release();
     printf(" totalsplits=%llu pass=%d fast_solve=%d", totalsplits, pass, fast_solve);
     
 #ifdef DEBUG1
@@ -1385,6 +1523,20 @@ void ensure_splits(int sbb) {
         }
     }
     s->size = c;
+    {   /* cle: histogram of each key, then prefix-summed */
+        int M = sb_pairs[sbb], j, x;
+        s->clen = M;
+        for (j = 0; j < 3; j++) s->cle[j] = (int *)calloc((size_t)M + 2, sizeof(int));
+        for (x = 0; x < c; x++) {
+            int *sp = s->splitsl[x];
+            int kk[3];
+            kk[0] = sb_pairs[sp[0]];
+            kk[1] = sb_pairs[sp[1]] + sb_pairs[sp[2]];
+            kk[2] = sb_pairs[sp[3]];
+            for (j = 0; j < 3; j++) if (kk[j] >= 0 && kk[j] <= M) s->cle[j][kk[j]]++;
+        }
+        for (j = 0; j < 3; j++) for (x = 1; x <= M; x++) s->cle[j][x] += s->cle[j][x-1];
+    }
     indexSpl(sbb, s, BY_SP0, pairs0);
     indexSpl(sbb, s, BY_SP1, pairs1);
     indexSpl(sbb, s, BY_SP2, pairs2);
