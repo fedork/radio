@@ -3216,7 +3216,17 @@ recorded earlier came from witness trees in the sat>=0.95 band and does not gene
 candidates, 17,280,206 survive singleton majorization on all three children - 1.0x. The `(n:m)->(n:1)`
 downgrade discards too much mass to fire at k=4 children.
 
-**Positive: a provable per-part filter, 15.3x.** By Subgraph Monotonicity every sub-part of every
+**CORRECTION (same day): the per-part filter is ALREADY IN THE SOLVER, so the 15.3x below is not
+new headroom.** `radiobase.c:947-962` caches, per split of each part, the minimal level at which
+`s[0]` alone, `s[3]` alone, *and the pair `{s[1],s[2]}` jointly* are solvable, and skips the split
+when that exceeds `k-1`. That subsumes both the per-part test and the intra-part self-check. The
+15.3x was measured against a baseline enumerator that lacked it - a property of my measuring tool,
+not of the solver. **The genuinely new constraint is the CROSS-part pair filter**, and re-measuring
+with the intra-part check moved into the baseline leaves it unchanged at 13.11x (k=5 4-segment) -
+so that factor is entirely cross-part and does stand. Expected refutation speedup is therefore
+~5-13x, not ~200x.
+
+**Provable per-part filter, 15.3x - superseded, see correction above.** By Subgraph Monotonicity every sub-part of every
 child must be solvable standalone at k-1, so for part `(n:m)` and take `(x,y)` all four of
 `(x:y)`, `(n-x:m-y)`, `(x:m-y)`, `(n-x:y)` must be. This is a table lookup applied *per part, before*
 the cartesian product. Across the 308 states it cuts 2.897e8 cap-feasible candidates to 1.892e7
