@@ -164,7 +164,10 @@ Do not run `gh auth switch` - it changes the global active account.
 - `*.txt` is ignored, deliberately. `witnesses/*.tree` and `data/**/*.csv` are explicitly
   re-admitted - if you add a category of small, valuable file, re-admit it too, and say why
   in the same commit.
-- Branch off `main`; do not push without being asked.
+- Keep the primary repo checkout on `main`; do not switch branches in it. When isolation is useful,
+  work in a per-chat scratch worktree or clone based on current `origin/main`, then integrate the
+  coherent, checked result directly to `main`. Push to `main` when the work is ready and fetch from
+  `origin/main` when convenient; never include unrelated working-tree changes.
 - Commit in reviewable chunks. Explain *why* in the message; the diff already shows what.
 
 ## Before you finish a session
