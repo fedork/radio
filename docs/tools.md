@@ -88,6 +88,12 @@ Enforces a wall-clock cap and an RSS cap, reports peak RSS and wall time on stde
 survives redirecting the driver's stdout), and exits 124 on timeout / 137 on memory kill.
 Wall time is quantised to `--poll` (default 5s); the drivers' own `took N` lines are exact.
 
+On macOS this is only a **resident-set** guard, not a bound on the solver's allocated heap.
+Swapped anonymous pages leave RSS: the 2026-08-10 local `Sa(193)` trial showed 2.77 GB peak RSS
+while `vmmap -summary` measured a 7.1 GB physical footprint, 5.9 GB of it swapped.  Sample
+`Physical footprint` as well as `vm_stat` for any long local run.  Linux/AWS did not show this
+gap because the solver heap remained resident there.
+
 ### The canonical search does not always work, even unrestricted
 
 It is a *hypothesis* about solution shape, and the hypothesis fails at small k. `Sb(46:6)` in 6

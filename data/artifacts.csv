@@ -11,3 +11,4 @@ sa193-2023,out26_2.txt.zst,out26_2.txt,2023,SUSPECT ERA,"Sb(112:81) verdict, 172
 sa193-2023,out26_3.txt.zst,out26_3.txt,2023,SUSPECT ERA,the other 15 + the Sa(193) verdict
 trees-2023,print_trees_2023.tar.zst,print38*.txt print65*.txt print112*.txt print192*.txt,2023,positives only,source of 13 verified witness trees
 trees-2023,fullsolve_2023.tar.zst,full_*.txt (18 files),2023,positives only,source of data/exhaustive_multipart.csv
+sa193-local-2026-08-10,out_sa193.txt.zst,out_sa193.txt,2026,partial clean,"cold current-engine trial; control passed, Sa(193) aborted without a verdict at 7.1 GB vmmap footprint"

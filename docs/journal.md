@@ -4171,3 +4171,41 @@ normal driver.  This change removes a bounded but needless source of virtual-mem
 does **not** compact the unbounded result-cache trie, which remains the next large-k memory problem.
 It is not present in the already-running `run3`, and the measured result does not justify throwing
 away that cold run's 21 hours of cache.
+
+## 2026-08-10 — a full `Sa(193)` run still does not fit this 24 GB Mac
+
+The current-main engine (`713b7d6`, full-star majorization plus level-lazy split tables) was compiled
+with `clang -O3 -DMAX_K=10 -DMAX_N=193` and run cold through `radio_sa193` on the 24 GB M4 Pro.
+The trial was bounded to one hour and nominally 8 GB RSS, with a second guard sampling
+`vmmap -summary` because the active trap already says macOS can swap a solver out from under an RSS
+cap.  The machine began with about 21 GB of old swap allocated by the working desktop, so this is a
+viability test under the real local workload, not a clean hardware benchmark.
+
+The positive gate passed:
+
+    result CONTROL Sa(192) in 10 = SOLVABLE  (734.5 s)
+
+That occurred after 173,433 emitted verdicts.  The actual `Sa(193)` phase then emitted another
+59,292, for 232,725 total.  At 1,152 wall seconds the run was stopped manually, before the nominal
+one-hour deadline: no top-level k=9 state had completed, `vmmap` reported a **7.1 GB physical
+footprint**, and its writable regions were 1.3 GB resident plus **5.9 GB swapped**.  The solver's
+CPU utilisation had fallen to about 44% and only ~6,300 additional verdicts appeared in the final
+three minutes.  In contrast, `capped_run` reported just 2.77 GB peak RSS.  This is a direct second
+demonstration that `--rss-gb` is not an allocation bound on macOS.
+
+The run ended by SIGTERM (exit 143), so it says nothing about whether `Sa(193)` is solvable.  It does
+answer the operational question: the new split layout is not enough to make a full local run safe
+or productive on the working 24 GB machine.  Total anonymous heap still grows into swap during the
+first `Sa(193)` branch; compacting or explicitly bounding the result cache remains the necessary
+next memory change.  Precise attribution between result-cache and residual split allocations was
+not instrumented in this binary, so the measurement is deliberately stated as total malloc
+footprint rather than assigned entirely to one structure.
+
+The raw 26,075,455-byte log is archived as
+`sa193-local-2026-08-10:out_sa193.txt` (SHA-256
+`357d50136933d96a873fd4db3e53f73240df5400020ba4240de24df20f8a6adb`); the audit found zero
+contradictions among 751 comparable states.  It is incomplete measurement evidence, not a verdict
+source.  Its 232,725-line parsed checkpoint remains at
+`/Users/fedor/radio-runs/sa193-local-713b7d6-trial1/sa193.checkpoint` and is sound for a same-log
+resume, but resuming locally before the memory representation changes would merely reproduce the
+swap failure.

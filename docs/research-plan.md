@@ -42,7 +42,7 @@ trees, mechanical invariant checks, agent instructions, artifact archival.
 green, and every artifact cited by `data/*.csv` is fetchable by tag.
 
 Delivered: source-of-truth CSVs with per-cell `bound`/`status`/`source`; 13 verified witness
-trees; four checking tools; the artifact store `fedork/radio-data` (7 tags, round-trip
+trees; four checking tools; the artifact store `fedork/radio-data` (8 tags, round-trip
 verified) with the archiving decision recorded in [data.md](data.md) including what was
 deliberately not kept; the vendor-neutral `AGENTS.md` brief with a session-end protocol;
 [status.md](status.md) as the cold-start snapshot. Merged to `main` and pushed 2026-08-03.

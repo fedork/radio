@@ -127,8 +127,13 @@ unbounded result-cache trie, and `ulimit -t` caps CPU, not memory — so for tho
 tools/capped_run.sh --seconds 3600 --rss-gb 16 --label sa113 -- ./radio_k9 > out.txt
 ```
 
-It enforces both caps, reports peak RSS and wall time, and exits 124 on timeout / 137 on
-memory kill. Use it for anything you would otherwise leave unattended.
+It enforces the wall-clock cap and a **resident-set** cap, reports peak RSS and wall time, and
+exits 124 on timeout / 137 on memory kill.  That is an effective heap bound on the Linux/AWS
+runs where the anonymous heap stays resident.  It is **not** a total-memory bound on macOS:
+swapped anonymous pages disappear from RSS.  For a long local run, also sample
+`vmmap -summary <pid>` (`Physical footprint`) and `vm_stat` swap activity; see the active trap in
+[docs/status.md](docs/status.md).  Use the wrapper for anything you would otherwise leave
+unattended, but do not mistake its macOS RSS cap for an allocation cap.
 
 Run these one at a time, and `pgrep -f radio_canon` before launching another. On 2026-08-03 three
 concurrent runs reached 28+21+12 GB and pushed the machine into heavy swap, because two of them

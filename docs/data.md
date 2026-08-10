@@ -97,6 +97,12 @@ from the build with known false negatives — the lines are kept as a record, an
 support is recorded as `legacy`, not accepted. `trees-2023` holds witness trees, which
 re-verify from first principles, so its era does not matter.
 
+### Archived — performance measurements, not verdict sources
+
+| tag | contents | raw | audited |
+|---|---|---:|---|
+| `sa193-local-2026-08-10` | `out_sa193.txt` — cold current-engine local trial; `Sa(192)` control passed, partial `Sa(193)` search was stopped at 7.1 GB `vmmap` footprint | 26 M | 0 contradictions among 751 comparable states; **aborted, no `Sa(193)` verdict** |
+
 ### Not archived
 
 | | raw | why |

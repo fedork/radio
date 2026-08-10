@@ -18,7 +18,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
-| **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Bound by `MAX_N` and cell selection at *compile* time; to detect it live, watch `vm_stat` swapins, not RSS. |
+| **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Bound by `MAX_N` and cell selection at *compile* time; to detect it live, use `vmmap -summary PID` (`Physical footprint`) plus `vm_stat` swapins, not RSS. The 2026-08-10 local `Sa(193)` trial independently reproduced the gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
 | **The k≤7 oracle does not fit in 24 GB at full coin range.** | The cache trie scales ~`MAX_N²`: 4.04 GB at `MAX_N=132`, ~20 GB at `MAX_N=262`. A k=8-rooted run spent 3 h 50 m loading and never finished. Loading that looks like it is "decelerating" is swapping. Mapping a *known* k=5 state needs only k=4 solving, so obtain states some other way and skip the large oracle entirely. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
@@ -158,8 +158,8 @@ Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
 fixed-small-m exact recurrence `tools/search_singletonization.cpp`.
 
-Artifact store `fedork/radio-data` (private): 7 tags, 12 assets plus a manifest per tag,
-367 MB stored, `check-index` green.
+Artifact store `fedork/radio-data` (private): 8 tags, 13 assets plus a manifest per tag,
+369 MB stored, `check-index` green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -169,13 +169,13 @@ Do not run `gh auth switch`.
 ## Running now
 
 All three prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
-`tools/sa193_status.sh --all` at **2026-08-10 21:14 UTC**:
+`tools/sa193_status.sh --all` at **2026-08-10 22:05 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
-| `run/` — original | stale by 18 h; reported solver gone | 2,568,394 verdicts, 0 of 16 |
-| `run2/` — A+B | stale by 18 h; alive only at the last upload | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 21 h 14 m, 868,760 verdicts, **22.65 GB**, 0 of 16 |
+| `run/` — original | stale by 18 h 46 m; reported solver gone | 2,568,394 verdicts, 0 of 16 |
+| `run2/` — A+B | stale by 18 h 56 m; alive only at the last upload | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 22 h 04 m, 883,157 verdicts, **22.76 GB**, 0 of 16 |
 
 Use `tools/sa193_status.sh --prefix run3 [--watch]` for the live stream; `--all` is still useful for
 the archived comparison, but must not be read as proof that a stale process remains alive.  `run3`'s
@@ -184,12 +184,22 @@ or **90.4%** of measured CPU, while k=6 is 2.1%.  It is inside the first top-lev
 `Sb(112:81)@9`, currently below `Sb(51:46,61:35)@8`.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
-22.65 GB with fewer than 0.9 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
+22.76 GB with fewer than 0.9 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
 so it does not by itself identify the cause; it does show that memory per verdict cannot be assumed
 stable across the changed search shape.  The result-cache trie remains the unbounded structure and
 the next memory target.  The level-lazy split-table change described below removes avoidable
 allocation, but is not deployed in `run3` and is not expected to account for tens of GB by itself.
 Do not restart a 21-hour cold run solely to pick it up.
+
+A current-main local trial (`713b7d6`, M4 Pro / 24 GB) was stopped deliberately rather than left
+to swap.  The cold `Sa(192)` control passed in **734.5 CPU seconds**.  In 1,152 wall seconds the
+process emitted 232,725 verdicts, but after entering `Sa(193)` its `vmmap` footprint reached
+**7.1 GB**, of which **5.9 GB was swapped**, while the wrapper reported only 2.77 GB peak RSS.
+CPU utilisation had fallen to about 44% and no top-level k=9 state had completed.  This is an
+abort, not a refutation.  It shows that the level-lazy split tables do not by themselves make a
+full 24 GB local run practical; compacting or bounding the result cache remains prerequisite.
+The raw log is archived as `sa193-local-2026-08-10:out_sa193.txt` and its same-run parsed checkpoint
+remains locally at `/Users/fedor/radio-runs/sa193-local-713b7d6-trial1/sa193.checkpoint`.
 
 Historical lesson, retained without treating the old processes as live: before full-star
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
