@@ -4093,3 +4093,81 @@ The timeout and completed residual line are retained in `evidence/m6_k11_scaled_
 The right next object is therefore the parametric `m=4 + m=2` mixed-state frontier in deficit
 coordinates.  Classify that family first, then work backwards through the low-`k` degeneracies;
 do not fit the late subtree of the 973 witness.
+
+## 2026-08-10 — split tables are coarse level-lazy and theorem-filtered
+
+The immediate trigger was memory, not another attempt to make `FAST` clever.  At the
+2026-08-10 21:14 UTC `tools/sa193_status.sh --all` snapshot, `run3` had produced 868,760 verdicts
+in 21 h 14 m while holding 22.65 GB resident; k=7 accounted for 90.4% of measured CPU.  The older
+`run2` status was already 18 hours stale, so its 5.72 GB / 1,897,635-verdict snapshot is not a
+matched comparison and does not identify the source.  It was enough to withdraw the convenient
+assumption that memory per verdict stays stable when a theorem changes the search shape.
+
+The implementation deliberately stays at whole-table granularity:
+
+- The global array of large `splits` headers is now a pointer index.  The `MAX_K+1` fanout for an
+  `sbb` is allocated only when that part is first encountered, and a complete table is keyed by
+  `(parent k,sbb)`.
+- One table is one exact-sized contiguous allocation: retained cut records, the four live order
+  indices, and all three `cle` arrays.  There are no cut chunks and no separately lazy orderings.
+- Depth-first search builds the first part's table initially and a suffix table only when the
+  prefix reaches that part.  The reachability DP is the sole bulk path: if it arms after ten
+  million candidates, it materialises every missing suffix because it genuinely needs them.
+- Before allocating, the builder makes two cheap enumeration passes and retains a local cut only
+  when each of its three child substates, by itself, passes the `3^(k-1)` counting bound and
+  full-star majorization at `k-1`.  Unit groups are counted and then eliminated exactly as in
+  `canSolveB`.  No cache negative, fitted rule or conjectural dominance relation participates.
+
+The filter is sound by Subgraph Monotonicity.  For any complete multi-part split, each local
+outcome is a subgraph of the corresponding complete child.  If the local outcome already violates
+a necessary condition, adding the other parent parts cannot repair it.  Keying by level is required
+because the child base sequence and capacity change with `k`; it also means the same `sbb` may own
+more than one table, which is why allocation rather than table count is the relevant measure.
+
+### Matched measurements
+
+`tools/split_memory_probe.c` records requested persistent split bytes, excluding malloc metadata
+and the result cache.  Its header gives the parent/current build commands.  Both controls used
+`MAX_K=6 MAX_N=193` and `/tmp/k6lab/warm_k5.txt`:
+
+| control | parent `5ea9b3c` | level-lazy build |
+|---|---:|---:|
+| positive `Sb(29:6,19:9,13:12,36:3)@6`, solve CPU printed by engine | 43 s | **32 s** |
+| same positive, whole-process wall including cache load | 62.05 s | **49.91 s** |
+| same positive, split tables / requested bytes | 71 / 1,407,276 | 82 / **261,560** |
+| same positive, geometric / retained options in new tables | — | 3,753 / 2,673 |
+| negative `Sb(17:11,16:11,22:7,21:6)@6`, solve CPU | 0.090 s | 0.080 s |
+| same negative, split tables / requested bytes | 7 / 1,255,216 | 7 / **135,096** |
+| same negative, geometric / retained options in new tables | — | 1,016 / 942 |
+
+The positive found the identical winning split `[8:1,8:4,11:11,19:2]` and printed the identical
+top-level `totalsplits=37899`; the speedup comes from cheaper work below that counter.  Requested
+split memory fell 5.4x on the positive and 9.3x on the negative despite level-key duplication.
+Process RSS was deliberately not promoted as a win: with a 2.5+ GB warm trie it moved in opposite
+directions on the two controls, far beyond the one-megabyte split delta, so allocator/cache noise
+dominates this small workload.
+
+Correctness gates:
+
+- `tools/split_regression.c` emitted 1,038 definitive one- and two-part answers through k=5;
+  every `CHECK` line matched the parent engine.
+- The complete `radio.c` Sa ladder through k=8 had identical `result` lines.
+- The known `Sb(16:1,12:2)@4` negative and `Sb(16:1,11:2)@4` positive matched.
+- The 1,038-case corpus completed under AddressSanitizer plus UndefinedBehaviorSanitizer with no
+  report.  All main drivers and the pair/triple/quad/FAST tools compile against the new API.
+- `radio_print` rendered its complete 24-line default tree under both sanitizers, and
+  `tools/check_witness.py` re-derived all 24 nodes successfully.
+
+That last gate found two renderer bugs before merge.  `radio_print` used to seek an exact
+symmetry-boundary cut by decrementing until it found `(floor(n/2),m2)`.  LLDB stopped just before
+underflow on `Sb(9:5)@4`: the filtered table had 12 retained entries, the requested `(4,0)` was
+absent, and `splitindex[0]` was 1.  The renderer now stops at the last retained cut in the same
+canonical cut/complement half, which is identical to the old boundary when that boundary exists.
+UBSan then exposed an older independent write to `solutions[-1].refs` for a `TRIVIAL=-1` child;
+reference counting now skips trivial leaves.
+
+`-DSPLIT_STATS` now reports per-level candidates, retained options and requested bytes from any
+normal driver.  This change removes a bounded but needless source of virtual-memory pressure; it
+does **not** compact the unbounded result-cache trie, which remains the next large-k memory problem.
+It is not present in the already-running `run3`, and the measured result does not justify throwing
+away that cold run's 21 hours of cache.

@@ -141,10 +141,21 @@ width-two counterexample to any single-base majorization rule are in
 [the theorem note](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
 
 Do not add `R_1` as a production pre-pass. The current recursive prefix checks already enforce its
-child inequalities, and on the residual 42.7-second four-part positive the first `R_1` witness is
-dead and still passes `R_2`; mere feasibility does not distinguish it from the true winning split.
-Direct deeper checks also lose to the warmed exact cache on the tested residual negative. If P6
-continues, the benchmark is
+child inequalities, and on the residual four-part positive the first `R_1` witness is dead and
+still passes `R_2`; mere feasibility does not distinguish it from the true winning split. Direct
+deeper checks also lose to the warmed exact cache on the tested residual negative.
+
+One theorem-level use *is* now deployed in split-table construction (2026-08-10): each local cut
+whose one-part child already fails the information bound or `R_0` is omitted from that level's
+table. By subgraph monotonicity no completion with the other parts could rescue it. This is the
+same cheap necessary test the recursive loop would eventually perform, not an `R_1` search.
+Tables are coarse-grained lazy per `(k,sbb)`, exact-sized and contiguous; suffix parts allocate no
+table until search reaches them. On the fixed warm positive control, the identical winning split
+and top-level counter were found in 32 rather than 43 solver seconds (49.91 rather than 62.05 wall
+seconds including cache load), while the warm negative stayed at 0.08-0.09 solver seconds. The
+reproducible regression and allocation measurements are in the 2026-08-10 journal entry.
+
+If P6 continues, the ordering benchmark remains
 `Sb(29:6,19:9,13:12,36:3)` in 6 and the only promising use is a **bounded, fallback-safe ordering
 signal** that approximates deeper synchronization without recursively solving it.
 
@@ -176,7 +187,7 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 now has two distinct tracks while the two cold `Sa(193)` runs continue remotely. The solver track
+P6 now has two distinct tracks while `run3` continues remotely. The solver track
 still needs a bounded ordering approximation rather than another unconditional hierarchy level. The
 theory track should work from the exact `k=10,m=6` mixed-child boundary toward a parametric large-k
 construction or obstruction, and only then recover small k backwards. Do not use witness-tree shape

@@ -19,7 +19,7 @@ preferred entry points.
 
 | what | where |
 |---|---|
-| `(n1:n2)` pair -> `sbb` integer id; split tables built lazily | `init`, `ensure_splits` |
+| `(n1:n2)` pair -> `sbb` integer id; level-keyed split tables built lazily | `init`, `ensure_splits` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: a trie over sorted `sbb` ids, closed downward for can-solve and upward for can't-solve | `cacheCanSolve`, `cacheCantSolve` |
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST-restricted first pass, exhaustive second pass, deadlines | `canSolveB` |
@@ -28,6 +28,28 @@ preferred entry points.
 | `Sa` recursion | `canSolveA` |
 | Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` |
 | Warm the cache from a previous run's parsed output | `parse_file` |
+
+### Split-table allocation
+
+Split tables are keyed by `(parent k, sbb)`, not merely by `sbb`.  A table is either absent or
+fully built; there is no cut-level/chunk-level lazy machinery.  `canSolveB` initially builds only
+the first part's table and materialises a suffix table when depth-first search reaches that part.
+The joint reachability accelerator is the one bulk path: when it arms, it needs every suffix and
+builds the missing whole tables then.
+
+Each table is one exact-sized contiguous allocation containing its cut records, four stored order
+indices, and three cumulative counting arrays.  Before sizing it, `ensure_splits` removes a cut if
+one of that part's three child substates, by itself, exceeds `3^(k-1)` or violates full-star
+majorization at `k-1`.  This is an exhaustive-search-safe filter: the child is a subgraph of the
+corresponding complete child state, and adding the other parent parts cannot make an impossible
+subgraph solvable.  Unit groups are counted and then eliminated exactly as at the start of
+`canSolveB`; cache verdicts and conjectural dominance rules are never used here.
+
+Compile any driver with `-DSPLIT_STATS` to print requested bytes, geometric candidates and retained
+options by level at exit.  `tools/split_regression.c` is the small deterministic old/new verdict
+gate, and `tools/split_memory_probe.c` isolates persistent split-allocation requests for one warm
+query; their headers contain the comparison commands.  These are regression/measurement drivers
+for the C solver, not independent evidence for a mathematical verdict.
 
 ### Memory: `radio_canon_search_generic` will eat your machine
 

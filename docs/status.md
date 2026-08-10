@@ -1,7 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (exact `k=10,m=6` frontier; two live runs remain).
+don't know it. Last refreshed **2026-08-10** (level-lazy split tables; `run3` is the only
+freshly reporting cold run).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -167,62 +168,33 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**Two cold runs are live on one instance** `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).
+All three prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
+`tools/sa193_status.sh --all` at **2026-08-10 21:14 UTC**:
 
-| | `run/` — original | `run2/` — A+B |
+| prefix / build | freshness | last reported state |
 |---|---|---|
-| build | 2026-08-05, pre-A+B | `efadab0` (2026-08-09) |
-| started | 2026-08-05 ~13:44 UTC | 2026-08-09 ~19:40 UTC |
-| at last check | 4 d 03 h, **0 of 16**, 2.56 M verdicts, 6.86 GB | just started |
-| memory cap | 110 GB | 40 GB |
-| binary | `radio_sa193` | `radio_sa193_ab` |
+| `run/` — original | stale by 18 h; reported solver gone | 2,568,394 verdicts, 0 of 16 |
+| `run2/` — A+B | stale by 18 h; alive only at the last upload | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 21 h 14 m, 868,760 verdicts, **22.65 GB**, 0 of 16 |
 
-Watch both with `tools/sa193_status.sh --both [--watch]`. Notification subjects for the second run
-are prefixed `[run2]`. Separate binary names matter: the original launcher locates its solver with
-`pgrep -x radio_sa193 | head -1`, which with two runs would aim the new watchdog at the incumbent.
+Use `tools/sa193_status.sh --prefix run3 [--watch]` for the live stream; `--all` is still useful for
+the archived comparison, but must not be read as proof that a stale process remains alive.  `run3`'s
+`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 accounts for 69,169 s,
+or **90.4%** of measured CPU, while k=6 is 2.1%.  It is inside the first top-level
+`Sb(112:81)@9`, currently below `Sb(51:46,61:35)@8`.
 
-**The comparison to read** is `verdicts by level` at matched wall clock, specifically the k=6 line -
-that level is 97% of the incumbent's CPU and is exactly what A+B targets. Do not expect the measured
-2.75x: both A+B benchmarks were run *warm*, and the reachability prune arms on candidate **count**,
-which accumulates far more slowly cold because every child solve is uncached.
+The memory profile is no longer the benign one inferred from the original build: `run3` has reached
+22.65 GB with fewer than 0.9 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
+so it does not by itself identify the cause; it does show that memory per verdict cannot be assumed
+stable across the changed search shape.  The result-cache trie remains the unbounded structure and
+the next memory target.  The level-lazy split-table change described below removes avoidable
+allocation, but is not deployed in `run3` and is not expected to account for tens of GB by itself.
+Do not restart a 21-hour cold run solely to pick it up.
 
-The incumbent is not stuck. Its k=7 state `Sb(33:16,32:15,45:10,23:19)` was at `left=331/578`; per
-the project owner, based on prior experience it is a few hours from done.
-
-**Two risks.** The incumbent's user-data ends in `shutdown -h now`, so if it finishes or trips a cap
-the instance stops and takes `run2` with it. And `run2`'s 40 GB cap is a guess - 2023 reached ~90 GB.
-
-## The `Sa(193)` cold run is live
-
-`i-0005d74f985c52ae1`, started 2026-08-05, serialized single process, **completely cold**
-(`cache=(none, cold)`). The `Sa(192)` control passed in 2,209 s. Details and how to follow it without
-logging in: [aws-run.md](aws-run.md); `tools/sa193_status.sh`.
-
-At 47 h: `0 of 16` top-level states, ~2.1 M verdicts, **5.8 GB** peak against a 110 GB guard.
-
-**Where the time goes (2026-08-07):** `self(k) = inclusive(k) - inclusive(k-1)`, valid because `took`
-is inclusive and each state is computed exactly once (2,065,670 distinct `(state,k)`, zero duplicates).
-**k=6 is 93.2% of CPU**, k=5 is 2.4%, k=4 is 0.2%; k>=7 is unknowable mid-run because their ancestors
-have not completed. One k=6 state at mass 728 of 729 took 16,603 s — **9.9% of the whole run** — and the
-92 k=6 states over 60 s are ~96% of all CPU. The near-saturated 8-part k=6 states are the whole cost.
-`tools/sa193_status.sh` reports this every cycle.
-
-**And within k=6 it is 166 states (2026-08-08).** Work per verdict is bimodal with an empty gap:
-249,913 verdicts below 1e8 splits hold 0.31% of k=6, while 164 at 1e10-1e12 hold 99.63%. The gap is
-structural — a mixed child doubles the part count while the other two preserve it, so k=6 states exist
-at 4 parts and 8 parts and nowhere between, and the two cost modes are those two shapes. **99.57% of
-k=6 work is one cell: 8 parts at mass >= 0.99 of 3^6**, i.e. ~90% of the entire run in 166 states.
-They have no cheap refutation — the counting bound is vacuous at saturation and majorization is not
-close — so any optimisation that matters must attack 8-part near-saturated states specifically. The
-memory profile (`run/seg-*/memprofile.csv`) shows essentially the whole footprint was allocated in a
-40-minute window during the control, and +900k verdicts since cost +0.48 GB — so **memory is not the
-binding constraint after all**, contrary to the earlier expectation drawn from 2023's ~90 GB. Wall
-clock is: there is no time bound anywhere below a pass-2 node, because
-`child_deadline = pass<2 ? deadline : NO_DEADLINE` and such a node bumps its deadline 10 s rather than
-returning `MAYBE`. Weeks is the expectation, not a symptom.
-
-The run's binary **predates** the majorization corollary below; not worth restarting for a 3-16%
-pruning gain against 27 h of accumulated cache.
+Historical lesson, retained without treating the old processes as live: before full-star
+majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
+majorization removes that mode strongly enough that `run3` is instead dominated by k=7.  Optimising
+only the old k=6 monsters is therefore no longer a complete plan for the current engine.
 
 ## The Sa(193) certificate
 
@@ -325,15 +297,24 @@ canonical negatives, `R_0,R_1,R_2,R_3` reject respectively 68, 150, 229 and all 
 rejections among 1,247 canonical positives. `Sb(16:1,12:2)` itself passes `R_0,R_1,R_2` and fails
 `R_3`. `tools/bundled_majorization.py` and `tools/pairtab.c` reproduce the census.
 
-It does **not** yet improve the long-state solver. `radiobase.c` already invokes `R_0` on every
-partial child before its cache lookup, so a separate `R_1` pass duplicates the existing prefix walk.
-On the 42.7-second four-part positive `Sb(29:6,19:9,13:12,36:3)` in 6, the first cheap `R_1` witness
-has two exactly unsolvable children and even passes `R_2`; `R_1` feasibility therefore does not
-distinguish it from the real winning split. On a residual four-part negative, isolated `R_2` took
-6.3 Python CPU seconds and still passed, while the warmed exact solver refuted it in 0.1 seconds;
-`R_3` hit a 30-second cap. Production code is therefore unchanged. The useful target, if P6
-continues, is a genuinely cheap approximation to deeper synchronization for **ordering**, not an
-unconditional hierarchy pre-pass.
+Deeper synchronization does **not** yet improve the long-state solver. `radiobase.c` already invokes
+`R_0` on every partial child before its cache lookup, so a separate `R_1` pass duplicates the
+existing prefix walk. On the residual four-part positive `Sb(29:6,19:9,13:12,36:3)` in 6, the first
+cheap `R_1` witness has two exactly unsolvable children and even passes `R_2`; `R_1` feasibility
+therefore does not distinguish it from the real winning split. On a residual four-part negative,
+isolated `R_2` took 6.3 Python CPU seconds and still passed, while the warmed exact solver refuted it
+in 0.1 seconds; `R_3` hit a 30-second cap.
+
+One safe `R_0` deployment landed on 2026-08-10: split-table construction omits a local cut when one
+of that part's child substates already fails counting or full-star majorization at `k-1`. Subgraph
+monotonicity proves that later parts cannot rescue it. Tables are now exact-sized contiguous blocks
+keyed by `(k,sbb)`, and suffix tables remain absent until depth-first search reaches them. Against
+the same warm cache, the positive above retained the identical winning split and top-level
+`totalsplits=37899` while moving from 43 to 32 solver seconds; its requested persistent split memory
+moved from 1,407,276 to 261,560 bytes. The exact negative control stayed at 0.08-0.09 seconds. This is
+allocation and a redundant local necessary check, not an unconditional hierarchy pre-pass. The
+remaining theoretical target is a genuinely cheap approximation to deeper synchronization for
+**ordering**.
 
 ### Theoretical m=6 track: exact k=10 break beyond the fitted continuation (2026-08-10)
 
@@ -377,10 +358,10 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 
 ## Immediate next steps
 
-0. **Watch the two runs** (`tools/sa193_status.sh --both`). If `run2` overtakes the incumbent on
-   k=6 verdicts at matched wall clock, the incumbent can be killed; until then leave it running.
-   The 2026-08-09 journal entry has the full launch detail. Both remote runs predate full star
-   expansion and do not benefit from it; do not restart either without a separate matched decision.
+0. **Watch `run3`** (`tools/sa193_status.sh --prefix run3 --watch`). The `run/` and `run2/` status
+   objects are stale; inspect the instance before making any claim about those processes. `run3`
+   includes full-star expansion but predates level-lazy split tables. Do not discard its 21-hour
+   cold cache merely to adopt an allocation change.
 
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the
