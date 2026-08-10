@@ -175,6 +175,7 @@ tools, not yet part of `radiobase.c`:
 
 | tool | purpose |
 |---|---|
+| `tools/pairtab.c` | build every solver-solvable pair of individually solvable parts at one level |
 | `tools/tripletab.c` | build every solver-solvable three-part state at one child level, gated by the exact pair table |
 | `tools/quadtab.c` | build every solver-solvable four-part state, gated by pair and triple tables |
 | `tools/subset_census.c` | count per-part, pair and triple survivors on complete k=5 four-part state lists |
@@ -182,10 +183,14 @@ tools, not yet part of `radiobase.c`:
 | `tools/label_split_features.c` | join `WIN ... state=... take=...` logs to feature rows without relying on row samples |
 | `tools/sample_subsets.c` | sample pair/triple rejection and lookup cost on k=6 states too large to enumerate |
 | `tools/fast_replay.c` | replay logged long k=5 states from one forked warm-cache image, clearing all per-target cache/self-training effects |
+| `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
 ```
+clang -O3 -DMAX_K=4 -DMAX_N=64 tools/pairtab.c -o /tmp/pairtab4
+/tmp/pairtab4 4 16 > /tmp/pairs_k4.txt
+
 clang -O3 -DMAX_K=4 -DMAX_N=96 tools/tripletab.c -o /tmp/tripletab4
 /tmp/tripletab4 4 16 pairs_k4.txt > /tmp/triples_k4.txt
 
@@ -199,6 +204,19 @@ clang -O3 -DMAX_K=5 -DMAX_N=100 tools/tripletab.c -o /tmp/tripletab5
 The tables' positive and negative entries are exhaustive according to the current C solver. That is
 enough for a fallback-safe heuristic experiment, but it is not an independent certificate. Do not
 let a table negative prune an exhaustive proof search until the table has an adequate audit.
+
+The bundled hierarchy starts at full star-expansion majorization (`R_0`), adds one synchronized
+rectangle split per level, and becomes exact at `R_k`. Its small regression case and complete k=4
+pair census are:
+
+```
+tools/bundled_majorization.py ladder 4 16 1 12 2
+tools/bundled_majorization.py census-pairs 4 /tmp/pairs_k4.txt
+```
+
+The checker is independent of `radiobase.c` once it has read the optional pair-table labels. It is
+intentionally a transparent research implementation, not a production pre-pass: intermediate depths
+remain exponential and can approach the cost of exact search.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

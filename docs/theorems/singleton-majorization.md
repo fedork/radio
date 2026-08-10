@@ -327,3 +327,115 @@ This matters specifically because of the corollary: full star expansion routinel
 `2^k` entries. `radio_verify.c` once had exactly this defect, and it fired **79 times** in a single
 k=4 level even under the weaker one-copy downgrade. `radiobase.c` was already correct — it stops the
 comparison at `min(size, len(G_k))`, which is equivalent when the counting bound has passed.
+
+## The synchronized-majorization hierarchy (2026-08-09)
+
+Full star expansion forgets only one thing: the cloned rows belonging to one rectangle cannot choose
+their tests independently. That missing constraint can be restored one test at a time.
+
+For a state `S` and `0 <= d <= k`, define the Boolean relaxation `R_d(S,k)` as follows.
+
+- `R_0(S,k)` means `Phi(S) <=_w G_k`, including the zero-padded total-mass inequality.
+- `R_d(S,k)` for `d>0` means that there is one legal synchronized rectangle split of `S` for which
+  all three children `S_0,S_1,S_2` satisfy `R_{d-1}(S_j,k-1)`.
+
+Thus `R_0` is the deployed static condition. `R_1` insists that its independent singleton
+strategies can at least share one legal first test; every further level postpones the singleton
+relaxation by one more synchronized test.
+
+> **Synchronized Hierarchy Theorem.** For `0 <= d < k`,
+>
+> `solvable(S,k)  =>  R_{d+1}(S,k)  =>  R_d(S,k)`.
+>
+> At the final level, `R_k(S,k)` is equivalent to exact solvability in `k` tests.
+
+*Proof.* The first implication follows by induction on `d`. Use the real strategy's first test; each
+of its children is solvable in `k-1`, so it satisfies the preceding relaxation level.
+
+For the base nesting step `R_1 => R_0`, apply the witnessing rectangle test to the row-star lift of
+`S`. Its three children are singleton states. For a child rectangle `(u:v)`, this inherited row
+orientation contributes `v` copies of `u`; the strongest orientation `Phi` contributes
+`min(u,v)` copies of `max(u,v)` and weakly majorizes the inherited one. The same is true after
+concatenating all child rectangles. `R_0` for the rectangle child therefore supplies a singleton
+strategy for the inherited child. Combining the three strategies below the common first test solves
+the row-star lift of `S`, and the Singleton Majorization Theorem gives `R_0(S,k)`.
+
+Now induct on `d`: a witness for `R_{d+1}` has children satisfying `R_d`; by the preceding nesting
+level those same children satisfy `R_{d-1}`, so the same first split witnesses `R_d`.
+
+Finally, an `R_k` witness recursively supplies a legal split at all `k` levels. At depth `k`, each
+leaf satisfies `R_0(S',0)`. Since `G_0=(1)`, such a leaf contains at most one possible defective
+pair and needs no further test. The recursive witnesses are therefore an exact strategy. The reverse
+direction was the first implication. ∎
+
+Every `R_d` is also subgraph-monotone: restrict its witnessing splits to the subgraph and induct on
+`d`. This justifies rejecting a partial split prefix as soon as one of its child prefixes fails the
+required relaxation.
+
+### Additive hinge form of `R_1`
+
+For a nonnegative sequence `x`, write
+
+    H_x(t) = sum_j max(x_j-t, 0).
+
+Weak majorization `x <=_w y` is equivalent to `H_x(t) <= H_y(t)` for every `t>=0`. For integer
+sequences it is enough to check integer thresholds. Define `C_k(t)=H_{G_k}(t)` and
+
+    h_t(u,v) = min(u,v) max(max(u,v)-t, 0).
+
+The quantity `h_t(u,v)` is exactly the hinge contribution of the full star expansion of one
+rectangle `(u:v)`. If `(n:m)` is split by selecting `(a:b)`, its contributions to the three children
+are
+
+    outcome 2: h_t(a,b)
+    outcome 0: h_t(n-a,m-b)
+    outcome 1: h_t(a,m-b) + h_t(n-a,b).
+
+Consequently, `R_1(S,k)` is exactly a multiple-choice integer feasibility problem: choose one
+`(a_i:b_i)` for every parent part so that, for every outcome and threshold, the sum of these
+contributions is at most `C_{k-1}(t)`. This formulation is additive and requires no sorting. Threshold
+`t=0` is the ordinary three-child counting bound; the positive thresholds retain the shape
+information that counting loses.
+
+### Worked residual: `Sb(16:1,12:2)` in four tests
+
+The static profile is `(16,12,12)`. It passes `R_0` because its nontrivial prefix sums
+`16,28,40` are bounded by the first three prefix sums `16,31,42` of `G_4`.
+
+For `R_1`, choose the synchronized split `[8:0,7:2]`. Its children are
+
+    outcome 2: Sb(7:2)
+    outcome 0: Sb(8:1)
+    outcome 1: Sb(8:1,5:2).
+
+Their full-star profiles `(7,7)`, `(8)`, and `(8,5,5)` all lie below `G_3`, so this witnesses
+`R_1`. Each child in turn has an `R_1` continuation, so the same first split also witnesses `R_2`.
+But `R_3` fails: three synchronized layers are already enough to expose the obstruction, one level
+before the exact `R_4` test. Reproduce all five verdicts with
+
+```
+tools/bundled_majorization.py ladder 4 16 1 12 2
+```
+
+### Why there is no single width-two base sequence
+
+Even if every part has width two, solvability is not downward closed under ordinary weak
+majorization. The independent reference solver gives
+
+```
+tools/refsolve.py solve 4 12 2 10 2 9 2 3 2   # solvable
+tools/refsolve.py solve 4 11 2 11 2 9 2 3 2   # unsolvable
+```
+
+Yet the unsolvable state's full-star profile
+
+    (11,11,11,11,9,9,3,3)
+
+is weakly majorized by the solvable state's profile
+
+    (12,12,10,10,9,9,3,3):
+
+their prefix sums are respectively `(11,22,33,44,53,62,65,68)` and
+`(12,24,34,44,53,62,65,68)`. Therefore the exact width-two solvable set is not a majorization ideal.
+No criterion obtained by replacing `G_k` with one fixed width-two base sequence can be exact; the
+discrete synchronization choices, retained by the hierarchy, are essential.
