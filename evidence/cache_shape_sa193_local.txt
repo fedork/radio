@@ -77,3 +77,34 @@ total               932.7 MiB             75.9 MiB
 # three maximal antichains above this is 4.334 + 2.132 + 0.355 = 6.821 MiB.  This is only a candidate
 # filter; distinct-part injection still has to be checked exactly.  It is a design size, not a
 # measured solver implementation or throughput result.
+
+last-segment Pareto folding, after zero-update rollback
+                 old arrays   old slots      branch arrays  branch slots   dense32 inline
+k=5              10,263,173   161,697,931       2,120,810    48,855,353       193.5 MiB
+k=6               2,455,766   237,104,109          40,991    10,238,017        55.9 MiB
+k=7                 100,973   113,497,327           7,815    11,057,898        42.4 MiB
+total             12,819,912   512,299,367       2,169,616    70,151,268       291.7 MiB
+
+front census      front nodes  positive points  negative points  max positive  max negative
+k=5               10,098,692        9,446,818        1,744,954          11             9
+k=6                2,452,521        5,343,747          382,651          15            15
+k=7                   93,877            5,102          120,364          18            19
+total             12,645,090       14,795,667        2,247,969
+
+# Method: inspect every current child transition.  An exact CAN child becomes a point in the
+# parent's maximal positive last-part front; an exact CANT child becomes a point in its minimal
+# negative front.  Retain the child transition only if it has information about a still-longer
+# suffix.  This is an exact semantic folding of the fully materialised trie, not a sample.  Its old
+# array/slot counts reproduce the rollback replay above exactly.
+#
+# The inline uint32 model uses the two non-part positions 0 and 1 in every retained branch array as
+# front descriptors.  A front-only node with at most one point of each sign fits in its tagged
+# 32-bit parent handle because an sbb id needs 14 bits; a branch node stores a singleton point inline
+# in its sign's descriptor.  Only larger fronts use packed uint16 lists.  Those lists total 25.3 MiB.
+# A deliberately pessimistic model giving every front a separate aligned record is 461.7 MiB; the
+# corresponding tagged dense-uint64 model is 559.3 MiB.  All exclude allocator/growth slack and have
+# not been implemented or timed in the solver.
+#
+# Fronts are small: 17,043,636 points / 12,645,090 nodes = 1.348 points per front node; 10,081,569
+# nodes (79.7%) have exactly one point, only 8,377 nodes contain both signs, and no sign has more
+# than 19 points in this checkpoint.

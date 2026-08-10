@@ -205,19 +205,22 @@ Checkpoint replay now explains the footprint.  The k=5..7 cache roots reserve **
 90.7 million live transitions; the 232,725 exact facts occupy only 8.0 MiB in parsed form.  Two
 different multipliers are involved: eager dominance-closure materialisation (especially positive
 k=5/6 facts) and sparse dense arrays (especially negative k=7).  The first implementation target is
-not a hash table or eviction: roll back `cacheCantSolve` arrays whose recursive insertion adds
-nothing, then use dense uint32 arena offsets per k.  The rollback alone models the heavy roots at
-3.82 GiB; rollback plus uint32 dense slots at 1.91 GiB, without changing the indexed lookup.  See
+not a hash table or eviction: land the validated rollback for `cacheCantSolve` arrays whose recursive
+insertion adds nothing, then prototype the last-segment front described below against the pointer
+trie before combining it with dense uint32 arena offsets per k.  The rollback alone models the heavy
+roots at 3.82 GiB; rollback plus uint32 dense slots, before folding, at 1.91 GiB.  See
 [`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt) for the exact
 counts and the separately labelled adaptive-layout estimates.
 
-There is now a concrete closure-minimising follow-up rather than only the word "antichain".  The
-positive k=5..7 facts reduce to 6,079 maximal witnesses, for which a per-part inverted bitmap
-candidate index is only 6.82 MiB; exact distinct-part matching filters its survivors, and a bounded
-exact L1 materialises only dominance answers that are actually queried.  The first experiment should
-be asymmetric: replace positive closure this way while retaining the fast negative upward-closure
-trie.  Negative-only rollback plus dense uint32 slots is 932.7 MiB (75.9 MiB in the unbenchmarked
-adaptive exact-cap model).  This design is not deployed and has no throughput result yet.
+The best closure-minimising design is now local rather than a global antichain oracle: store maximal
+positive and minimal negative Pareto fronts for the last part at every exact trie prefix.  A semantic
+fold of the replay shrinks the rollback trie from 512.30 million to 70.15 million dense slots; tagged
+uint32 branch handles plus packed non-singleton fronts model the heavy roots at **291.7 MiB**.  The
+12.65 million fronts average only 1.348 points and no sign exceeds 19, while single-part states get
+full dominance and negative prefix refutation is preserved.  This supersedes the 6.82 MiB global
+positive-bitmap index as the first prototype; that remains a fallback if one folded dimension is
+insufficient.  Neither design is deployed or has a solver-throughput result yet.  Exact counts and
+layout assumptions are in [`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt).
 
 Historical lesson, retained without treating the old processes as live: before full-star
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star

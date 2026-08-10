@@ -4239,14 +4239,11 @@ sparse otherwise) models at 1.05 GiB with 64-bit children or 0.58 GiB with uint3
 last figures exclude growth slack and are design estimates, not benchmark results; the previous
 all-sparse 64-bit prototype really achieved 3.4x at 40,000 inserts but cost 12.4% throughput.
 
-Implementation order implied by the evidence:
-
-1. land zero-update rollback;
-2. replace pointer slots with per-k uint32 arena offsets, retaining dense indexing;
-3. rerun the local checkpoint/control before adding lookup complexity;
-4. only if necessary, add an adaptive sparse container for low-occupancy wide nodes;
-5. treat lazy positive closure as the larger but higher-risk final step, behind a bounded exact
-   L1 cache and an antichain/dominance L2.
+Implementation order originally implied by this evidence was rollback, then per-k uint32 arenas,
+then an adaptive container and only finally lazy closure.  The last-segment folding measured below
+supersedes that order: land rollback, validate the folding semantics against the pointer trie, then
+combine its tagged front/branch representation with uint32 arena offsets.  Adaptive nodes and the
+global antichain oracle are fallbacks only if that measured combination is insufficient.
 
 The complete replay counts and layout formulas are retained in
 `evidence/cache_shape_sa193_local.txt`.
@@ -4293,3 +4290,51 @@ positive oracle against the same checkpoint and collect: L1 stable-hit and gener
 bitmap words touched, surviving exact candidates, and wall time on the `Sa(192)` control plus the
 first bounded `Sa(193)` phase.  Compare every answer against the existing closure trie; a hash is
 never trusted without full state equality.
+
+**Superseded as the first prototype by the last-segment folding below.**  The global positive
+bitmap remains a fallback if folding one dimension is not enough, but the local construction keeps
+more of the present lookup and models substantially smaller on this checkpoint.
+
+## 2026-08-10 — Pareto fronts in the last trie segment remove most closure cheaply
+
+The better compromise came from the user: keep the prefix trie, but do not materialise dominance in
+its final part.  At every exact prefix store two 2-D staircases over the possible next rectangle:
+the maximal positive parts and the minimal negative parts.  A negative-front hit refutes a query
+even when more parts follow; a positive-front hit proves it only when that part ends the query.
+This retains precisely the prefix behaviour that made the earlier subset filters redundant.
+
+Insertion stops closure recursion one segment early.  `cacheCanSolve` must also put its current part
+on the positive front at every prefix, not only at the terminal call: deleting all remaining parts
+proves that shorter prefix state.  `cacheCantSolve` adds only at its terminal part.  Within a front,
+positive insertion removes componentwise-smaller points and negative insertion removes larger ones.
+Sorted by the large side, each staircase has monotone small sides, so lookup can be a tiny linear
+scan or one binary search.  No multi-part injection algorithm is involved—the existing closure has
+already handled all earlier parts.
+
+A read-only fold of the rollback replay gives the exact shape this representation would have on the
+232,725-line checkpoint.  It replaces 12.82 million branch arrays / 512.30 million dense slots with
+2.17 million branch arrays / **70.15 million slots**.  The fronts contain 17.04 million points at
+12.65 million prefixes, only **1.348 points per prefix on average**; 79.7% are singletons, only 8,377
+prefixes contain both signs, and the largest front of either sign has 19 points.
+
+With uint32 branch handles and singleton fronts encoded directly in the handle or in the branch
+array's otherwise-unused positions 0 and 1, the heavy k=5..7 roots model at:
+
+| | k=5 | k=6 | k=7 | total |
+|---|---:|---:|---:|---:|
+| current rollback + dense uint32 | 616.8 MiB | 904.5 MiB | 433.0 MiB | 1,954.3 MiB |
+| last-part fronts + dense uint32 | 193.5 MiB | 55.9 MiB | 42.4 MiB | **291.7 MiB** |
+
+The packed non-singleton lists contribute only 25.3 MiB in that model.  Even a deliberately
+pessimistic separate record for every front is 461.7 MiB, and keeping 64-bit branch slots while
+tagging singleton fronts is 559.3 MiB.  These are semantic replay/layout models, not allocator or
+throughput measurements, but they are much stronger than the global positive-antichain proposal:
+both signs keep prefix closure, single-part queries receive full dominance, and average lookup
+overhead is roughly one or two point comparisons per visited prefix.
+
+This now becomes the first cache prototype after the already-validated zero-update rollback.  Use a
+tagged front-only node plus a branch node whose slots 0/1 hold positive/negative front descriptors;
+larger fronts come from small packed slabs.  Negative insertion should free any dominated child
+branches because the new front makes them unreachable.  Validate against the old trie on exact and
+mutated checkpoint queries, all 1,039 deterministic regression cases and ASan+UBSan before measuring
+the `Sa(192)` control and a bounded local `Sa(193)` phase.
