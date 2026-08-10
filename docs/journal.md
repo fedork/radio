@@ -4250,3 +4250,46 @@ Implementation order implied by the evidence:
 
 The complete replay counts and layout formulas are retained in
 `evidence/cache_shape_sa193_local.txt`.
+
+## 2026-08-10 — a lazy positive dominance oracle is small enough to be credible
+
+The closure measurement suggested an antichain L2 but did not yet supply a plausible hot lookup.
+The asymmetry of this checkpoint does.  After Unit-Group Elimination and exact deduplication, the
+13,762 positive k=5..7 facts reduce to **6,079 maximal witnesses**: 3,903 at k=5, 1,901 at k=6 and
+275 at k=7.  The negative side is much larger (135,374 minimal witnesses), while its retained
+upward closure is the part that makes warm prefix refutation cheap.  The first closure-removal
+experiment should therefore be asymmetric rather than a universal antichain rewrite.
+
+For each k, give every maximal positive witness one bit and build `H[x]`, the bitmap of witnesses
+having at least one part componentwise greater than or equal to part `x`.  A query `Q` can only be
+dominated by a positive witness in
+
+    length_at_least[|Q|] AND H[q0] AND H[q1] AND ... .
+
+This is a necessary candidate filter, not the dominance theorem itself: different query parts may
+compete for the same witness part.  For example `P=(3:2,2:1,2:1)` passes the individual and sorted
+rank tests for `Q=(3:1,2:2,2:1)`, but both `3:1` and `2:2` need the sole `3:2` part, so no injection
+exists.  Each surviving candidate is therefore checked exactly.  That exact check need not
+backtrack: process query parts by decreasing large side, expose witness parts with sufficient large
+side, and take the smallest sufficient small side.  The usual exchange argument makes this greedy
+matching exact.
+
+At `MAX_N=193`, all three positive bitmap tables over the maximal antichains model at only
+**6.82 MiB**.  The proposed hot path is a bounded direct-mapped or two-way L1 over the actual queried
+4--8-part states.  A positive dominance hit is permanent and is memoised exactly; a `MAYBE` is valid
+only for the current positive-insertion generation.  This is demand-driven determinisation: the
+first occurrence pays the bitmap/matching cost, while repeated warm prefix states recover a direct
+lookup without materialising unqueried closure members.
+
+Keep the negative closure for the first experiment.  After rollback it models at 932.7 MiB with
+dense uint32 slots, preserving one-indexed-load lookup, or 75.9 MiB with the separately modelled
+adaptive uint32 layout.  Thus removing positive closure first attacks the measured 90.9-million-
+transition explosion without simultaneously risking the negative prefix mechanism that subsumed
+the earlier pair/triple filters.  A fully antichain-based negative oracle remains possible, but it
+is not required to make the result cache small.
+
+This is a design, not a speed result.  Before replacing production `cacheCanSolve`, prototype the
+positive oracle against the same checkpoint and collect: L1 stable-hit and generation-hit rates,
+bitmap words touched, surviving exact candidates, and wall time on the `Sa(192)` control plus the
+first bounded `Sa(193)` phase.  Compare every answer against the existing closure trie; a hash is
+never trusted without full state equality.

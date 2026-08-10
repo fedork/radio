@@ -48,3 +48,32 @@ positive k=5: 8,111 facts -> 43,748,097 used slots, 800,843,936 requested bytes
 positive k=6: 4,808 facts -> 47,135,021 used slots, 1,357,395,936 requested bytes
 negative k=7: 5,649 facts -> 1,628,534 used slots, 2,385,851,136 requested bytes
 negative k=7 after rollback: 1,348,633 used slots, 903,662,000 requested bytes
+
+canonical antichain census after Unit-Group Elimination and exact deduplication
+                 exact unique  extremal  redundant
+positive k=5        8,110        3,903      51.9%   (maximal antichain)
+positive k=6        4,807        1,901      60.5%   (maximal antichain)
+positive k=7          845          275      67.5%   (maximal antichain)
+negative k=5       99,871       68,733      31.2%   (minimal antichain)
+negative k=6       93,317       65,152      30.2%   (minimal antichain)
+negative k=7        5,621        1,489      73.5%   (minimal antichain)
+
+# For each fact, extremality was tested against every signature-compatible fact at the same k;
+# the final test was an exact injection of parts under componentwise (n,m) dominance.  The negative
+# pass used radio_verify.c's independent dominates() implementation.  The positive pass used the
+# reversed query (is this positive fact dominated by another positive fact?) with the same exact
+# injection test.  The one-count differences from the raw sign table above are duplicate or
+# Unit-Group-equivalent checkpoint lines.
+
+negative closure alone, after zero-update rollback
+                 dense uint32  adaptive uint32 exact-cap model
+negative k=5       239.1 MiB             53.1 MiB
+negative k=6       262.7 MiB             14.2 MiB
+negative k=7       430.9 MiB              8.6 MiB
+total               932.7 MiB             75.9 MiB
+
+# A positive-witness bitmap H[x] with one bit per maximal positive fact, where H[x] marks facts
+# containing some part componentwise >= x, needs 9,313 * ceil(facts/64) * 8 bytes per k.  For the
+# three maximal antichains above this is 4.334 + 2.132 + 0.355 = 6.821 MiB.  This is only a candidate
+# filter; distinct-part injection still has to be checked exactly.  It is a design size, not a
+# measured solver implementation or throughput result.

@@ -211,6 +211,14 @@ nothing, then use dense uint32 arena offsets per k.  The rollback alone models t
 [`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt) for the exact
 counts and the separately labelled adaptive-layout estimates.
 
+There is now a concrete closure-minimising follow-up rather than only the word "antichain".  The
+positive k=5..7 facts reduce to 6,079 maximal witnesses, for which a per-part inverted bitmap
+candidate index is only 6.82 MiB; exact distinct-part matching filters its survivors, and a bounded
+exact L1 materialises only dominance answers that are actually queried.  The first experiment should
+be asymmetric: replace positive closure this way while retaining the fast negative upward-closure
+trie.  Negative-only rollback plus dense uint32 slots is 932.7 MiB (75.9 MiB in the unbenchmarked
+adaptive exact-cap model).  This design is not deployed and has no throughput result yet.
+
 Historical lesson, retained without treating the old processes as live: before full-star
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
 majorization removes that mode strongly enough that `run3` is instead dominated by k=7.  Optimising
