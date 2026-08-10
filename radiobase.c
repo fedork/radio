@@ -62,12 +62,20 @@ typedef struct {
     int *ind[INDEX_COUNT];
     /* cle[j][x] = how many of this part's options have key j <= x, where the keys are the three
        children's pair counts: j=0 is k0 (the key BY_SP2 is sorted by), j=1 is k1 (BY_SP1), j=2 is
-       k2 (BY_SP0). Static per part, so built once per sbb and shared by every state using it.
+       k2 (BY_SP0). Static per level and part, so built once per (k,sbb) and shared by every
+       state using that key.
        It answers "how far will the level run before the counting bound retires it?" in one load,
        which is what lets the ordering be chosen by measurement instead of by a gap heuristic. */
     int *cle[3];
     int clen;
 } splits;
+
+/* Split admissibility depends on the number of tests left, so tables are keyed by both
+   parent level and sbb.  The top-level array contains only one pointer per possible sbb;
+   the MAX_K+1 pointer fanout is allocated only after that sbb is actually encountered. */
+typedef struct {
+    splits *at[MAX_K + 1];
+} split_levels;
 
 // The three _DESC orderings were materialised by indexDesc as exact reversals of their
 // bases: ind[DESC][e] == ind[BASE][size-1-e]. Storing them cost 12 bytes per split for no
@@ -105,7 +113,7 @@ static const signed char ORDER_MONO_P[INDEX_COUNT] = {
     int _o = splitincr[lvl];                                                         \
     int _rev = ORDER_REVERSED[_o];                                                   \
     ordp[lvl] = splitsarr[lvl]->ind[ORDER_BASE[_o]] +                                \
-                (_rev ? splitsarr[lvl]->size - 1 : 0);                               \
+                (_rev && splitsarr[lvl]->size > 0 ? splitsarr[lvl]->size - 1 : 0);    \
     ords[lvl] = _rev ? -1 : 1;                                                       \
     ordmono[lvl] = ORDER_MONO_P[_o];                                                 \
 } while (0)
@@ -124,7 +132,7 @@ int max_sbb_for_pairs[MAX_PROD+1];
 int singleton_base_len[MAX_K+1];
 int singleton_base_prefix[MAX_K+1][1 << MAX_K];
 
-splits *sbb_splits;
+split_levels **sbb_splits;
 
 #ifdef MEASURE_FAST_REPLAY
 int fast_replay_capture, fast_replay_pass, fast_replay_fast;
@@ -133,7 +141,8 @@ unsigned long long fast_replay_first_splits, fast_replay_first_ok[32];
 int fast_replay_first_depth;
 #endif
 
-void ensure_splits(int sbb);
+splits *ensure_splits(int sbb, int k);
+splits *prepare_splits(int sbb, int k, int need_fast);
 int minK(int);
 void init_singleton_majorization(void);
 int singleton_majorization_can_solve(int *sb, int size, int k);
@@ -775,39 +784,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     
     int sb0p[size],sb2p[size],sb1p[size];
     
-    for(i=0;i<size;i++){
-        ensure_splits(tmp[i]);
-        splitsarr[i] = &sbb_splits[tmp[i]];
-        if (size>1 && splitsarr[i]->splitsl[0][FAST]<0) {
-            int sbb = tmp[i];
-            debug_printf("initializing FAST for %s\n", sbb_to_str[sbb]);
-            int n1=sbb_to_n1[sbb];
-            int n2=sbb_to_n2[sbb];
-            splits* sp = splitsarr[i];
-            int c;
-            for (c=0; c < sp->size; c++) {
-                int m1 = sp->splitsl[c][6];
-                int m2 = sp->splitsl[c][7];
-                int fast = FALSE;
-                if (n1==n2) {
-                    // special case for square groups (n1==n2)
-                    if (m2 == m1-1) fast = TRUE;
-                } else {
-                    int sbb1 = get_max_sbb(m1, n2-m2, n1-m1, m2);
-                    if ((m2==0 || compare_solvability(sbb1, get_max_sbb(m1, n2-m2+1, n1-m1, m2-1)) <= 0) &&
-                        (m2==n2 || compare_solvability(sbb1, get_max_sbb(m1, n2-m2-1, n1-m1, m2+1)) <= 0)) {
-                        fast = TRUE;
-                    }
-                }
-                sp->splitsl[c][FAST] = fast;
-#ifdef DEBUG1
-                if (fast) {
-                    printf("FAST for %s -> [%d:%d]\n", sbb_to_str[sbb], m1, m2);
-                }
-#endif
-            }
-        }
-    }
+    memset(splitsarr, 0, sizeof(splitsarr));
+    /* Search is depth first.  Building every suffix table here made a large-k state pay for
+       many parts it never reached.  Materialise the first table now and each suffix only when
+       the prefix survives far enough to enter it. */
+    splitsarr[0] = prepare_splits(tmp[0], k, size > 1);
     //full search
     clock_t start = clock();
     clock_t progress = start + PROGRESS_INTERVAL;
@@ -1061,6 +1042,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                        race. The fragility is real but has not been observed to fire. */
                     if (!rb_here && !rb_on && totalsplits >= RB_TRIGGER
                         && size >= 4 && power3[k_1] < RB_MAXCAP) {
+                        int ri;
+                        /* Reachability needs every suffix at once.  This is deliberately the
+                           only bulk materialisation path; it runs only after the state has paid
+                           enough search cost to arm the accelerator. */
+                        for (ri = 0; ri < size; ri++) {
+                            if (splitsarr[ri] == NULL)
+                                splitsarr[ri] = ensure_splits(tmp[ri], k);
+                        }
                         rb_on = rb_here = 1;
                         rb_build(splitsarr, tmp, size, power3[k_1]);
                     }
@@ -1148,6 +1137,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             }
                         } else {
                             i++;
+                            /* `rb_build` may already have materialised this table, but FAST is
+                               intentionally prepared only when ordinary search reaches it. */
+                            splitsarr[i] = prepare_splits(tmp[i], k, size > 1);
                             if (i>max_solvable_maybe) {
                                 max_solvable_maybe = i;
                                 debug_printf("max_solvable_maybe=%d\n", max_solvable_maybe);
@@ -1414,6 +1406,7 @@ void indexSpl(int sbb, splits* s, int indexindex, int (*f)(int, int[])) {
     srt *splitsort;
     int e;
     int c = s->size;
+    if (c == 0) return;
     splitsort = (srt *)malloc(c * sizeof(srt));
     if (splitsort == NULL) {
         printf("\nout of memory - can't allocate split sort buffer for sbb=%d\n", sbb);
@@ -1528,77 +1521,238 @@ int magic3(int sbb, int spl[]) {
     return distance(spl, magicm1, magicm2, n1, n2);
 }
 
-void ensure_splits(int sbb) {
-    if (sbb <= 0) return;
-    splits *s = &sbb_splits[sbb];
-    if (s->size >= 0) return;
+/* Unconditional counters make memory experiments possible without changing table layout.
+   They are not printed during normal runs; small probe drivers can inspect them directly. */
+unsigned long long split_level_fanouts;
+unsigned long long split_level_fanout_bytes;
+unsigned long long split_tables_built[MAX_K + 1];
+unsigned long long split_table_candidates[MAX_K + 1];
+unsigned long long split_table_options[MAX_K + 1];
+unsigned long long split_table_bytes[MAX_K + 1];
 
+#ifdef SPLIT_STATS
+static void report_split_stats(void) {
+    unsigned long long table_total = 0;
+    int k;
+    fprintf(stderr, "SPLIT_STATS index_bytes=%zu fanouts=%llu fanout_bytes=%llu\n",
+            (size_t)(MAX_SBB + 1) * sizeof(*sbb_splits),
+            split_level_fanouts, split_level_fanout_bytes);
+    for (k = 1; k <= MAX_K; k++) {
+        if (split_tables_built[k] == 0) continue;
+        fprintf(stderr,
+                "SPLIT_STATS k=%d tables=%llu candidates=%llu options=%llu bytes=%llu\n",
+                k, split_tables_built[k], split_table_candidates[k],
+                split_table_options[k], split_table_bytes[k]);
+        table_total += split_table_bytes[k];
+    }
+    fprintf(stderr, "SPLIT_STATS table_bytes=%llu total_bytes=%llu\n",
+            table_total,
+            table_total + split_level_fanout_bytes
+                + (unsigned long long)(MAX_SBB + 1) * sizeof(*sbb_splits));
+}
+#endif
+
+static void fill_split(int sbb, int m1, int m2, int out[SPLIT_FIELD_COUNT]) {
     int n1 = sbb_to_n1[sbb];
     int n2 = sbb_to_n2[sbb];
-    int cmax = (n1 + 1) * (n2 + 1);
-    int c = 0;
-    int m1, m2;
-    int ii;
+    int sbb1;
+    int sbb2;
+    int maxpairs;
+    int kk = 0;
 
-    s->splitsl = (int (*)[SPLIT_FIELD_COUNT])malloc(cmax * sizeof(*s->splitsl));
-    if (s->splitsl == NULL) {
-        printf("\nout of memory - can't allocate splitsl for sbb=%d\n", sbb);
+    out[0] = getSbb(m1, m2);
+    sbb1 = getSbb(n1 - m1, m2);
+    sbb2 = getSbb(m1, n2 - m2);
+    out[1] = max(sbb1, sbb2);
+    out[2] = min(sbb1, sbb2);
+    out[3] = getSbb(n1 - m1, n2 - m2);
+    maxpairs = max(sb_pairs[out[0]],
+                   max(sb_pairs[out[3]], sb_pairs[out[1]] + sb_pairs[out[2]]));
+    while (kk < MAX_K && power3[kk] <= maxpairs) kk++;
+    out[4] = out[5] = kk - 1;
+    out[6] = m1;
+    out[7] = m2;
+    out[FAST] = -1;
+}
+
+/* This mirrors canSolveB's two theorem-level prechecks, including Unit Group Elimination.
+   No cache fact or heuristic estimate is allowed here: a false rejection would make the
+   supposedly exhaustive pass incomplete. */
+static int split_child_admissible(const int *sb, int size, int k) {
+    int nonunit[2];
+    int nonunit_size = 0;
+    int pairs_full = 0;
+    int i;
+
+    for (i = 0; i < size; i++) {
+        pairs_full += sb_pairs[sb[i]];
+        if (sb[i] > 1) nonunit[nonunit_size++] = sb[i];
+    }
+    if (pairs_full > power3[k]) return FALSE;
+    if (nonunit_size == 0) return TRUE;
+    return star_expansion_majorization_can_solve(nonunit, nonunit_size, k);
+}
+
+static int split_admissible(const int sp[SPLIT_FIELD_COUNT], int child_k) {
+    int middle[2] = { sp[1], sp[2] };
+    return split_child_admissible(sp, 1, child_k)
+        && split_child_admissible(middle, 2, child_k)
+        && split_child_admissible(sp + 3, 1, child_k);
+}
+
+splits *ensure_splits(int sbb, int k) {
+    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3 };
+    const int live_count = (int)(sizeof(live_orderings) / sizeof(live_orderings[0]));
+    split_levels *levels;
+    splits *s;
+    int n1;
+    int n2;
+    int candidate[SPLIT_FIELD_COUNT];
+    int candidates = 0;
+    int c = 0;
+    int m1;
+    int m2;
+    int ii;
+    int M;
+    size_t table_ints;
+    size_t index_ints;
+    size_t cle_ints;
+    size_t total_ints;
+    size_t bytes;
+    int *storage;
+
+    if (sbb <= 0 || sbb > MAX_SBB || k <= 0 || k > MAX_K) {
+        printf("\ninvalid split table key sbb=%d k=%d\n", sbb, k);
         exit(1);
     }
-    // Only seven of the ten orderings are ever selected by `splitincr`; BY_MAX, BY_MAGIC and
-    // BY_MAGIC2 survive solely in the commented-out experiments above the split loop. They
-    // were still being built and indexed for every sbb. Skipping them drops 3 of 10 index
-    // arrays - measured 2026-08-03 at MAX_N=193: split tables 570.2 MB -> 480.9 MB, with
-    // throughput unchanged. Re-admit one here if you re-enable it above.
-    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3 };
-    for (ii = 0; ii < INDEX_COUNT; ii++) s->ind[ii] = NULL;
-    for (ii = 0; ii < (int)(sizeof(live_orderings)/sizeof(live_orderings[0])); ii++) {
-        int which = live_orderings[ii];
-        s->ind[which] = (int *)malloc(cmax * sizeof(int));
-        if (s->ind[which] == NULL) {
-            printf("\nout of memory - can't allocate index %d for sbb=%d\n", which, sbb);
+    levels = sbb_splits[sbb];
+    if (levels == NULL) {
+        levels = (split_levels *)calloc(1, sizeof(*levels));
+        if (levels == NULL) {
+            printf("\nout of memory - can't allocate split levels for sbb=%d\n", sbb);
             exit(1);
         }
+        sbb_splits[sbb] = levels;
+        split_level_fanouts++;
+        split_level_fanout_bytes += sizeof(*levels);
     }
+    if (levels->at[k] != NULL) return levels->at[k];
 
-    for (m1=0; m1<=n1; m1++) {
-        for (m2=(n2==n1?m1:n2); m2>=0; m2--) {
-            s->splitsl[c][0]=getSbb(m1, m2);
-            int sbb1 = getSbb(n1-m1, m2);
-            int sbb2 = getSbb(m1, n2-m2);
-            s->splitsl[c][1]=max(sbb1, sbb2);
-            s->splitsl[c][2]=min(sbb1, sbb2);
-            s->splitsl[c][3]=getSbb(n1-m1, n2-m2);
-            int maxpairs = max(sb_pairs[s->splitsl[c][0]],max(sb_pairs[s->splitsl[c][3]], sb_pairs[s->splitsl[c][1]] + sb_pairs[s->splitsl[c][2]]));
-
-            int k=0;
-            while (k < MAX_K && power3[k]<=maxpairs) k++;
-            s->splitsl[c][4] = s->splitsl[c][5] = k-1;
-            s->splitsl[c][FAST] = -1; // init on demand, in canSolveB
-            s->splitsl[c][6] = m1;
-            s->splitsl[c][7] = m2;
-            c++;
+    n1 = sbb_to_n1[sbb];
+    n2 = sbb_to_n2[sbb];
+    for (m1 = 0; m1 <= n1; m1++) {
+        for (m2 = (n2 == n1 ? m1 : n2); m2 >= 0; m2--) {
+            fill_split(sbb, m1, m2, candidate);
+            candidates++;
+            if (split_admissible(candidate, k - 1)) c++;
         }
     }
+
+    M = sb_pairs[sbb];
+    table_ints = (size_t)c * SPLIT_FIELD_COUNT;
+    index_ints = (size_t)c * live_count;
+    cle_ints = (size_t)3 * (M + 2);
+    total_ints = table_ints + index_ints + cle_ints;
+    if (total_ints > ((size_t)-1 - sizeof(*s)) / sizeof(int)) {
+        printf("\nsplit table size overflow for sbb=%d k=%d\n", sbb, k);
+        exit(1);
+    }
+    bytes = sizeof(*s) + total_ints * sizeof(int);
+    s = (splits *)calloc(1, bytes);
+    if (s == NULL) {
+        printf("\nout of memory - can't allocate split table for sbb=%d k=%d (%zu bytes)\n",
+               sbb, k, bytes);
+        exit(1);
+    }
+
     s->size = c;
+    s->clen = M;
+    storage = (int *)(s + 1);
+    s->splitsl = (int (*)[SPLIT_FIELD_COUNT])storage;
+    storage += table_ints;
+    for (ii = 0; ii < live_count; ii++) {
+        s->ind[live_orderings[ii]] = storage;
+        storage += c;
+    }
+    for (ii = 0; ii < 3; ii++) {
+        s->cle[ii] = storage;
+        storage += M + 2;
+    }
+
+    c = 0;
+    for (m1 = 0; m1 <= n1; m1++) {
+        for (m2 = (n2 == n1 ? m1 : n2); m2 >= 0; m2--) {
+            fill_split(sbb, m1, m2, candidate);
+            if (split_admissible(candidate, k - 1)) {
+                memcpy(s->splitsl[c++], candidate, sizeof(candidate));
+            }
+        }
+    }
+    if (c != s->size || storage != (int *)(s + 1) + total_ints) {
+        printf("\ninternal split table size mismatch for sbb=%d k=%d\n", sbb, k);
+        exit(1);
+    }
+
     {   /* cle: histogram of each key, then prefix-summed */
-        int M = sb_pairs[sbb], j, x;
-        s->clen = M;
-        for (j = 0; j < 3; j++) s->cle[j] = (int *)calloc((size_t)M + 2, sizeof(int));
+        int j;
+        int x;
         for (x = 0; x < c; x++) {
             int *sp = s->splitsl[x];
-            int kk[3];
-            kk[0] = sb_pairs[sp[0]];
-            kk[1] = sb_pairs[sp[1]] + sb_pairs[sp[2]];
-            kk[2] = sb_pairs[sp[3]];
-            for (j = 0; j < 3; j++) if (kk[j] >= 0 && kk[j] <= M) s->cle[j][kk[j]]++;
+            int key[3];
+            key[0] = sb_pairs[sp[0]];
+            key[1] = sb_pairs[sp[1]] + sb_pairs[sp[2]];
+            key[2] = sb_pairs[sp[3]];
+            for (j = 0; j < 3; j++) {
+                if (key[j] >= 0 && key[j] <= M) s->cle[j][key[j]]++;
+            }
         }
-        for (j = 0; j < 3; j++) for (x = 1; x <= M; x++) s->cle[j][x] += s->cle[j][x-1];
+        for (j = 0; j < 3; j++) {
+            for (x = 1; x <= M; x++) s->cle[j][x] += s->cle[j][x - 1];
+        }
     }
     indexSpl(sbb, s, BY_SP0, pairs0);
     indexSpl(sbb, s, BY_SP1, pairs1);
     indexSpl(sbb, s, BY_SP2, pairs2);
     indexSpl(sbb, s, BY_MAGIC3, magic3);
+
+    levels->at[k] = s;
+    split_tables_built[k]++;
+    split_table_candidates[k] += candidates;
+    split_table_options[k] += s->size;
+    split_table_bytes[k] += bytes;
+    return s;
+}
+
+splits *prepare_splits(int sbb, int k, int need_fast) {
+    splits *sp = ensure_splits(sbb, k);
+    if (need_fast && sp->size > 0 && sp->splitsl[0][FAST] < 0) {
+        int n1 = sbb_to_n1[sbb];
+        int n2 = sbb_to_n2[sbb];
+        int c;
+        debug_printf("initializing FAST for %s in k=%d\n", sbb_to_str[sbb], k);
+        for (c = 0; c < sp->size; c++) {
+            int m1 = sp->splitsl[c][6];
+            int m2 = sp->splitsl[c][7];
+            int fast = FALSE;
+            if (n1 == n2) {
+                /* Special case for square groups (n1==n2). */
+                if (m2 == m1 - 1) fast = TRUE;
+            } else {
+                int sbb1 = get_max_sbb(m1, n2 - m2, n1 - m1, m2);
+                if ((m2 == 0 || compare_solvability(
+                         sbb1, get_max_sbb(m1, n2 - m2 + 1, n1 - m1, m2 - 1)) <= 0)
+                    && (m2 == n2 || compare_solvability(
+                         sbb1, get_max_sbb(m1, n2 - m2 - 1, n1 - m1, m2 + 1)) <= 0)) {
+                    fast = TRUE;
+                }
+            }
+            sp->splitsl[c][FAST] = fast;
+#ifdef DEBUG1
+            if (fast) printf("FAST for %s -> [%d:%d]\n", sbb_to_str[sbb], m1, m2);
+#endif
+        }
+    }
+    return sp;
 }
 
 int canSolveAll4(int n1, int n2, int m1, int m2, int k) {
@@ -1949,26 +2103,20 @@ void init(){
         // terminator
         sbb_greater[i][k++]=MAX_SBB + 1;
     }
-    printf("initializing splits metadata\n");
+    printf("initializing split table index\n");
     {
-        long splits_count = MAX_SBB + 1;
-        long splits_size = splits_count * sizeof(splits);
-        printf("splits_size = %ld (lazy mode)\n", splits_size);
-        sbb_splits = (splits *)malloc(splits_size);
+        size_t splits_count = MAX_SBB + 1;
+        size_t splits_size = splits_count * sizeof(*sbb_splits);
+        printf("split_index_size = %zu (level-lazy mode)\n", splits_size);
+        sbb_splits = (split_levels **)calloc(splits_count, sizeof(*sbb_splits));
         if (sbb_splits == NULL){
-            printf("\nout of memory - can't allocate sbb_splits metadata\n");
+            printf("\nout of memory - can't allocate split table index\n");
             exit(1);
         }
-        for (i = 0; i <= MAX_SBB; i++) {
-            int ii;
-            sbb_splits[i].size = -1;
-            sbb_splits[i].splitsl = NULL;
-            for (ii = 0; ii < INDEX_COUNT; ii++) {
-                sbb_splits[i].ind[ii] = NULL;
-            }
-        }
-        sbb_splits[0].size = 0;
     }
+#ifdef SPLIT_STATS
+    atexit(report_split_stats);
+#endif
     printf("\ninit done\n");
     fflush(stdout);
 }

@@ -180,7 +180,7 @@ int main(int argc, char **argv){
             int sb0p[size],sb2p[size],sb1p[size];
             
             for(i=0;i<size;i++){
-                splitsarr[i] = &sbb_splits[tmp[i]];
+                splitsarr[i] = prepare_splits(tmp[i], k, size > 1);
                 if (size>1) {
                     for (spi = 0; spi<splitsarr[i]->size; spi++) {
                         int *s = splitsarr[i]->splitsl[spi];
@@ -211,15 +211,21 @@ int main(int argc, char **argv){
             int n1 = sbb_to_n1[tmp[0]];
             int n2 = sbb_to_n2[tmp[0]];
             if (n1 != n2) { // leave it alone for square
-                int m1 = n1/2;
-                int m2 = (n1 % 2 == 0)? (n2+1)/2 : 0;
-                
-//                printf("skiptop for ");
-//                printSb(tmp, size);
-//                printf(" skipping to %d:%d\n", m1, m2);
-                while (splitsarr[0]->splitsl[splitindex[0]-1][6] != m1 || splitsarr[0]->splitsl[splitindex[0]-1][7] != m2) {
+                int half = n1 / 2;
+                int middle_m2 = (n1 % 2 == 0) ? (n2 + 1) / 2 : 0;
+
+                /* Search one representative from each cut/complement pair.  Before split
+                   filtering this found the exact boundary cut (half,middle_m2).  That cut may
+                   now be absent, so stop at the last retained cut in the same canonical half
+                   instead of scanning through index zero looking for a record that does not
+                   exist.  Enumeration order is ascending m1, then descending m2. */
+                while (splitindex[0] > 0) {
+                    int *boundary = splitsarr[0]->splitsl[splitindex[0] - 1];
+                    int bm1 = boundary[6];
+                    int bm2 = boundary[7];
+                    if (bm1 < half
+                        || (bm1 == half && (n1 % 2 != 0 || bm2 >= middle_m2))) break;
                     splitindex[0]--;
-//                    printf("skipped %d:%d\n", splitsarr[0]->splitsl[splitindex[0]][6], splitsarr[0]->splitsl[splitindex[0]][7]);
                 }
             }
             memset(sb, 0, sizeof(sb));
@@ -467,7 +473,7 @@ int main(int argc, char **argv){
                     }
                 }
                 s->l[i] = l;
-                solutions[l].refs++;
+                if (l != TRIVIAL) solutions[l].refs++;
             }
             
             printf("resultprint %d. (in %d) (used %d) ", line, s->k, s->refs);
