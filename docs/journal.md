@@ -3773,8 +3773,9 @@ original coin differently. A strategy that descends to the unsplit rectangle mus
 Equivalently, a part `(n:m)` is a bundle of `m` singleton rows of length `n`. Ordinary majorization
 may decompose each row independently. A legal original test must use one common wide-side cut `a`
 across the whole bundle, then choose `b` row centres: `b` rows route `(a,n-a)` to outcomes `(2,1)`,
-and `m-b` rows route them to `(1,0)`. A future stronger theory is therefore a
-**synchronised/bundled majorization decomposition**, not another scalar metric or subset table.
+and `m-b` rows route them to `(1,0)`. The corresponding stronger theory must therefore be a
+**synchronised/bundled majorization decomposition**, not another scalar metric or subset table; the
+following entry develops it.
 
 ### Validation before deployment
 
@@ -3823,5 +3824,115 @@ commands in P6; no raw artifact was archived.
 Deploy the theorem-backed filter. It solves the active positive benchmark, eliminates the negative
 monster, and improves the expensive negative population; the only measured regression is 0.122 s
 spread over 200 already-cheap positives. The pair/triple/quad deployment and discrepancy-pass
-rejections from the preceding entry still stand. If long states remain expensive after this change,
-the next theoretical target is the synchronisation constraint inside the cloned singleton bundles.
+rejections from the preceding entry still stand. This made the synchronisation constraint inside the
+cloned singleton bundles the next target; the following entry records that result.
+
+## 2026-08-09 (bundled follow-up) — a hierarchy exists, but its first levels are not the long-state heuristic
+
+The synchronization residual now has a precise theorem rather than just an example. Define `R_0(S,k)`
+to be full star-expansion majorization. For `d>0`, `R_d(S,k)` holds when one legal rectangle split has
+all three children in `R_{d-1}` at `k-1`. Solvability implies every `R_d`; the relaxations are nested;
+and `R_k` is exact solvability. The only non-obvious nesting step is `R_1 => R_0`: apply the common
+rectangle test to the row-star lift, observe that each inherited row-oriented child is weakly
+majorized by that rectangle child's strongest full-star orientation, and attach the three singleton
+strategies. The full proof is now in
+[the theorem note](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
+
+There is also a useful algorithmic form. Weak majorization is equivalent to the hinge inequalities
+`H_x(t)=sum_j max(x_j-t,0) <= H_G(t)`. A rectangle `(u:v)` contributes
+`min(u,v)*max(max(u,v)-t,0)`. For a local split `(a:b)`, its outcome-2, outcome-0 and outcome-1
+contributions are respectively those of `(a:b)`, `(n-a:m-b)`, and the sum for
+`(a:m-b),(n-a:b)`. Therefore `R_1` is an exact additive multiple-choice capacity problem over the
+three outcomes and integer thresholds. It can be searched without repeatedly sorting child
+profiles.
+
+### Small exhaustive result
+
+I added `tools/pairtab.c` to make the previously scratch-only current-solver pair table reproducible,
+and `tools/bundled_majorization.py` as an independent implementation of the hierarchy. The commands
+
+```
+clang -O3 -DMAX_K=4 -DMAX_N=64 tools/pairtab.c -o /tmp/pairtab4
+/tmp/pairtab4 4 16 > /tmp/pairs_k4.txt
+tools/bundled_majorization.py census-pairs 4 /tmp/pairs_k4.txt
+```
+
+rebuild 102 raw oriented individually solvable parts and 5,253 raw pairs, of which the current C
+solver labels 4,368 solvable. After orientation there are 1,485 canonical states: 1,247 positive and
+238 negative. `R_0` rejects 68 of the 238 canonical negatives, `R_1` rejects 150, `R_2` rejects 229,
+and `R_3` rejects all 238; none rejects a labelled positive. The hierarchy run took 0.003, 0.126,
+0.188 and 0.281 Python CPU seconds by level in the final run. These are comparisons with exhaustive
+current-solver labels, not independent certificates for the negative labels.
+
+The original residual illustrates the depth cleanly:
+
+```
+tools/bundled_majorization.py ladder 4 16 1 12 2
+```
+
+reports YES at `R_0,R_1,R_2` and NO at `R_3,R_4`. The first synchronized split
+`[8:0,7:2]` gives children `Sb(7:2)`, `Sb(8:1)` and `Sb(8:1,5:2)`, whose full-star profiles all fit
+`G_3`; each child also has another synchronized continuation. The obstruction only appears on the
+third synchronized layer.
+
+### A direct fixed-width majorization rule is false
+
+Pure width-two states look Schur-downward for two and three bundles at small k, but that pattern fails
+at four bundles. The independent reference solver checked
+
+```
+tools/refsolve.py solve 4 12 2 10 2 9 2 3 2
+tools/refsolve.py solve 4 11 2 11 2 9 2 3 2
+```
+
+in 10.44 and 11.64 CPU seconds: the first state is solvable and the second is not. Nevertheless the
+unsolvable profile `(11,11,11,11,9,9,3,3)` is weakly majorized by the solvable profile
+`(12,12,10,10,9,9,3,3)`. This rules out an exact analogue obtained by replacing `G_k` with one
+width-two base sequence. Synchronization makes the feasible set discrete and non-convex under
+Robin-Hood transfers; it cannot be compressed into an ordinary Lorenz curve.
+
+### Long-state engineering result
+
+`R_1` is cheap, but it is not new work for the solver. `canSolveB` applies full-star majorization to
+every partial child before the cache lookup. Because adding later parts cannot repair a prefix
+violation, every complete candidate it reaches has already passed exactly the `R_1` inequalities.
+A separate `R_1` pre-pass can only duplicate that walk or generate a different order.
+
+The residual four-part positive `Sb(29:6,19:9,13:12,36:3)` in 6 makes the ordering failure concrete.
+Against `/tmp/k6lab/warm_k5.txt`, the current solver found the exact winning split
+`[8:1,8:4,11:11,19:2]` after 37,899 counted prefix candidates and 42.7 solve CPU seconds (60 seconds
+including cache load, peak RSS 2.60 GB). The additive `R_1` prototype instead found
+`[10:2,17:8,3:5,12:1]` almost immediately. Its outcome-2 and outcome-0 children are exactly
+unsolvable in 5; only outcome 1 is solvable. Worse, all three children pass `R_1`, so the dead split
+also witnesses `R_2` for the parent. Thus even the next hierarchy level does not distinguish this
+cheap dead witness from the real winning split.
+
+Deeper checks do not yet pay. On the residual exact negative
+`Sb(17:11,16:11,22:7,21:6)` in 6, the transparent Python `R_2` checker used 6.33 CPU seconds and still
+returned YES; `R_3` hit a 30-second CPU cap. The current warmed solver refutes the same state in
+0.098 solve seconds. The hard positive's isolated `R_2` and `R_3` probes each hit the same 30-second
+cap before returning. No capped process was left running.
+
+The long controls are reproducible with the same bounded build and warm cache:
+
+```
+clang -O3 -DMAX_K=6 -DMAX_N=193 radio_one.c -o /tmp/radio_bundled
+tools/capped_run.sh --seconds 900 --rss-gb 8 --label bundled-positive -- \
+  /tmp/radio_bundled /tmp/k6lab/warm_k5.txt 6 29 6 19 9 13 12 36 3
+tools/capped_run.sh --seconds 900 --rss-gb 8 --label bundled-negative -- \
+  /tmp/radio_bundled /tmp/k6lab/warm_k5.txt 6 17 11 16 11 22 7 21 6
+( ulimit -t 30; tools/bundled_majorization.py solve 6 2 17 11 16 11 22 7 21 6 )
+( ulimit -t 30; tools/bundled_majorization.py solve 6 3 17 11 16 11 22 7 21 6 )
+```
+
+The local benchmark log was 112 KB and the pair-census output 246 KB; both are regenerated by
+the recorded commands, so neither was archived.
+
+### Decision
+
+Keep `radiobase.c` unchanged. The hierarchy is the right theoretical interpolation between static
+majorization and exact search, and the hinge form is a useful research primitive, but unconditional
+`R_1` is cache/prefix-redundant and direct `R_2/R_3` spends more than the warm exact solver on the
+controls that matter. Any next attempt should be a bounded, fallback-safe approximation used to
+order the existing `FAST` candidates on the 42.7-second positive. The rough standalone C probes were
+discarded; only the transparent hierarchy checker and reproducible pair-table generator were kept.

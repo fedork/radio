@@ -104,7 +104,7 @@ pursue it at all.
 **Done when** the draft passes `tools/check_tables.py` with no stale generated blocks and
 contains no number absent from `data/*.csv`.
 
-### P6 - Full star-expansion majorization for long states
+### P6 - Full star expansion and synchronized majorization for long states
 
 **Delivered 2026-08-09.** The useful child-profile feature was not merely an ordering score. The
 [Vertex-Splitting Pullback Lemma](theorems/singleton-majorization.md#vertex-splitting-pullback-lemma-2026-08-09)
@@ -132,11 +132,20 @@ The old pair/triple/quad deployment remains rejected: its information is already
 upward-closed prefix cache. The full star filter is different—it is a global arbitrary-part-count
 theorem and directly proves 40.6% of the recorded k=5 negatives.
 
-If a residual long state is still expensive, the next theoretical target is **synchronised
-majorization**. Ordinary Singleton Majorization may test the cloned copies of one original coin
-differently; an original rectangle requires all those clones to move together. Characterise or relax
-that bundled three-way decomposition before fitting another score. `Sb(16:1,12:2)` in 4 is the first
-small counterexample to the converse and a useful regression case.
+**The synchronized theory is now characterised, but not deployed.** Define `R_0` as full-star
+majorization and `R_d` by requiring one legal synchronized split whose three children pass
+`R_{d-1}`. These conditions are nested and sound, and `R_k` is exact solvability. The first level is
+an additive hinge-capacity problem. The full theorem, a worked `Sb(16:1,12:2)` ladder, and a
+width-two counterexample to any single-base majorization rule are in
+[the theorem note](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
+
+Do not add `R_1` as a production pre-pass. The current recursive prefix checks already enforce its
+child inequalities, and on the residual 42.7-second four-part positive the first `R_1` witness is
+dead and still passes `R_2`; mere feasibility does not distinguish it from the true winning split.
+Direct deeper checks also lose to the warmed exact cache on the tested residual negative. If P6
+continues, the benchmark is
+`Sb(29:6,19:9,13:12,36:3)` in 6 and the only promising use is a **bounded, fallback-safe ordering
+signal** that approximates deeper synchronization without recursively solving it.
 
 ## Ordering
 
@@ -148,9 +157,10 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 is the active optimisation experiment while the two cold `Sa(193)` runs continue remotely. Its
-cheap replay corpus is seconds, but the newly identified hard-positive control needs explicit
-5-30-minute caps and must run one at a time.
+P6 remains the active optimisation experiment while the two cold `Sa(193)` runs continue remotely,
+but the next experiment needs a new bounded approximation rather than another hierarchy level. Its
+cheap replay corpus is seconds; the residual hard-positive control needs explicit 5-30-minute caps
+and must run one at a time.
 
 H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
 "probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is

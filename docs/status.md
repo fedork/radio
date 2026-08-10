@@ -308,10 +308,26 @@ seconds**. The A+B monster is now refuted at the root by the prefix certificate 
 [journal entry](journal.md).
 
 The condition is not sufficient: `Sb(16:1,12:2)` passes it but is unsolvable in 4. The residual is
-now precise. Singleton Majorization may test clones of one original coin independently, while a legal
-rectangle strategy must keep them synchronised. If P6 continues, work on a bundled/synchronised
-version of the Three-Way Majorization Decomposition Lemma; do not return to scalar scores or warm-cache
-subset tables.
+now formalised by the
+[synchronized-majorization hierarchy](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
+`R_0` is full star expansion; `R_d` requires one legal rectangle split whose children pass
+`R_{d-1}`. The relaxations are nested and sound, and `R_k` is exact solvability. `R_1` also has an
+additive hinge-vector formulation, so it can be checked without sorting child profiles.
+
+The hierarchy is structurally sharp on the complete current-solver k=4 pair universe. Among its 238
+canonical negatives, `R_0,R_1,R_2,R_3` reject respectively 68, 150, 229 and all 238, with zero
+rejections among 1,247 canonical positives. `Sb(16:1,12:2)` itself passes `R_0,R_1,R_2` and fails
+`R_3`. `tools/bundled_majorization.py` and `tools/pairtab.c` reproduce the census.
+
+It does **not** yet improve the long-state solver. `radiobase.c` already invokes `R_0` on every
+partial child before its cache lookup, so a separate `R_1` pass duplicates the existing prefix walk.
+On the 42.7-second four-part positive `Sb(29:6,19:9,13:12,36:3)` in 6, the first cheap `R_1` witness
+has two exactly unsolvable children and even passes `R_2`; `R_1` feasibility therefore does not
+distinguish it from the real winning split. On a residual four-part negative, isolated `R_2` took
+6.3 Python CPU seconds and still passed, while the warmed exact solver refuted it in 0.1 seconds;
+`R_3` hit a 30-second cap. Production code is therefore unchanged. The useful target, if P6
+continues, is a genuinely cheap approximation to deeper synchronization for **ordering**, not an
+unconditional hierarchy pre-pass.
 
 ## Immediate next steps
 
@@ -325,9 +341,10 @@ facts are real, but the warm upward-closed prefix cache already contains the sub
 former added zero marginal rejections on the A+B monster, and the latter regressed negatives. Full
 star expansion is different: it is an arbitrary-part-count global theorem and is now deployed.
 
-1. For further P6 work, find a residual expensive state that **passes** full star expansion, then
-   attack the clone-synchronisation constraint. The old hard positive and A+B monster are solved
-   benchmarks now, not useful stress tests.
+1. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
+   bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
+   finding an `R_1` or `R_2` witness is already known not to do that. Keep any deeper check bounded
+   and fallback-safe.
 2. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
 3. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
