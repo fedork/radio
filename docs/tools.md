@@ -212,11 +212,18 @@ pair census are:
 ```
 tools/bundled_majorization.py ladder 4 16 1 12 2
 tools/bundled_majorization.py census-pairs 4 /tmp/pairs_k4.txt
+( ulimit -t 60; tools/bundled_majorization.py m6-kernel 7 4 )
 ```
 
 The checker is independent of `radiobase.c` once it has read the optional pair-table labels. It is
 intentionally a transparent research implementation, not a production pre-pass: intermediate depths
 remain exponential and can approach the cost of exact search.
+
+`m6-kernel` constructs the parametric four-part state reached by extending the tight
+`m=6` prefix, exhausts every first split whose children pass full-star majorization,
+deduplicates identical normalized child triples (including outcome symmetry), and checks
+them at the requested hierarchy depth. It does not inherit any continuation from a stored
+witness tree.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

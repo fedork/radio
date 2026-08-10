@@ -147,6 +147,14 @@ continues, the benchmark is
 `Sb(29:6,19:9,13:12,36:3)` in 6 and the only promising use is a **bounded, fallback-safe ordering
 signal** that approximates deeper synchronization without recursively solving it.
 
+**Separate theoretical m=6 thread (2026-08-10).** Do not fit the continuation of
+`canon_473_6_at9.tree`. The early arithmetic prefix reaches a near-saturated parametric kernel
+`Z_t`; complete, witness-independent checks prove `Z_7` and `Z_8` fail `R_4`. The mathematical next
+steps are to prove whether an optimal large-k root is forced into this kernel, and to turn the
+stable finite split classification into a parametric obstruction for all `t>=7`. An alternative
+large-k root prefix would be equally valuable. Reproduction and the exact limits of the result are
+in the latest journal entry.
+
 ## Ordering
 
 P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed
@@ -157,10 +165,11 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 remains the active optimisation experiment while the two cold `Sa(193)` runs continue remotely,
-but the next experiment needs a new bounded approximation rather than another hierarchy level. Its
-cheap replay corpus is seconds; the residual hard-positive control needs explicit 5-30-minute caps
-and must run one at a time.
+P6 now has two distinct tracks while the two cold `Sa(193)` runs continue remotely. The solver track
+still needs a bounded ordering approximation rather than another unconditional hierarchy level. The
+theory track should work from the stabilized large-k `m=6` prefix/kernel classification and only
+then recover small k backwards. Do not use witness-tree shape as evidence that either track has a
+unique continuation.
 
 H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
 "probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is

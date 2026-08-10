@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-09** (two live runs; see Running now).
+don't know it. Last refreshed **2026-08-10** (m=6 kernel result; two live runs remain).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -328,6 +328,33 @@ distinguish it from the real winning split. On a residual four-part negative, is
 `R_3` hit a 30-second cap. Production code is therefore unchanged. The useful target, if P6
 continues, is a genuinely cheap approximation to deeper synchronization for **ordering**, not an
 unconditional hierarchy pre-pass.
+
+### Theoretical m=6 track: forced prefix versus fitted continuation (2026-08-10)
+
+The `473:6@9` witness must not be treated as a canonical scalable object. Exhaustive data support
+only its early trunk: `Sb(110:3,115:2,121:1)@7` has two working splits, one outcome-complement pair.
+Its mixed child `Sb(53:2,52:2,57:1,57:1)@6` has 12 working splits, or three genuine symmetry
+classes. The stored tree chooses one; the ambiguity is real from that point onward.
+
+Extending the forced arithmetic prefix gives the parametric four-part kernel
+
+    Z_t = Sb((D_t+2t-1):2, (A_t-2t):2, C_t:1, C_t:1),
+
+where `A_t,C_t,D_t` are the first, third and fourth dyadic atom values of `G_t`. Its six-row
+full-star mass is exactly one below the top-six capacity. This forces any `R_1`-feasible next test
+into row-count patterns `(2,6,4)`, `(3,6,3)` or `(4,6,2)`, with one unit of total child slack.
+
+The independent hierarchy checker exhausts every such first test without using a witness
+continuation. `Z_6` passes `R_4`, as it must. `Z_7` has 356 `R_1`-feasible raw splits / 84 distinct
+normalized child triples and fails `R_4`; `Z_8` has 424 / 101 and also fails `R_4`. Since every
+solvable state satisfies every `R_d`, both kernels are unsolvable. Reproduce with
+`tools/bundled_majorization.py m6-kernel <t> 4` (21.2 and 57.5 CPU seconds in the recorded runs).
+
+This does **not** yet refute the conjectured single-part `m=6` frontier at `k>=10`: it remains to
+prove that a large-k optimal root is forced into this same kernel. The next theoretical targets
+are therefore (1) classify or force the large-k root prefix, and (2) turn the now-stable finite
+`R_1` case pattern into a parametric `Z_t` obstruction for every `t>=7`. Do not infer either from
+the shape of the `k=9` witness tree.
 
 ## Immediate next steps
 

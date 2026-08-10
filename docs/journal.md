@@ -3936,3 +3936,82 @@ majorization and exact search, and the hinge form is a useful research primitive
 controls that matter. Any next attempt should be a bounded, fallback-safe approximation used to
 order the existing `FAST` candidates on the 42.7-second positive. The rough standalone C probes were
 discarded; only the transparent hierarchy checker and reproducible pair-table generator were kept.
+
+## 2026-08-10 — m=6: keep the forced trunk, discard the fitted continuation
+
+The user supplied the right evidential correction: the canonical witnesses were fitted naively.
+They can prove a state solvable, but a late subtree failing to lift says nothing about another
+subtree beneath the same early prefix.
+
+The exhaustive `trees-2023` artifact locates one exact boundary. The state
+`Sb(110:3,115:2,121:1)@7` has 2 working splits among 37,700,928, one outcome-complement pair. Its
+mixed child is
+
+    Z_6 = Sb(53:2,52:2,57:1,57:1) @6.
+
+`Z_6` has 12 working splits among 346,599,648. Exchanging the identical `57:1` parts and globally
+complementing the test reduces them to three genuine classes, represented (in the displayed state
+order) by
+
+    [31:2,27:1,26:0,25:0]
+    [31:2,26:1,26:0,25:0]
+    [27:1,31:2,26:0,25:0].
+
+The committed witness takes only the first. Thus the early trunk is the robust object; all
+ambiguity from `Z_6` onward is later than it. The rows and split counts are already sourced in
+`data/exhaustive_multipart.csv`; the representatives above were re-extracted from the indexed raw
+artifact.
+
+### Parametric kernel and the one-unit slack law
+
+Let
+
+    A_t = 2^t,
+    C_t = 2^t-(t+1),
+    D_t = 2^t-(t(t+1)/2+1).
+
+Extending the arithmetic of the early `k=9` prefix, without extending its subtree, reaches
+
+    Z_t = Sb((D_t+2t-1):2, (A_t-2t):2, C_t:1, C_t:1) @t.
+
+Its full-star profile has six rows and total mass `H_t(6)-1`, where `H_t(r)` is the sum of the
+largest `r` entries of `G_t`. The dyadic refinement identities give
+
+    H_t(6) = H_(t-1)(2)+H_(t-1)(6)+H_(t-1)(4)
+           = 2 H_(t-1)(3)+H_(t-1)(6).
+
+Consequently every first split that even passes `R_0` has child row counts `(2,6,4)`, `(3,6,3)`
+or `(4,6,2)`, and the three nonnegative integer capacity slacks sum to exactly one. This is a
+structural reduction, independent of which exact tree is selected.
+
+It also explains one misleading `t=6` option. The third exact split class relies on
+`D_(t-1)+2t-2 = C_(t-1)`. The difference between the right and left sides is
+`(t-1)(t-6)/2`, so the equality is a `t=6` degeneration and cannot be lifted literally.
+
+### Sound synchronized obstruction at the first nondegenerate levels
+
+`tools/bundled_majorization.py m6-kernel` now performs the complete specialized check: construct
+`Z_t`, enumerate every first split whose three children pass `R_0`, quotient outcome symmetry, and
+require every child to pass `R_(d-1)`. It never reads a witness tree.
+
+Recorded runs:
+
+| kernel | raw `R_1` splits | distinct child triples | result | CPU |
+|---|---:|---:|---|---:|
+| `Z_6` | 276 | 66 | `R_4=YES` | 3.3 s |
+| `Z_7` | 356 | 84 | `R_4=NO` | 21.2 s |
+| `Z_8` | 424 | 101 | `R_4=NO` | 57.5 s |
+
+Because solvability implies every `R_d`, the last two negatives prove `Z_7` and `Z_8`
+unsolvable. They rule out the whole parametric kernel at those values, not merely the continuation
+chosen in `canon_473_6_at9.tree`.
+
+What this does **not** prove: that `Sb(976:6)@10`, or the conjectured `m=6` formula in general, is
+false. That requires showing that an optimal large-k root is forced through this same prefix.
+Nor do two parameter values prove `Z_t` impossible for every `t>=7`. The `R_1` split classes have
+stabilized by `t=7`, which makes a parametric proof plausible, but it still has to be written.
+
+The theoretical programme is now clean: classify the large-k root prefix without witness fitting;
+then either find a different prefix that carries the `BBCD` profile, or prove the stable finite
+kernel classes all contain an `R_3`-forbidden child. Only after that should low-k cases be recovered
+backwards.

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import itertools
 import re
 import time
 from dataclasses import dataclass
@@ -243,6 +244,71 @@ def cmd_census_pairs(args: argparse.Namespace) -> int:
     return 0
 
 
+def m6_kernel(t: int) -> State:
+    """The four-part residual reached by the conjectured m=6 tight prefix."""
+    a = 2**t
+    c = a - (t + 1)
+    d = a - (t * (t + 1) // 2 + 1)
+    return normalize(((d + 2 * t - 1, 2), (a - 2 * t, 2), (c, 1), (c, 1)))
+
+
+def cmd_m6_kernel(args: argparse.Namespace) -> int:
+    """Check the m=6 kernel without inheriting a fitted witness continuation.
+
+    A child of a legal first split that passes R_0 cannot contain a row wider than
+    the largest entry 2^(t-1) of G_(t-1).  Thus every wide-side cut lies in the
+    short interval [n-2^(t-1), 2^(t-1)].  Enumerating those intervals is complete
+    for R_depth, while being much smaller than the generic Cartesian product.
+
+    Outcome 0/2 exchange and exchange of the two identical singleton components
+    can produce the same normalized child triple.  We retain one representative
+    of each triple; this changes only cost, not the decision.
+    """
+    state = m6_kernel(args.t)
+    child_k = args.t - 1
+    largest = 2**child_k
+    choices = [
+        tuple(
+            (a, b)
+            for b in range(m + 1)
+            for a in range(max(0, n - largest), min(n, largest) + 1)
+        )
+        for n, m in state
+    ]
+
+    raw = 0
+    representatives: dict[
+        tuple[State, State, State], tuple[tuple[Part, ...], tuple[State, State, State]]
+    ] = {}
+    started = time.process_time()
+    for splits in itertools.product(*choices):
+        child_parts: list[list[Part]] = [[], [], []]
+        for part, split in zip(state, splits):
+            local = children(part, split)
+            for outcome in range(3):
+                child_parts[outcome].extend(local[outcome])
+        child_states = tuple(normalize(parts) for parts in child_parts)
+        if not all(r0(child, child_k) for child in child_states):
+            continue
+        raw += 1
+        mirror = (child_states[2], child_states[1], child_states[0])
+        key = min(child_states, mirror)
+        representatives.setdefault(key, (splits, child_states))
+
+    print(
+        f"m6-kernel t={args.t} state={state} R_1_raw={raw} "
+        f"distinct_child_triples={len(representatives)}"
+    )
+    for splits, child_states in representatives.values():
+        if all(relax(child, child_k, args.depth - 1) for child in child_states):
+            print(f"R_{args.depth}=YES split={splits} children={child_states}")
+            print(f"cpu={time.process_time() - started:.6f}s {COUNTERS}")
+            return 0
+    print(f"R_{args.depth}=NO exhausted={len(representatives)}")
+    print(f"cpu={time.process_time() - started:.6f}s {COUNTERS}")
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -265,10 +331,21 @@ def main() -> int:
     census_parser.add_argument("table")
     census_parser.set_defaults(function=cmd_census_pairs)
 
+    kernel_parser = commands.add_parser(
+        "m6-kernel", help="check the parametric tight m=6 four-part residual"
+    )
+    kernel_parser.add_argument("t", type=int, help="tests remaining at the four-part kernel")
+    kernel_parser.add_argument("depth", type=int, nargs="?", default=4)
+    kernel_parser.set_defaults(function=cmd_m6_kernel, k=None)
+
     args = parser.parse_args()
-    if hasattr(args, "depth") and not 0 <= args.depth <= args.k:
+    if args.command == "m6-kernel" and not 1 <= args.depth <= args.t:
+        parser.error("kernel depth must be between 1 and t")
+    if args.command != "m6-kernel" and hasattr(args, "depth") and not 0 <= args.depth <= args.k:
         parser.error("depth must be between 0 and k")
-    if args.k < 0:
+    if args.command == "m6-kernel" and args.t < 1:
+        parser.error("t must be positive")
+    if args.command != "m6-kernel" and args.k < 0:
         parser.error("k must be nonnegative")
     return args.function(args)
 

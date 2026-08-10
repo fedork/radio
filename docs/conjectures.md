@@ -512,15 +512,20 @@ So canonicalise *within* that class and treat the rest as a separate family. Wha
 well defined is the two conditions: no empty paths (`atom count = m·2^(k-t)`) and census divisible
 by `m`.
 
-### Why m=6 has no alternatives to compare
+### Why the m=6 top prefix has no alternatives
 
 The split window for `Sb(n(k,6):6)` at `b=2` is bounded below by `n(k,6) - n(k-1,4)` and above by
 `n(k-1,2)`. Those give a window of 7, 10, 14, 19, 25 values for `k = 5..9` — wide. But the mixed
 child `Sb(a:4, (n-a):2)` closes it to **two** values at `k=5,6,7`, and at `k=9` to essentially
 **one**: `a = 231`, appearing as its mirror `[242:4]`.
 
-That is why `canon_473_6_at9` is the *only* tree the canonical search returns, and why there is no
-symmetric alternative to find — at the root there is nothing to choose.
+That is why `canon_473_6_at9` has only one working root split. It does **not** make the whole tree
+unique. The recorded descent reaches `Sb(110:3,115:2,121:1)@7`, whose exhaustive artifact has one
+outcome-complement pair; ambiguity then appears at `Sb(53:2,52:2,57:1,57:1)@6`, where the artifact
+records 12 working splits. These reduce to three classes under outcome complementation and exchange
+of the identical `57:1` parts.
+The committed witness follows only one class. Consequently the forced prefix is structural
+evidence; its later fitted continuation is not evidence against a different scalable tree.
 
 **The descent depth is forced, not incidental.** Running the search with `target_k = 4`, which
 requires every leaf to be canonical at depth 4 or deeper, returns `NO_CANONICAL_TREE`. So no
@@ -544,7 +549,10 @@ Carried over from [journal.md](journal.md), unresolved:
   final branch-signature multisets. A second generator is needed and no candidate preserving
   the right invariants has been found. The depth-2 block clue is a conservative 3-block
   rewrite `{AACC, AB, BC} <-> {AA, AC, BBCC}`.
-- **Whether `473:6 @9` scales.** Answered negatively for the witness we have — see above.
-  Whether a symmetric one exists is open.
+- **Whether the `m=6` construction scales.** The committed `473:6 @9` continuation does not, but
+  that answers only for one late subtree. The forced prefix reaches a four-part parametric kernel;
+  the 2026-08-10 journal entry separates that kernel from the fitted continuation and records a
+  sound obstruction at its first two nondegenerate parameter values. An alternative large-k root
+  prefix, or a proof that none exists, remains open.
 - **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs.
   Nothing beyond `m = 4` has a matching upper bound.
