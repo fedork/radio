@@ -181,3 +181,4 @@ k,m,n1,bound,status,source,note
 9,94,98,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(99:94) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
 9,95,97,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(98:95) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
 9,96,96,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(97:96) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+10,6,973,max,proven-exhaustive,witnesses/majorized_973_6_at10.tree+evidence/sb_m6_k10_frontier.txt,"verified singleton-majorized witness at 973; exact synchronized search refutes 974"

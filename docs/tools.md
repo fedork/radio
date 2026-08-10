@@ -166,7 +166,10 @@ Both are pure Python 3 with no dependencies. Reading the spreadsheets needs `ope
 there is a venv at `.venv` for that.
 
 **Run `check_witness.py` before recording any new result.** A tree that passes is a proof
-that does not depend on the solver being correct; a solver log is not.
+that does not depend on the solver being correct; a solver log is not.  Recursive trees may
+stop either at `[canonical U_k]` atom sub-multisets or at `[majorized G_k]` arbitrary singleton
+sequences.  The checker verifies the former by multiplicity and the latter by every weak-
+majorization prefix.
 
 ## Split-heuristic research tools
 
@@ -184,6 +187,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/sample_subsets.c` | sample pair/triple rejection and lookup cost on k=6 states too large to enumerate |
 | `tools/fast_replay.c` | replay logged long k=5 states from one forked warm-cache image, clearing all per-target cache/self-training effects |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
+| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
 
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
@@ -224,6 +228,39 @@ remain exponential and can approach the cost of exact search.
 deduplicates identical normalized child triples (including outcome symmetry), and checks
 them at the requested hierarchy depth. It does not inherit any continuation from a stored
 witness tree.
+
+### Exact small-m singletonization search
+
+`search_singletonization.cpp` is the scale-free counterpart of the hierarchy prototype for states
+with a small total narrow-side multiplicity.  Define `C_d(S,k)` to hold when `S` passes full-star
+majorization and either is already a singleton state, or has a legal rectangle split whose three
+children satisfy `C_(d-1)`.  A singleton terminal is decided exactly by the Singleton Majorization
+Theorem.  At `d=k`, this is exact solvability: any strategy supplies the recurrence, and at depth
+zero full-star majorization permits at most one edge.
+
+The implementation's short cut range is complete, not heuristic.  In a viable first test on
+`(n:m)@k`, both wide-side pieces `a` and `n-a` are at most `2^(k-1)`; otherwise one of the three
+nonempty rectangle children has a full-star row wider than the largest entry of `G_(k-1)`.  Thus a
+near-top width `n=2^k-delta` has only `delta+1` possible wide cuts.  While assembling a multi-part
+split, a partial child that fails `C_(d-1)` can also be rejected soundly by subgraph monotonicity.
+
+Build and run it directly:
+
+```
+clang++ -O3 -std=c++20 -Wall -Wextra -pedantic \
+    tools/search_singletonization.cpp -o /tmp/search_singletonization
+
+/tmp/search_singletonization 9 9 488 3 488 3
+/tmp/search_singletonization forced 10 10 973 6 477 2
+/tmp/search_singletonization frontier 10 6 974 973
+```
+
+The first form checks one state with a bounded number of synchronized levels.  `forced` verifies a
+specified one-part root split and prints its tree.  `frontier` walks downward, retains the exact memo
+between adjacent `n`, stops at the first positive, and prints its tree.  Cap frontier runs with
+`tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never a negative verdict.
+The retained `k=10,m=6` replay and independently checked tree are
+`evidence/sb_m6_k10_frontier.txt` and `witnesses/majorized_973_6_at10.tree`.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

@@ -4015,3 +4015,81 @@ The theoretical programme is now clean: classify the large-k root prefix without
 then either find a different prefix that carries the `BBCD` profile, or prove the stable finite
 kernel classes all contain an `R_3`-forbidden child. Only after that should low-k cases be recovered
 backwards.
+
+## 2026-08-10 — the deficit automaton gives the exact `k=10,m=6` break
+
+The requested large-`k`-first analysis changed the result, rather than merely explaining the old
+witness.  Write a near-top width as `n=2^k-d`.  Any first cut that can pass full-star majorization
+has
+
+    a = 2^(k-1)-u,        n-a = 2^(k-1)-(d-u),        0 <= u <= d.
+
+Thus the exponential coordinates disappear: a part with deficit `d` has only `d+1` possible
+wide-side cuts.  If the expanded row deficits of a state are `p_1 <= ... <= p_r`, and the deficits
+of the top `r` entries of `G_k` are `e_1 <= ... <= e_r`, full-star majorization is exactly
+
+    sum(p_1..p_j) >= sum(e_1..e_j)  for every j.
+
+For six rows the base deficits are `[0,1,k+1,k+1,Q,Q]`,
+`Q=k(k+1)/2+1`.  This is the scale-free state description that had been missing from the
+fixed-`m`, `n >> m` discussion.
+
+### The balanced escape route is real as a case, but not as a solution
+
+Shallow synchronized majorization leaves both the old `2+4` root family and a qualitatively new
+`3+3` family at `Sb(976:6)@10`.  The centered mixed child of the latter is
+`Sb(488:3,488:3)@9`; the corresponding centered child one level earlier is
+`Sb(237:3,236:3)@8`.  An exact bounded singletonization search rejected the latter through six
+levels and the former through all nine levels.  The neighboring centered total-973 state
+`Sb(487:3,486:3)@9` is also exactly unsolvable (104.819 s).  This does not prove that every
+`3+3` split at total 973 fails, and no uniqueness claim is being made about the successful root.
+
+### Exact bounded recurrence
+
+`tools/search_singletonization.cpp` implements `C_d(S,k)`: require full-star majorization, stop
+exactly on an arbitrary singleton-majorized state, otherwise choose one legal synchronized split
+whose children satisfy `C_(d-1)`.  At `d=k` this is exact solvability.  The wide-cut interval above
+is complete; while assembling several parent parts, rejection of a partial child is sound by
+subgraph monotonicity.  Along the present searches the total narrow-side multiplicity is at most
+six, so a normalized state has at most six nonempty parts.
+
+Before trusting a new negative implementation, it was checked against independent controls.  On all
+25 proven one-part frontiers with `k<=6,m<=6`, it rejected `n+1` and accepted `n`.  It also
+reproduced the `Sb(16:1,12:2)@4` negative and `Sb(16:1,11:2)@4` positive from `refsolve.py`;
+accepted the known `Z_6` and rejected the independently `R_4`-refuted `Z_7`; and reproduced the
+width-two positive/negative pair in the synchronized-hierarchy theorem note.  Representative cases
+also passed AddressSanitizer and UndefinedBehaviorSanitizer.  Positive output is separately checked
+by `tools/check_witness.py`, which now accepts `[majorized G_k]` terminals and verifies every
+weak-majorization prefix rather than trusting the search.
+
+### Exact frontier and the corrected root
+
+The final cold replay exhaustively rejected `Sb(974:6)@10` in 576.178 s, visiting 810,726 memo
+states and 3,712,815,870 partial split assignments.  With that memo retained, `Sb(973:6)@10` was
+accepted in 54.4011 s.  Subgraph monotonicity plus the checked positive tree proves
+
+    n(10,6) = 973.
+
+The retained line pair is `evidence/sb_m6_k10_frontier.txt`; the 115-node, 38-split, 77-terminal
+proof is `witnesses/majorized_973_6_at10.tree`.  It uses root `[477:2]`, producing
+
+    Sb(477:2),        Sb(496:2,477:4),        Sb(496:4).
+
+The `m=4` pure child remains saturated, but the other width is 477 rather than the fitted 480.
+This bypasses `Z_7`.  Consequently both `2^k-k(k-1)/2-3` and the `BBCD` profile are refuted: each
+predicts 976 at `k=10`.
+
+The next tempting formula is **not** being adopted.  A constant three-unit correction would give
+`n(11,6)=1987`; its natural lifted mixed-state construction reduces to the new hard child
+`Sb(503:1,495:2,478:3)@9`.  A capped exact run reached five minutes and timed out at 0.04 GB RSS
+without a verdict.  Literally scaling the next split of the 973 witness to
+`[247:0,255:2,231:1]` is now **refuted**: its only new hard child,
+`Sb(247:1,247:1,240:2,231:2)@8`, is exactly unsolvable (277.622 s, 343,297 memo states,
+1,972,790,070 assignments).  This kills that fitted continuation, not the parent state, which may
+have a different first split.
+
+The timeout and completed residual line are retained in `evidence/m6_k11_scaled_attempt.txt`.
+
+The right next object is therefore the parametric `m=4 + m=2` mixed-state frontier in deficit
+coordinates.  Classify that family first, then work backwards through the low-`k` degeneracies;
+do not fit the late subtree of the 973 witness.

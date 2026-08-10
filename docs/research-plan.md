@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-09.
+entries. Last revised 2026-08-10.
 
 ## High-level goals
 
@@ -26,9 +26,10 @@ loading it would confirm them circularly, and it cannot be filtered by build era
 warm-start warning in [data.md](data.md#warm-starting-from-parsed_260txt-two-traps). A sound
 negative needs a cold run, which is why this stays expensive.
 
-**H4 - Structural theory.** Prove the closed-form family rather than fitting it. Resolve the
-canonical decomposition matrix questions: the missing second generator, and whether
-`473:6 @9` lifts to a scalable compact matrix.
+**H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
+`m=6` closed form and `BBCD` profile are now refuted by the exact `n(10,6)=973` frontier.  The
+next question is the large-`k` two-bundle construction/obstruction behind its successful `2+4`
+root, not whether the particular `473:6@9` witness scales.
 
 ## Proximate goals
 
@@ -147,13 +148,23 @@ continues, the benchmark is
 `Sb(29:6,19:9,13:12,36:3)` in 6 and the only promising use is a **bounded, fallback-safe ordering
 signal** that approximates deeper synchronization without recursively solving it.
 
-**Separate theoretical m=6 thread (2026-08-10).** Do not fit the continuation of
-`canon_473_6_at9.tree`. The early arithmetic prefix reaches a near-saturated parametric kernel
-`Z_t`; complete, witness-independent checks prove `Z_7` and `Z_8` fail `R_4`. The mathematical next
-steps are to prove whether an optimal large-k root is forced into this kernel, and to turn the
-stable finite split classification into a parametric obstruction for all `t>=7`. An alternative
-large-k root prefix would be equally valuable. Reproduction and the exact limits of the result are
-in the latest journal entry.
+**Separate theoretical m=6 thread (updated 2026-08-10).** The first large-`k` classification is
+complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified
+singleton-majorized tree at 973.  This refutes both the closed form and `BBCD` profile, which
+predict 976.  The working root is `[477:2]`, with mixed child `Sb(496:2,477:4)@9`; it avoids the
+`Z_7` kernel rather than repairing it.  Next, work forward from this **state family**, not from its
+particular stored subtree:
+
+1. classify the working root splits at 973 and express the `m=4 + m=2` mixed-child boundary in
+   deficit coordinates;
+2. decide the proposed one-level lift, whose only new hard child is
+   `Sb(503:1,495:2,478:3)@9` (the first five-minute run was inconclusive, and the literal scaled
+   continuation is refuted by the exact negative `Sb(247:1,247:1,240:2,231:2)@8`);
+3. derive a parametric lower construction or synchronized upper obstruction for that two-bundle
+   frontier, then recover the low-`k` degeneracies backwards.
+
+Do not infer a constant `-3` correction from one value.  Reproduction, correctness argument and
+costs are in the latest journal entry and `docs/tools.md`.
 
 ## Ordering
 
@@ -167,9 +178,9 @@ more a costing exercise than a plan.
 
 P6 now has two distinct tracks while the two cold `Sa(193)` runs continue remotely. The solver track
 still needs a bounded ordering approximation rather than another unconditional hierarchy level. The
-theory track should work from the stabilized large-k `m=6` prefix/kernel classification and only
-then recover small k backwards. Do not use witness-tree shape as evidence that either track has a
-unique continuation.
+theory track should work from the exact `k=10,m=6` mixed-child boundary toward a parametric large-k
+construction or obstruction, and only then recover small k backwards. Do not use witness-tree shape
+as evidence that either track has a unique continuation.
 
 H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
 "probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is

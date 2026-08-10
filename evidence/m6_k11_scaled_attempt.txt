@@ -1,0 +1,17 @@
+# Attempt to lift the k=10,m=6 construction one level, 2026-08-10.
+# Built from tools/search_singletonization.cpp with clang++ -O3 -std=c++20.
+
+# Full new mixed child; no verdict, not a negative:
+# tools/capped_run.sh --seconds 300 --rss-gb 4 --label m6-minus3-lift-k11 -- \
+#   /tmp/search_singletonization 9 9 503 1 495 2 478 3
+[capped_run] m6-minus3-lift-k11: TIMEOUT after 300s | exit 124 | wall 304s (5m04s) | peak RSS 0.04 GB
+
+# Literal scaling of the next witness split [247:0,255:2,231:1] leaves the
+# following sole new hard child.  This run completed normally with exit 1:
+# tools/capped_run.sh --seconds 300 --rss-gb 4 --label m6-minus3-scaled-residual -- \
+#   /tmp/search_singletonization 8 8 247 1 247 1 240 2 231 2
+singletonize_8=NO k=8 state=247:1,247:1,240:2,231:2 wall=277.622s calls=3688909763 memo_hits=3688566466 memo=343297 options=6315522 assignments=1972790070 prefix_rejects=1930506726
+[capped_run] m6-minus3-scaled-residual: completed | exit 1 | wall 282s (4m42s) | peak RSS 0.02 GB
+
+# Interpretation: the literal scaled continuation is impossible.  The parent
+# Sb(503:1,495:2,478:3)@9 remains undecided and may admit a different first split.

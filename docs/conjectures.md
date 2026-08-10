@@ -1,7 +1,8 @@
 # Open predictions
 
-Nothing on this page is established. Every claim here comes with the experiment that would
-settle it, because a prediction you cannot falsify is not worth recording.
+This page tracks open predictions and the experiments that refute them.  A prediction you cannot
+falsify is not worth recording; once a row is settled, its fact moves to `data/*.csv` and the failed
+model remains here so it is not rediscovered.
 
 The formulas are stored executably in `data/conjectures.csv`; `tools/check_tables.py`
 re-evaluates each one against every proven datum on every run. Proof status per lemma is in
@@ -23,7 +24,7 @@ first dyadic block of `G_{k-q}`, `B` the second, and so on:
 | 3 | `AC` | 1 |
 | 4 | `AACC` | 2 |
 | 5 | `BBBD` | 2 |
-| 6 | `BBCD` | 2 |
+| 6 | ~~`BBCD`~~ **refuted at k=10** | 2 |
 | 7 | `ABBBBCDD` | 3 |
 | 8 | `AAACCCDD` | 3 |
 | 9 | `AAAAAABBCCCCCCDE` | 4 |
@@ -34,9 +35,12 @@ slots. For `m = 11` the shortest exact fit found needs length 64 at `q = 5`, and
 was not recorded - a gap worth closing, since it is the only thing blocking an independent
 check of `n(9,11)`.
 
-Both models reproduce **every** proven value for `k = 1..8`, `m = 1..10`.
+Both models reproduce **every** proven value for `k = 1..8`, `m = 1..10`.  They are no longer
+globally viable models: both give 976 from their `m=6` row at `k=10`, while the exact maximum is
+973.  The disagreement below remains useful for distinguishing their still-open `m=9,10` rows,
+but neither model should be extrapolated wholesale.
 
-## The discriminating experiment
+## The remaining m=9,10 discriminating experiment
 
 The two models agree everywhere data exists and diverge at `k = 9`:
 
@@ -345,7 +349,7 @@ none above `2.0`, the largest part being `20:10`. Against a population whose med
 Reproduce with the classification in [journal.md](journal.md#2026-08-03--n-side-splits); the
 comparison uses only `data/pareto_sb.csv`.
 
-## Scalable constructions for m=5 and m=6 (2026-08-03)
+## Finite m5m6 recurrences and the k10 break (2026-08-10)
 
 Full split enumerations of the frontier states, from `radio_full`:
 
@@ -361,12 +365,13 @@ Full split enumerations of the frontier states, from `radio_full`:
 The `a`-windows are exactly `[n - n(k-1,3), n(k-1,3)]` for m=5, so the m=3 child is the
 binding single-part constraint, and the window is nonempty because `n(k,5) <= 2·n(k-1,3)`.
 
-**Two recursions, exact on every available k (5..9):**
+**Two numerical identities, exact on the then-available range `k=5..9`:**
 
     n(k,5) = n(k-1,2) + n(k-1,6)
     n(k,6) = n(k-1,4) + n(k-1,5)
 
-The second is realised directly by a split: `b = 2`, `a = n(k-1,5)`, giving
+On that finite range the second is realised directly by a split: `b = 2`,
+`a = n(k-1,5)`, giving
 `n(k-1,5):2` on outcome 2 and `n(k-1,4):4` **saturated** on outcome 0. The `473:6@9` witness
 uses the mirror form `[242:4]`, i.e. `a = n(8,4) = 242`, `n-a = n(8,5) = 231`.
 
@@ -374,8 +379,21 @@ The first is a numerical identity only — `m=6 > 5` cannot appear as a child of
 the split that would saturate it (`a = n(k-1,2)`) is *not* in the working set, so it is not
 realised structurally.
 
-Both constructions bottom out in a 2-part mixed state whose frontier is uncharacterised. That
-is where the work now is.
+**2026-08-10 correction.**  The apparent `m=6` recursion fails at its first extrapolation.  It
+predicts `496+480=976` at `k=10`, but exact synchronized search proves `n(10,6)=973`.  A verified
+tree uses root `[477:2]`, with children
+
+    Sb(477:2),  Sb(496:2,477:4),  Sb(496:4).
+
+Thus the `m=4` pure child remains saturated while the other width retreats by three.  The old
+continuation through `Sb(496:2,480:4)` reaches the impossible `Z_7` kernel; the new mixed state
+avoids it.  This establishes a break, **not** the replacement formula
+`n(k-1,4)+n(k-1,5)-3`.  Its natural `k=11` lift reduces to
+`Sb(503:1,495:2,478:3)@9`; a five-minute exact run was inconclusive.  The two-part/mixed-state
+frontier, rather than either fitted witness, is where the work now is.  In particular, literally
+scaling the witness's next split produces the exactly unsolvable residual
+`Sb(247:1,247:1,240:2,231:2)@8`; that continuation is refuted even though the parent state remains
+open.
 
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 
@@ -549,10 +567,9 @@ Carried over from [journal.md](journal.md), unresolved:
   final branch-signature multisets. A second generator is needed and no candidate preserving
   the right invariants has been found. The depth-2 block clue is a conservative 3-block
   rewrite `{AACC, AB, BC} <-> {AA, AC, BBCC}`.
-- **Whether the `m=6` construction scales.** The committed `473:6 @9` continuation does not, but
-  that answers only for one late subtree. The forced prefix reaches a four-part parametric kernel;
-  the 2026-08-10 journal entry separates that kernel from the fitted continuation and records a
-  sound obstruction at its first two nondegenerate parameter values. An alternative large-k root
-  prefix, or a proof that none exists, remains open.
+- **What replaces the refuted `m=6` profile.** The exact `k=10` maximum is 973, reached through
+  `Sb(496:2,477:4)@9`, so the old `BBCD`/closed-form value 976 is dead.  The next task is a
+  parametric construction or obstruction for this `m=2 + m=4` mixed-state frontier.  Do not fit
+  the 973 witness's later subtree or infer a constant three-unit correction from one level.
 - **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs.
   Nothing beyond `m = 4` has a matching upper bound.

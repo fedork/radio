@@ -1,0 +1,31 @@
+# Exact fixed-m frontier replay, 2026-08-10.
+#
+# Build:
+#   clang++ -O3 -std=c++20 -Wall -Wextra -pedantic \
+#       tools/search_singletonization.cpp -o /tmp/search_singletonization
+# Run:
+#   tools/capped_run.sh --seconds 900 --rss-gb 8 \
+#       --label final-frontier-sb-m6-k10 -- \
+#       /tmp/search_singletonization frontier 10 6 974 973
+#
+# The run completed normally in 633 s wall time at 0.06 GB peak RSS.  The two
+# decision lines below are copied verbatim.  The emitted positive tree is committed
+# separately as witnesses/majorized_973_6_at10.tree and independently rechecked by
+# tools/check_witness.py.
+
+n=974 NO wall=576.178s calls=6926477914 assignments=3712815870 memo=810726
+n=973 YES wall=54.4011s calls=627269858 assignments=338059015 memo=862416
+
+# Why this is a maximum rather than two isolated verdicts: the search at depth k is
+# exact (documented in docs/tools.md), and Subgraph Monotonicity makes every n > 974
+# impossible once Sb(974:6) is impossible, while the verified tree proves Sb(973:6).
+#
+# Independent regression controls run before recording the result:
+#   all 25 proven one-part frontiers with k <= 6 and m <= 6 -> reject n+1, accept n
+#   Sb(16:1,12:2)@4  -> NO   (matches tools/refsolve.py and the R_4 worked example)
+#   Sb(16:1,11:2)@4  -> YES  (matches tools/refsolve.py)
+#   Z_6@6            -> YES  (known exact positive)
+#   Z_7@7            -> NO   (independently refuted by R_4)
+#   width-two positive/negative pair from the hierarchy theorem -> YES / NO
+# An AddressSanitizer + UndefinedBehaviorSanitizer build passed representative positive,
+# negative and frontier cases.

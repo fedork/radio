@@ -19,7 +19,7 @@ numerical fit only.
 | 3 | `2^k - k` | k >= 3 | proven-theorem |
 | 4 | `2^k - 2*k + 2` | k >= 3 | conjecture |
 | 5 | `2^k - k*(k-3)/2 - 5` | k >= 4 | conjecture |
-| 6 | `2^k - k*(k-1)/2 - 3` | k >= 4 | conjecture |
+| 6 | `2^k - k*(k-1)/2 - 3` | k >= 4 | refuted |
 | 7 | `2^k - k*k + 4*k - 10` | k >= 5 | conjecture |
 | 8 | `2^k - k*k + 2*k - 2` | k >= 5 | conjecture |
 | 9 | `(31*2^k)/32 - k*k + 2*k - 2` | k >= 5 | conjecture |
@@ -79,10 +79,15 @@ Matches the proven maximum for `k = 3..8`. The `k=9` value 496 has a verified wi
 Exact for `k = 4..8`. The `k=9` value 480 has a verified witness tree,
 `witnesses/canon_480_5_at9.tree`.
 
-## (10) `Sb(2^k - k(k-1)/2 - 3 : 6)` - conjecture
+## (10) `Sb(2^k - k(k-1)/2 - 3 : 6)` - refuted
 
 Exact for `k = 4..8`: gives 7, 19, 46, 104, 225. The `k=9` value 473 has a verified witness
 tree, `witnesses/canon_473_6_at9.tree`.
+
+It fails at `k=10`: the formula predicts 976, while exact synchronized search proves the maximum
+is 973.  The lower witness is `witnesses/majorized_973_6_at10.tree`; the exhaustive 974 rejection
+is retained in `evidence/sb_m6_k10_frontier.txt`.  Thus this row was a finite fit, not a
+construction valid for all `k`.
 
 > **Correction, 2026-08-02.** An earlier write-up of this lemma had
 > `2^k - k(k-5)/2 - 3`, which yields 15, 29, 58, 118, 241 - above the true frontier at every

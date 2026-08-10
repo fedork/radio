@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (m=6 kernel result; two live runs remain).
+don't know it. Last refreshed **2026-08-10** (exact `k=10,m=6` frontier; two live runs remain).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -47,17 +47,19 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   Monotonicity, all proved. The third is elementary but was load-bearing and unwritten: it is
   what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
   on, and what lets a negative certificate store antichains instead of closures.
-- **15 verified witness trees** — `Sa(38)` through `Sa(192)`, plus canonical trees for
+- **16 verified witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
-  `Sb(480:5)@9`. All pass
+  `Sb(480:5)@9`, and the singleton-majorized proof of the exact frontier
+  `Sb(973:6)@10`. All pass
   `tools/check_witness.py`, which re-derives every step without consulting the solver.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
 
 ## What is refuted
 
-Kept on record so it is not re-derived: the `m=11` closed form (violates monotonicity in m),
-the hand-typed `409?` as a *derivation* (though see below — it is *consistent* with the
+Kept on record so it is not re-derived: the `m=6` closed form and `BBCD` profile (both predict
+`n(10,6)=976`, while the exact maximum is 973), the `m=11` closed form (violates monotonicity in
+m), the hand-typed `409?` as a *derivation* (though see below — it is *consistent* with the
 profile model), and 31 verdicts from the 2023 build.
 
 ## Where H4 stands — the most active thread
@@ -125,9 +127,12 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   the mirror filter is top-level dedup only). But it *does* require every leaf to be a
   `G_k`-atom singleton state, so conclusions about tree interiors from those trees are
   conditional on that hypothesis.
-- **Scalable recursions:** `n(k,5) = n(k-1,2) + n(k-1,6)` (numerical only) and
-  `n(k,6) = n(k-1,4) + n(k-1,5)` (realised by a split, outcome-0 saturated). Exact for k=5..9.
-  See [conjectures.md](conjectures.md#scalable-constructions-for-m5-and-m6-2026-08-03).
+- **The apparent m=6 recursion is refuted at its first extrapolation.**
+  `n(k,6) = n(k-1,4) + n(k-1,5)` is exact for `k=5..9` but predicts 976 at `k=10`; the exact
+  value is 973.  The verified construction still uses a `2+4` root and saturates the `m=4`
+  pure child, but backs the other width down from 480 to 477.  This is one datum, not a new
+  constant-correction formula.  See
+  [conjectures.md](conjectures.md#finite-m5m6-recurrences-and-the-k10-break-2026-08-10).
 - **Ruled out:** the non-adaptive reformulation. Each test returns
   `[x∈S] + [y∈S]`, so non-adaptive solving is a Sidon condition
   `(U−U) ∩ (V−V) = {0}` — exact for m ≤ 2, but strictly weaker from m = 3 (k=4, m=5: 6 vs 9).
@@ -149,7 +154,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 
 Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 `tools/extract_evidence.py` (`certify` / `audit`), `tools/artifacts.sh`
-(`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`.
+(`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
+fixed-small-m exact recurrence `tools/search_singletonization.cpp`.
 
 Artifact store `fedork/radio-data` (private): 7 tags, 12 assets plus a manifest per tag,
 367 MB stored, `check-index` green.
@@ -329,7 +335,7 @@ distinguish it from the real winning split. On a residual four-part negative, is
 continues, is a genuinely cheap approximation to deeper synchronization for **ordering**, not an
 unconditional hierarchy pre-pass.
 
-### Theoretical m=6 track: forced prefix versus fitted continuation (2026-08-10)
+### Theoretical m=6 track: exact k=10 break beyond the fitted continuation (2026-08-10)
 
 The `473:6@9` witness must not be treated as a canonical scalable object. Exhaustive data support
 only its early trunk: `Sb(110:3,115:2,121:1)@7` has two working splits, one outcome-complement pair.
@@ -350,11 +356,24 @@ normalized child triples and fails `R_4`; `Z_8` has 424 / 101 and also fails `R_
 solvable state satisfies every `R_d`, both kernels are unsolvable. Reproduce with
 `tools/bundled_majorization.py m6-kernel <t> 4` (21.2 and 57.5 CPU seconds in the recorded runs).
 
-This does **not** yet refute the conjectured single-part `m=6` frontier at `k>=10`: it remains to
-prove that a large-k optimal root is forced into this same kernel. The next theoretical targets
-are therefore (1) classify or force the large-k root prefix, and (2) turn the now-stable finite
-`R_1` case pattern into a parametric `Z_t` obstruction for every `t>=7`. Do not infer either from
-the shape of the `k=9` witness tree.
+The missing root classification is now settled at the first new level.  The exact small-m
+synchronized search exhausts every strategy for `Sb(974:6)@10`, while a 115-node tree proves
+`Sb(973:6)@10`; hence **`n(10,6)=973`**.  The old formula and `BBCD` profile both predict 976 and
+are refuted.  At the successful root `[477:2]`, the children are `Sb(477:2)`,
+`Sb(496:2,477:4)`, and `Sb(496:4)`: it keeps the saturated `m=4` side but avoids the dead
+`Z_7` continuation by giving up three units on the other width.  The centered `3+3` alternatives
+`Sb(488:3,488:3)@9` (total 976) and `Sb(487:3,486:3)@9` (total 973) are both exactly unsolvable;
+this does not classify every working root at 973.
+
+The proof sources are `evidence/sb_m6_k10_frontier.txt` and
+`witnesses/majorized_973_6_at10.tree`.  `tools/search_singletonization.cpp` is independent of the
+old fitted witness: at full depth its recurrence is exact solvability, it enumerates the complete
+short deficit interval for each cut, and its positive tree is re-derived by `check_witness.py`.
+The next large-k target is the two-bundle mixed frontier behind the working `2+4` root.  A tempting
+`-3` lift to `k=11` reduces to `Sb(503:1,495:2,478:3)@9`, but its first five-minute exact run timed
+out without a verdict.  The literal scaled next split is nevertheless dead: it produces the
+exactly unsolvable residual `Sb(247:1,247:1,240:2,231:2)@8` (277.622 s).  A different first split
+of the parent remains possible.  Do not promote that one-point correction to a formula.
 
 ## Immediate next steps
 

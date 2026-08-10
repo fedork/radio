@@ -44,7 +44,7 @@ Every row carries a **bound** and a **status**:
 
 | status | meaning |
 |---|---|
-| `proven-exhaustive` | an artifact on record contains both the can-solve line at `n` and the can't-solve line at `n+1` |
+| `proven-exhaustive` | retained evidence contains a complete rejection at `n+1` and either a positive verdict or independently checked witness at `n` |
 | `proven-theorem` | follows from a proved theorem or lemma, which `source` names |
 | `witness` | a machine-checked witness tree exists; lower bound only |
 | `solver-lower` | the solver reported a solution, not independently recheckable |

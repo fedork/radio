@@ -5,7 +5,7 @@ KNOWN WORK REMAINING - see docs/research-plan.md item P5:
   - the K=8 table below is STALE at m=10..17; correct values are in data/pareto_sb.csv
   - lemma numbering: (7) duplicates (5); "(7) holds true k up to 8" refers to (u1)
   - <TODO> sections: Terminology, Unit Group Triviality Lemma, Insights, Refuted lemmas
-  - lemma (10) has been corrected here already: k(k-1)/2, not k(k-5)/2
+  - lemma (10)'s transcription is corrected, but the corrected conjecture is now refuted at k=10
   - add lemma (12) for m=8 and the G_k = sum-of-binomials closed form
   - the Sa table should mark k<=9 proven vs k=10 constructed
 Do not treat any number in this file as authoritative; data/*.csv is.
@@ -148,11 +148,13 @@ Sb(2^(k-1)-1:1) (solvable per (1))
 (7) holds true k up to 8 and is expected to also hold for any k, but the author was unable to find a rigorous proof. 
 
 (9) Sb(2^k-k(k-3)/2-5 : 5) solvable in k  
-(10) Sb(2^k-k(k-1)/2-3 : 6) solvable in k  
 (11) Sb(2^k-k^2+4k-10 : 7) solvable in k
 
 **Proposed and refuted lemmas:**  
- \<TODO>
+
+(10) `Sb(2^k-k(k-1)/2-3 : 6)` is solvable in `k`.  It matches `k=4..9` but is false at
+`k=10`: it predicts 976, whereas the exact maximum is 973.  See
+`../docs/theorems/special-cases.md` and `../evidence/sb_m6_k10_frontier.txt`.
 
 **Solution for 192 coins in 10 tests:**
 
