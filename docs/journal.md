@@ -4209,3 +4209,44 @@ source.  Its 232,725-line parsed checkpoint remains at
 `/Users/fedor/radio-runs/sa193-local-713b7d6-trial1/sa193.checkpoint` and is sound for a same-log
 resume, but resuming locally before the memory representation changes would merely reproduce the
 swap failure.
+
+## 2026-08-10 — the cache blowup is two multipliers, and both are now measured
+
+Replaying the local trial's own 232,725-line parsed checkpoint reconstructs the result cache without
+running a query or building a split table.  The heavy k=5..7 roots reserve **698,174,470** dense
+pointer slots, or **5.20 GiB requested**, for 90.7 million live transitions.  This reconciles the
+7.1 GB `vmmap` footprint: roughly 5.2 GiB is the result trie and the remainder is split tables,
+relations, allocator metadata and fragmentation.  The exact fact file itself is 8.0 MiB.
+
+The first multiplier is semantic: every printed verdict is expanded to its monotonicity closure.
+Ten thousand positives alone create 7.81 million internal arrays / 1.15 GB requested, against
+48,898 arrays / 118 MB for ten thousand negatives.  Positive k=5 and k=6 together account for
+90.9 million used slots from only 12,919 exact facts.  An antichain is therefore the information-
+minimal representation, but querying a mutable dominance index billions of times is a separate
+performance problem; do not jump straight from this measurement to removing positive closure.
+
+The second multiplier is representational, and it has a free subcase.  Negative k=7 is only 0.64%
+occupied.  `cacheCantSolve` allocates before it knows whether a recursive closure insertion adds
+anything, leaving **266,263 completely empty arrays**.  A scratch prototype rolls back an array
+when that call contributes zero updates.  It reduces the combined k=7 root from 2.390 GB to
+0.908 GB requested (62.0%), makes checkpoint replay faster, matches all 1,039 deterministic
+regression answers and passes ASan+UBSan.  It changes no lookup or successful closure insertion.
+
+After that rollback, the existing dense layout would need 3.82 GiB for the heavy roots.  Merely
+storing the same dense slots as uint32 offsets in per-k contiguous arenas models at **1.91 GiB**
+with the same one-indexed-load lookup.  An adaptive exact-cap layout (dense when occupied, packed
+sparse otherwise) models at 1.05 GiB with 64-bit children or 0.58 GiB with uint32 children.  Those
+last figures exclude growth slack and are design estimates, not benchmark results; the previous
+all-sparse 64-bit prototype really achieved 3.4x at 40,000 inserts but cost 12.4% throughput.
+
+Implementation order implied by the evidence:
+
+1. land zero-update rollback;
+2. replace pointer slots with per-k uint32 arena offsets, retaining dense indexing;
+3. rerun the local checkpoint/control before adding lookup complexity;
+4. only if necessary, add an adaptive sparse container for low-occupancy wide nodes;
+5. treat lazy positive closure as the larger but higher-risk final step, behind a bounded exact
+   L1 cache and an antichain/dominance L2.
+
+The complete replay counts and layout formulas are retained in
+`evidence/cache_shape_sa193_local.txt`.

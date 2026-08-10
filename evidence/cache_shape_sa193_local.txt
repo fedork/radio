@@ -1,0 +1,50 @@
+# Cache-shape replay of the 2026-08-10 local Sa(193) trial
+#
+# Source: sa193-local-2026-08-10:out_sa193.txt
+# Engine: 713b7d6 (full-star majorization + level-lazy split tables)
+# Parsed checkpoint: 232,725 exact verdicts, 8,379,714 bytes
+#
+# Method: filter the parsed checkpoint by k while preserving original order, call init() and
+# parse_file(), then read radiobase.c's alloc_count/alloc_size.  No query was run, so no split
+# table was built.  A read-only trie walk re-derived each dense-array width with clamp_sbb and
+# counted non-NULL child slots.  "transitions" excludes the internal slot-0 positive marker.
+#
+# The rollback prototype changes only cacheCantSolve: when a call allocated its array but all
+# recursive insertions returned zero updates, free that new array and restore the prior NULL/CAN
+# marker.  It matched all 1,039 split_regression verdicts and passed ASan+UBSan on that corpus.
+#
+# Compact estimates are exact-cap layout models, not measured implementations.  Per internal
+# node, sparse32 is an 8-byte header + uint16 keys + uint32 child handles; sparse64 is a 16-byte
+# header + uint16 keys + 64-bit child handles.  Adaptive takes min(dense,sparse) independently at
+# each node.  Dynamic growth capacity and allocator metadata are excluded.
+
+exact facts by sign and level
+k=5  positive=8,111  negative=99,880
+k=6  positive=4,808  negative=93,333
+k=7  positive=846    negative=5,649
+
+current dense trie, signs combined in original order
+k=5 arrays=10,263,173 slots=161,697,931 transitions=41,929,986 requested=1,293,583,448 bytes
+k=6 arrays=2,477,976  slots=237,760,172 transitions=47,128,244 requested=1,902,081,376 bytes
+k=7 arrays=380,837    slots=298,716,367 transitions=1,916,536  requested=2,389,730,936 bytes
+heavy total: slots=698,174,470 requested=5,585,395,760 bytes (5.20 GiB)
+
+after zero-update negative-array rollback
+k=5 arrays=10,263,173 slots=161,697,931 transitions=41,929,986 requested=1,293,583,448 bytes
+k=6 arrays=2,455,766  slots=237,104,109 transitions=47,108,123 requested=1,896,832,872 bytes
+k=7 arrays=100,973    slots=113,497,327 transitions=1,636,697  requested=907,978,616 bytes
+heavy total: slots=512,299,367 requested=4,098,394,936 bytes (3.82 GiB)
+
+exact-cap layout estimates after rollback
+                 k=5       k=6       k=7       heavy total
+dense uint32     616.8 MiB  904.5 MiB 433.0 MiB 1,954.3 MiB
+adaptive uint64  581.9 MiB  480.7 MiB  17.5 MiB 1,080.1 MiB
+adaptive uint32  315.3 MiB  272.2 MiB  10.2 MiB   597.7 MiB
+
+standalone sign diagnosis
+10,000 positive facts: arrays=7,812,575 slots=143,276,929 requested=1,146,215,432 bytes
+10,000 negative facts: arrays=48,898 slots=14,771,583 requested=118,172,664 bytes
+positive k=5: 8,111 facts -> 43,748,097 used slots, 800,843,936 requested bytes
+positive k=6: 4,808 facts -> 47,135,021 used slots, 1,357,395,936 requested bytes
+negative k=7: 5,649 facts -> 1,628,534 used slots, 2,385,851,136 requested bytes
+negative k=7 after rollback: 1,348,633 used slots, 903,662,000 requested bytes

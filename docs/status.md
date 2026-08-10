@@ -201,6 +201,16 @@ full 24 GB local run practical; compacting or bounding the result cache remains 
 The raw log is archived as `sa193-local-2026-08-10:out_sa193.txt` and its same-run parsed checkpoint
 remains locally at `/Users/fedor/radio-runs/sa193-local-713b7d6-trial1/sa193.checkpoint`.
 
+Checkpoint replay now explains the footprint.  The k=5..7 cache roots reserve **5.20 GiB** for
+90.7 million live transitions; the 232,725 exact facts occupy only 8.0 MiB in parsed form.  Two
+different multipliers are involved: eager dominance-closure materialisation (especially positive
+k=5/6 facts) and sparse dense arrays (especially negative k=7).  The first implementation target is
+not a hash table or eviction: roll back `cacheCantSolve` arrays whose recursive insertion adds
+nothing, then use dense uint32 arena offsets per k.  The rollback alone models the heavy roots at
+3.82 GiB; rollback plus uint32 dense slots at 1.91 GiB, without changing the indexed lookup.  See
+[`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt) for the exact
+counts and the separately labelled adaptive-layout estimates.
+
 Historical lesson, retained without treating the old processes as live: before full-star
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
 majorization removes that mode strongly enough that `run3` is instead dominated by k=7.  Optimising
