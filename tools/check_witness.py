@@ -7,9 +7,10 @@ a proof you can trust without trusting radiobase.c.
 
 Two input formats are auto-detected:
 
-  canonical  - output of radio_canon_search_generic
+  canonical  - output of radio_canon_search_generic or search_singletonization
                `<state> @k --[split]-->` with three indented children, terminating in
-               `<state> @k [canonical U_k]` leaves.
+               `<state> @k [canonical U_k]` leaves (atom sub-multisets) or
+               `<state> @k [majorized G_k]` leaves (arbitrary singleton sequences).
 
   numbered   - output of radio_print.c
                `N. (in k) (used r) <state> take[...]:` followed by three
@@ -28,10 +29,9 @@ What is checked, in both formats:
 
 Format-specific:
 
-  canonical  * every leaf is a singleton state whose parts form a sub-multiset of the
-               singleton base sequence G_k, hence solvable in k by the Singleton
-               Majorization Theorem (docs/theorems/singleton-majorization.md). This is
-               what makes a canonical tree a self-contained proof.
+  canonical  * every leaf is a singleton state certified either as a sub-multiset of
+               G_k or by direct weak majorization against G_k.  In both cases the
+               Singleton Majorization Theorem makes the tree a self-contained proof.
 
   numbered   * a `(line M)` reference is legal iff the state at line M dominates the child
                after deleting unit groups (1:1), by the Unit-Group Elimination Theorem
@@ -162,14 +162,17 @@ def parse_split(text: str) -> List[Part]:
 
 # ------------------------------------------------------------------- canonical format
 
-CANON = re.compile(r"^\s*(.*?)\s+@(\d+)\s+(?:\[canonical U_(\d+)\]|--\[(.*?)\]-->)\s*$")
+CANON = re.compile(
+    r"^\s*(.*?)\s+@(\d+)\s+(?:\[(canonical U|majorized G)_(\d+)\]|--\[(.*?)\]-->)\s*$"
+)
 
 
 class CanonNode:
-    __slots__ = ("state", "k", "canonical", "split", "text", "kids")
+    __slots__ = ("state", "k", "terminal", "stopk", "split", "text", "kids")
 
-    def __init__(self, state, k, canonical, split, text):
-        self.state, self.k, self.canonical, self.split, self.text = state, k, canonical, split, text
+    def __init__(self, state, k, terminal, stopk, split, text):
+        self.state, self.k, self.terminal, self.stopk = state, k, terminal, stopk
+        self.split, self.text = split, text
         self.kids: List["CanonNode"] = []
 
 
@@ -179,8 +182,8 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
         m = CANON.match(line)
         if m:
             seq.append((parse_state(m.group(1)), int(m.group(2)),
-                        int(m.group(3)) if m.group(3) else None,
-                        parse_split(m.group(4)) if m.group(4) else None,
+                        m.group(3), int(m.group(4)) if m.group(4) else None,
+                        parse_split(m.group(5)) if m.group(5) else None,
                         m.group(1).strip()))
     if not seq:
         errs.append("no parseable nodes")
@@ -196,10 +199,10 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
         if pos >= len(seq):
             errs.append("tree truncated: ran out of nodes")
             return None
-        state, k, canonical, split, text = seq[pos]
+        state, k, terminal, stopk, split, text = seq[pos]
         pos += 1
-        node = CanonNode(state, k, canonical, split, text)
-        if canonical is None:
+        node = CanonNode(state, k, terminal, stopk, split, text)
+        if terminal is None:
             for _ in range(3):
                 kid = build()
                 if kid is None:
@@ -222,18 +225,30 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
         nonlocal splits
         if mass(n.state) > 3 ** n.k:
             errs.append(f"{n.text} @{n.k}: mass {mass(n.state)} exceeds 3^{n.k}")
-        if n.canonical is not None:
-            if n.canonical != n.k:
-                errs.append(f"{n.text}: labelled U_{n.canonical} but sits at depth {n.k}")
+        if n.terminal is not None:
+            if n.stopk != n.k:
+                errs.append(f"{n.text}: labelled {n.terminal}_{n.stopk} but sits at depth {n.k}")
             norm = normalize(n.state)
             if any(b != 1 for _, b in norm):
-                errs.append(f"{n.text} @{n.k}: canonical leaf has a non-singleton part")
+                errs.append(f"{n.text} @{n.k}: certified leaf has a non-singleton part")
             else:
-                base = Counter(singleton_base(n.k))
-                need = Counter(a for a, _ in norm)
-                if not all(base[v] >= c for v, c in need.items()):
-                    errs.append(f"{n.text} @{n.k}: not a sub-multiset of G_{n.k}, "
-                                f"so majorization does not certify it")
+                base_values = singleton_base(n.k)
+                widths = sorted((a for a, _ in norm), reverse=True)
+                if n.terminal == "canonical U":
+                    base = Counter(base_values)
+                    need = Counter(widths)
+                    if not all(base[v] >= c for v, c in need.items()):
+                        errs.append(f"{n.text} @{n.k}: not a sub-multiset of G_{n.k}, "
+                                    f"so its canonical label is false")
+                else:
+                    left = right = 0
+                    for i, width in enumerate(widths[:len(base_values)]):
+                        left += width
+                        right += base_values[i]
+                        if left > right:
+                            errs.append(f"{n.text} @{n.k}: singleton prefix {i + 1} "
+                                        f"has sum {left} > {right} in G_{n.k}")
+                            break
             leaves[n.k] += 1
             return
         splits += 1
@@ -264,7 +279,7 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
         errs.append(f"{len(seq) - pos} trailing nodes not attached to any tree")
     names = ", ".join(f"{r.text}@{r.k}" for r in roots[:3]) + ("..." if len(roots) > 3 else "")
     return (f"{len(seq)} nodes, {len(roots)} tree(s) [{names}], "
-            f"{splits} splits, {sum(leaves.values())} canonical leaves")
+            f"{splits} splits, {sum(leaves.values())} certified leaves")
 
 
 # -------------------------------------------------------------------- numbered format
