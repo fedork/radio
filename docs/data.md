@@ -102,6 +102,8 @@ re-verify from first principles, so its era does not matter.
 | tag | contents | raw | audited |
 |---|---|---:|---|
 | `sa193-local-2026-08-10` | `out_sa193.txt` — cold current-engine local trial; `Sa(192)` control passed, partial `Sa(193)` search was stopped at 7.1 GB `vmmap` footprint | 26 M | 0 contradictions among 751 comparable states; **aborted, no `Sa(193)` verdict** |
+| `bounded-probe-2026-08-11` | cold `Sa(192)` control plus focused k=5/7/8/9 scheduler replays; all carry complete embedded build/run provenance | 15.8 M | 1,038-answer regression and sanitizer gates passed; performance/positive-path evidence only |
+| `bounded-probe-rejected-2026-08-11` | universal two-second probe experiments: the enclosing k=8 pass timed out and the cold control re-entered an unbounded pass-2 dive | 57.0 M | rejected performance experiments; no negative claim |
 
 ### Not archived
 

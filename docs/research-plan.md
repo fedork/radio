@@ -42,7 +42,7 @@ trees, mechanical invariant checks, agent instructions, artifact archival.
 green, and every artifact cited by `data/*.csv` is fetchable by tag.
 
 Delivered: source-of-truth CSVs with per-cell `bound`/`status`/`source`; 13 verified witness
-trees; four checking tools; the artifact store `fedork/radio-data` (8 tags, round-trip
+trees; four checking tools; the artifact store `fedork/radio-data` (10 tags, round-trip
 verified) with the archiving decision recorded in [data.md](data.md) including what was
 deliberately not kept; the vendor-neutral `AGENTS.md` brief with a session-end protocol;
 [status.md](status.md) as the cold-start snapshot. Merged to `main` and pushed 2026-08-03.
@@ -194,17 +194,21 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 now has two distinct tracks while `run3` continues remotely. The solver track
-still needs a bounded ordering approximation rather than another unconditional hierarchy level. The
-theory track should work from the exact `k=10,m=6` mixed-child boundary toward a parametric large-k
-construction or obstruction, and only then recover small k backwards. Do not use witness-tree shape
-as evidence that either track has a unique continuation.
+P6 now has two distinct tracks while `run3` continues remotely. The solver track has a first bounded
+ordering approximation in `45c34fd`: long candidates receive a geometric local probe while the
+one/two-segment constructive spine keeps the shared parent budget. It reproduces the cold
+`Sa(192)` path in 376.293 CPU seconds, but must still be measured on a retained `Sa(193)` segment;
+do not add split history before that test. The theory track should work from the exact `k=10,m=6`
+mixed-child boundary toward a parametric large-k construction or obstruction, and only then recover
+small k backwards. Do not use witness-tree shape as evidence that either track has a unique
+continuation.
 
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`
 control passes at 0.35 GB peak RSS and 711.7 CPU seconds, with no remaining measured premium over the
-734.5-second pre-compaction control.  Corrected cold AWS `run7` and a same-chain local continuation
-at `e648e83` are active beside frozen `run3`; the intervening `c13b5d3` deadline experiment is not a
-valid performance baseline.  H3 still sits awkwardly—the answer is probably
+734.5-second pre-compaction control. AWS `run7` and the same-chain local continuation are still alive
+but use the now-obsolete `e648e83` progress-gated pass-2 scheduler; preserve them before retirement.
+Run3 remains the untouched live incumbent. Neither `c13b5d3` nor `e648e83` is a valid performance
+baseline for the new scheduler. H3 still sits awkwardly—the answer is probably
 192, the evidence is probably right, and neither "probably" belongs in a paper.  Resume only from a
 run's own output and retain every raw segment; compact does not mean bounded.

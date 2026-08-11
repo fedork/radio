@@ -4634,19 +4634,21 @@ finished its mandatory `Sa(192)` gate, so this records a verified cold launch an
 not a solver verdict.  The status view displayed all three live builds at the time; current
 `tools/sa193_status.sh --all` retains their final snapshots.
 
-## 2026-08-10 — run4/run5 deadline diagnosis (retracted 2026-08-11)
+## 2026-08-10 — run4/run5 deadline diagnosis (first correction; superseded later 2026-08-11)
 
-**Retraction.** The observations in this entry were real, but the interpretation was backwards.
-Read-only GDB found run4 and run5 in the same information-tight 14-part k=5 child, below the first
-required negative-cache increment.  That is the intended depth-first dive, not a livelock: a
-bounded state is deliberately unable to throw away the pass until it contributes facts, and pass 2
-hands an unresolved child `NO_DEADLINE`.  The 12-second local replay likewise demonstrated that
-policy; it did not demonstrate a broken deadline.
+**First correction, itself superseded.** The observations in this entry were real, but they did not
+yet prove the interpretation. Read-only GDB found run4 and run5 in the same information-tight
+14-part k=5 child, below the first required negative-cache increment. Source history showed that
+this was the *intended* depth-first policy: a bounded state could not throw away the pass until it
+contributed facts, and pass 2 handed an unresolved child `NO_DEADLINE`. The 12-second local replay
+demonstrated that policy, not whether it would terminate usefully. Run7 later supplied the missing
+long-duration evidence that the intended policy loses its finite escape on a saturated cache.
 
 Commit `c13b5d3`, originally recorded here as the repair, instead broke both invariants.  It allowed
 zero-progress expiry and polled while still enumerating partial prefixes, before pass 2 could make
-the `NO_DEADLINE` handoff.  Run4 and run5 were therefore stopped prematurely at
-2026-08-11 05:37:59 UTC.  Run6 was a valid cold launch and its printed verdicts remain definitive,
+the `NO_DEADLINE` handoff. Run4 and run5 were stopped before the distinction was proved at
+2026-08-11 05:37:59 UTC. Run7 later vindicated the operational decision, though not the original
+claim that those early snapshots alone proved a livelock. Run6 was a valid cold launch and its printed verdicts remain definitive,
 but it is not a valid timing/progress comparison.  The corrected debugger evidence, historical
 state machine, regressions and run disposition supersede this entry in
 [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
@@ -4686,7 +4688,10 @@ reproduced the positive control from cache, and resumed `Sa(193)`.  Its first fo
 returned normally; four consecutive samples through 06:06 UTC remained near 1.05 GiB with zero
 probe failures.  All three raw segment logs must be retained for a closed eventual proof.
 
-## 2026-08-11 — restored the depth-first deadline policy; run7 replaces run6
+## 2026-08-11 — restored the historical policy; run7 exposes its remaining failure
+
+This entry records why `e648e83` was launched. Its final recommendation is superseded by the bounded
+probe result later in this journal: run7 showed that source-history intent was not sufficient.
 
 The slow `run6` attempts made the contradiction visible: multiple k=8 calls consumed more than
 3,000 seconds and then produced no verdict, even though the exhaustive phase should have delegated
@@ -4791,3 +4796,57 @@ folds the exact inherited checkpoint plus this segment's raw verdicts into
 by the managed command's descendant cleanup, exactly as the tooling notes warn; the persistent
 foreground session survived and was independently observed under the same session parent as the
 original supervisor.
+
+## 2026-08-11 — bounded long-state probes recover the cold `Sa(192)` happy path
+
+The restored historical deadline policy was intentional but not safe. Run7 reached the same
+information-tight 14-part k=5 state as run4/run5 beneath a finite parent, then exhaustive pass 2
+converted it to `NO_DEADLINE`. The caller required one more negative cache fact before it could
+honour expiry, while the warm compact cache produced no new fact. At the 21:26 UTC snapshot the
+activation had consumed 19,859 CPU seconds and 270,697,771,548 admitted prefixes without completing
+the `Sa(192)` control. This is the evidence the earlier run4/run5 snapshot lacked: the old rule does
+not merely allow a useful dive; it removes the finite caller's escape when cache progress is zero.
+
+The replacement in `45c34fd` deliberately has no split hint, cursor or persistent score:
+
+* an expired finite parent is inherited as expired and may return `MAYBE` with no cache mutation;
+* pass 2 never turns a finite descendant into `NO_DEADLINE`;
+* one- and two-segment states keep the shared parent allowance, matching the observed
+  ratio-preserving/opposed-branch constructive spine;
+* states with at least three segments initially probe a child for two CPU seconds;
+* an unresolved exhaustive pass doubles that local quantum, so a retry permits strictly more work
+  even when the cache is saturated.
+
+Several superficially simpler versions failed and were removed. A universal two-second slice solved
+the known long k=7 state but starved its k=8 parent: after the 360-second cap the first pass was still
+at 1,319 admitted candidates and `left=794/1149` (0.53 GiB peak RSS). The corresponding cold control
+eventually reached root pass 2 and handed candidate 5 an unbounded child, so it was stopped at
+16 m 20 s. Fixed 30/40-second “commit after two TRUE children” attempts spent their allowance on bad
+near-candidates, while repeated two-second passes keyed to cache growth restarted the same prefix;
+both good and bad states continued producing facts. Persisting the best-looking split was rejected
+because it stores an ordering artifact rather than a structural reason. The two rejected raw logs
+are archived under `bounded-probe-rejected-2026-08-11`.
+
+The structural distinction is the part that made the composition work. Against the run7-derived
+checkpoint, the known four-part k=7 state solved in 22.0 CPU seconds with
+`[17:8,27:13,10:8,12:0]`. Its two-part k=8 parent then solved in the same 22.0 seconds with
+`[16:15,45:23]`, the symmetric form of `[33:32,19:9]`; `Sb(112:80)@9` solved in the same 22.0 seconds
+with `[48:32]`, symmetric to `[64:48]`. No preferred split was carried between calls.
+
+The decisive normal-learning, genuinely cold control completed `Sb(112:80)@9` in 281 CPU seconds
+after 446 admitted top-level candidates and completed `Sa(192)@10` in 376.293 CPU seconds. The
+wrapper measured 382 seconds wall and 0.18 GiB peak RSS. An exact replay of run7's saturated k=5
+state with a one-second finite parent returned `MAYBE` in 1.000 CPU second with
+`negative_delta=0`. These raw outputs and their embedded build/run provenance are archived as
+`bounded-probe-2026-08-11`; the detailed index is
+[`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
+
+Correctness gates did not rely on those timings. The optimized one/two-part corpus matched all 1,038
+prior-main answers byte for byte after normalization, SHA-256
+`2cf020540919d6fe2f8da20636ecceb8f8d14ccc4d5a3cd599ac0a91e99eade2`; ASan+UBSan produced the same
+answers with no diagnostic. `tools/deadline_regression.c` now locks exhausted-parent inheritance,
+the short shared spine, the long local slice and expired cache-miss behaviour. Repository table,
+witness and documentation checks are run again after this record is rendered.
+
+Run3 was not touched. Run7 and the local `e648e83` continuation were left alive pending archival and
+an explicit decision to start a multi-hour replacement, but neither is now a scheduler baseline.

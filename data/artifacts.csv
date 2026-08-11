@@ -12,3 +12,10 @@ sa193-2023,out26_3.txt.zst,out26_3.txt,2023,SUSPECT ERA,the other 15 + the Sa(19
 trees-2023,print_trees_2023.tar.zst,print38*.txt print65*.txt print112*.txt print192*.txt,2023,positives only,source of 13 verified witness trees
 trees-2023,fullsolve_2023.tar.zst,full_*.txt (18 files),2023,positives only,source of data/exhaustive_multipart.csv
 sa193-local-2026-08-10,out_sa193.txt.zst,out_sa193.txt,2026,partial clean,"cold current-engine trial; control passed, Sa(193) aborted without a verdict at 7.1 GB vmmap footprint"
+bounded-probe-2026-08-11,sa192-structural-final-cold.out.zst,sa192-structural-final-cold.out,2026,validated,"cold Sa(192) scheduler control; solvable in 376.293 CPU s"
+bounded-probe-2026-08-11,k7-structural.out.zst,k7-structural.out,2026,validated,"run7-checkpoint replay of the long k=7 positive path"
+bounded-probe-2026-08-11,k8-structural.out.zst,k8-structural.out,2026,validated,"run7-checkpoint replay of the enclosing two-segment k=8 path"
+bounded-probe-2026-08-11,k9-structural.out.zst,k9-structural.out,2026,validated,"run7-checkpoint replay of Sb(112:80) in 9"
+bounded-probe-2026-08-11,finite-k5-final.out.zst,finite-k5-final.out,2026,validated,"one-second finite replay of the saturated run7 k=5 child"
+bounded-probe-rejected-2026-08-11,k8-iterative.out.zst,k8-iterative.out,2026,performance-only,"universal two-second probe failed to finish its first k=8 pass in 360 s"
+bounded-probe-rejected-2026-08-11,sa192-core-cold.out.zst,sa192-core-cold.out,2026,performance-only,"universal two-second cold control re-entered an unbounded root pass-2 dive"

@@ -47,7 +47,7 @@ pre-banner historical file whose limitation is explicitly recorded in `docs/data
 | `(n1:n2)` pair -> `sbb` integer id; level-keyed split tables built lazily | `init`, `ensure_splits` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: exact-prefix trie with maximal-positive/minimal-negative Pareto fronts in its last part | `cacheCanSolve`, `cacheCantSolve`, `checkCache` |
-| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST-restricted first pass, exhaustive second pass, deadlines | `canSolveB` |
+| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, shared short-state budget and geometric long-state probes | `canSolveB` |
 | Unit-group stripping before search | start of `canSolveB` |
 | Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
 | `Sa` recursion | `canSolveA` |
@@ -191,11 +191,14 @@ Two behaviours to be aware of:
 
 - **`MAYBE` is a real answer.** Deadlines cause `canSolveB` to give up and return `MAYBE`
   rather than `FALSE`. A `can't solve` line in the output is a genuine negative; the absence
-  of a line is not. The budget is deliberately subordinate to depth-first progress: a bounded
-  state cannot bail until it has added negative cache facts, and pass 2 gives an unresolved child
-  `NO_DEADLINE`. Polling during partial-prefix enumeration bypasses that handoff and was briefly
-  introduced in `c13b5d3`; `e648e83` restored the historical policy and
-  `tools/deadline_regression.c` now checks it.
+  of a line is not. A finite state may now bail without adding a cache fact, but it never gives an
+  unresolved descendant `NO_DEADLINE` or refills an expired parent. One- and two-segment states
+  retain the shared parent allowance; states with three or more segments give each speculative
+  child an initial two-second slice. An unresolved exhaustive pass doubles that local slice, so an
+  unbounded root still deepens monotonically without persisting a preferred split. Finite prefix
+  enumeration polls the shared deadline every 65,536 admitted prefixes. The exact run7 failure and
+  the superseded progress-gated policy are recorded in
+  [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
 - **The search is not byte-deterministic.** The FAST pass was briefly removed on 2026-08-03 and
   restored on 2026-08-04 after the solver sank into known-solvable branches. On a solution,
   `canSolveB` can promote a previously non-FAST option with `s[FAST] = 1`, so later search order

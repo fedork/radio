@@ -1,124 +1,121 @@
-# Deadline investigation corrected: preserve the depth-first dive, 2026-08-11
+# Deadline investigation, final correction: bounded breadth with a short constructive spine
 
-Retraction
-----------
+Status: measured engine diagnosis and performance evidence, 2026-08-11.  The retained raw logs are
+in the private artifact tags `bounded-probe-2026-08-11` and
+`bounded-probe-rejected-2026-08-11`; every archived log passes the strict embedded-provenance check.
 
-The original version of this file called the long `run4`/`run5` child a deadline livelock and
-treated commit `c13b5d3` as its repair.  That diagnosis was wrong.  The long child was the intended
-depth-first dive, and `c13b5d3` broke the policy that makes such dives useful.  This file supersedes
-the mistaken account in place while retaining the observations that led to it.
+## Why this file changed twice
 
-What the debuggers actually established
-----------------------------------------
+The original 2026-08-10 account called the long run4/run5 child a deadline livelock.  The first
+2026-08-11 correction retracted that claim after source history showed the behaviour was deliberate:
+a bounded call had to add a negative cache fact before returning `MAYBE`, and exhaustive pass 2 gave
+an unresolved child `NO_DEADLINE`.  That correction was right about what the old code *intended* but
+wrong to conclude that the intention was safe.
 
-AWS `run4` (compact cache, frozen bundle `6af384e`) and `run5` (plus exact L1, `290a892`) were both
-inside the same information-tight child:
+Run7 supplied the missing evidence.  After 5 h 40 m it was still inside the same information-tight
+state, now after 270,697,771,548 admitted prefixes:
 
-  Sb(9:4,8:4,8:1,5:5,15:1,5:3,6:3,7:2,5:3,11:1,8:2,11:1,14:1,13:1)@5.
+```
+Sb(9:4,8:4,8:1,5:5,15:1,5:3,6:3,7:2,5:3,11:1,8:2,11:1,14:1,13:1)@5
+```
 
-Its pair mass is `243 = 3^5`.  Run4 was in exhaustive pass 2 after 144,042,842,325 admitted
-prefixes; run5 was in pass 1 after 10,516,061,204.  Both had global
-`cant_solve_count=98,355` and local `cant_solve_count_min=98,356`.  Byte-identical debug rebuilds
-and read-only GDB attaches support those frames:
+Its pair mass is exactly `243 = 3^5`.  The k=5 call was in exhaustive pass 2 beneath a finite
+parent, but the old pass-2 rule had converted the child to `NO_DEADLINE`.  The global negative count
+remained one below the caller's required minimum.  With a saturated cache, zero new negative facts
+is normal; tying cancellation to such a mutation therefore removes the finite escape exactly when
+it is most needed.  A read-only status snapshot at 2026-08-11 21:26 UTC recorded 19,859 CPU seconds
+in this activation and no completed `Sa(192)` control.
 
-  run4 live/debug .text SHA-256  6606d606b5a848927391df65a3b24041d4fa880fa54c42121d2098e802bfa25c
-  run5 live/debug .text SHA-256  f3ea042b0b9b2378b52a1a016c1a965bf71e2bcc33e41894401b0cd6f9cee744
+The earlier debugger observations remain valid historical evidence: run4/run5 reached the same
+state, and commit `c13b5d3`'s prefix poll could return before any complete child was tried.  What is
+superseded is the proposed cure.  Neither an unconditional pass-2 dive nor a zero-budget prefix
+retry is a usable scheduler.
 
-The corresponding SSM commands were `39e27445-d0f3-4eaf-89de-55a9e6ee6df7` for the text
-comparison and `3fe5a0e3-fc0e-4a9f-8b29-7a2f0ca0f24d` /
-`af8cbbcc-a06e-4f88-84f1-ba7642a8a3e6` for the two attaches.  These observations establish where
-the processes were; they do **not** establish that the processes were stuck.
+## Implemented state machine (`45c34fd`)
 
-The intended state machine
---------------------------
+The replacement keeps no split cursor, score or remembered winning split.
 
-Historical source and commit messages make the control flow explicit:
+* An expired finite parent stays expired.  A descendant never receives a fresh minimum interval.
+* A finite call may return `MAYBE` with zero cache mutations.  `FALSE` is still printed/cached only
+  after an unskipped exhaustive pass, so this cannot manufacture a negative.
+* One- and two-segment states keep their caller's shared absolute allowance.  This preserves the
+  observed constructive spine: the ratio-preserving first cut and the opposed-branch two-segment
+  cut can compose into the first genuinely long state.
+* States with at least three segments give each speculative child an initial two-CPU-second slice.
+  All still-possible siblings are checked unless one is already `FALSE`.
+* After an unresolved exhaustive pass, the local slice doubles.  Thus even a saturated cache changes
+  the allowed work on the next pass; pure same-budget spinning is impossible without storing which
+  split happened to look promising.
+* Finite prefix enumeration polls the shared deadline every 65,536 admitted prefixes.  This is safe
+  under the new policy because there is no later `NO_DEADLINE` handoff to bypass.
 
-  * `cant_solve_count_min = cant_solve_count + 1`: a bounded state must contribute negative cache
-    facts before it may return `MAYBE`.  Commit `d3a41ed` introduced this as “do not bail out without
-    making at least some progress.”
-  * While the count is exactly the minimum, the five-times-elapsed grace deliberately slides.  It
-    keeps the dive alive until another negative fact is produced.  Once the count exceeds the
-    minimum, an expired finite deadline can return `MAYBE`.
-  * Pass 1 gives unresolved children the finite local deadline.  Exhaustive pass 2 gives them
-    `NO_DEADLINE` (`child_deadline = pass < 2 ? deadline : NO_DEADLINE`).
-  * The deadline is tested at complete candidates, immediately before that child call.  It is not a
-    general cancellation poll over partial prefixes.
+`tools/deadline_regression.c` checks exhausted-parent inheritance, long-state division, the shared
+one/two-segment cap, the local quantum, and immediate `MAYBE` on an expired cache miss.
 
-The captured run4-state replay is consistent with this policy: with a nominal five-second parent
-budget, the pre-`c13b5d3` engine remained alive beyond 12 CPU seconds and the wrapper stopped it at
-17 wall seconds.  That was previously presented as proof of a bug.  It instead shows the required
-zero-progress dive refusing to discard its work.
+## Focused validation
 
-What `c13b5d3` broke
---------------------
+The exact saturated k=5 state above was replayed against the run7-derived checkpoint with a
+one-second finite parent.  It returned `MAYBE` in 1.000 CPU second with
+`negative_delta=0`.  This is the case the old progress gate could not escape.  Source:
+`bounded-probe-2026-08-11:finite-k5-final.out`, build ID
+`8ae1c2b6881db63ab04254cb74df55e19140158fb99c35084c257431c03acc18`.
 
-`c13b5d3` made two contrary changes:
+Against the same checkpoint, the intended positive path composed without a stored hint:
 
-  * it allowed an expired bounded state to return `MAYBE` with zero negative progress; and
-  * it polled every 65,536 admitted prefixes, before a complete candidate reached the pass-2 child
-    call.
+```
+Sb(33:16,32:15,23:19,45:9)@7
+  [17:8,27:13,10:8,12:0]                         22.0 CPU s
+Sb(48:48,64:32)@8
+  [16:15,45:23] -> the k=7 state above             22.0 CPU s
+Sb(112:80)@9
+  [48:32] -> the k=8 state above                   22.0 CPU s
+```
 
-The second point is decisive.  An expensive pass 1 can expire, enter pass 2, and then bail from the
-prefix loop before the first unresolved child is called with `NO_DEADLINE`.  The whole attempt can
-therefore return `MAYBE` without leaving a reusable fact.  This explains the `run6` pattern of
-multi-thousand-second k=8 attempts followed by no verdict; those absences are `MAYBE`, not
-refutations.
+The second split is the symmetric form of `[33:32,19:9]`; the first cut is the symmetric form of
+`[64:48]`.  Sources: `bounded-probe-2026-08-11:k7-structural.out`,
+`k8-structural.out`, and `k9-structural.out`, all build ID
+`e07be334856587114ef51522567bca93629fe623637df78bc422f6b7a244885b`.
 
-Live GDB inspection used byte-identical `-O3 -g` rebuilds of `run3` and `run6`:
+Most importantly, a genuinely cold normal-learning control completed:
 
-  run3 live/debug .text SHA-256  056cd117c37527f9e9d7f7e05d5d09a65d96a0aeeff8a472063acfabfe7c1a73
-  run6 live/debug .text SHA-256  3a11395016c75cfd884067a592b78485f7c0d2c0aaae4dc53f26dcf68269f4a3
+```
+Sb(112:80)@9  SOLVABLE in 281 CPU s, 446 admitted top-level candidates
+Sa(192)@10    SOLVABLE in 376.293 CPU s
+```
 
-Both current k=8 size-2 frames were in pass 1 with a finite `parent_deadline` and
-`no_deadline=1`, inside unbounded pass-1 work for short states.  Their k=9 roots were also in pass 1.
-The stack and locals were captured by SSM commands `d12ad651-6514-46c8-a96c-44adcea4fe54` and
-`b2f1a246-ad42-43d0-ba22-3a516f9984e3`.  A focused local debugger stop in the erroneous helper
-showed `deadline=200`, `start=100`, `now=201`, `cant_solve_count=0`, and minimum `1`; the helper was
-about to treat that zero-progress state as expired.  Together with the source path, this confirms
-the broken handoff rather than merely correlating it with the logs.
+The wrapper measured 382 s wall and 0.18 GiB peak RSS.  The emitted path is exactly the three lines
+above.  Source: `bounded-probe-2026-08-11:sa192-structural-final-cold.out`, build ID
+`5d3887defae285963a00671c91e0f78a4487e61478f0c9cfbfd3c6a75529e94f`.
+That validation build embeds every dependency hash; commit `45c34fd` adds only probe-state reporting
+after the measured search-semantic source.
 
-Restoration and gates
----------------------
+The optimized regression corpus emitted the same 1,038 definitive one/two-part answers as prior
+main, and the ASan+UBSan build matched them with no diagnostics.  The normalized output SHA-256 is
+`2cf020540919d6fe2f8da20636ecceb8f8d14ccc4d5a3cd599ac0a91e99eade2`.
 
-Commit `e648e83` removes prefix polling and restores the historical progress condition and sliding
-grace.  It retains a small `child_deadline_for_pass` helper so the pass-2 `NO_DEADLINE` handoff is
-directly regression-tested.  The relevant gates are:
+## Rejected simpler variants
 
-  * `tools/deadline_regression.c`: zero progress cannot expire; exactly-minimum progress slides the
-    grace; progress beyond the minimum can expire; pass 2 maps to `NO_DEADLINE`.
-  * The optimized and ASan+UBSan exhaustive split corpora emitted the same 1,038 answers plus
-    summary, with output SHA-256
-    `5d0ef6f86bc32b7206da6a9dc2f59c06a11e9ac6b1ff6ad97f5788ed22dec6bd`.
-  * Against exact pre-change commit `290a892`, split output was byte-identical.  Cache-query outputs
-    were also byte-identical at k=5,6,7; their SHA-256 values were respectively
-    `b7629d5addfae62ee9e2ab36a71f0d429806e6b006ec2615d2b26d0cda1ebdbb`,
-    `1ed2d3c12a6901557f70b80b2ae303b357bec78b36f7892b781f0ead7456a721`, and
-    `63a881f51b880bc8e8aa220a339fb54837d52b6070a53cd9953903a0606f4e2b`.
-  * `radio_sa193.c` syntax-compiles at both `MAX_N=193` and `MAX_N=1030`; table, witness and
-    documentation checks pass.
+These failures are part of the result, not future suggestions:
 
-Run disposition
----------------
+* A universal two-second child slice fixed the k=7 state but starved its enclosing k=8 state.  The
+  k=8 replay was still in its first pass after the 360-second cap, at 1,319 admitted candidates and
+  `left=794/1149`; peak RSS was 0.53 GiB.  Source:
+  `bounded-probe-rejected-2026-08-11:k8-iterative.out`.
+* The same universal slice in a cold `Sa(192)` control eventually entered root pass 2 and again
+  handed candidate 5 an unbounded child.  It was stopped after 16 m 20 s rather than rediscover the
+  old sink.  Source: `bounded-probe-rejected-2026-08-11:sa192-core-cold.out` and its retained local
+  stack sample.
+* Immediately committing 30 or 40 seconds to a candidate after two easy children were `TRUE`
+  advanced only about seven k=8 candidates per minute; bad near-candidates consumed the whole
+  allowance.  Repeating fixed two-second passes based on cache growth also failed because both the
+  good and bad long states kept generating facts while restarting from the same prefix.
+* Persisting a winning split/cursor was deliberately not implemented.  Besides storage complexity,
+  it would over-credit a solution that may only reflect the current probe order.
 
-Run4 and run5 were stopped prematurely at 2026-08-11 05:37:59 UTC because of the incorrect
-diagnosis.  Their final artifacts remain archived, and their printed definitive verdicts remain
-evidence.  There is no demonstrated deadline bug in either pre-`c13b5d3` binary.
+## Run disposition
 
-Run6 used the broken `c13b5d3` experiment.  It was stopped at about 2026-08-11 15:44 UTC after
-618,816 raw log lines; its wrapper reported exit 143, 35,974 seconds wall time, and 1.37 GiB peak
-RSS.  The watchdog finalized
-`run6/seg-seg-20260811054509Z-c13b5d3/out_sa193.txt.zst` and its checkpoint at 15:47:51–52 UTC.
-Its printed verdicts are still definitive—the bad paths return `MAYBE`—but its throughput and
-slow-state timing are not a valid comparison baseline.
-
-Corrected cold AWS `run7` started at 2026-08-11 15:45:30 UTC from exact commit `e648e83` with no
-cache.  `radiobase.c` SHA-256 is
-`f6edd19d1c683b8cff40f4ae171347b0a8af4ccbfc0667f205721701eb179291`; remote binary SHA-256 is
-`691c7a1c23aafc516292e3c1b8e046d241994f2f0046d65dbbb0a8279f915fa5`.  Run3 remained alive and
-untouched; the active memory caps remain 40 + 60 GiB.
-
-The local chain was stopped cleanly at 443,713 raw lines and folded into a 931,075-line,
-34,999,432-byte checkpoint with SHA-256
-`9bdb9915d5ea8f4fc240aca5a5c631b1177573be24dfa454ba8c7002e195ec56`.  A corrected same-chain
-resume started at 2026-08-11 15:49:16 UTC under the 20 GiB physical-footprint guard.
+Run6 remains a broken zero-progress/prefix-poll experiment; its printed definitive verdicts are
+sound, but its timing is not a comparison baseline.  Run7 is now diagnostic evidence for the
+opposite failure and should not be described as a healthy mandatory dive.  Run3 remains the live
+incumbent and is unaffected.  Preserve the old raw logs/checkpoints before stopping or replacing
+either sidecar; do not use a missing line from any of them as a negative verdict.
