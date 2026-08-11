@@ -106,3 +106,85 @@ CPU on the decisive long-state control.  It stayed at 98-100% CPU throughout; no
 was observed.  The 17 MB raw candidate log was not archived because Sa(192) solvability already has
 canonical witness proofs and this run adds performance evidence, not a new mathematical fact.  Its
 local SHA-256 was 0d5a9fea49d90e556a36a5c7116393f31aeb1a98cfaac192eaa4435756048579.
+
+Exact-state L1 follow-up
+------------------------
+
+Profiling the compact build on the same 2,201,187-fact `warm_k5.txt` control attributed roughly
+19% of sampled solve time directly to `checkCache`, chiefly the final-front comparisons.  A
+pre-front snapshot solved the control in 33.0 CPU seconds; compact commit c146d9d took 42.6 seconds.
+Both found `[8:1,8:4,11:11,19:2]` after exactly 37,899 top-level splits.
+
+The deployed follow-up keeps the 32-bit tagged trie and puts a bounded exact-result L1 in front of
+it.  At `MAX_N=193`, 65,536 direct-mapped entries occupy exactly 2,097,152 zero-filled bytes.  Each
+entry holds the complete normalized sequence for up to 12 parts, its level, a 32-bit fingerprint
+and a definitive verdict.  The full sequence and level are compared after the fingerprint, so a
+hash collision can only cause a miss.  `MAYBE` is never stored.  Longer states bypass L1 and use
+the unchanged theorem/trie path.
+
+Placement was more important than lookup mechanics.  L1 is probed after the information bound,
+unit elimination and sorting, but before singleton/full-star majorization.  Thus an exact warm hit
+skips both repeated majorization and dominance-trie traversal.  On a miss, singleton
+majorization, full-star majorization and the trie retain their prior order.  Definitive results
+from any of those sources and from completed search are safe to retain because they are permanent
+mathematical facts, unlike a deadline `MAYBE`.
+
+With a 16,384-entry instrumented prototype, the warm control made 708,562,672 normalized queries;
+708,562,650 were at most 12 parts and 542,949,678 hit exactly (76.63%).  It stored 61,427,871
+definitive misses.  A clean size sweep, with identical witness and split count, gave:
+
+  entries / table bytes       solve CPU
+  32,768 / 1,048,576             26.7 s
+  65,536 / 2,097,152             26.6 s
+ 131,072 / 4,194,304             27.1 s
+
+The middle size is the default.  Relative to the matched reruns above, 26.6 seconds is 37.56%
+less solve CPU than compact c146d9d and 19.39% less than the pre-front engine.  Whole-process wall,
+including the unchanged 2.2-million-line replay, was 48.74 seconds.
+
+Rejected variants are part of the result.  Merely forcing the compact traversal inline improved
+42.6 to 39.7 seconds.  Replacing 32-bit branch handles by direct pointers gained less than one
+second but raised maximum RSS from roughly 624 to 966 MB, so it was reverted.  Packing each exact
+query into 64-bit words made the scalar-hash prototype slower, 37.5 versus 36.1 seconds, and was
+also reverted.  Very large direct tables had already lost to cache pressure: 1,048,576 entries
+took 38.8 seconds even when the L1 still sat after majorization.
+
+The full positive gate used the same command and scratch control driver as the earlier run:
+
+  final radiobase.c SHA-256: 6cd31bd81d65a4f62054d8b73f16deda68fa95f0e284a882942eb2160e64f3b5
+
+  clang -O3 -DMAX_K=10 -DMAX_N=193 radio_sa192_l1_control.c -o control
+  tools/capped_run.sh --seconds 1200 --rss-gb 4 --label sa192-l1-control -- ./control
+
+It returned:
+
+  can solve Sb(112:80) in 9 with [48:32] ... took 619 totalsplits=446
+  can solve Sa(192) in 10 ... took 711
+  CONTROL Sa(192) in 10 = SOLVABLE (711.7 s)
+  wall=719 s
+  peak RSS=0.35 GB
+  printed lines=177,159
+
+This is 13.20% less control CPU than the first compact implementation's 819.9 seconds and 3.10%
+less than the pre-compaction control's 734.5 seconds.  Clock-driven deadlines produced a somewhat
+different internal transcript, so this is an end-to-end gate rather than a claim of identical
+subtree traversal.  The root witness and local split count match.  The unarchived raw output is
+19,268,338 bytes with SHA-256
+3a9199f2999d67a03818273fe36416514c3c1414d09e658b0497bbad1929757b.
+
+Final correctness gates:
+
+  * Against compact baseline c146d9d, all 3,379,067 verdict bytes from the combined-checkpoint
+    regression matched exactly: 543,116 TRUE, 1,819,528 FALSE and 1,016,423 MAYBE.  Both files had
+    SHA-256 94bf295ef197107a72d4e545cde05e0fe82d75b465b362071c3906008f0e9f00.
+  * All 1,038 definitive answers (1,039 `CHECK` lines including the summary) from
+    `tools/split_regression.c` matched c146d9d exactly.
+  * That corpus passed AddressSanitizer plus UndefinedBehaviorSanitizer; the legacy `checkCache`
+    diagnostic API still changed its test state from MAYBE to FALSE after insertion as expected.
+  * `MAX_N=1030` syntax compilation passed.  The packed two-coordinate dominance comparison was
+    also checked exhaustively over all 9,312 rectangles at `MAX_N=193`: 86,713,344 ordered pairs,
+    zero disagreements with two scalar comparisons.  Larger coordinates use the scalar fallback.
+
+The live local cold run and AWS `run4` use their frozen pre-L1 binaries and were deliberately not
+restarted.  These measurements apply to future runs or a later same-log resume on current source;
+they do not retroactively change those processes' recorded timings.

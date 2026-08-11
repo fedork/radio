@@ -169,28 +169,28 @@ Do not run `gh auth switch`.
 ## Running now
 
 All four prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
-`tools/sa193_status.sh --compare` at **2026-08-11 01:37 UTC**:
+`tools/sa193_status.sh --compare` at **2026-08-11 04:27 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 1 d 01 h 36 m, 982,294 verdicts, **23.69 GB**, 0 of 16 |
-| `run4/` — compact cache on current source | **fresh and alive** | cold control just started, 1,743 verdicts, **0.17 GB**, 0 of 16 |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 1 d 04 h 27 m, 1,039,742 verdicts, **24.01 GB**, 0 of 16 |
+| `run4/` — compact cache at frozen commit `6af384e` | **fresh and alive** | 2 h 50 m, 103,773 verdicts, **0.29 GB**, control still open |
 
 Use `tools/sa193_status.sh --compare [--watch]` for the matched live stream; `--all` also prints the
 stale historical runs and must not be read as proof that those processes remain alive.  `run3`'s
-`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 accounts for 83,737 s,
-or **90.9%** of measured CPU, while k=6 is 1.9%.  It is inside the first top-level
-`Sb(112:81)@9`, currently below `Sb(52:46,60:35)@8`.
+`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 self time is 93,411 s,
+or **91.2%** of measured CPU, while k=6 is 1.7%.  It is inside the first top-level
+`Sb(112:81)@9`, currently below `Sb(63:38,49:43)@8`.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
-23.69 GB with 0.98 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
+24.01 GB with 1.04 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
 so it does not by itself identify the cause; it does show that memory per verdict cannot be assumed
-stable across the changed search shape.  The result-cache trie remains the unbounded structure and
-the next memory target.  The level-lazy split-table change described below removes avoidable
-allocation, but is not deployed in `run3` and is not expected to account for tens of GB by itself.
-Do not restart a one-day cold run solely to pick it up.
+stable across the changed search shape.  `run3` still has the old unbounded dense result trie; the
+current compact representation remains unbounded but is over an order of magnitude smaller on the
+retained checkpoint.  The level-lazy split-table and cache changes are not deployed in `run3`.
+Do not restart a cold run solely to pick them up.
 
 `run4` started cold at 2026-08-11 01:37:20 UTC from bundle commit `6af384e`; its source hashes match
 the compact implementation (`radiobase.c` SHA-256
@@ -199,14 +199,14 @@ reports level-lazy split tables, `control=yes`, and `cache=(none, cold)`.  It ha
 beside `run3`'s 40 GiB guard, leaving at least about 23 GiB outside the two solver caps.  This is a
 launch record only: its own `Sa(192)` gate had not completed at the snapshot.
 
-The first hour exposed a search-path warning rather than a resource failure.  At 68m51s of solver
-CPU, `run4` still had not completed the control; it remained at 100% CPU and only 301,624 KiB RSS,
-but `/root/run4/out_sa193.txt` stayed at 103,778 lines for about 57 minutes.  Its last root progress
-was `Sb(112:80)@9`, elapsed 436/1000 with 3,664/6,247 outer options left, before it descended into a
-non-reporting child.  Keep it running for now—the process and caps are healthy—but do not use total
-elapsed time as evidence that the compact cache itself is intrinsically this slow.  The identical
-source passed the local cold control in 807.7 CPU seconds; clock-driven deadlines can choose a
-different hard descendant on a machine with different throughput.
+The first three hours exposed a search-path warning rather than a resource failure.  At the latest
+snapshot `run4` still had not completed the control; it remained alive at one full core and only
+0.29 GB RSS, but its last root progress was still `Sb(112:80)@9`, elapsed 436/1000 with
+3,664/6,247 outer options left, before it descended into a non-reporting child.  Keep it running for
+now—the process and caps are healthy—but do not use total elapsed time as evidence that the compact
+cache itself is intrinsically this slow.  The identical source passed the local cold control in
+807.7 CPU seconds; clock-driven deadlines can choose a different hard descendant on a machine with
+different throughput.
 
 The completed common prefix does give a clean throughput warning.  Matching negative `Sb` verdicts
 by exact printed state and level found 98,253 common calls.  Across the k=8, k=7 and k=6 groups,
@@ -218,6 +218,16 @@ cost.  Treat this as an approximately 25% cost for the *whole compact build on t
 path*, not as an isolated Pareto-front lookup measurement: `took` is inclusive and the two builds
 also differ in split storage/filtering and code layout.  Exact states and snapshot hashes are in the
 2026-08-10 journal entry.
+
+That measurement motivated an isolated profile and is no longer the throughput expectation for
+future `main` runs.  A bounded exact-state L1 now probes before repeated bundled majorization and
+the compact dominance trie.  On the fixed warm four-part control it takes **26.6** solve seconds,
+versus 42.6 for the first compact build and 33.0 before compaction, with the identical witness and
+37,899 local splits.  The full `Sa(192)` gate is SOLVABLE in **711.7 CPU seconds**, versus 819.9 for
+the first compact build and 734.5 before compaction, at 0.35 GB peak RSS.  All 3,379,067 verdict
+bytes in the combined-checkpoint regression match compact baseline c146d9d exactly.  This fixes the
+measured tax for future runs; frozen `run4` does not contain it and its timings remain valid for
+that binary.
 
 For the proposed matched state `Sb(48:48,64:33)@8`, `run3` did **not** print a refutation.  It logged
 progress through 2,602 seconds, 45,149 tested split combinations and 565/1,225 outer options left,
@@ -251,9 +261,10 @@ part at every exact prefix, with tagged uint32 child descriptors and inline sing
 same k=5..7 replay requests **499,877,916 bytes**, down **11.174x / 91.05%** from 5,585,395,760;
 the process peaks at 0.60 GB RSS.  Across 4,164,958 exact, mutated and deterministic random queries,
 every old verdict is preserved and 4,622 `MAYBE` answers become sound positive-front hits.  The full
-`Sa(192)` control remains SOLVABLE in 819.9 CPU seconds versus 734.5 before the change (+11.63%),
-while peaking at **0.41 GB RSS** without swap decay.  This makes a bounded local `Sa(193)`
-continuation credible; it does not bound future cache growth or prove that the full refutation fits.
+`Sa(192)` control now remains SOLVABLE in 711.7 CPU seconds after adding the 2 MiB exact-state L1,
+versus 819.9 for the first compact build and 734.5 before compaction; peak RSS is **0.35 GB**.  This
+makes a bounded local `Sa(193)` continuation credible without retaining the earlier CPU premium; it
+does not bound future cache growth or prove that the full refutation fits.
 Implementation measurements and commands are in
 [`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
 
@@ -266,9 +277,11 @@ entered the required `Sa(192)` control normally.  The control had not completed 
 this was initially only a launch record.  It subsequently returned
 `result CONTROL Sa(192) in 10 = SOLVABLE (807.7 s)` and entered `Sa(193)`.  At 1,568 elapsed seconds
 it had a 1.0 GiB `vmmap` footprint and 242,348 emitted verdicts.  This validates the live engine and
-is much smaller than the pre-compact trial's 7.1 GiB footprint at 1,152 seconds; it is still not an
-`Sa(193)` verdict or a bound on later growth.  Read `status.txt` and `monitor.log` in that directory
-and verify the recorded PID before calling it live.  The sibling
+is much smaller than the pre-compact trial's 7.1 GiB footprint at 1,152 seconds.  At the
+2026-08-11 04:33 UTC sample it remained at a 1.3 GiB footprint after 12,044 elapsed seconds and
+450,273 output lines.  This is still not an `Sa(193)` verdict or a bound on later growth.  Read
+`status.txt` and `monitor.log` in that directory and verify the recorded PID before calling it
+live.  The sibling
 `cold1` directory is an empty launcher failure: a managed one-shot shell reaped both descendants
 despite `nohup`; it contains no solver result and must never be used as a checkpoint.
 
@@ -354,8 +367,9 @@ every solvable state must have its mass-preserving profile
 
     sort(n_1 repeated m_1 times, n_2 repeated m_2 times, ...) <=_w G_k.
 
-`radiobase.c` now applies this full star-expansion majorization before the cache; the independent C
-verifier and Python certificate prototype apply the same lemma separately. This **corrects** the
+On an exact-L1 miss, `radiobase.c` applies this full star-expansion majorization before the
+dominance trie; the independent C verifier and Python certificate prototype apply the same lemma
+separately. This **corrects** the
 earlier claim that the `majtight>1` cutoff was heuristic-only. The cutoff is sound; its continuous
 value below 1 remains only an ordering score.
 
@@ -378,9 +392,10 @@ canonical negatives, `R_0,R_1,R_2,R_3` reject respectively 68, 150, 229 and all 
 rejections among 1,247 canonical positives. `Sb(16:1,12:2)` itself passes `R_0,R_1,R_2` and fails
 `R_3`. `tools/bundled_majorization.py` and `tools/pairtab.c` reproduce the census.
 
-Deeper synchronization does **not** yet improve the long-state solver. `radiobase.c` already invokes
-`R_0` on every partial child before its cache lookup, so a separate `R_1` pass duplicates the
-existing prefix walk. On the residual four-part positive `Sb(29:6,19:9,13:12,36:3)` in 6, the first
+Deeper synchronization does **not** yet improve the long-state solver. On an exact-L1 miss,
+`radiobase.c` already invokes `R_0` on every partial child before its dominance-trie lookup, so a
+separate `R_1` pass duplicates the existing prefix walk. On the residual four-part positive
+`Sb(29:6,19:9,13:12,36:3)` in 6, the first
 cheap `R_1` witness has two exactly unsolvable children and even passes `R_2`; `R_1` feasibility
 therefore does not distinguish it from the real winning split. On a residual four-part negative,
 isolated `R_2` took 6.3 Python CPU seconds and still passed, while the warmed exact solver refuted it
@@ -456,8 +471,9 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
 
 2. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
    bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
-   finding an `R_1` or `R_2` witness is already known not to do that. Keep any deeper check bounded
-   and fallback-safe.
+   finding an `R_1` or `R_2` witness is already known not to do that. Current `main` takes 26.6
+   solve seconds and 37,899 top-level splits after the exact-L1 change. Keep any deeper check
+   bounded and fallback-safe.
 3. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
 4. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`

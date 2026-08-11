@@ -111,8 +111,8 @@ contains no number absent from `data/*.csv`.
 [Vertex-Splitting Pullback Lemma](theorems/singleton-majorization.md#vertex-splitting-pullback-lemma-2026-08-09)
 proves that every part `(n:m)`, `n>=m`, may be lifted to `m` disjoint singleton stars `(n:1)`.
 Therefore the mass-preserving block profile of every solvable state must be weakly majorized by
-`G_k`. `radiobase.c` now applies this sound filter before its cache lookup; `radio_verify.c` and
-`tools/certify.py` implement it independently.
+`G_k`. On an exact-L1 miss, `radiobase.c` applies this sound filter before its dominance-trie
+lookup; `radio_verify.c` and `tools/certify.py` implement it independently.
 
 This supersedes the value-order experiment. Against the same warm lower cache, the hard positive
 `Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)` in 5 moved from a 300-second timeout to 5.3 CPU seconds.
@@ -157,7 +157,9 @@ reproducible regression and allocation measurements are in the 2026-08-10 journa
 
 If P6 continues, the ordering benchmark remains
 `Sb(29:6,19:9,13:12,36:3)` in 6 and the only promising use is a **bounded, fallback-safe ordering
-signal** that approximates deeper synchronization without recursively solving it.
+signal** that approximates deeper synchronization without recursively solving it.  The current
+exact-L1 baseline is 26.6 solve seconds with 37,899 top-level splits; compare both numbers, because
+a cache-only speed change and an ordering improvement answer different questions.
 
 **Separate theoretical m=6 thread (updated 2026-08-10).** The first large-`k` classification is
 complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified

@@ -61,8 +61,18 @@ negative fronts refute any extension of the matching prefix.
 
 This remains an unbounded cache, but it no longer materialises last-part dominance as child nodes.
 On the retained `MAX_N=193` checkpoint, k=5..7 requested storage fell from 5.59 GB to 0.50 GB.  The
-full `Sa(192)` control cost 11.6% more CPU and peaked at 0.41 GB RSS.  Exact layout, query-regression
-and throughput measurements are in
+initial compact version paid an 11.6% control-CPU premium.  Current `main` removes that premium with
+a 65,536-entry (2 MiB at `MAX_N=193`) exact-state L1.  It stores no `MAYBE`, verifies the full
+normalized state after its fingerprint, and bypasses states longer than 12 parts.  The probe sits
+before repeated singleton/full-star majorization; misses still follow those theorem checks and the
+same dominance trie.  `-DMEASURE_CACHE_L1` prints aggregate query/hit/store counts at exit and
+`-DCACHE_L1_BITS=n` overrides the default size for controlled measurements.
+
+On the fixed warm four-part control, the final build took 26.6 solve seconds versus 42.6 for the
+first compact build and 33.0 before compaction, with the identical witness and 37,899 top-level
+splits.  The full `Sa(192)` gate returned SOLVABLE in 711.7 CPU seconds and 0.35 GB peak RSS, versus
+819.9 seconds for the first compact build and 734.5 seconds before compaction.  Exact layout,
+query-regression and throughput measurements are in
 [`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
 
 `tools/cache_query_regression.c` verifies every exact fact in a parsed cache, then writes one byte

@@ -8,7 +8,7 @@ findings go to [journal.md](journal.md) as usual.
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| active solvers | `run3`: full-star build; `run4`: compact last-segment Pareto cache; both `MAX_K=10 MAX_N=193` |
+| active solvers | `run3`: full-star build; `run4`: compact last-segment Pareto cache at `6af384e`; both `MAX_K=10 MAX_N=193` |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
@@ -24,6 +24,10 @@ neither loads the other's cache.
 |---|---|---|---|
 | `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | `/root/run3/radio_sa193_v3` |
 | `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | `/root/run4/radio_sa193_v4` |
+
+Both rows name frozen binaries, not aliases for current `main`.  In particular, `run4` predates the
+exact-state L1 added after its launch; preserve the cold session rather than silently treating its
+timings as measurements of newer source.
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.

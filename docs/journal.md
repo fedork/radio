@@ -4533,3 +4533,67 @@ the very closely matched cold-control path.  The consistency and unchanged k=6/k
 make compact result-cache lookup/representation the leading suspect, but that attribution still
 needs an A/B microbenchmark.  This is the price side of the memory tradeoff, not a reason to stop
 `run4`; its 0.29 GiB footprint remains healthy while the old run is already at 23.8 GiB.
+
+## 2026-08-10 — a 2 MiB exact L1 removes the compact-cache CPU tax
+
+The A/B microbenchmark identified the tax rather than merely accepting it.  On the same
+2,201,187-fact `warm_k5.txt` and residual positive
+`Sb(29:6,19:9,13:12,36:3)@6`, the pre-front engine took 33.0 solve seconds and compact c146d9d took
+42.6.  Both found `[8:1,8:4,11:11,19:2]` after 37,899 top-level splits.  Sampling attributed about
+19% of compact solve time directly to `checkCache`, concentrated in the last-part Pareto-front
+comparisons; this nearly accounts for the whole gap.
+
+The successful change follows the user's warm-prefix observation literally.  A 65,536-entry exact
+L1 stores the complete normalized state, level and only a definitive TRUE/FALSE.  Its 32-bit hash
+selects a slot but is not trusted: size, level and every part are compared before a hit, and
+`MAYBE` is never stored.  At `MAX_N=193` the entries are 32 bytes, so the whole table is 2 MiB.
+States longer than 12 parts bypass it.  The compact 32-bit tagged trie and both Pareto fronts remain
+unchanged.
+
+The decisive placement is before repeated singleton/full-star majorization, not merely before the
+dominance trie.  After the information bound, Unit-Group Elimination and canonical sorting, an
+exact hit is already a permanent mathematical fact and can return immediately.  On a miss, the
+same theorem checks and trie run in their previous order.  Definitive theorem failures, singleton
+answers, trie hits and completed searches may all populate L1; deadline `MAYBE`s may not.  This is
+demand-driven determinisation of actual queries, not closure materialisation.
+
+With a 16,384-entry instrumented prototype, 542,949,678 of 708,562,672 normalized queries hit
+exactly (**76.63%**), and only 22 queries exceeded the 12-part bound.  The clean table-size sweep
+was 26.7, **26.6**, and 27.1 solve seconds for 32,768, 65,536 and 131,072 entries respectively, so
+65,536 is the default.  The final 26.6 seconds is 37.56% below compact c146d9d and 19.39% below the
+pre-front engine, with the same witness and counter.  It also completes the 2.2-million-line replay
+and solve in 48.74 wall seconds.
+
+Several plausible variants lost and were removed.  Forced inlining alone reached 39.7 seconds.
+Direct branch pointers bought less than one second while moving maximum RSS from roughly 624 to
+966 MB, so the 32-bit handles stay.  Packing an exact state into 64-bit words made its lookup 37.5
+seconds versus 36.1 for scalar 32-bit hashing.  A 1,048,576-entry table took 38.8 seconds when L1
+still sat after majorization; cache pressure overwhelmed its extra hits.  These costs are retained
+so none of those variants needs rediscovery.
+
+The full gate confirms that this is not a narrow warm-cache win.  `Sa(192)` returned SOLVABLE in
+**711.7 CPU seconds**, 719 seconds wall and **0.35 GB peak RSS**.  It used the known root
+`Sb(112:80)@9 -> [48:32]`, whose local counter remained 446.  The first compact control took 819.9
+CPU seconds and the pre-compaction control 734.5, so the compact memory representation no longer
+has a measured control premium.  Clock-driven deadlines led to a somewhat different internal
+transcript (177,159 lines), so the full control is an end-to-end gate, while the four-part control
+is the exact-path comparison.
+
+Correctness gates are complete.  Against compact baseline c146d9d, all **3,379,067** verdict bytes
+from the combined checkpoint, its targeted mutations and 500,000 deterministic random states are
+identical.  The 1,038-answer split corpus also matches exactly and passes ASan+UBSan.  The legacy
+`checkCache` diagnostic API remains available; `MAX_N=1030` syntax-compiles.  Finally, the packed
+two-coordinate front comparison was checked against scalar comparisons for all **86,713,344**
+ordered pairs of the 9,312 valid `MAX_N=193` rectangles with zero mismatches; larger coordinates
+compile to the scalar fallback.  Commands, hashes, size trials and exact verdict counts are in
+[`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
+
+The active local cold run and remote `run4` were not restarted.  They retain their frozen pre-L1
+binaries, so their measurements remain internally consistent; current `main` improves future runs
+or a later same-log resume rather than retroactively changing those sessions.
+
+Final live inventory at the documentation cutoff: local PID 21538 was still at one full core after
+12,044 seconds, 450,273 output lines and a 1.3 GiB `vmmap` footprint.  The 04:27 UTC remote snapshot
+had `run3` alive at 24.01 GB / 1,039,742 verdicts and frozen compact `run4` alive at 0.29 GB /
+103,773 verdicts; neither had completed a top-level `Sa(193)` state, and `run4` had still not closed
+its control.  These are operational snapshots, not verdicts.

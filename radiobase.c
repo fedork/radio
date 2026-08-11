@@ -123,6 +123,9 @@ int power3[MAX_K+1];
 int n_to_sbb[MAX_N+1][MAX_N/2 + 1];
 int sbb_to_n1[MAX_SBB+1];
 int sbb_to_n2[MAX_SBB+1];
+#if MAX_N < 32768
+uint32_t sbb_dominance_key[MAX_SBB+1];
+#endif
 char sbb_to_str[MAX_SBB+1][8];
 int sb_pairs[MAX_SBB+1];
 int sa_can[MAX_N+1];
@@ -274,6 +277,38 @@ static uint32_t front_records_len = 1;
 static uint32_t front_records_cap;
 static uint32_t front_record_free;
 static uint32_t front_record_live;
+
+/* Demand-materialise only hot exact answers.  Definitive verdicts are mathematical facts and
+   therefore never need invalidation; MAYBE is deliberately not retained.  Full state equality is
+   checked after the hash, so collisions affect hit rate only, never correctness.  Longer states
+   bypass this small front cache. */
+#ifndef CACHE_L1_BITS
+#define CACHE_L1_BITS 16u
+#endif
+#define CACHE_L1_SIZE (1u << CACHE_L1_BITS)
+#define CACHE_L1_MAX_PARTS 12u
+typedef struct {
+    uint32_t hash;
+    front_point part[CACHE_L1_MAX_PARTS];
+    uint8_t size;
+    uint8_t k;
+    uint8_t verdict_plus_one;
+    uint8_t padding;
+} cache_l1_entry;
+static cache_l1_entry cache_l1[CACHE_L1_SIZE];
+#ifdef MEASURE_CACHE_L1
+static unsigned long long cache_l1_queries;
+static unsigned long long cache_l1_eligible;
+static unsigned long long cache_l1_hits;
+static unsigned long long cache_l1_stores;
+static unsigned long long cache_l1_replacements;
+static void print_cache_l1_stats(void) {
+    fprintf(stderr,
+            "CACHE_L1 queries=%llu eligible=%llu hits=%llu stores=%llu replacements=%llu\n",
+            cache_l1_queries, cache_l1_eligible, cache_l1_hits, cache_l1_stores,
+            cache_l1_replacements);
+}
+#endif
 
 static int cache_replay_depth;
 
@@ -475,7 +510,16 @@ static void release_front_record(uint32_t descriptor) {
 }
 
 static inline int part_greater_equal(int a, int b) {
+#if MAX_N < 32768
+    /* Put the two coordinates in independent 16-bit lanes.  Setting each lane's guard bit before
+       subtraction prevents a borrow from crossing lanes; both guard bits survive exactly when
+       both coordinates of a are at least those of b.  This replaces four scattered int loads and
+       two comparisons on every Pareto-front probe with two packed loads and one branchless test. */
+    uint32_t d = (sbb_dominance_key[a] | UINT32_C(0x80008000)) - sbb_dominance_key[b];
+    return (d & UINT32_C(0x80008000)) == UINT32_C(0x80008000);
+#else
     return sbb_to_n1[a] >= sbb_to_n1[b] && sbb_to_n2[a] >= sbb_to_n2[b];
+#endif
 }
 
 static int front_has_greater_equal(uint32_t descriptor, int sbb) {
@@ -774,7 +818,7 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
     if (updated == 0 && cache_replay_depth != 0) redundant_cache_replays++;
 }
 
-int checkCache(int *sb, int size, int k) {
+static inline __attribute__((always_inline)) int checkCacheTrie(int *sb, int size, int k) {
     uint32_t node = sb_cache_root[k];
     for (int i = 0; i < size; i++) {
         uint32_t tag = node & NODE_TAG_MASK;
@@ -800,6 +844,72 @@ int checkCache(int *sb, int size, int k) {
         node = b->slot[sbb];
     }
     return MAYBE;
+}
+
+static inline __attribute__((always_inline)) uint32_t cache_l1_hash(const int *sb, int size,
+                                                                    int k) {
+    uint32_t h = UINT32_C(2166136261) ^ ((uint32_t)(unsigned)k << 24)
+                 ^ (uint32_t)(unsigned)size;
+    for (int i = 0; i < size; i++) {
+        h ^= (uint32_t)sb[i];
+        h *= UINT32_C(16777619);
+    }
+    return h;
+}
+
+static inline __attribute__((always_inline)) int cache_l1_probe(
+    const int *sb, int size, int k, cache_l1_entry **entry_out, uint32_t *hash_out) {
+#ifdef MEASURE_CACHE_L1
+    cache_l1_queries++;
+#endif
+    *entry_out = NULL;
+    if ((unsigned)size <= CACHE_L1_MAX_PARTS) {
+#ifdef MEASURE_CACHE_L1
+        cache_l1_eligible++;
+#endif
+        uint32_t hash = cache_l1_hash(sb, size, k);
+        cache_l1_entry *entry = &cache_l1[hash & (CACHE_L1_SIZE - 1u)];
+        *entry_out = entry;
+        *hash_out = hash;
+        if (entry->verdict_plus_one != 0 && entry->hash == hash && entry->size == (uint8_t)size &&
+            entry->k == (uint8_t)k) {
+            int i = 0;
+            while (i < size && entry->part[i] == (front_point)sb[i]) i++;
+            if (i == size) {
+#ifdef MEASURE_CACHE_L1
+                cache_l1_hits++;
+#endif
+                return (int)entry->verdict_plus_one - 1;
+            }
+        }
+    }
+    return MAYBE;
+}
+
+static inline __attribute__((always_inline)) void cache_l1_store(
+    cache_l1_entry *entry, uint32_t hash, const int *sb, int size, int k, int verdict) {
+    if (entry != NULL && verdict != MAYBE) {
+#ifdef MEASURE_CACHE_L1
+        cache_l1_stores++;
+        cache_l1_replacements += entry->verdict_plus_one != 0;
+#endif
+        entry->hash = hash;
+        for (int i = 0; i < size; i++) entry->part[i] = (front_point)sb[i];
+        entry->size = (uint8_t)size;
+        entry->k = (uint8_t)k;
+        entry->verdict_plus_one = (uint8_t)(verdict + 1);
+    }
+}
+
+/* Kept as the cache-query API for regression tools and small diagnostic drivers.  The main solver
+   probes L1 separately so an exact hit can avoid its bundled-majorization checks as well. */
+int checkCache(int *sb, int size, int k) {
+    cache_l1_entry *entry;
+    uint32_t hash = 0;
+    int verdict = cache_l1_probe(sb, size, k, &entry, &hash);
+    if (verdict == MAYBE) verdict = checkCacheTrie(sb, size, k);
+    cache_l1_store(entry, hash, sb, size, k, verdict);
+    return verdict;
 }
 
 #ifdef DEBUG_CACHE_ONLY
@@ -1053,17 +1163,28 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     
     size = newsize;
     if (size>1) sort1(tmp, size);
+    int query_size = size;
+    cache_l1_entry *l1_entry;
+    uint32_t l1_hash = 0;
+    int ck = cache_l1_probe(tmp, size, k, &l1_entry, &l1_hash);
+    if (ck == TRUE || ck == FALSE) return ck;
     if (singleton_size == size) {
         // Singleton states are decided exactly by majorization against G_k.
-        return singleton_majorization_can_solve(tmp, size, k);
+        ck = singleton_majorization_can_solve(tmp, size, k);
+        cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
+        return ck;
     }
     // Apply Singleton Majorization to the full star expansion: (n:m) becomes m copies of (n:1).
     // This strictly dominates the old one-copy downgrade, because it contains that downgraded
     // singleton sequence and adds only nonnegative entries.  It is a necessary condition, not an
     // ordering heuristic; see docs/theorems/singleton-majorization.md.
-    if (!star_expansion_majorization_can_solve(tmp, size, k)) return FALSE;
+    if (!star_expansion_majorization_can_solve(tmp, size, k)) {
+        cache_l1_store(l1_entry, l1_hash, tmp, size, k, FALSE);
+        return FALSE;
+    }
     //check cache
-    int ck = checkCache(tmp, size, k);
+    ck = checkCacheTrie(tmp, size, k);
+    cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
     //	printf("got from cache %d\n", ck);
     if (parent_deadline == CACHE_ONLY || ck == TRUE || ck == FALSE) {
 //        debug_printf("returning ck=%d\n", ck);
@@ -1578,6 +1699,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #ifdef DEBUG1
     fflush(stdout);
 #endif
+    cache_l1_store(l1_entry, l1_hash, tmp, query_size, k, canSolve);
     cache(tmp, size, canSolve, k, pairs);
     //    fflush(stdout);
     printf("\n");
@@ -2285,6 +2407,9 @@ void parse_file(char *file_name) {
 }
 
 void init(){
+#ifdef MEASURE_CACHE_L1
+    atexit(print_cache_l1_stats);
+#endif
     int i,pow,k,n;
     for (i=0,pow=1; i<= MAX_K; i++){
         power3[i]=pow;
@@ -2347,6 +2472,9 @@ void init(){
                 
                 sbb_to_n1[sbb]=n1;
                 sbb_to_n2[sbb]=n2;
+#if MAX_N < 32768
+                sbb_dominance_key[sbb]=((uint32_t)n1 << 16) | (uint32_t)n2;
+#endif
                 sb_pairs[sbb]=n1*n2;
                 max_sbb_for_pairs[prod] = sbb;
                 sprintf(sbb_to_str[sbb],"%d:%d",n1,n2);
