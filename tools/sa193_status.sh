@@ -20,7 +20,8 @@ INSTANCE=i-0005d74f985c52ae1
 #   run3  + full star-expansion majorization (3cf1406)
 #   run4  + level-lazy tables and compact last-segment Pareto cache (6af384e bundle)
 #   run5  + bounded exact-state L1 before majorization/cache lookup (290a892)
-#   run6  + repaired bounded-search deadlines (c13b5d3)
+#   run6  + broken zero-progress deadline/prefix polling experiment (c13b5d3)
+#   run7  + restored depth-first progress and pass-2 NO_DEADLINE handoff (e648e83)
 # `--prefix runN` reads one; `--all` reads every prefix listed in render() below.
 PREFIX=run
 BOTH=0
@@ -67,14 +68,15 @@ banner() {
 render() {
     if (( COMPARE )); then
         banner run3 "full-star incumbent"
-        banner run6 "deadline-fixed compact sidecar"
+        banner run7 "depth-first compact sidecar"
     elif (( BOTH )); then
         banner run  "original build"
         banner run2 "A+B optimisations"
         banner run3 "A+B + star-expansion majorization"
-        banner run4 "compact cache (aborted: deadline bug)"
-        banner run5 "exact L1 (aborted: deadline bug)"
-        banner run6 "compact cache + exact L1 + deadline repair"
+        banner run4 "compact cache (stopped prematurely)"
+        banner run5 "exact L1 (stopped prematurely)"
+        banner run6 "broken deadline experiment (aborted)"
+        banner run7 "compact cache + exact L1 + restored depth-first deadlines"
     else
         show "$PREFIX"
     fi

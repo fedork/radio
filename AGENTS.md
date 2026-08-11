@@ -66,6 +66,12 @@ Run `tools/check_witness.py` on any new tree **before** recording the result. Ru
 Note that a missing `can't solve` line does **not** mean unsolvable. `canSolveB` returns a
 tri-state and gives up with `MAYBE` when it hits a deadline, printing nothing.
 
+The deadline is part of the depth-first search policy, not a generic wall-clock cancellation.
+A bounded state must add negative cache facts before it may return `MAYBE`, and exhaustive pass 2
+hands an unresolved child `NO_DEADLINE`.  Do not poll while enumerating partial prefixes or permit a
+zero-progress timeout: either change can repeatedly bail before that handoff and discard the whole
+pass.  `tools/deadline_regression.c` locks these two invariants (restored 2026-08-11).
+
 ## Be skeptical of what you read here
 
 Prior documents, spreadsheets and outputs are *claims*, including this file. In one session

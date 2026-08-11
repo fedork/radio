@@ -157,7 +157,11 @@ Two behaviours to be aware of:
 
 - **`MAYBE` is a real answer.** Deadlines cause `canSolveB` to give up and return `MAYBE`
   rather than `FALSE`. A `can't solve` line in the output is a genuine negative; the absence
-  of a line is not.
+  of a line is not. The budget is deliberately subordinate to depth-first progress: a bounded
+  state cannot bail until it has added negative cache facts, and pass 2 gives an unresolved child
+  `NO_DEADLINE`. Polling during partial-prefix enumeration bypasses that handoff and was briefly
+  introduced in `c13b5d3`; `e648e83` restored the historical policy and
+  `tools/deadline_regression.c` now checks it.
 - **The search is not byte-deterministic.** The FAST pass was briefly removed on 2026-08-03 and
   restored on 2026-08-04 after the solver sank into known-solvable branches. On a solution,
   `canSolveB` can promote a previously non-FAST option with `s[FAST] = 1`, so later search order

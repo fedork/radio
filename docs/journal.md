@@ -4631,72 +4631,31 @@ the remote `run.meta` files.
 The 05:07 UTC matched snapshot had `run3` at 24.11 GiB / 1,056,348 verdicts, `run4` at 0.29 GiB /
 103,773 verdicts, and the initial `run5` snapshot at 0.17 GiB / 3,304 verdicts.  `run5` had not yet
 finished its mandatory `Sa(192)` gate, so this records a verified cold launch and resource envelope,
-not a solver verdict.  `tools/sa193_status.sh --compare` now displays all three live builds.
+not a solver verdict.  The status view displayed all three live builds at the time; current
+`tools/sa193_status.sh --all` retains their final snapshots.
 
-## 2026-08-10 — run4/run5 shared one deadline livelock; fixed runs replace them
+## 2026-08-10 — run4/run5 deadline diagnosis (retracted 2026-08-11)
 
-The apparently healthy run4 process was not merely on a different slow path.  Its log stopped at
-103,778 lines while the process stayed runnable at one core and 0.29 GiB.  Run5 then reproduced the
-same completed-verdict counts—down to 98,355 negative `Sb` calls—and stopped writing at the same
-point.  That exact agreement turned a vague performance suspicion into a debugger target.
+**Retraction.** The observations in this entry were real, but the interpretation was backwards.
+Read-only GDB found run4 and run5 in the same information-tight 14-part k=5 child, below the first
+required negative-cache increment.  That is the intended depth-first dive, not a livelock: a
+bounded state is deliberately unable to throw away the pass until it contributes facts, and pass 2
+hands an unresolved child `NO_DEADLINE`.  The 12-second local replay likewise demonstrated that
+policy; it did not demonstrate a broken deadline.
 
-I installed GDB on the dedicated instance, rebuilt each frozen source with `-O3 -g`, and first
-verified that the live and debug `.text` sections were byte-identical.  Read-only attaches then found
-both solvers under `canSolveA(192,10) -> Sb(112:80)@9 ->` a two-, four-, eight-, then 14-part
-descendant.  The shared k=5 state is
-
-```
-Sb(9:4,8:4,8:1,5:5,15:1,5:3,6:3,7:2,5:3,11:1,8:2,11:1,14:1,13:1)@5.
-```
-
-Its pair mass is exactly 243 = 3^5.  Run4 was in pass 2 after 144,042,842,325 local candidates;
-run5 was in pass 1 after 10,516,061,204.  In both frames the global `cant_solve_count` was 98,355
-and the local `cant_solve_count_min` 98,356, while the finite deadline had long expired.
-
-That exposed two old state-machine mistakes.  The deadline check itself was wrapped in
-`cant_solve_count >= cant_solve_count_min`, so zero new refutations disabled it forever.  If exactly
-one refutation did appear, every visit recalculated `now + 5*(now-start)`, allowing the one-refutation
-grace to slide forever too.  There was also a granularity problem: the clock was sampled only after
-a complete long-state candidate survived all prefix filters, and such leaves can be sparse.
-
-Commit `c13b5d3` makes expiry independent of refutation progress, grants the five-times grace at
-most once per call, and polls every 65,536 admitted prefix candidates in bounded states.  Unbounded
-roots retain their old iterative behaviour.  This changes only when a child returns `MAYBE`; it
-cannot manufacture `FALSE`.
-
-The decisive local replay used run4's 3,684,161-byte checkpoint and the reconstructed state with a
-finite five-second parent budget.  The frozen engine was still running when killed after 12 seconds.
-The fixed engine returned `MAYBE` after 3.002 CPU seconds with zero new refutations; it had tested
-12,782,758 prefixes, so the added clock sampling cost about 195 calls on that path.  The focused
-deadline test, 4,164,958 cache-query bytes, the 1,038-answer split corpus, ASan+UBSan, and
-`MAX_N=1030` syntax compilation all passed.  Full commands, hashes and debugger command ids are in
+Commit `c13b5d3`, originally recorded here as the repair, instead broke both invariants.  It allowed
+zero-progress expiry and polled while still enumerating partial prefixes, before pass 2 could make
+the `NO_DEADLINE` handoff.  Run4 and run5 were therefore stopped prematurely at
+2026-08-11 05:37:59 UTC.  Run6 was a valid cold launch and its printed verdicts remain definitive,
+but it is not a valid timing/progress comparison.  The corrected debugger evidence, historical
+state machine, regressions and run disposition supersede this entry in
 [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
 
-With the cause reproduced locally, run4 and run5 had no remaining diagnostic value.  Their wrappers
-were stopped at 2026-08-11 05:37:59 UTC; both watchdogs made final immutable uploads at 05:47:57 and
-05:45:28 respectively.  Run3 was untouched.  These are aborted controls, not mathematical verdicts.
-
-The clean replacement, run6, started cold at 2026-08-11 05:45:09 UTC from an exact archive of
-`c13b5d3` (archive SHA-256
-`91da35711c9d8bc9bb96ee9e835f58aa4a63431d1a418f27fbdd7426c745695b`).  Its `radiobase.c` SHA-256
-is `a20449c1452236494df4285f92f527c6d746cca531cfdf7d7e3dc5d18f1e8e70`; remote binary SHA-256 is
-`09c1210e3515b735edd445b57126bd0cf8851b791335b7fd6fd6544202cc8d73`.  SSM launch command
-`0aea04dc-f997-408a-b36c-1285d78fb099` left solver 587707, watchdog 587744 and a two-name idle guard
-alive.  Run3 retains 40 GiB and run6 has 60 GiB, preserving the 100 GiB joint ceiling; the launch
-inventory showed 97 GiB available and no swap.  Its mandatory control was still open at launch.
-
-The first ten-minute snapshot is the direct liveness check: run6 had reached 116,103 verdicts and
-0.50 GiB RSS with a growing log, past run4/run5's frozen 103,773/103,769 counts.  The old exact child
-therefore returned and the parent continued.  The full positive gate followed at 06:04 UTC:
-`result CONTROL Sa(192) in 10 = SOLVABLE (922.0 s)`.  The process then entered `Sa(193)` and remained
-runnable at about 0.98 GiB RSS.  This is the required cold end-to-end validation of the repair.
-
-The pre-fix local segment was also retired rather than waiting for the same trap.  It had run for
+The first local segment was also stopped because of that mistaken diagnosis.  It had run for
 4 h 34 m, passed the control in 807.7 CPU seconds, emitted 485,337 lines and stayed near a 1.3 GiB
-physical footprint.  The supervisor stopped it with exit 143 and produced a final 17 MiB checkpoint
-with SHA-256 `3b8622f4d1cc342f28c93626e6554d2c7ca8da8ff0582c993ceeca6e19c73ae2`.
-The raw log remains local: this failed-engine session adds no mathematical claim worth promoting to
-the artifact store.
+physical footprint.  The supervisor produced a final 17 MiB checkpoint with SHA-256
+`3b8622f4d1cc342f28c93626e6554d2c7ca8da8ff0582c993ceeca6e19c73ae2`.  Its facts are sound and
+remain part of the local checkpoint chain.
 
 That shutdown exposed a separate guard failure: `vmmap -summary` had hung for 19 minutes, freezing
 both memory checks and checkpoint cadence.  Commit `aee1a02` first bounded each probe to 20 seconds
@@ -4705,7 +4664,8 @@ out: `vmmap` was no longer capable of monitoring this workload.  macOS `top` doc
 field as physical footprint and returned the same kind of value in about a second (1,046 MiB while
 RSS was roughly 260 MiB), so the supervisor now uses that field under the same 20-second bound.
 Every new checkpoint includes both inherited facts and the new segment, avoiding a restart that
-silently forgets its prefix.  The fixed continuation started
+silently forgets its prefix.  The guard-fixed continuation (still carrying the later-retracted
+`c13b5d3` deadline change) started
 at 2026-08-11 05:49:31 UTC in
 `/Users/fedor/radio-runs/sa193-local-deadline-aee1a02-resume1`, loaded the exact final checkpoint,
 reproduced the positive control from cache, and resumed `Sa(193)` under the 20 GiB footprint guard.
@@ -4725,3 +4685,47 @@ Commit `ebf4e2d` switched the probe to bounded `top MEM`.  A second continuation
 reproduced the positive control from cache, and resumed `Sa(193)`.  Its first footprint probe
 returned normally; four consecutive samples through 06:06 UTC remained near 1.05 GiB with zero
 probe failures.  All three raw segment logs must be retained for a closed eventual proof.
+
+## 2026-08-11 — restored the depth-first deadline policy; run7 replaces run6
+
+The slow `run6` attempts made the contradiction visible: multiple k=8 calls consumed more than
+3,000 seconds and then produced no verdict, even though the exhaustive phase should have delegated
+the unresolved child with `NO_DEADLINE`.  Source history confirmed that
+`cant_solve_count_min = cant_solve_count + 1` was introduced deliberately in `d3a41ed` as “do not
+bail out without making at least some progress.”  The repeated five-times-elapsed extension at
+exactly that minimum is also deliberate: it keeps the dive alive until a second fact permits an
+expired finite caller to return `MAYBE`.
+
+Live read-only GDB inspection of byte-identical run3/run6 debug rebuilds located both current k=8
+calls in pass 1 under finite parent deadlines, and their k=9 roots in pass 1.  A focused local
+debugger stop in the erroneous helper showed the concrete zero-progress case:
+`deadline=200, start=100, now=201, cant_solve_count=0, minimum=1`, with the helper about to expire.
+The prefix poll could then fire at the start of pass 2 before any complete candidate reached
+`child_deadline = NO_DEADLINE`.  This explains the no-verdict bailouts without treating them as
+negatives.
+
+Commit `e648e83` removes the prefix poll and restores the pre-`c13b5d3` progress/grace semantics.
+The focused regression now checks zero-progress suppression, the sliding exactly-minimum grace,
+expiry after further progress, and the pass-2 handoff.  The optimized and ASan+UBSan split corpora
+matched at all 1,039 lines (SHA-256
+`5d0ef6f86bc32b7206da6a9dc2f59c06a11e9ac6b1ff6ad97f5788ed22dec6bd`).  Split and k=5..7
+cache-query output also matched exact pre-change commit `290a892`; both `MAX_N=193` and 1030 syntax
+compilations passed.  `tools/check_tables.py`, all witness verification and `tools/check_docs.py`
+were green.  The correction was pushed to `main` before replacing either run.
+
+Run6 was stopped at about 15:44 UTC after 618,816 raw log lines.  Its wrapper reported exit 143,
+35,974 seconds wall time and 1.37 GiB peak RSS; its watchdog finalized the immutable log and
+checkpoint at 15:47:51–52.  Run3 remained alive throughout.  Cold run7 started at
+15:45:30 from the exact `e648e83` archive with `cache=none`, source SHA-256
+`f6edd19d1c683b8cff40f4ae171347b0a8af4ccbfc0667f205721701eb179291`, and binary SHA-256
+`691c7a1c23aafc516292e3c1b8e046d241994f2f0046d65dbbb0a8279f915fa5`.  Its solver, watchdog and
+new run3/run7 idle guard were all alive with 97 GiB available and no swap; the joint cap remains
+40 + 60 GiB.
+
+The local `ebf4e2d` segment stopped cleanly at 443,713 raw lines.  Its final folded checkpoint has
+931,075 lines, 34,999,432 bytes and SHA-256
+`9bdb9915d5ea8f4fc240aca5a5c631b1177573be24dfa454ba8c7002e195ec56`.  A corrected continuation
+started at 15:49:16 in
+`/Users/fedor/radio-runs/sa193-local-depth-e648e83-resume3`, loaded that complete chain, and remains
+under the 20 GiB physical-footprint guard.  The c13-era facts remain usable because its bad paths
+returned `MAYBE`; no missing line was promoted to `FALSE`.

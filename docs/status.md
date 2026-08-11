@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (the shared `run4`/`run5` deadline stall is repaired;
-fixed AWS `run6` and a same-run local resume are active beside frozen `run3`).
+don't know it. Last refreshed **2026-08-11** (`c13b5d3`'s deadline change was retracted;
+corrected AWS `run7` and a same-chain local resume are active beside frozen `run3`).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -18,7 +18,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
-| **Do not resume a pre-`c13b5d3` long-state binary.** | `run4` and `run5` independently entered the same bounded 14-part child and spun forever: the deadline was checked only after negative progress, and its grace period could slide repeatedly. Their logs/checkpoints are evidence, but their binaries are not viable continuations. Resume a same-run checkpoint only with the fixed engine; see [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt). |
+| **Do not reintroduce `c13b5d3`'s zero-progress timeout or prefix poll.** | The deadline is subordinate to the depth-first dive: a bounded state must add negative facts before returning `MAYBE`, and exhaustive pass 2 hands an unresolved child `NO_DEADLINE`. Polling partial prefixes can bail before that handoff and repeat thousands of seconds of work without a reusable fact. `e648e83` restores the historical policy; see [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt). |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
@@ -170,18 +170,19 @@ Do not run `gh auth switch`.
 ## Running now
 
 The live AWS comparison is on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot
-around the repaired run's **2026-08-11 05:45 UTC** launch:
+around corrected run7's **2026-08-11 15:45 UTC** launch:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 1 d 05 h 37 m, 1,067,379 verdicts, **24.18 GB**, 0 of 16 |
-| `run4/` — compact cache at frozen commit `6af384e` | stopped, archived | 103,773 verdicts, **0.29 GB**, control never returned |
-| `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped, archived | 103,769 verdicts, **0.29 GB**, control never returned |
-| `run6/` — exact L1 + repaired deadlines at `c13b5d3` | **cold and alive** | control **SOLVABLE in 922.0 s**; entered `Sa(193)`, ~0.98 GB |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | ~1.31 M verdicts, **25.1 GB**, 0 of 16 |
+| `run4/` — compact cache at frozen commit `6af384e` | stopped prematurely, archived | 103,773 verdicts, **0.29 GB**, control never returned |
+| `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped prematurely, archived | 103,769 verdicts, **0.29 GB**, control never returned |
+| `run6/` — broken deadline experiment at `c13b5d3` | stopped, archived | control SOLVABLE in 922.0 s; 618,816 raw lines, 1.37 GB peak RSS |
+| `run7/` — restored depth-first deadlines at `e648e83` | **cold and alive** | 103,769 verdicts at ten minutes; control in progress, **0.29 GB** |
 
-Use `tools/sa193_status.sh --compare [--watch]` for active `run3`/`run6`; `--all` also prints the
+Use `tools/sa193_status.sh --compare [--watch]` for active `run3`/`run7`; `--all` also prints the
 stopped historical sessions and must not be read as proof that those processes remain alive.
 `run3`'s `Sa(192)` control took 540.7 s.  Its workload remains dominated by k=7 while it explores
 the first top-level `Sb(112:81)@9`.
@@ -194,31 +195,32 @@ current compact representation remains unbounded but is over an order of magnitu
 retained checkpoint.  The level-lazy split-table and cache changes are not deployed in `run3`.
 Do not restart a cold run solely to pick them up.
 
-`run4` and `run5` were not merely slow.  Debuggers found both in the identical 14-part k=5 child,
-with global `cant_solve_count=98,355` and local minimum 98,356.  The deadline check was therefore
-unreachable forever.  Run4 had evaluated 144,042,842,325 candidates in pass 2; run5's exact L1 had
-reached the same state and 10,516,061,204 pass-1 candidates.  Their wrappers were stopped at
-2026-08-11 05:37:59 UTC, their watchdogs finalized the S3 artifacts, and neither produced a control
-verdict.  Exact frames, state reconstruction and local replay are in
+The prior deadline diagnosis is retracted.  Run4 and run5 were in the identical information-tight
+14-part k=5 child with global `cant_solve_count=98,355` and local minimum 98,356, but that is the
+intended depth-first progress rule: the subtree must add cache facts before a bounded caller may
+return `MAYBE`.  The old five-times-elapsed grace deliberately slides at exactly the minimum, and
+pass 2 hands unresolved children `NO_DEADLINE`.  Run4 and run5 were stopped prematurely, not rescued
+from a proved livelock.
+
+`c13b5d3` reversed that policy and added prefix-level polling.  The poll can fire after pass 1 but
+before pass 2 reaches a complete split, so the `NO_DEADLINE` child dive never happens; run6's
+multi-thousand-second no-verdict k=8 attempts are consistent with repeated zero-fact `MAYBE`
+returns.  Its definitive printed verdicts remain sound, but its performance is not a valid
+comparison baseline.  It was stopped at about 15:44 UTC and its watchdog finalized the immutable
+log/checkpoint at 15:47:51–52.
+
+Commit `e648e83` removes the prefix poll and restores the historical progress/grace rule.  It
+matches exact pre-change split and cache-query output, and the focused regression now checks both
+progress and the pass-2 `NO_DEADLINE` handoff.  Cold run7 started from that exact commit at
+15:45:30 UTC with no cache.  `radiobase.c` SHA-256 is
+`f6edd19d1c683b8cff40f4ae171347b0a8af4ccbfc0667f205721701eb179291`; the remote binary is
+`691c7a1c23aafc516292e3c1b8e046d241994f2f0046d65dbbb0a8279f915fa5`.  Run3 remains untouched;
+the active caps and idle guard track run3 at 40 GiB plus run7 at 60 GiB.  Exact debugger frames,
+replay reinterpretation and hashes are in
 [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
-
-The repair removes the negative-progress gate, makes the existing grace period one-shot, and polls
-the clock every 65,536 admitted prefixes because complete 14-part leaves can be sparse.  Against the
-captured run4 checkpoint and exact stuck state, the frozen engine exceeded a five-second parent
-budget and was killed after 12 seconds; the fixed engine returned `MAYBE` after 3.002 CPU seconds
-with zero new negatives, after testing 12,782,758 prefixes.  `MAYBE` cannot create a false negative.
-Commit `c13b5d3` passed the cache-query, split, sanitizer and focused deadline regressions.
-
-`run6` is the cold replacement.  It started from an exact archive of `c13b5d3` at
-2026-08-11 05:45:09 UTC; `radiobase.c` SHA-256 is
-`a20449c1452236494df4285f92f527c6d746cca531cfdf7d7e3dc5d18f1e8e70` and the remote binary is
-`09c1210e3515b735edd445b57126bd0cf8851b791335b7fd6fd6544202cc8d73`.  The launch independently
-verified `cache=(none, cold)`, the expected source hash, one live solver/watchdog and 97 GiB available
-with no swap.  `run3` keeps its 40 GiB cap and `run6` has 60 GiB; their two-name idle guard preserves
-the same 100 GiB total ceiling.  Its first ten-minute snapshot reached 116,103 verdicts—a growing log
-past run4/run5's frozen 103,773/103,769 counts—so the repaired engine has cleared their exact trap.
-At 2026-08-11 06:04 UTC it completed the mandatory gate:
-`result CONTROL Sa(192) in 10 = SOLVABLE (922.0 s)`, then entered `Sa(193)`.
+Run7's ten-minute snapshot reached 103,769 verdicts—the same completed prefix as run5.  A quiet log
+from this point is expected while the restored engine performs the required dive; silence alone is
+not evidence of another stall.
 
 The completed common prefix does give a clean throughput warning.  Matching negative `Sb` verdicts
 by exact printed state and level found 98,253 common calls.  Across the k=8, k=7 and k=6 groups,
@@ -232,19 +234,19 @@ also differ in split storage/filtering and code layout.  Exact states and snapsh
 2026-08-10 journal entry.
 
 That measurement motivated an isolated profile and is no longer the throughput expectation for
-`run6` or current `main`.  A bounded exact-state L1 now probes before repeated bundled majorization and
+`run7` or current `main`.  A bounded exact-state L1 now probes before repeated bundled majorization and
 the compact dominance trie.  On the fixed warm four-part control it takes **26.6** solve seconds,
 versus 42.6 for the first compact build and 33.0 before compaction, with the identical witness and
 37,899 local splits.  The full `Sa(192)` gate is SOLVABLE in **711.7 CPU seconds**, versus 819.9 for
 the first compact build and 734.5 before compaction, at 0.35 GB peak RSS.  All 3,379,067 verdict
 bytes in the combined-checkpoint regression match compact baseline c146d9d exactly.  This fixes the
-measured tax for current runs; frozen `run4` does not contain it, while stopped `run5` and active
-`run6` do.
+measured tax for current runs; frozen `run4` does not contain it, while stopped `run5`/`run6` and
+active `run7` do.
 
 For the proposed matched state `Sb(48:48,64:33)@8`, `run3` did **not** print a refutation.  It logged
 progress through 2,602 seconds, 45,149 tested split combinations and 565/1,225 outer options left,
 then produced no verdict line; record that outcome as `MAYBE`, not `FALSE`.  The stopped run4 never
-reached it because the control bug came first.  Its retained read-only tracker artifact is therefore
+reached it before it was prematurely terminated.  Its retained read-only tracker artifact is therefore
 empty of target progress.  A meaningful comparison still requires a final verdict or an explicitly
 bounded non-verdict, not merely matching `still solving` lines.
 
@@ -280,16 +282,17 @@ Implementation measurements and commands are in
 
 The genuinely cold local segment at commit `7ceb59d` ran from 2026-08-11 01:12:42 to 05:47:30 UTC
 in `/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  Its control passed in 807.7 seconds;
-it then emitted 485,337 log lines while holding about a 1.3 GiB physical footprint.  Once the shared
-deadline bug was proved, the supervisor stopped that pre-fix binary with exit 143 and generated a
+it then emitted 485,337 log lines while holding about a 1.3 GiB physical footprint.  It was stopped
+because of the now-retracted deadline diagnosis; its pre-`c13b5d3` depth-first policy was valid.  The
+supervisor exited 143 and generated a
 17 MiB final same-run checkpoint (SHA-256
 `3b8622f4d1cc342f28c93626e6554d2c7ca8da8ff0582c993ceeca6e19c73ae2`).  This is an interrupted
 segment, not an `Sa(193)` verdict.
 
-A fixed same-run continuation is active in
-`/Users/fedor/radio-runs/sa193-local-deadline-ebf4e2d-resume2`.  It started at
-2026-08-11 05:59:03 UTC on commit `ebf4e2d`, loaded the combined checkpoint of the cold segment and
-a short first continuation, reproduced the positive control from cache, and resumed `Sa(193)`.
+A corrected same-chain continuation is active in
+`/Users/fedor/radio-runs/sa193-local-depth-e648e83-resume3`.  It started at
+2026-08-11 15:49:16 UTC on commit `e648e83`, loaded the 931,075-line checkpoint folded from every
+earlier segment, reproduced the positive control from cache, and resumed `Sa(193)`.
 The old supervisor's `vmmap` probe itself hung for 19 minutes, freezing both its memory guard and
 checkpoint cadence; merely bounding it showed that it still timed out consistently.  The guard now
 reads macOS `top`'s documented physical-footprint field, with its own 20-second timeout, and its
@@ -469,14 +472,14 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 
 ## Immediate next steps
 
-0. **Watch the repaired two-way remote comparison** (`tools/sa193_status.sh --compare --watch`).
-   `run6` passed its cold `Sa(192)` control in 922.0 CPU seconds and is now inside `Sa(193)`.
+0. **Watch the corrected two-way remote comparison** (`tools/sa193_status.sh --compare --watch`).
+   `run7` is a cold no-cache run and is still inside its mandatory `Sa(192)` control.
    `run3` includes full-star expansion but predates level-lazy split tables and the compact cache;
-   `run6` has those changes, exact L1 and the deadline repair.  Preserve the stopped run4/run5
-   artifacts, but never resume their binaries.
+   `run7` has those changes, exact L1 and the restored depth-first deadline policy.  Preserve the
+   stopped run4/run5/run6 artifacts; do not use run6 as a performance baseline.
 
 1. **Watch the fixed local same-run continuation** in
-   `/Users/fedor/radio-runs/sa193-local-deadline-ebf4e2d-resume2`.  It inherits only the checkpoint
+   `/Users/fedor/radio-runs/sa193-local-depth-e648e83-resume3`.  It inherits only the checkpoint
    chain rooted in the cold `cold2` segment, whose `Sa(192)` gate passed in 807.7 CPU seconds.  Keep
    all raw segment logs and keep watching physical footprint because the cache is compact, not bounded.
 

@@ -8,11 +8,11 @@ findings go to [journal.md](journal.md) as usual.
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| active solvers | `run3`: full-star build; `run6`: compact cache + exact L1 + deadline repair at `c13b5d3`; both `MAX_K=10 MAX_N=193` |
+| active solvers | `run3`: full-star build; `run7`: compact cache + exact L1 + restored depth-first deadlines at `e648e83`; both `MAX_K=10 MAX_N=193` |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| memory guards | `run3` 40 GiB + `run6` 60 GiB = 100 GiB on the 123 GiB host |
+| memory guards | `run3` 40 GiB + `run7` 60 GiB = 100 GiB on the 123 GiB host |
 | completion | a 20-minute final-upload grace period, then instance-initiated stop once both solvers are gone |
 
 Each run remains internally serialized: one process and cache handle all sixteen top-level states
@@ -23,18 +23,22 @@ none loads another run's cache.
 | prefix | build | started UTC | state / binary |
 |---|---|---|---|
 | `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | active; `/root/run3/radio_sa193_v3` |
-| `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | stopped; deadline bug; `/root/run4/radio_sa193_v4` |
-| `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | stopped; same deadline bug; `/root/run5/radio_sa193_v5` |
-| `run6/` | run5 engine + bounded-search deadline repair (`c13b5d3`) | 2026-08-11 05:45:09 | active; `/root/run6/radio_sa193_v6` |
+| `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | stopped prematurely; `/root/run4/radio_sa193_v4` |
+| `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | stopped prematurely; `/root/run5/radio_sa193_v5` |
+| `run6/` | broken zero-progress deadline/prefix-poll experiment (`c13b5d3`) | 2026-08-11 05:45:09 | stopped and archived; `/root/run6/radio_sa193_v6` |
+| `run7/` | restored depth-first progress and pass-2 handoff (`e648e83`) | 2026-08-11 15:45:30 | active; `/root/run7/radio_sa193_v7` |
 
-All rows name frozen binaries, not aliases for current `main`.  `run4` and `run5` entered the same
-bounded 14-part child and could not observe its expired deadline because no new negative verdict
-had appeared; both were stopped after debugger reconstruction.  Preserve their logs/checkpoints,
-but never resume those binaries.  The exact stack, state and before/after replay are in
+All rows name frozen binaries, not aliases for current `main`.  The original interpretation of
+run4/run5 as a deadline livelock was wrong: their information-tight 14-part child was the intended
+depth-first dive, so they were stopped prematurely.  `c13b5d3` then allowed zero-progress expiry and
+polled partial prefixes before pass 2 could hand the unresolved child `NO_DEADLINE`; run6 is therefore
+not a valid timing baseline.  Its definitive printed verdicts and archived checkpoint remain sound.
+Run7 is the corrected cold replacement.  The exact frames, historical state machine, regression
+hashes and disposition are in
 [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
-`run6` is their clean cold replacement.  Its first ten-minute snapshot reached 116,103 verdicts,
-past both frozen counts, so it cleared the reproduced trap.  It then completed the mandatory cold
-control: `Sa(192)` was SOLVABLE in 922.0 CPU seconds, and the process entered `Sa(193)`.
+Its ten-minute snapshot reached 103,769 verdicts, exactly the prefix where run5 was stopped.  Under
+the restored policy, a quiet log while it dives from there is expected; do not terminate it merely
+because the verdict count pauses.
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
@@ -64,13 +68,13 @@ no syntactic marker, and given an engine change trapped the last run. It is also
 tools/sa193_status.sh --compare --watch
 ```
 
-This prints active `run3` and `run6` together.  `--prefix run6` selects only the repaired run and
+This prints active `run3` and `run7` together.  `--prefix run7` selects only the corrected run and
 `--all` also includes the stopped/historical prefixes.  Each live `STATUS` gets refreshed every 10 minutes
 with verdict count, cache size and RSS.  Also in the bucket:
 
 | key | what |
 |---|---|
-| `run3/STATUS`, `run6/STATUS` | latest active status snapshots |
+| `run3/STATUS`, `run7/STATUS` | latest active status snapshots |
 | `runN/sa193.checkpoint` | same-run restart checkpoint, refreshed hourly |
 | `runN/seg-*/out_sa193.txt.zst` | immutable per-segment raw log, refreshed hourly and finalized at exit |
 | `runN/seg-*/memprofile.csv` | time/RSS/verdict profile used for the comparison |
