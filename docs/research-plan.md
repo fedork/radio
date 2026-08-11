@@ -195,9 +195,10 @@ theory track should work from the exact `k=10,m=6` mixed-child boundary toward a
 construction or obstruction, and only then recover small k backwards. Do not use witness-tree shape
 as evidence that either track has a unique continuation.
 
-The result-cache prerequisite for a local H3 run is now delivered.  Last-segment positive/negative
-Pareto fronts reduce the measured k=5..7 checkpoint storage 11.2x; the full `Sa(192)` control passes
-at 0.41 GB peak RSS for an 11.6% CPU premium.  H3 still sits awkwardly—the answer is probably 192,
-the evidence is probably right, and neither "probably" belongs in a paper—but a bounded local
-current-main continuation is now the next useful compute rather than a swap experiment.  Resume only
-from that run's own output and retain the raw log; compact does not mean bounded.
+The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
+reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`
+control passes at 0.35 GB peak RSS and 711.7 CPU seconds, with no remaining measured premium over the
+734.5-second pre-compaction control.  A cold local compact run and the current-main AWS `run5` are
+now active alongside the two older remote builds.  H3 still sits awkwardly—the answer is probably
+192, the evidence is probably right, and neither "probably" belongs in a paper.  Resume only from a
+run's own output and retain every raw segment; compact does not mean bounded.

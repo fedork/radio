@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Launch a second cold Sa(193) solver in an already-populated EC2 run directory.
+# Launch another cold Sa(193) solver in an already-populated EC2 run directory.
 # This script runs ON the instance, after the current source bundle has been unpacked.
 # It never touches the incumbent run directory or process.
 #
 # Example (from /root/run4):
 #   tools/sa193_sidecar_remote.sh --prefix run4 --binary radio_sa193_v4 \
-#       --build bca3a2e --peer radio_sa193_v3 --rss-gb 60
+#       --build bca3a2e --peer radio_sa193_v3 --rss-gb 60 \
+#       --idle-solvers radio_sa193_v3,radio_sa193_v4
 
 set -euo pipefail
 
@@ -13,6 +14,7 @@ PREFIX=run4
 BINARY=radio_sa193_v4
 BUILD=unknown
 PEER=radio_sa193_v3
+IDLE_SOLVERS=
 RSS_GB=60
 # Ten years is an accident backstop, not an intended deadline.  The run should end by verdict.
 SECONDS_CAP=315360000
@@ -25,6 +27,7 @@ while (( $# )); do
         --binary) BINARY="$2"; shift 2 ;;
         --build) BUILD="$2"; shift 2 ;;
         --peer) PEER="$2"; shift 2 ;;
+        --idle-solvers) IDLE_SOLVERS="$2"; shift 2 ;;
         --rss-gb) RSS_GB="$2"; shift 2 ;;
         --seconds) SECONDS_CAP="$2"; shift 2 ;;
         *) echo "unknown argument: $1" >&2; exit 64 ;;
@@ -36,6 +39,18 @@ done
 [[ "$PEER" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid peer name: $PEER" >&2; exit 64; }
 [[ "$RSS_GB" =~ ^[0-9]+$ && "$RSS_GB" -gt 0 ]] || { echo "invalid RSS cap" >&2; exit 64; }
 [[ "$SECONDS_CAP" =~ ^[0-9]+$ && "$SECONDS_CAP" -gt 0 ]] || { echo "invalid time cap" >&2; exit 64; }
+[[ -n "$IDLE_SOLVERS" ]] || {
+    echo "need --idle-solvers with every solver that must keep the host alive" >&2
+    exit 64
+}
+IFS=',' read -r -a IDLE_NAMES <<< "$IDLE_SOLVERS"
+(( ${#IDLE_NAMES[@]} > 0 )) || { echo "need at least one idle-guard solver" >&2; exit 64; }
+for name in "${IDLE_NAMES[@]}"; do
+    [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || {
+        echo "invalid idle-guard process name: $name" >&2
+        exit 64
+    }
+done
 
 RUN_DIR=$(pwd -P)
 [[ "$RUN_DIR" == /root/run* ]] || {
@@ -133,22 +148,28 @@ setsid nohup env SEG="$SEG" PROFILE="$RUN_DIR/memprofile.csv" \
 WATCHDOG_PID=$!
 printf '%s\n' "$WATCHDOG_PID" > watchdog.pid
 
-IDLE_COUNT=$(pgrep -fc 'sa193_idle_shutdown.sh radio_sa193_v3 radio_sa193_v4' || true)
-if [[ "$IDLE_COUNT" == 0 ]]; then
-    setsid nohup tools/sa193_idle_shutdown.sh radio_sa193_v3 radio_sa193_v4 \
-        >> /var/log/sa193-idle-shutdown.log 2>&1 < /dev/null &
-    printf '%s\n' "$!" > idle_guard.pid
-fi
+# Replace any older idle guard only after the broader one is alive.  Leaving a two-name guard in
+# place when a third sidecar is added can stop the host while that third solver is still running.
+OLD_IDLE_PIDS=$(pgrep -f '[s]a193_idle_shutdown[.]sh' || true)
+setsid nohup tools/sa193_idle_shutdown.sh "${IDLE_NAMES[@]}" \
+    >> /var/log/sa193-idle-shutdown.log 2>&1 < /dev/null &
+IDLE_GUARD_PID=$!
+printf '%s\n' "$IDLE_GUARD_PID" > idle_guard.pid
 
 sleep 3
 kill -0 "$SOLVER_PID"
 kill -0 "$WATCHDOG_PID"
+kill -0 "$IDLE_GUARD_PID"
 [[ "$(pgrep -xc "$PEER" || true)" == 1 ]]
+for old_pid in $OLD_IDLE_PIDS; do
+    [[ "$old_pid" == "$IDLE_GUARD_PID" ]] || kill -TERM "$old_pid" 2>/dev/null || true
+done
 {
     printf 'wrapper_pid=%s\n' "$WRAPPER_PID"
     printf 'solver_pid=%s\n' "$SOLVER_PID"
     printf 'watchdog_pid=%s\n' "$WATCHDOG_PID"
-    [[ -f idle_guard.pid ]] && printf 'idle_guard_pid=%s\n' "$(cat idle_guard.pid)"
+    printf 'idle_guard_pid=%s\n' "$IDLE_GUARD_PID"
+    printf 'idle_guard_solvers=%s\n' "$IDLE_SOLVERS"
 } >> run.meta
 
 echo "launched $BINARY pid=$SOLVER_PID, watchdog=$WATCHDOG_PID, prefix=$PREFIX"

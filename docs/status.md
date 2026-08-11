@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (the first exact paired timings from compact `run4`
-show an approximately 25% CPU cost; both remote runs and the compact local run remain active).
+don't know it. Last refreshed **2026-08-10** (`run5`, the first remote exact-L1 build, is now cold
+and active beside the frozen `run3`/`run4`; the compact local run also remains active).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -168,24 +168,25 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-All four prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
-`tools/sa193_status.sh --compare` at **2026-08-11 04:27 UTC**:
+All five prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
+`tools/sa193_status.sh --compare` at **2026-08-11 05:07 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 1 d 04 h 27 m, 1,039,742 verdicts, **24.01 GB**, 0 of 16 |
-| `run4/` — compact cache at frozen commit `6af384e` | **fresh and alive** | 2 h 50 m, 103,773 verdicts, **0.29 GB**, control still open |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 1 d 05 h 07 m, 1,056,348 verdicts, **24.11 GB**, 0 of 16 |
+| `run4/` — compact cache at frozen commit `6af384e` | **fresh and alive** | 3 h 20 m, 103,773 verdicts, **0.29 GB**, control still open |
+| `run5/` — compact cache + exact L1 at frozen commit `290a892` | **fresh and alive** | launch snapshot: 3,304 verdicts, **0.17 GB**, control still open |
 
 Use `tools/sa193_status.sh --compare [--watch]` for the matched live stream; `--all` also prints the
 stale historical runs and must not be read as proof that those processes remain alive.  `run3`'s
-`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 self time is 93,411 s,
-or **91.2%** of measured CPU, while k=6 is 1.7%.  It is inside the first top-level
-`Sb(112:81)@9`, currently below `Sb(63:38,49:43)@8`.
+`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 self time is 95,732 s,
+or **91.3%** of measured CPU, while k=6 is 1.7%.  It is inside the first top-level
+`Sb(112:81)@9`, currently below `Sb(62:38,50:43)@8`.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
-24.01 GB with 1.04 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
+24.11 GB with 1.06 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
 so it does not by itself identify the cause; it does show that memory per verdict cannot be assumed
 stable across the changed search shape.  `run3` still has the old unbounded dense result trie; the
 current compact representation remains unbounded but is over an order of magnitude smaller on the
@@ -195,9 +196,17 @@ Do not restart a cold run solely to pick them up.
 `run4` started cold at 2026-08-11 01:37:20 UTC from bundle commit `6af384e`; its source hashes match
 the compact implementation (`radiobase.c` SHA-256
 `99f84940b728312f774de0222f92151cf8c472d96824590ff0bead8ded6158b4`).  The remote log explicitly
-reports level-lazy split tables, `control=yes`, and `cache=(none, cold)`.  It has a 60 GiB RSS guard
-beside `run3`'s 40 GiB guard, leaving at least about 23 GiB outside the two solver caps.  This is a
-launch record only: its own `Sa(192)` gate had not completed at the snapshot.
+reports level-lazy split tables, `control=yes`, and `cache=(none, cold)`.  Its original wrapper still
+shows 60 GiB, but a live supplemental guard lowers the effective cap to 30 GiB.  Together with
+`run3` at 40 GiB and `run5` at 30 GiB, the three effective caps total 100 GiB and retain about
+23 GiB for the host.  Its own `Sa(192)` gate had not completed at the snapshot.
+
+`run5` started cold at 2026-08-11 05:05:13 UTC from exact commit `290a892`.  Its `radiobase.c`
+SHA-256 is `6cd31bd81d65a4f62054d8b73f16deda68fa95f0e284a882942eb2160e64f3b5` and binary
+SHA-256 is `88bf08ff8498aa223dec3c87d83893c93175ef7ef361028087fba8aa6d62cd38`.
+The first log lines report the level-lazy table, `control=yes`, and `cache=(none, cold)`; PID 576613,
+its watchdog, the 30 GiB wrapper and the three-name idle guard all survived their launching SSM
+sessions.  This is only a launch record: the required `Sa(192)` control was still open.
 
 The first three hours exposed a search-path warning rather than a resource failure.  At the latest
 snapshot `run4` still had not completed the control; it remained alive at one full core and only
@@ -220,14 +229,14 @@ also differ in split storage/filtering and code layout.  Exact states and snapsh
 2026-08-10 journal entry.
 
 That measurement motivated an isolated profile and is no longer the throughput expectation for
-future `main` runs.  A bounded exact-state L1 now probes before repeated bundled majorization and
+`run5` or future `main` runs.  A bounded exact-state L1 now probes before repeated bundled majorization and
 the compact dominance trie.  On the fixed warm four-part control it takes **26.6** solve seconds,
 versus 42.6 for the first compact build and 33.0 before compaction, with the identical witness and
 37,899 local splits.  The full `Sa(192)` gate is SOLVABLE in **711.7 CPU seconds**, versus 819.9 for
 the first compact build and 734.5 before compaction, at 0.35 GB peak RSS.  All 3,379,067 verdict
 bytes in the combined-checkpoint regression match compact baseline c146d9d exactly.  This fixes the
 measured tax for future runs; frozen `run4` does not contain it and its timings remain valid for
-that binary.
+that binary, while frozen `run5` does.
 
 For the proposed matched state `Sb(48:48,64:33)@8`, `run3` did **not** print a refutation.  It logged
 progress through 2,602 seconds, 45,149 tested split combinations and 565/1,225 outer options left,
@@ -454,10 +463,11 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 
 ## Immediate next steps
 
-0. **Watch the matched remote comparison** (`tools/sa193_status.sh --compare --watch`).  Require
-   `run4`'s own `Sa(192)` control to pass before interpreting later progress.  `run3` includes
-   full-star expansion but predates level-lazy split tables and the compact cache; preserve both
-   cold sessions and compare elapsed CPU, RSS, current level and completed top-level states.
+0. **Watch the three-way remote comparison** (`tools/sa193_status.sh --compare --watch`).  Require
+   `run4` and `run5` to pass their own `Sa(192)` controls before interpreting later progress.
+   `run3` includes full-star expansion but predates level-lazy split tables and the compact cache;
+   `run4` has the compact cache but not exact L1; `run5` has both.  Preserve all cold sessions and
+   compare elapsed CPU, RSS, current level and completed top-level states.
 
 1. **Watch the active compact local `Sa(193)` derivation** in
    `/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  Its own cold `Sa(192)` gate passed in

@@ -4597,3 +4597,38 @@ Final live inventory at the documentation cutoff: local PID 21538 was still at o
 had `run3` alive at 24.01 GB / 1,039,742 verdicts and frozen compact `run4` alive at 0.29 GB /
 103,773 verdicts; neither had completed a top-level `Sa(193)` state, and `run4` had still not closed
 its control.  These are operational snapshots, not verdicts.
+
+## 2026-08-10 — exact-L1 AWS `run5` launched beside frozen `run3` and `run4`
+
+The current-main engine now has its own cold AWS session.  A read-only inventory immediately before
+launch found `run3` PID 375197 at 24.10 GiB RSS and `run4` PID 542146 at 0.29 GiB, both using one
+full core; the host had 97 GiB available, no swap and 196 GiB free disk.  Neither incumbent process,
+directory, cache, watchdog nor log was touched.
+
+`run5` started at 2026-08-11 05:05:13 UTC in `/root/run5` from an exact `git archive` of commit
+`290a892`.  The archive SHA-256 is
+`0a956f5123694829b57c5275d5c62cf6be07acf59b28260586c3bc5bd441f3cc`, `radiobase.c` is
+`6cd31bd81d65a4f62054d8b73f16deda68fa95f0e284a882942eb2160e64f3b5`, and the newly compiled
+`radio_sa193_v5` binary is
+`88bf08ff8498aa223dec3c87d83893c93175ef7ef361028087fba8aa6d62cd38`.  The launch SSM command was
+`4d37a1a1-c190-4ce7-8b65-a3adfaf05cd4`; solver PID 576613 and watchdog PID 576650 both survived the
+managed command returning.  The first raw lines independently report
+`split_index_size = 74504 (level-lazy mode)` and
+`control=yes, cache=(none, cold)`.  Its mutable state is isolated under S3 prefix `run5/`, including
+the ten-minute status, hourly immutable raw segment, memory profile and same-run checkpoint.
+
+The third solver required changing the cap plan, not merely trusting its small launch footprint.
+`run3` retains its 40 GiB wrapper.  `run5` has a native 30 GiB wrapper, and a detached supplemental
+guard (PID 576907) lowers `run4`'s effective cap from its immutable launch-time 60 GiB wrapper to
+30 GiB.  Thus the effective solver limits remain 40 + 30 + 30 = 100 GiB on the 123 GiB usable host,
+leaving about 23 GiB outside them.  SSM command
+`5638ef2b-401a-4bd8-96f7-4db43e27a870` installed that guard and atomically replaced the old
+two-name idle watcher with PID 576924, which tracks `radio_sa193_v3`, `radio_sa193_v4` and
+`radio_sa193_v5`.  A subsequent independent SSM command found both detached guards reparented to
+PID 1 and all three solvers/watchdogs alive.  The nominal and effective limits and guard PIDs are in
+the remote `run.meta` files.
+
+The 05:07 UTC matched snapshot had `run3` at 24.11 GiB / 1,056,348 verdicts, `run4` at 0.29 GiB /
+103,773 verdicts, and the initial `run5` snapshot at 0.17 GiB / 3,304 verdicts.  `run5` had not yet
+finished its mandatory `Sa(192)` gate, so this records a verified cold launch and resource envelope,
+not a solver verdict.  `tools/sa193_status.sh --compare` now displays all three live builds.
