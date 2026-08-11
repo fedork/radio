@@ -5021,3 +5021,8 @@ no prior k=9 boundary, hence `345/-` versus `414/-`. The five k=8 calls had esti
 4.719–16 seconds in run8 and 4.678–15 seconds in run3; their inclusive ratios were 0.90x–1.02x and
 estimated-self ratios 0.77x–1.06x. At 23:33 the separate run8 level profile, including 2,260 seconds
 of visible active k=9 work, read `k9 2.6k/2.1k`; run8 remained inside `Sb(112:81)@9`, at 0.92 GiB RSS.
+The next ordinary watchdog cycle—not a manual one-shot—refreshed `COMPARE` in the same format at
+23:37:51 UTC. A final isolation check (SSM `35b6109c-5da1-4fa8-a060-d4638b30f90c`) found exactly one
+run3 solver, one run8 solver, one run8 watchdog and one two-name idle guard; the run8 binary hash was
+still `d9ae6e5feea4700be742504e345e2af09c910d790330b37457755cd89d4ac950`, with 95 GiB available and
+no swap.

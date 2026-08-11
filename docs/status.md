@@ -171,7 +171,7 @@ Do not run `gh auth switch`.
 ## Running now
 
 The two live AWS solvers are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot
-from **2026-08-11 23:33 UTC**:
+from **2026-08-11 23:38 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
@@ -182,7 +182,7 @@ from **2026-08-11 23:33 UTC**:
 | `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped, archived; old scheduler | 103,769 verdicts, **0.29 GB**, control never returned |
 | `run6/` — broken deadline experiment at `c13b5d3` | stopped, archived | control SOLVABLE in 922.0 s; 618,816 raw lines, 1.37 GB peak RSS |
 | `run7/` — progress-gated pass-2 dive at `e648e83` | stopped and archived; obsolete scheduler | 104,931 verdicts; control never returned; **0.29 GB** peak RSS |
-| `run8/` — compact cache + bounded probes at `9395218` | **fresh and alive** | exploring `Sb(112:81)@9`; 319.6 K verdicts, **0.92 GB**, 0 of 16 |
+| `run8/` — compact cache + bounded probes at `9395218` | **fresh and alive** | exploring `Sb(112:81)@9`; 341.3 K verdicts, **0.93 GB**, 0 of 16 |
 
 Use `tools/sa193_status.sh --compare [--watch]` for compact live run3/run8 rows and the exact-call
 comparison; `--all` prints the stopped historical sessions and must not be read as proof that those
