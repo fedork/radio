@@ -104,5 +104,11 @@ Run disposition
 After the state and cause were independently reproduced, run4 and run5 no longer had diagnostic
 value.  Their wrappers were terminated at 2026-08-11 05:37:59 UTC by SSM command
 `ab7765b7-00da-4c3f-a94d-48c785947251`; both solver processes exited, while run3 and its watchdog
-remained alive.  Their own watchdogs were left running to make final immutable S3 uploads.  This is
-an aborted-engine record, not evidence for or against Sa(192) or Sa(193).
+remained alive.  Their watchdogs made final immutable uploads at 05:47:57 and 05:45:28 UTC.
+This is an aborted-engine record, not evidence for or against Sa(192) or Sa(193).
+
+Cold replacement `run6` started from fix commit `c13b5d3` at 2026-08-11 05:45:09 UTC.  Its first
+ten-minute snapshot had already reached 116,103 verdicts, past run4/run5's frozen 103,773/103,769,
+and the log was still growing.  This establishes that the formerly inescapable child now returns;
+the mandatory cold control subsequently reported
+`result CONTROL Sa(192) in 10 = SOLVABLE (922.0 s)` and the process entered Sa(193).

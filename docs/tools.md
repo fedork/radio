@@ -118,17 +118,22 @@ Wall time is quantised to `--poll` (default 5s); the drivers' own `took N` lines
 
 On macOS this is only a **resident-set** guard, not a bound on the solver's allocated heap.
 Swapped anonymous pages leave RSS: the pre-compaction 2026-08-10 local `Sa(193)` trial showed 2.77 GB peak RSS
-while `vmmap -summary` measured a 7.1 GB physical footprint, 5.9 GB of it swapped.  Sample
-`Physical footprint` as well as `vm_stat` for any long local run.  Linux/AWS did not show this
-gap because the solver heap remained resident there.
+while `vmmap -summary` measured a 7.1 GB physical footprint, 5.9 GB of it swapped.  macOS `top`'s
+documented `MEM` field reports that physical footprint cheaply enough for a live guard; also retain
+`vm_stat` for swap context.  `vmmap` remains useful for one-off attribution but later hung for 19
+minutes on the active solver, so do not call it without a separate bound.  Linux/AWS did not show
+the RSS gap because the solver heap remained resident there.
 
 For the deliberately unbounded-time local `Sa(193)` run, use
-`tools/sa193_local_supervisor.sh RUN_DIR [FOOTPRINT_GIB]`.  `RUN_DIR` must contain a newly compiled
-`radio_sa193`; the supervisor always invokes it with no cache argument, keeps the machine awake,
-samples its `vmmap` physical footprint every two minutes, regenerates a same-log checkpoint hourly,
+`tools/sa193_local_supervisor.sh RUN_DIR [FOOTPRINT_GIB] [SAME_RUN_CHECKPOINT]`.  `RUN_DIR` must
+contain a newly compiled `radio_sa193`.  With no third argument the run is cold; with one it is a
+same-run continuation, and every generated checkpoint folds the inherited facts together with the
+new segment so a later restart cannot forget its prefix.  The supervisor keeps the machine awake,
+samples `top MEM` every two minutes under a 20-second probe bound, regenerates a checkpoint hourly,
 and refuses to overwrite an existing attempt.  It has no time limit.  It stops on the requested
 footprint ceiling, less than 10 GiB free disk, or five consecutive failures of the physical-memory
-measurement.  Inspect `status.txt`, `monitor.log`, and the PID files in `RUN_DIR`.
+measurement.  Inspect `status.txt`, `monitor.log`, and the PID files in `RUN_DIR`.  Never edit the
+script while its bash process is live; stop the supervisor first, because bash re-reads scripts.
 
 In an ordinary terminal the supervisor may be put under `nohup`.  A managed one-shot command may
 reap its whole descendant process group after returning despite `nohup`; in that environment keep

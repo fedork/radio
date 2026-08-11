@@ -8,32 +8,33 @@ findings go to [journal.md](journal.md) as usual.
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| active solvers | `run3`: full-star build; `run4`: compact cache at `6af384e`; `run5`: compact cache + exact L1 at `290a892`; all `MAX_K=10 MAX_N=193` |
+| active solvers | `run3`: full-star build; `run6`: compact cache + exact L1 + deadline repair at `c13b5d3`; both `MAX_K=10 MAX_N=193` |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| memory guards | effective caps are `run3` 40 GiB + `run4` 30 GiB + `run5` 30 GiB = 100 GiB on the 123 GiB host |
-| completion | a 20-minute final-upload grace period, then instance-initiated stop once all three solvers are gone |
+| memory guards | `run3` 40 GiB + `run6` 60 GiB = 100 GiB on the 123 GiB host |
+| completion | a 20-minute final-upload grace period, then instance-initiated stop once both solvers are gone |
 
 Each run remains internally serialized: one process and cache handle all sixteen top-level states
-in sequence.  The three builds run side by side on separate cores to give a matched-host
+in sequence.  The two builds run side by side on separate cores to give a matched-host
 time/memory comparison.  They have separate directories, binary names, watchdogs and S3 prefixes;
 none loads another run's cache.
 
-| prefix | build | started UTC | directory / binary |
+| prefix | build | started UTC | state / binary |
 |---|---|---|---|
-| `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | `/root/run3/radio_sa193_v3` |
-| `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | `/root/run4/radio_sa193_v4` |
-| `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | `/root/run5/radio_sa193_v5` |
+| `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | active; `/root/run3/radio_sa193_v3` |
+| `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | stopped; deadline bug; `/root/run4/radio_sa193_v4` |
+| `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | stopped; same deadline bug; `/root/run5/radio_sa193_v5` |
+| `run6/` | run5 engine + bounded-search deadline repair (`c13b5d3`) | 2026-08-11 05:45:09 | active; `/root/run6/radio_sa193_v6` |
 
-All rows name frozen binaries, not aliases for current `main`.  In particular, `run4` predates the
-exact-state L1 and `run5` is the first remote run containing it.  Preserve both cold sessions rather
-than silently treating either one's timings as measurements of the other source.
-
-`run4`'s original wrapper still displays its launch-time 60 GiB limit.  A separate live
-`rss_guard.sh` process lowers its **effective** limit to 30 GiB; `run5`'s wrapper is natively capped
-at 30 GiB and `run3` remains at 40 GiB.  The supplemental guard PID and effective limit are recorded
-in `/root/run4/run.meta`.  Do not remove that guard while all three solvers share this host.
+All rows name frozen binaries, not aliases for current `main`.  `run4` and `run5` entered the same
+bounded 14-part child and could not observe its expired deadline because no new negative verdict
+had appeared; both were stopped after debugger reconstruction.  Preserve their logs/checkpoints,
+but never resume those binaries.  The exact stack, state and before/after replay are in
+[`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
+`run6` is their clean cold replacement.  Its first ten-minute snapshot reached 116,103 verdicts,
+past both frozen counts, so it cleared the reproduced trap.  It then completed the mandatory cold
+control: `Sa(192)` was SOLVABLE in 922.0 CPU seconds, and the process entered `Sa(193)`.
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
@@ -63,13 +64,13 @@ no syntactic marker, and given an engine change trapped the last run. It is also
 tools/sa193_status.sh --compare --watch
 ```
 
-This prints `run3`, `run4` and `run5` together.  `--prefix run5` selects only the exact-L1 run and
-`--all` also includes the two stale historical prefixes.  Each `STATUS` gets refreshed every 10 minutes
+This prints active `run3` and `run6` together.  `--prefix run6` selects only the repaired run and
+`--all` also includes the stopped/historical prefixes.  Each live `STATUS` gets refreshed every 10 minutes
 with verdict count, cache size and RSS.  Also in the bucket:
 
 | key | what |
 |---|---|
-| `run3/STATUS`, `run4/STATUS`, `run5/STATUS` | latest status snapshots |
+| `run3/STATUS`, `run6/STATUS` | latest active status snapshots |
 | `runN/sa193.checkpoint` | same-run restart checkpoint, refreshed hourly |
 | `runN/seg-*/out_sa193.txt.zst` | immutable per-segment raw log, refreshed hourly and finalized at exit |
 | `runN/seg-*/memprofile.csv` | time/RSS/verdict profile used for the comparison |
@@ -92,7 +93,7 @@ the EBS volume and all run directories:
 aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52ae1
 ```
 
-The active idle guard does this automatically only after all three named solvers have gone, then
+The active idle guard does this automatically only after both named solvers have gone, then
 waits 20 minutes so their watchdogs can finalize S3 artifacts.  A manual stop is an interruption,
 not a proof; S3 checkpoints are at most about one hour stale and the full EBS logs remain intact.
 
@@ -114,8 +115,8 @@ confused. Only warm-start from a file that has that header.
   `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, which at that
   rate is ~25 GB of trie before the search starts. Filter harder, or size the instance for it.
   The current engine visits about half as many states, so the estimate is 40–60 GB with 90 GB
-  pessimistic.  The active comparison caps the three concurrent solvers at 40 + 30 + 30 GiB, which
-  reserves about 23 GiB for the OS and file cache even if all three reach their effective caps.
+  pessimistic.  The active comparison caps the two concurrent solvers at 40 + 60 GiB, which
+  reserves about 23 GiB for the OS and file cache even if both reach their caps.
 - **On-demand, not spot.** Spot is ~$0.54/hr against $1.49, but the run is single-threaded and
   we are paying for RAM; the saving is not worth interruption handling on an unattended run.
 - **AWS is slower than the laptop.** The k=9 ladder takes 391 s on r7iz against 261 s on the

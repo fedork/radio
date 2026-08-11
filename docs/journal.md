@@ -4632,3 +4632,96 @@ The 05:07 UTC matched snapshot had `run3` at 24.11 GiB / 1,056,348 verdicts, `ru
 103,773 verdicts, and the initial `run5` snapshot at 0.17 GiB / 3,304 verdicts.  `run5` had not yet
 finished its mandatory `Sa(192)` gate, so this records a verified cold launch and resource envelope,
 not a solver verdict.  `tools/sa193_status.sh --compare` now displays all three live builds.
+
+## 2026-08-10 — run4/run5 shared one deadline livelock; fixed runs replace them
+
+The apparently healthy run4 process was not merely on a different slow path.  Its log stopped at
+103,778 lines while the process stayed runnable at one core and 0.29 GiB.  Run5 then reproduced the
+same completed-verdict counts—down to 98,355 negative `Sb` calls—and stopped writing at the same
+point.  That exact agreement turned a vague performance suspicion into a debugger target.
+
+I installed GDB on the dedicated instance, rebuilt each frozen source with `-O3 -g`, and first
+verified that the live and debug `.text` sections were byte-identical.  Read-only attaches then found
+both solvers under `canSolveA(192,10) -> Sb(112:80)@9 ->` a two-, four-, eight-, then 14-part
+descendant.  The shared k=5 state is
+
+```
+Sb(9:4,8:4,8:1,5:5,15:1,5:3,6:3,7:2,5:3,11:1,8:2,11:1,14:1,13:1)@5.
+```
+
+Its pair mass is exactly 243 = 3^5.  Run4 was in pass 2 after 144,042,842,325 local candidates;
+run5 was in pass 1 after 10,516,061,204.  In both frames the global `cant_solve_count` was 98,355
+and the local `cant_solve_count_min` 98,356, while the finite deadline had long expired.
+
+That exposed two old state-machine mistakes.  The deadline check itself was wrapped in
+`cant_solve_count >= cant_solve_count_min`, so zero new refutations disabled it forever.  If exactly
+one refutation did appear, every visit recalculated `now + 5*(now-start)`, allowing the one-refutation
+grace to slide forever too.  There was also a granularity problem: the clock was sampled only after
+a complete long-state candidate survived all prefix filters, and such leaves can be sparse.
+
+Commit `c13b5d3` makes expiry independent of refutation progress, grants the five-times grace at
+most once per call, and polls every 65,536 admitted prefix candidates in bounded states.  Unbounded
+roots retain their old iterative behaviour.  This changes only when a child returns `MAYBE`; it
+cannot manufacture `FALSE`.
+
+The decisive local replay used run4's 3,684,161-byte checkpoint and the reconstructed state with a
+finite five-second parent budget.  The frozen engine was still running when killed after 12 seconds.
+The fixed engine returned `MAYBE` after 3.002 CPU seconds with zero new refutations; it had tested
+12,782,758 prefixes, so the added clock sampling cost about 195 calls on that path.  The focused
+deadline test, 4,164,958 cache-query bytes, the 1,038-answer split corpus, ASan+UBSan, and
+`MAX_N=1030` syntax compilation all passed.  Full commands, hashes and debugger command ids are in
+[`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
+
+With the cause reproduced locally, run4 and run5 had no remaining diagnostic value.  Their wrappers
+were stopped at 2026-08-11 05:37:59 UTC; both watchdogs made final immutable uploads at 05:47:57 and
+05:45:28 respectively.  Run3 was untouched.  These are aborted controls, not mathematical verdicts.
+
+The clean replacement, run6, started cold at 2026-08-11 05:45:09 UTC from an exact archive of
+`c13b5d3` (archive SHA-256
+`91da35711c9d8bc9bb96ee9e835f58aa4a63431d1a418f27fbdd7426c745695b`).  Its `radiobase.c` SHA-256
+is `a20449c1452236494df4285f92f527c6d746cca531cfdf7d7e3dc5d18f1e8e70`; remote binary SHA-256 is
+`09c1210e3515b735edd445b57126bd0cf8851b791335b7fd6fd6544202cc8d73`.  SSM launch command
+`0aea04dc-f997-408a-b36c-1285d78fb099` left solver 587707, watchdog 587744 and a two-name idle guard
+alive.  Run3 retains 40 GiB and run6 has 60 GiB, preserving the 100 GiB joint ceiling; the launch
+inventory showed 97 GiB available and no swap.  Its mandatory control was still open at launch.
+
+The first ten-minute snapshot is the direct liveness check: run6 had reached 116,103 verdicts and
+0.50 GiB RSS with a growing log, past run4/run5's frozen 103,773/103,769 counts.  The old exact child
+therefore returned and the parent continued.  The full positive gate followed at 06:04 UTC:
+`result CONTROL Sa(192) in 10 = SOLVABLE (922.0 s)`.  The process then entered `Sa(193)` and remained
+runnable at about 0.98 GiB RSS.  This is the required cold end-to-end validation of the repair.
+
+The pre-fix local segment was also retired rather than waiting for the same trap.  It had run for
+4 h 34 m, passed the control in 807.7 CPU seconds, emitted 485,337 lines and stayed near a 1.3 GiB
+physical footprint.  The supervisor stopped it with exit 143 and produced a final 17 MiB checkpoint
+with SHA-256 `3b8622f4d1cc342f28c93626e6554d2c7ca8da8ff0582c993ceeca6e19c73ae2`.
+The raw log remains local: this failed-engine session adds no mathematical claim worth promoting to
+the artifact store.
+
+That shutdown exposed a separate guard failure: `vmmap -summary` had hung for 19 minutes, freezing
+both memory checks and checkpoint cadence.  Commit `aee1a02` first bounded each probe to 20 seconds
+and added a same-run checkpoint argument.  The bound worked, but the first three probes all timed
+out: `vmmap` was no longer capable of monitoring this workload.  macOS `top` documents its `MEM`
+field as physical footprint and returned the same kind of value in about a second (1,046 MiB while
+RSS was roughly 260 MiB), so the supervisor now uses that field under the same 20-second bound.
+Every new checkpoint includes both inherited facts and the new segment, avoiding a restart that
+silently forgets its prefix.  The fixed continuation started
+at 2026-08-11 05:49:31 UTC in
+`/Users/fedor/radio-runs/sa193-local-deadline-aee1a02-resume1`, loaded the exact final checkpoint,
+reproduced the positive control from cache, and resumed `Sa(193)` under the 20 GiB footprint guard.
+
+That first continuation was deliberately stopped after 2,878 raw lines to replace `vmmap` rather
+than wait for the five-failure safety exit.  I made the mistake the AWS watchdog instructions warn
+about: I edited the shell script while bash was still executing it.  Its finalizer did not run.
+No solver data was lost—the raw segment and its exact source checkpoint were intact—so I rebuilt the
+combined checkpoint explicitly as `source checkpoint + parse_out.sh(raw segment)`.  It has 487,968
+lines and SHA-256 `bd5a6e8843f57ce1273dc63bf5f3c4b4df1684aca975922c80294f9003880f58`.
+This is mechanically the same operation the supervisor performs, but the failed finalizer is an
+operational error and is recorded rather than hidden.
+
+Commit `ebf4e2d` switched the probe to bounded `top MEM`.  A second continuation started at
+2026-08-11 05:59:03 UTC in
+`/Users/fedor/radio-runs/sa193-local-deadline-ebf4e2d-resume2`, loaded the combined checkpoint,
+reproduced the positive control from cache, and resumed `Sa(193)`.  Its first footprint probe
+returned normally; four consecutive samples through 06:06 UTC remained near 1.05 GiB with zero
+probe failures.  All three raw segment logs must be retained for a closed eventual proof.
