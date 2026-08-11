@@ -4489,3 +4489,47 @@ solver age, RSS, VmData, VmPeak, raw-log line and message, refreshing
 `run4/matches/sb48_48_64_33.tsv` in S3.  It does not signal, restart, cache, or otherwise affect the
 solver.  Thus a future session can compare the completed state without reconstructing memory from
 coarse ten-minute whole-run samples.
+
+## 2026-08-10 — exact paired refutations expose an approximately 25% compact-build CPU cost
+
+The first timing comparison does not need to wait for the stalled control root.  I ranked every
+completed negative `Sb` verdict in the current `run4` raw prefix by its own inclusive `took` field,
+then joined it to `run3` by the exact printed `(state,k)` key.  There were no duplicate verdict keys.
+Of 98,355 completed negative `Sb` calls in `run4`, 98,253 had an exact `run3` verdict; the slowest
+entries all matched and all had the same negative outcome.  The source snapshots were:
+
+- `run4/seg-seg-20260811013720Z-6af384e/out_sa193.txt.zst`, last modified
+  2026-08-11 02:37:33 UTC, 103,778 raw lines, compressed SHA-256
+  `1ca28c122917716ef9a874ee314d9d42f1b1da608d4a0945238809a94dc9bb50`;
+- `run3/seg-20260810T032021Z/out_sa193.txt.zst`, last modified 2026-08-11 02:26:27 UTC,
+  999,309 raw lines, compressed SHA-256
+  `6c74624e2db3025520bce2ecf33d7ed08ba5eba589aa987dc915341875ff957f`.
+
+The top completed refutations in the compact log were:
+
+| exact state | `run4` took / splits | `run3` took / splits | `run4/run3` time |
+|---|---:|---:|---:|
+| `Sb(67:46)@8` | 156 s / 219 | 131 s / 299 | 1.19x |
+| `Sb(66:47)@8` | 105 s / 186 | 86 s / 264 | 1.22x |
+| `Sb(65:48)@8` | 81 s / 323 | 61 s / 431 | 1.33x |
+| `Sb(69:45)@8` | 70 s / 228 | 58 s / 320 | 1.21x |
+| `Sb(68:46)@8` | 47 s / 249 | 37 s / 347 | 1.27x |
+| `Sb(64:49)@8` | 36 s / 283 | 27 s / 393 | 1.33x |
+| `Sb(40:20,27:26)@7` | 10 s / 8,616 | 8 s / 8,616 | 1.25x |
+
+This is a broad effect, not one unlucky state.  Summing the inclusive times over every exact
+matched negative gives 587.493 versus 471.537 seconds at k=8 (1.246x), 518.777 versus 416.038 at
+k=7 (1.247x), and 555.874 versus 439.699 at k=6 (1.264x).  The corresponding aggregate local split
+ratios are 0.402x, 0.999x and 1.000x.  Thus the one-part k=8 table filter is doing useful work, but
+the compact build is still slower; at k=7 and k=6 essentially equal enumeration isolates a similar
+throughput tax.
+
+Interpretation boundary: these are natural-run, same-host paired observations, not an isolated
+microbenchmark of the Pareto fronts.  `took` is inclusive, so level totals double-count descendant
+work, and `totalsplits` counts only the printed state's local candidates.  The builds also differ in
+split allocation/filtering and code layout, and the `run3` prefix was recorded earlier rather than
+simultaneously.  The defensible conclusion is that the *whole compact build* costs about 25% CPU on
+the very closely matched cold-control path.  The consistency and unchanged k=6/k=7 split counts
+make compact result-cache lookup/representation the leading suspect, but that attribution still
+needs an A/B microbenchmark.  This is the price side of the memory tradeoff, not a reason to stop
+`run4`; its 0.29 GiB footprint remains healthy while the old run is already at 23.8 GiB.

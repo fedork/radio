@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (compact `run4` launched beside `run3` for a matched-host
-time/memory comparison; the compact local run also remains active).
+don't know it. Last refreshed **2026-08-10** (the first exact paired timings from compact `run4`
+show an approximately 25% CPU cost; both remote runs and the compact local run remain active).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -207,6 +207,17 @@ non-reporting child.  Keep it running for now—the process and caps are healthy
 elapsed time as evidence that the compact cache itself is intrinsically this slow.  The identical
 source passed the local cold control in 807.7 CPU seconds; clock-driven deadlines can choose a
 different hard descendant on a machine with different throughput.
+
+The completed common prefix does give a clean throughput warning.  Matching negative `Sb` verdicts
+by exact printed state and level found 98,253 common calls.  Across the k=8, k=7 and k=6 groups,
+`run4`'s summed inclusive per-call `took` values were respectively 1.246x, 1.247x and 1.264x
+`run3`'s.  The slowest six completed `run4` refutations were all one-part k=8 states and each was
+slower by 19-33%, even though its local `totalsplits` count was 25-30% smaller.  At k=7 and k=6 the
+aggregate split counts are essentially identical, so reduced split construction is not hiding the
+cost.  Treat this as an approximately 25% cost for the *whole compact build on this natural cold
+path*, not as an isolated Pareto-front lookup measurement: `took` is inclusive and the two builds
+also differ in split storage/filtering and code layout.  Exact states and snapshot hashes are in the
+2026-08-10 journal entry.
 
 For the proposed matched state `Sb(48:48,64:33)@8`, `run3` did **not** print a refutation.  It logged
 progress through 2,602 seconds, 45,149 tested split combinations and 565/1,225 outer options left,
