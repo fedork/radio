@@ -4453,3 +4453,39 @@ reported 242,348 verdicts and a 1.0 GiB physical footprint.  The pre-compact loc
 reached 7.1 GiB at 1,152 seconds, so this is the first live-search confirmation that the checkpoint
 replay reduction persists beyond the control.  It remains an early measurement, not an upper bound
 and not a verdict on `Sa(193)`.
+
+## 2026-08-10 — exact-state comparison instrumented; the `run3` example was not a refutation
+
+The proposed matched benchmark was `Sb(48:48,64:33)@8`.  Searching the complete live logs before
+interpreting it changed the premise: `run3` contains progress lines from elapsed 60 through 2,602
+seconds, ending at `left=565/1225 totalsplits=45149`, but no `can solve` or `can't solve` line for
+that state.  It therefore contributed no exact fact to the raw log/same-run checkpoint and must be
+recorded operationally as a non-verdict/MAYBE, not as a refutation.  Surrounding descendant verdicts
+do not repair the missing target verdict.  This is still a useful comparison target: a compact
+`FALSE` would be a
+qualitative `MAYBE -> FALSE` improvement, while another non-verdict gives a directly comparable
+stall cost.
+
+The compact local run entered the same state after its control.  Its enumeration has 1,149 outer
+options rather than `run3`'s 1,225, so only state, level and semantics are held fixed—not traversal.
+Its first matching progress line appeared just after a monitor sample at 844 solver-wall seconds
+and 915.4 MiB physical footprint.  By state elapsed 1,989 seconds it reported `left=510/1149` and
+47,377 tested combinations; no final verdict existed at this cutoff.  The local physical footprint
+was 1.1 GiB during the later part of that interval.
+
+`run4` had not reached the target because its own control had not finished.  More importantly, at
+68m51s CPU it had emitted no new line for about 57 minutes: the file remained at 103,778 lines after
+the control root's `Sb(112:80)@9` progress line at elapsed 436/1000.  PID 542146 remained runnable at
+100% CPU with 301,624 KiB RSS and no swap.  This is a genuine search-path stall but not yet a reason
+to discard the cold run: memory and process health are fine, and the user explicitly wants a longer
+completion attempt.  The identical source's 807.7-second local control shows that clock-sensitive
+deadlines/search order, not just cache lookup throughput, can send the two platforms down different
+paths.
+
+To retain the matched measurement, commit `25c843d` added `tools/sa193_track_state.sh`.  A detached
+read-only instance of it (SSM command `670731cf-c948-4f50-8b5c-493934367413`, PID 553594) started
+before `run4` first mentioned the target.  Every exact matching progress or verdict line records UTC,
+solver age, RSS, VmData, VmPeak, raw-log line and message, refreshing
+`run4/matches/sb48_48_64_33.tsv` in S3.  It does not signal, restart, cache, or otherwise affect the
+solver.  Thus a future session can compare the completed state without reconstructing memory from
+coarse ten-minute whole-run samples.

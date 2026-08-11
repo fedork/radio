@@ -199,6 +199,24 @@ reports level-lazy split tables, `control=yes`, and `cache=(none, cold)`.  It ha
 beside `run3`'s 40 GiB guard, leaving at least about 23 GiB outside the two solver caps.  This is a
 launch record only: its own `Sa(192)` gate had not completed at the snapshot.
 
+The first hour exposed a search-path warning rather than a resource failure.  At 68m51s of solver
+CPU, `run4` still had not completed the control; it remained at 100% CPU and only 301,624 KiB RSS,
+but `/root/run4/out_sa193.txt` stayed at 103,778 lines for about 57 minutes.  Its last root progress
+was `Sb(112:80)@9`, elapsed 436/1000 with 3,664/6,247 outer options left, before it descended into a
+non-reporting child.  Keep it running for now—the process and caps are healthy—but do not use total
+elapsed time as evidence that the compact cache itself is intrinsically this slow.  The identical
+source passed the local cold control in 807.7 CPU seconds; clock-driven deadlines can choose a
+different hard descendant on a machine with different throughput.
+
+For the proposed matched state `Sb(48:48,64:33)@8`, `run3` did **not** print a refutation.  It logged
+progress through 2,602 seconds, 45,149 tested split combinations and 565/1,225 outer options left,
+then produced no verdict line; record that outcome as `MAYBE`, not `FALSE`.  The compact local run is
+currently inside the same state with a different 1,149-option enumeration.  A read-only `run4`
+tracker now writes exact-state progress/verdict lines with contemporaneous RSS/VmData/VmPeak to
+`s3://radio-sa193-393287594714/run4/matches/sb48_48_64_33.tsv`; it started before the state first
+appeared.  A meaningful comparison requires a final verdict or an explicitly bounded non-verdict,
+not merely matching `still solving` lines.
+
 A current-main local trial (`713b7d6`, M4 Pro / 24 GB) was stopped deliberately rather than left
 to swap.  The cold `Sa(192)` control passed in **734.5 CPU seconds**.  In 1,152 wall seconds the
 process emitted 232,725 verdicts, but after entering `Sa(193)` its `vmmap` footprint reached
