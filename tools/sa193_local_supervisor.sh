@@ -2,17 +2,18 @@
 # Supervise one cold local radio_sa193 run without imposing a time limit.
 #
 # Usage:
-#   tools/sa193_local_supervisor.sh RUN_DIR [FOOTPRINT_GIB]
+#   tools/sa193_local_supervisor.sh RUN_DIR [FOOTPRINT_GIB] [SAME_RUN_CHECKPOINT]
 #
 # RUN_DIR must already contain a freshly compiled `radio_sa193`.  The solver is
-# deliberately invoked with no cache argument.  This script is intended to be
-# started under nohup; it owns the solver, a caffeinate helper, checkpoints, and
-# the physical-footprint guard that capped_run cannot provide on macOS.
+# invoked cold unless SAME_RUN_CHECKPOINT is supplied.  A resumed checkpoint is folded into every
+# new checkpoint so the segment chain remains closed.  This script is intended to be started under
+# nohup; it owns the solver, a caffeinate helper, checkpoints, and the physical-footprint guard that
+# capped_run cannot provide on macOS.
 
 set -u
 
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-    echo "usage: $0 RUN_DIR [FOOTPRINT_GIB]" >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 3 ]; then
+    echo "usage: $0 RUN_DIR [FOOTPRINT_GIB] [SAME_RUN_CHECKPOINT]" >&2
     exit 64
 fi
 
@@ -21,6 +22,7 @@ RUN_DIR=$(cd "$1" 2>/dev/null && pwd) || {
     exit 66
 }
 FOOTPRINT_GIB=${2:-20}
+CACHE=${3:-}
 REPO=/Users/fedor/radio
 BIN="$RUN_DIR/radio_sa193"
 OUT="$RUN_DIR/out_sa193.txt"
@@ -32,12 +34,23 @@ META="$RUN_DIR/run.meta"
 STOP_REASON="$RUN_DIR/stop.reason"
 INTERVAL=120
 CHECKPOINT_INTERVAL=3600
+VMAP_TIMEOUT=20
 MIN_DISK_KIB=$((10 * 1024 * 1024))
 HARD_BYTES=$(awk -v gib="$FOOTPRINT_GIB" 'BEGIN { printf "%.0f", gib * 1024 * 1024 * 1024 }')
 
 if [ ! -x "$BIN" ]; then
     echo "missing executable: $BIN" >&2
     exit 66
+fi
+if [ -n "$CACHE" ]; then
+    CACHE=$(cd "$(dirname "$CACHE")" 2>/dev/null && printf '%s/%s' "$PWD" "$(basename "$CACHE")") || {
+        echo "checkpoint directory does not exist: $CACHE" >&2
+        exit 66
+    }
+    if [ ! -f "$CACHE" ]; then
+        echo "checkpoint does not exist: $CACHE" >&2
+        exit 66
+    fi
 fi
 if [ -e "$OUT" ] || [ -e "$ERR" ] || [ -e "$META" ]; then
     echo "refusing to overwrite an existing run in $RUN_DIR" >&2
@@ -67,9 +80,36 @@ write_checkpoint() {
     local tmp="$CHECKPOINT.tmp"
     {
         printf '# Same-run checkpoint generated from %s\n' "$OUT"
-        printf '# Cold solver command: %s (no cache argument)\n' "$BIN"
+        if [ -n "$CACHE" ]; then
+            printf '# Resume source: %s\n' "$CACHE"
+            # Preserve the inherited facts as well as this segment's new facts.  Omitting the
+            # source here would make a second restart forget everything learned before this one.
+            command cat "$CACHE"
+        else
+            printf '# Cold solver command: %s (no cache argument)\n' "$BIN"
+        fi
         "$REPO/parse_out.sh" < "$OUT"
     } > "$tmp" && mv "$tmp" "$CHECKPOINT"
+}
+
+bounded_vmmap() {
+    # `vmmap` can itself hang while sampling a busy solver.  That previously froze both the memory
+    # guard and hourly checkpoints indefinitely.  Kill only the diagnostic child after a short
+    # timeout; five consecutive failed samples still stop the solver through the existing guard.
+    vmmap -summary "$SOLVER_PID" 2>/dev/null &
+    local probe_pid=$!
+    (
+        sleep "$VMAP_TIMEOUT"
+        kill -TERM "$probe_pid" 2>/dev/null || exit 0
+        sleep 1
+        kill -KILL "$probe_pid" 2>/dev/null || true
+    ) &
+    local timer_pid=$!
+    wait "$probe_pid"
+    local probe_status=$?
+    kill -TERM "$timer_pid" 2>/dev/null || true
+    wait "$timer_pid" 2>/dev/null || true
+    return "$probe_status"
 }
 
 terminate_solver() {
@@ -99,13 +139,19 @@ BASE_SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
     printf 'started_utc=%s\n' "$START_UTC"
     printf 'commit=%s\n' "$COMMIT"
     printf 'command=%s\n' "$BIN"
-    printf 'cache=none (cold)\n'
+    if [ -n "$CACHE" ]; then
+        printf 'cache=%s (same-run resume)\n' "$CACHE"
+        printf 'cache_sha256=%s\n' "$(shasum -a 256 "$CACHE" | awk '{print $1}')"
+    else
+        printf 'cache=none (cold)\n'
+    fi
     printf 'control=Sa(192) in 10, enabled\n'
     printf 'time_limit=none\n'
     printf 'physical_footprint_limit_gib=%s\n' "$FOOTPRINT_GIB"
     printf 'minimum_free_disk_gib=10\n'
     printf 'monitor_interval_seconds=%s\n' "$INTERVAL"
     printf 'checkpoint_interval_seconds=%s\n' "$CHECKPOINT_INTERVAL"
+    printf 'vmmap_timeout_seconds=%s\n' "$VMAP_TIMEOUT"
     printf 'baseline_swap=%s\n' "$BASE_SWAP"
     printf 'radio_sa193_c_sha256=%s\n' "$SOURCE_SHA"
     printf 'radiobase_c_sha256=%s\n' "$BASE_SHA"
@@ -113,7 +159,11 @@ BASE_SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
     printf 'supervisor_sha256=%s\n' "$SUPERVISOR_SHA"
 } > "$META"
 
-"$BIN" > "$OUT" 2> "$ERR" &
+if [ -n "$CACHE" ]; then
+    "$BIN" "$CACHE" > "$OUT" 2> "$ERR" &
+else
+    "$BIN" > "$OUT" 2> "$ERR" &
+fi
 SOLVER_PID=$!
 printf '%s\n' "$SOLVER_PID" > "$RUN_DIR/solver.pid"
 
@@ -141,7 +191,9 @@ while kill -0 "$SOLVER_PID" 2>/dev/null; do
     DISK_KIB=$(df -k "$RUN_DIR" | awk 'NR == 2 {print $4}')
     SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
     FREE_PERCENT=$(memory_pressure 2>/dev/null | awk -F': ' '/System-wide memory free percentage/ {print $2; exit}')
-    VMAP=$(vmmap -summary "$SOLVER_PID" 2>/dev/null || true)
+    VMAP=$(bounded_vmmap)
+    VMAP_STATUS=$?
+    [ "$VMAP_STATUS" -eq 0 ] || VMAP=
     FOOTPRINT_RAW=$(printf '%s\n' "$VMAP" | awk '/^Physical footprint:/ {print $3; exit}')
     FOOTPRINT_BYTES=unknown
 
