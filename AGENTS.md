@@ -82,12 +82,19 @@ picking whichever source is more convenient.
 
 ## Building and running
 
-No build system. Each driver is one `clang` invocation; `MAX_K` and `MAX_N` size static
-tables at compile time and must match the problem.
+No build system. Each driver is one compiler invocation; `MAX_K` and `MAX_N` size static tables at
+compile time and must match the problem. Always invoke the compiler through the provenance builder:
 
 ```
-clang -O3 -DMAX_K=<k> -DMAX_N=<n1+n2> <driver>.c -o <driver>
+tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<n1+n2> <driver>.c -o <driver>
 ```
+
+It embeds the commit, exact compiler arguments, compiler identity and source hashes in the binary;
+`radiobase.c` adds exact run arguments and a safe execution-environment fingerprint to stdout before
+initialization. It also writes `<driver>.provenance`. A direct compiler invocation still works, but
+its output says `provenance_complete=no` and is not durable evidence. Validate retained output with
+`tools/check_provenance.py <log>`. Standalone utilities which do not include `radiobase.c` must run
+through `tools/run_with_provenance.py`.
 
 Prefer the wrappers, which compute both and compile for you:
 
@@ -113,8 +120,8 @@ allocates 1.26 GB per pool chunk and never frees one (see [docs/tools.md](docs/t
 exhausting search grows without bound. Run it as
 
 ```
-clang -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 -DMAX_TREE_NODES=400000 \
-      -DMAX_MEMO=4000000 radio_canon_search_generic.c -o canon
+tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 \
+      -DMAX_TREE_NODES=400000 -DMAX_MEMO=4000000 radio_canon_search_generic.c -o canon
 ( ulimit -t 900; ./canon 3 9 473 6 )
 ```
 
@@ -162,6 +169,8 @@ tools/artifacts.sh list | show <tag> | push <tag> <file>... | pull <tag> [dest] 
 - **Archive before deleting.** The K=9 Pareto walk was lost exactly this way.
 - Archive raw output, not `parse_out.sh` output. The distilled form drops the `with [...]`
   witnesses, which are what witness-tree reconstruction needs later.
+- New raw solver output must pass `tools/check_provenance.py` before archival. `artifacts.sh push`
+  enforces this; its legacy override is only for a documented pre-banner historical artifact.
 - **Not everything deserves archiving.** Logs from a build known to emit false negatives are
   not evidence; extract what is verifiable and let the bulk sit on local storage. See the
   archiving decision in [docs/data.md](docs/data.md).

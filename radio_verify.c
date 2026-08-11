@@ -40,8 +40,8 @@
 //   | pairwise narrowing with forward checking | complement symmetry
 //   | identical-part permutation skip
 //
-//   clang -O3 radio_verify.c -o radio_verify
-//   ./radio_verify <log> [maxk [group_order [pairwise [pairwise_min_parts]]]]
+//   tools/build_radio.py -O3 radio_verify.c -o radio_verify
+//   tools/run_with_provenance.py ./radio_verify <log> [maxk [group_order [pairwise [pairwise_min_parts]]]]
 //
 // Group order 0 (canonical descending) is the best of the three tried: ascending is 3.8x more
 // nodes, fewest-options-first 1.09x. Option order WITHIN a group is provably irrelevant for a

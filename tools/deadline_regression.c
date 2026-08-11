@@ -5,7 +5,7 @@
    reusable fact; only progress beyond that count makes expiry enforceable.  Pass 2 must hand its
    unresolved children NO_DEADLINE instead of repeatedly timing out at the same frontier.
 
-     clang -O2 -DMAX_K=2 -DMAX_N=8 tools/deadline_regression.c -o /tmp/deadline_regression
+     tools/build_radio.py -O2 -DMAX_K=2 -DMAX_N=8 tools/deadline_regression.c -o /tmp/deadline_regression
      /tmp/deadline_regression
 */
 #include <assert.h>

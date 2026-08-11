@@ -96,7 +96,7 @@ if (( max_n < 2 )); then
 fi
 
 echo "Compiling radio_full with MAX_K=$max_k MAX_N=$max_n"
-: "${CC:=clang}"
-"$CC" -O3 -DMAX_K="$max_k" -DMAX_N="$max_n" radio_full.c -o radio_full
+python3 tools/build_radio.py -O3 -DMAX_K="$max_k" -DMAX_N="$max_n" \
+    radio_full.c -o radio_full
 
 exec ./radio_full "$@"

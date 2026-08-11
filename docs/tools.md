@@ -2,18 +2,43 @@
 
 ## Layout
 
-`radiobase.c` (~2350 lines) is the entire engine. Every other `.c` at the repo root is a
-`main()` wrapped around it, selected by `#include "radiobase.c"`. There is no build system;
-each driver is a single `clang` invocation.
+`radiobase.c` is the entire engine. Every other `.c` at the repo root is a `main()` wrapped around
+it, selected by `#include "radiobase.c"`. There is no build system; each driver is a single compiler
+invocation made through the provenance builder.
 
 ```
-clang -O3 -DMAX_K=<k> -DMAX_N=<n> <driver>.c -o <driver>
+tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<n> <driver>.c -o <driver>
 ```
 
 `MAX_K` and `MAX_N` size static tables at compile time, so **they must be set for the
 problem you are running**. `MAX_N` is the largest total coin count `n1 + n2` any state will
 reach, not the largest single group. Two wrapper scripts compute both for you and are the
 preferred entry points.
+
+## Build and run provenance
+
+Every `radiobase.c` process writes a `# radio-provenance-v1` block to stdout before allocating
+tables or reading a cache. It contains the Git commit, source-dependency hashes, exact compiler
+argument vector, compiler version, deterministic build ID, exact run argument vector, UTC time,
+working directory, OS/kernel/architecture, CPU, physical RAM, locale and declared resource caps.
+Arguments are stored as indexed fields, so spaces and escaping never erase their boundaries. The
+runtime environment is deliberately an allow-list; credentials and unrelated variables are never
+dumped.
+
+`tools/build_radio.py` also writes `<binary>.provenance`, including the final binary SHA-256. Direct
+`clang` builds remain possible for archaeology, but the engine marks them
+`provenance_complete=no`; strict validation rejects them:
+
+```
+tools/check_provenance.py out.txt binary.provenance
+```
+
+Standalone programs such as `radio_verify`, which do not include the engine, retain the same raw
+output contract when launched as
+`tools/run_with_provenance.py ./radio_verify ...`. `parse_out.sh` preserves all comment metadata in
+checkpoints, and `parse_file` ignores and re-echoes it while replaying facts. `tools/artifacts.sh push` refuses a
+new solver log which lacks a complete block; `RADIO_ALLOW_LEGACY_PROVENANCE=1` exists only for a
+pre-banner historical file whose limitation is explicitly recorded in `docs/data.md`.
 
 ## Engine internals worth knowing
 
@@ -94,7 +119,8 @@ heavy swap.
 **Always cap it.** Run under a memory limit and a wall-clock limit, one at a time:
 
 ```
-clang -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 radio_canon_search_generic.c -o canon
+tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 \
+    radio_canon_search_generic.c -o canon
 ( ulimit -v 6000000; ulimit -t 900; ./canon 3 9 473 6 )
 ```
 
@@ -134,6 +160,14 @@ and refuses to overwrite an existing attempt.  It has no time limit.  It stops o
 footprint ceiling, less than 10 GiB free disk, or five consecutive failures of the physical-memory
 measurement.  Inspect `status.txt`, `monitor.log`, and the PID files in `RUN_DIR`.  Never edit the
 script while its bash process is live; stop the supervisor first, because bash re-reads scripts.
+
+If that rule has already been violated, do not restart or perturb the solver merely to repair the
+launcher. `tools/sa193_recovery_guard.sh RUN_DIR SOLVER_PID SUPERVISOR_PID SOURCE_CHECKPOINT
+FOOTPRINT_GIB` is a non-owning fallback: it remains passive while the primary lives, assumes the
+same footprint cap if it disappears, and writes a separate closed recovery checkpoint after solver
+exit. Copy it and `parse_out.sh` into the run directory before starting it, and point
+`RADIO_PARSE_OUT` at that copied parser, so later repository edits cannot repeat the same failure.
+It is recovery machinery, not a second normal supervisor.
 
 In an ordinary terminal the supervisor may be put under `nohup`.  A managed one-shot command may
 reap its whole descendant process group after returning despite `nohup`; in that environment keep
@@ -270,16 +304,16 @@ tools, not yet part of `radiobase.c`:
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
 ```
-clang -O3 -DMAX_K=4 -DMAX_N=64 tools/pairtab.c -o /tmp/pairtab4
+tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=64 tools/pairtab.c -o /tmp/pairtab4
 /tmp/pairtab4 4 16 > /tmp/pairs_k4.txt
 
-clang -O3 -DMAX_K=4 -DMAX_N=96 tools/tripletab.c -o /tmp/tripletab4
+tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=96 tools/tripletab.c -o /tmp/tripletab4
 /tmp/tripletab4 4 16 pairs_k4.txt > /tmp/triples_k4.txt
 
-clang -O3 -DMAX_K=4 -DMAX_N=128 tools/quadtab.c -o /tmp/quadtab4
+tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=128 tools/quadtab.c -o /tmp/quadtab4
 /tmp/quadtab4 4 16 pairs_k4.txt /tmp/triples_k4.txt > /tmp/quads_k4.txt
 
-clang -O3 -DMAX_K=5 -DMAX_N=100 tools/tripletab.c -o /tmp/tripletab5
+tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=100 tools/tripletab.c -o /tmp/tripletab5
 /tmp/tripletab5 5 32 pairs_k5.txt > /tmp/triples_k5.txt
 ```
 
@@ -325,12 +359,12 @@ split, a partial child that fails `C_(d-1)` can also be rejected soundly by subg
 Build and run it directly:
 
 ```
-clang++ -O3 -std=c++20 -Wall -Wextra -pedantic \
+CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_singletonization.cpp -o /tmp/search_singletonization
 
-/tmp/search_singletonization 9 9 488 3 488 3
-/tmp/search_singletonization forced 10 10 973 6 477 2
-/tmp/search_singletonization frontier 10 6 974 973
+tools/run_with_provenance.py /tmp/search_singletonization 9 9 488 3 488 3
+tools/run_with_provenance.py /tmp/search_singletonization forced 10 10 973 6 477 2
+tools/run_with_provenance.py /tmp/search_singletonization frontier 10 6 974 973
 ```
 
 The first form checks one state with a bounded number of synchronized levels.  `forced` verifies a
@@ -345,7 +379,7 @@ split-table initialization and `s[FAST]=1` learning disappear with the child and
 the identical parent image:
 
 ```
-clang -O3 -DMAX_K=5 -DMAX_N=128 -DMEASURE_FAST_REPLAY -DNO_FAST_LEARN \
+tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=128 -DMEASURE_FAST_REPLAY -DNO_FAST_LEARN \
       tools/fast_replay.c -o /tmp/fast_replay
 /tmp/fast_replay /tmp/warm_k4.txt /tmp/warm_k5.txt 5 7 + 17 200
 ```

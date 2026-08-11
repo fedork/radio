@@ -15,7 +15,7 @@
 // then p_a + p_b > 2cap, so one of them already exceeds cap. Measured on the state above: it
 // cuts 0.0% of 427,673,655 prefix nodes. Do not re-add it.
 //
-//   clang -O3 -DMAX_K=5 -DMAX_N=91 radio_allsol.c -o radio_allsol
+//   tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=91 radio_allsol.c -o radio_allsol
 //   tools/capped_run.sh --seconds 3600 --rss-gb 12 -- ./radio_allsol 5 8 6 7 7 8 5 11 4 7 4 15 1 5 3
 //
 // Usage: radio_allsol <k> <n1> <m1> [<n2> <m2> ...]

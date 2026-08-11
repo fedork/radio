@@ -58,7 +58,7 @@ if (( max_n < 2 )); then
 fi
 
 echo "Compiling radio_canon_search_generic with MAX_K=$max_k MAX_N=$max_n"
-: "${CC:=clang}"
-"$CC" -O3 -DMAX_K="$max_k" -DMAX_N="$max_n" radio_canon_search_generic.c -o radio_canon_search_generic
+python3 tools/build_radio.py -O3 -DMAX_K="$max_k" -DMAX_N="$max_n" \
+    radio_canon_search_generic.c -o radio_canon_search_generic
 
 exec ./radio_canon_search_generic "$@"

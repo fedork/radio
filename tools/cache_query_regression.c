@@ -5,7 +5,7 @@
  * with RADIOBASE_PATH and compare the output files byte-for-byte; any intentional strengthening is
  * then visible as a specific MAYBE -> TRUE/FALSE direction rather than hidden behind a hash.
  *
- *   clang -O3 -DMAX_K=10 -DMAX_N=193 tools/cache_query_regression.c -o /tmp/cache-query
+ *   tools/build_radio.py -O3 -DMAX_K=10 -DMAX_N=193 tools/cache_query_regression.c -o /tmp/cache-query
  *   /tmp/cache-query /tmp/verdicts.bin parsed.cache 5
  */
 #include <limits.h>

@@ -1,7 +1,7 @@
 # A negative certificate for `Sa(193)`
 
-Design, 2026-08-04. Nothing here is built yet. The point of writing it before the run is that
-the format determines what the run must emit, and reconstructing a certificate afterwards from
+Design begun 2026-08-04; the cold-run/checkpoint path and independent `radio_verify` now implement
+it. The format was fixed before the run because reconstructing a certificate afterwards from
 900 MB of logs is the failure this project already lived through once.
 
 ## What is being certified
@@ -32,7 +32,12 @@ no circularity, no fixpoint, and no topological sort. Verify level by level, asc
 A fact is one line in the format `parse_out.sh` already produces and `parse_file` already reads:
 
 ```
-# radio-cert v1 build=<sha> state=112_81 generated=<iso8601>
+# radio-provenance-v1 begin
+# build_id=<sha256>
+# git_commit=<sha>
+# ... exact build/run arguments and execution environment ...
+# radio-provenance-v1 end
+# radio-cert v1 state=112_81 segment=<id> generated=<iso8601>
 - b 95 69 t 6555 164 8
 ```
 
@@ -43,7 +48,9 @@ negative certificate never consults a positive fact. That is most of the data an
 Reusing the format is deliberate. It is already emitted, already parsed, already exercised by
 every cache warm-start, and it is human-inspectable. A new packed binary format would be smaller
 and would need its own writer, reader, and bugs. `parse_file` skips `#` lines as of `69ae856`,
-so the provenance header costs nothing.
+so comment metadata costs nothing. The `radio-provenance-v1` block is emitted automatically by the
+canonical builder/runtime path and validated by `tools/check_provenance.py`; `radio-cert` remains
+the certificate/segment label rather than trying to duplicate build identity by hand.
 
 ### Size, from measured quantities
 
@@ -172,8 +179,9 @@ Two properties, both established 2026-08-03/04:
 
 1. Raw stdout, streamed and compressed — the archival artifact, needed for witness-tree
    reconstruction later, which `parse_out.sh` output cannot support.
-2. The parsed fact file, regenerated periodically, each with the `# radio-cert v1` header naming
-   build and state. This doubles as the restart checkpoint, so it costs nothing extra.
+2. The parsed fact file, regenerated periodically, retaining each automatic provenance block and a
+   `# radio-cert v1` segment/state label. This doubles as the restart checkpoint, so it costs
+   nothing extra.
 3. Whatever option 1/2/3 above requires for dominance.
 
 The header is not cosmetic. Warm-starting a *negative* from `cache-2025:parsed_260.txt` is

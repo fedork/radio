@@ -4,9 +4,9 @@
    against the parent engine and once against the current engine to isolate the table-layout
    change.  OLD_SPLITS selects the former layout's accounting formula.
 
-     clang -O3 -DMAX_K=6 -DMAX_N=193 -DOLD_SPLITS \
+     tools/build_radio.py -O3 -DMAX_K=6 -DMAX_N=193 -DOLD_SPLITS \
        -DRADIOBASE_PATH='"/path/to/old/radiobase.c"' tools/split_memory_probe.c -o /tmp/old
-     clang -O3 -DMAX_K=6 -DMAX_N=193 tools/split_memory_probe.c -o /tmp/new
+     tools/build_radio.py -O3 -DMAX_K=6 -DMAX_N=193 tools/split_memory_probe.c -o /tmp/new
 
    Usage is the same as radio_one: [cache] k n1 m1 [n2 m2 ...].
 */

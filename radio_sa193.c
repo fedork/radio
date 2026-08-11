@@ -6,7 +6,7 @@
 // and all sixteen of its k=9 facts. A cold single session cannot have that defect, so its log is
 // closed under SPLITS and `radio_verify` can check it end to end. See docs/certificate.md.
 //
-//   clang -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o radio_sa193
+//   tools/build_radio.py -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o radio_sa193
 //   ./radio_sa193 [cache] [--no-control]
 //
 // Order matters. The positive control runs FIRST: Sa(192) in 10 is solvable and has a verified

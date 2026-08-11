@@ -18,7 +18,8 @@ it underestimates memory-bound components. Treat the numbers as lower bounds.
 
 Build against a generated file with, e.g.
 
-    clang -O3 -DMAX_K=9 -DMAX_N=193 -DRADIOBASE='"/tmp/rb_counters.c"' driver.c -o prog
+    tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=193 \
+        -DRADIOBASE='"/tmp/rb_counters.c"' driver.c -o prog
 
 where the driver does `#include RADIOBASE` instead of `#include "radiobase.c"`. For
 `counters`, the driver must also call `instr_report()` (declared `void instr_report(void);`)

@@ -23,6 +23,9 @@
 #
 # The store repo defaults to fedork/radio-data and can be overridden with RADIO_DATA_REPO.
 # Requires: gh (authenticated), zstd, shasum.
+# New solver logs must pass tools/check_provenance.py.  Historical/pre-banner logs require the
+# explicit RADIO_ALLOW_LEGACY_PROVENANCE=1 escape hatch; using it is a classification decision that
+# belongs in docs/data.md, not a quiet convenience flag.
 
 set -euo pipefail
 
@@ -120,6 +123,19 @@ cmd_push() {
     for f in "$@"; do
         [ -f "$f" ] || die "no such file: $f"
         base="$(basename "$f")"
+        local looks_solver=0
+        case "$base" in out*.txt|*.solver.log) looks_solver=1 ;; esac
+        if grep -Eq '^# radio-provenance-v1 begin$|^(can|can.t) solve |^still solving in ' \
+                < <(head -c 1048576 "$f"); then
+            looks_solver=1
+        fi
+        if [ "$looks_solver" -eq 1 ] && \
+                ! python3 "$REPO_ROOT/tools/check_provenance.py" "$f" >&2; then
+            if [ "${RADIO_ALLOW_LEGACY_PROVENANCE:-0}" != 1 ]; then
+                die "$f is solver output without complete provenance; archive only with an explicit documented RADIO_ALLOW_LEGACY_PROVENANCE=1 override"
+            fi
+            echo "    WARNING: archiving pre-banner/incomplete solver output under the legacy-provenance override" >&2
+        fi
         echo "==> $base"
         sha="$(shasum -a 256 "$f" | cut -d' ' -f1)"
         raw="$(stat -f%z "$f")"

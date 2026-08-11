@@ -4729,3 +4729,65 @@ started at 15:49:16 in
 `/Users/fedor/radio-runs/sa193-local-depth-e648e83-resume3`, loaded that complete chain, and remains
 under the 20 GiB physical-footprint guard.  The c13-era facts remain usable because its bad paths
 returned `MAYBE`; no missing line was promoted to `FALSE`.
+
+## 2026-08-11 — new outputs are self-identifying
+
+The historical-output problem is broader than retaining the bytes: a raw log did not say which
+commit produced its binary, which compile-time bounds and optimization flags were used, or which
+runtime command and machine executed it. `run.meta` helped the recent Sa(193) runs, but it was a
+sidecar assembled at launch and recorded the *then-current checkout*; a copied older binary could
+therefore be mislabeled. This is one reason it is so difficult to tell which bugs and optimizations
+the 2023/2025 outputs contain.
+
+The canonical path is now `tools/build_radio.py` rather than a direct compiler invocation. It asks
+the compiler for the local dependency set, hashes every source, records the Git commit and whether
+the compiled sources/worktree differ, preserves the exact compiler argument vector and compiler
+version, and derives a deterministic build ID from those inputs. A generated forced-include header
+embeds that identity. The completed binary gets a `<binary>.provenance` sidecar with the same fields
+and its final SHA-256. Source archives without `.git` must supply a full 40- or 64-digit
+`RADIO_SOURCE_COMMIT`; the AWS launchers do this and fail if it is absent or malformed.
+
+`radiobase.c` emits the embedded identity from a pre-main constructor (with `init` as a guarded
+fallback) before any table allocation or cache replay, then adds exact indexed runtime arguments,
+UTC/cwd, host, OS/kernel/architecture, CPU, physical RAM,
+pointer width, process resource limits, locale and the declared cap/runner settings. Environment
+capture is deliberately allow-listed rather than wholesale, so cloud/Git credentials cannot leak
+into a log. Comment-prefixed lines are safe in witness output and caches. `parse_out.sh` now retains
+every block, and `parse_file` ignores it (including overlong comment continuations), so a resumed
+checkpoint carries the identity of each process segment in its proof chain.
+
+Direct compiler builds remain usable for archaeology and regression, but print
+`provenance_complete=no`; `tools/check_provenance.py` rejects them in strict mode. Standalone tools
+which do not include `radiobase.c` use `tools/run_with_provenance.py`, which validates the binary
+against its build sidecar, emits the corresponding runtime block and then execs it. The artifact
+uploader now rejects new solver logs without complete provenance. Its
+`RADIO_ALLOW_LEGACY_PROVENANCE=1` escape is intentionally conspicuous and must be justified in
+`docs/data.md` for pre-banner history.
+
+End-to-end regression covers a canonical build/run with spaces and backslashes in distinct argv
+entries, safe wrapper-limit propagation, strict rejection plus explicit inspection of a direct
+build, and the standalone launcher; it takes about two seconds locally. A small pair-to-triple table
+pipeline also passed after making integer-table readers skip provenance comments (26 solvable pairs,
+49 solvable triples in the tiny k=2 case). The provenance code changes output only, not search
+semantics.
+
+This is prospective. Active AWS run3/run7 and the local `e648e83` continuation were sensibly left
+running; they started before this format and retain their source bundles, launch metadata and
+source/binary hashes instead. They must not be described later as having embedded provenance, and
+there is no reason to discard weeks of computation merely to add a header.
+
+Operational mistake during this change: I edited `tools/sa193_local_supervisor.sh` while its Bash
+process for the active local continuation was live, despite the explicit warning written after the
+previous finalizer failure. The solver is a separate process and remained near 99% CPU; the primary
+monitor continued advancing every two minutes with a ~1.3 GiB footprint. Nevertheless, Bash FD 255
+had reached the new file size, so it was not defensible to assume its buffered post-loop finalizer
+was still pristine. I copied a separate `sa193_recovery_guard.sh` into the run directory and attached
+it in a persistent execution session. The first persistent copy was then deliberately replaced so
+its parser, not only its guard script, was immutable; the final guard is PID 28814, with copied
+guard/parser SHA-256 `d965ea47...` / `4689057a...`. It is passive while supervisor 19059 lives; on a
+primary failure it takes over the 20 GiB footprint cap, and after solver 19088 exits it independently
+folds the exact inherited checkpoint plus this segment's raw verdicts into
+`sa193.recovery.checkpoint`, never overwriting the primary output. A first `nohup` launch was reaped
+by the managed command's descendant cleanup, exactly as the tooling notes warn; the persistent
+foreground session survived and was independently observed under the same session parent as the
+original supervisor.

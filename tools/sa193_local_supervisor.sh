@@ -25,6 +25,7 @@ FOOTPRINT_GIB=${2:-20}
 CACHE=${3:-}
 REPO=/Users/fedor/radio
 BIN="$RUN_DIR/radio_sa193"
+BUILD_META="$BIN.provenance"
 OUT="$RUN_DIR/out_sa193.txt"
 ERR="$RUN_DIR/sa193.err"
 MONITOR_LOG="$RUN_DIR/monitor.log"
@@ -41,6 +42,20 @@ HARD_BYTES=$(awk -v gib="$FOOTPRINT_GIB" 'BEGIN { printf "%.0f", gib * 1024 * 10
 if [ ! -x "$BIN" ]; then
     echo "missing executable: $BIN" >&2
     exit 66
+fi
+if [ ! -f "$BUILD_META" ]; then
+    echo "missing build provenance sidecar: $BUILD_META" >&2
+    exit 66
+fi
+if ! python3 "$REPO/tools/check_provenance.py" "$BUILD_META" >&2; then
+    echo "refusing to launch a binary with incomplete build provenance" >&2
+    exit 65
+fi
+BINARY_SHA=$(shasum -a 256 "$BIN" | awk '{print $1}')
+RECORDED_BINARY_SHA=$(sed -n 's/^# binary_sha256=//p' "$BUILD_META")
+if [ "$BINARY_SHA" != "$RECORDED_BINARY_SHA" ]; then
+    echo "binary does not match its provenance sidecar: $BIN" >&2
+    exit 65
 fi
 if [ -n "$CACHE" ]; then
     CACHE=$(cd "$(dirname "$CACHE")" 2>/dev/null && printf '%s/%s' "$PWD" "$(basename "$CACHE")") || {
@@ -129,16 +144,14 @@ trap cleanup_signal INT TERM HUP
 
 START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 START_EPOCH=$(date +%s)
-COMMIT=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || printf unknown)
-SOURCE_SHA=$(shasum -a 256 "$REPO/radio_sa193.c" | awk '{print $1}')
-BASE_SHA=$(shasum -a 256 "$REPO/radiobase.c" | awk '{print $1}')
-BINARY_SHA=$(shasum -a 256 "$BIN" | awk '{print $1}')
+LAUNCH_REPO_COMMIT=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || printf unknown)
 SUPERVISOR_SHA=$(shasum -a 256 "$0" | awk '{print $1}')
 BASE_SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
 
 {
     printf 'started_utc=%s\n' "$START_UTC"
-    printf 'commit=%s\n' "$COMMIT"
+    printf 'launch_repo_commit=%s (not used as binary identity; see embedded build block)\n' \
+        "$LAUNCH_REPO_COMMIT"
     printf 'command=%s\n' "$BIN"
     if [ -n "$CACHE" ]; then
         printf 'cache=%s (same-run resume)\n' "$CACHE"
@@ -155,16 +168,22 @@ BASE_SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
     printf 'footprint_probe=top MEM (documented physical memory footprint)\n'
     printf 'footprint_probe_timeout_seconds=%s\n' "$FOOTPRINT_TIMEOUT"
     printf 'baseline_swap=%s\n' "$BASE_SWAP"
-    printf 'radio_sa193_c_sha256=%s\n' "$SOURCE_SHA"
-    printf 'radiobase_c_sha256=%s\n' "$BASE_SHA"
-    printf 'binary_sha256=%s\n' "$BINARY_SHA"
     printf 'supervisor_sha256=%s\n' "$SUPERVISOR_SHA"
+    command cat "$BUILD_META"
 } > "$META"
 
 if [ -n "$CACHE" ]; then
-    "$BIN" "$CACHE" > "$OUT" 2> "$ERR" &
+    RADIO_RUNNER=sa193_local_supervisor \
+    RADIO_RUN_LABEL=sa193-local \
+    RADIO_LIMIT_PHYSICAL_FOOTPRINT_GIB="$FOOTPRINT_GIB" \
+    RADIO_RUN_CONTEXT="same-run-resume; checkpoint_interval_seconds=$CHECKPOINT_INTERVAL" \
+        "$BIN" "$CACHE" > "$OUT" 2> "$ERR" &
 else
-    "$BIN" > "$OUT" 2> "$ERR" &
+    RADIO_RUNNER=sa193_local_supervisor \
+    RADIO_RUN_LABEL=sa193-local \
+    RADIO_LIMIT_PHYSICAL_FOOTPRINT_GIB="$FOOTPRINT_GIB" \
+    RADIO_RUN_CONTEXT="cold; checkpoint_interval_seconds=$CHECKPOINT_INTERVAL" \
+        "$BIN" > "$OUT" 2> "$ERR" &
 fi
 SOLVER_PID=$!
 printf '%s\n' "$SOLVER_PID" > "$RUN_DIR/solver.pid"

@@ -15,6 +15,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 |---|---|
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
+| **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
 | **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
@@ -218,6 +219,11 @@ progress and the pass-2 `NO_DEADLINE` handoff.  Cold run7 started from that exac
 the active caps and idle guard track run3 at 40 GiB plus run7 at 60 GiB.  Exact debugger frames,
 replay reinterpretation and hashes are in
 [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
+These active runs predate the embedded `radio-provenance-v1` format added later on 2026-08-11; do
+not claim otherwise or restart them merely to change their headers. Their retained source bundles,
+`run.meta`, source/binary hashes and launch flags remain the provenance bridge. Every newly built
+segment after this point must use the automatic format, which is also preserved in parsed
+checkpoints.
 Run7's ten-minute snapshot reached 103,769 verdicts—the same completed prefix as run5.  A quiet log
 from this point is expected while the restored engine performs the required dive; silence alone is
 not evidence of another stall.
@@ -299,6 +305,13 @@ reads macOS `top`'s documented physical-footprint field, with its own 20-second 
 first sample succeeded.  Resumed checkpoints fold inherited facts into each new file, so another
 restart does not silently forget an earlier segment.  A final proof must retain all raw logs; the
 continuation alone is not a closed derivation.
+
+Operational guard: while adding future provenance, the live primary supervisor script was edited
+in place despite the documented Bash re-read trap. Solver 19088 and primary supervisor 19059 remain
+healthy, but finalization is backed independently by recovery guard PID 28814, running immutable
+copies `.../resume3/recovery_guard.sh` and `recovery_parse_out.sh`. It is passive unless the primary
+dies, retains the same 20 GiB cap on takeover, and writes `sa193.recovery.checkpoint` after solver
+exit without overwriting the primary checkpoint. Keep that guard alive with the run.
 
 The sibling `cold1` directory is an empty launcher failure: a managed one-shot shell reaped both
 descendants despite `nohup`; it contains no solver result and must never be used as a checkpoint.

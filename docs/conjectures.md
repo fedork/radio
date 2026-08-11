@@ -143,7 +143,8 @@ solvers; reproduce in under a second with either:
 ```
 tools/refsolve.py solve 4 15 2 5 4        # can solve
 tools/refsolve.py solve 4 15 2 6 3        # can't solve
-clang -O3 -DMAX_K=4 -DMAX_N=40 radio_one.c -o /tmp/r4 && /tmp/r4 4 15 2 6 3
+tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=40 radio_one.c -o /tmp/r4
+/tmp/r4 4 15 2 6 3
 ```
 
 **Consequence, and the main structural finding:** no induction on `k` that rewrites a

@@ -36,8 +36,17 @@ fi
 
 RSS_KB_CAP=$(( RSS_GB_CAP * 1024 * 1024 ))
 [[ -n "$LABEL" ]] || LABEL="$(basename "$1")"
+RUN_CONTEXT="capped_run_poll_seconds=$POLL"
+if [[ -n "${RADIO_RUN_CONTEXT:-}" ]]; then
+    RUN_CONTEXT="$RADIO_RUN_CONTEXT; $RUN_CONTEXT"
+fi
 
-"$@" &
+RADIO_RUNNER=capped_run \
+RADIO_RUN_LABEL="$LABEL" \
+RADIO_LIMIT_WALL_SECONDS="$SECONDS_CAP" \
+RADIO_LIMIT_RSS_GIB="$RSS_GB_CAP" \
+RADIO_RUN_CONTEXT="$RUN_CONTEXT" \
+    "$@" &
 PID=$!
 START=$(date +%s)
 PEAK_KB=0

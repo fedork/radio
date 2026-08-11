@@ -5,12 +5,12 @@
    one-part state of total width <=18 and two-part state whose individual totals are <=10, for
    k=1..5.  NO_DEADLINE makes every emitted answer definitive.
 
-     clang -O3 -DMAX_K=5 -DMAX_N=24 tools/split_regression.c -o /tmp/split_regression
+     tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=24 tools/split_regression.c -o /tmp/split_regression
      /tmp/split_regression | grep '^CHECK' > /tmp/checks
 
    RADIOBASE_PATH can name an engine in another checkout for old/new comparisons:
 
-     clang -O3 -DMAX_K=5 -DMAX_N=24 \
+     tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=24 \
        -DRADIOBASE_PATH='"/path/to/old/radiobase.c"' tools/split_regression.c -o /tmp/old
 */
 #ifndef RADIOBASE_PATH

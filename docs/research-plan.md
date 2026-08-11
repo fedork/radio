@@ -50,6 +50,11 @@ deliberately not kept; the vendor-neutral `AGENTS.md` brief with a session-end p
 Credentials are per-repo and leave global config alone: `core.sshCommand` for git,
 `GH_CONFIG_DIR=.gh` for `gh`, both as `fedork`.
 
+Durability extension (2026-08-11): new solver output is self-identifying. The canonical builder
+embeds commit/source hashes/compiler arguments and emits a binary sidecar; runtime stdout adds exact
+arguments, host/OS/CPU/RAM and resource limits. Checkpoints preserve the block and archival rejects
+missing/incomplete provenance unless a historical override is explicit.
+
 ### P2 - Extend the K=9 column constructively
 
 Canonical search for `m = 7` (predicted 457) and `m = 8` (predicted 447), where both models

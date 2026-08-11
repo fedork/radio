@@ -38,24 +38,40 @@ done
 BUCKET=radio-sa193-393287594714
 TOPIC=arn:aws:sns:us-west-2:393287594714:radio-sa193-progress
 SECS=$(( DAYS * 86400 ))
+FULL_SHA=$(git rev-parse HEAD)
 SHA=$(git rev-parse --short HEAD)
 
-tar czf /tmp/sa193_src.tgz radiobase.c radio_sa193.c parse_out.sh \
-        tools/capped_run.sh tools/sa193_watchdog.sh
+BUNDLE_FILES=(radiobase.c radio_sa193.c parse_out.sh tools/build_radio.py \
+              tools/check_provenance.py tools/capped_run.sh tools/sa193_watchdog.sh)
+for file in "${BUNDLE_FILES[@]}"; do
+    git ls-files --error-unmatch -- "$file" >/dev/null 2>&1 || {
+        echo "refusing to label an untracked source as commit $FULL_SHA: $file" >&2
+        exit 65
+    }
+done
+if ! git diff --quiet HEAD -- "${BUNDLE_FILES[@]}" || \
+        ! git diff --cached --quiet HEAD -- "${BUNDLE_FILES[@]}"; then
+    echo "refusing a commit-labelled source bundle with dirty build inputs" >&2
+    exit 65
+fi
+
+tar czf /tmp/sa193_src.tgz "${BUNDLE_FILES[@]}"
 echo "source bundle: $(du -h /tmp/sa193_src.tgz | cut -f1), build $SHA"
 
 cat > /tmp/sa193_userdata.sh <<EOF
 #!/bin/bash
 exec > >(tee -a /var/log/sa193.log) 2>&1
 set -x
-dnf install -y clang zstd tar gzip
+dnf install -y clang python3 zstd tar gzip
 cd /root
 aws s3 cp s3://$BUCKET/src/sa193_src_$SHA.tgz src.tgz
 mkdir -p run && tar xzf src.tgz -C run && cd run
 chmod +x tools/*.sh parse_out.sh
 
 # MAX_N is the coin count of the largest state the run will touch: 193. MAX_K is 10.
-clang -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o radio_sa193
+RADIO_SOURCE_COMMIT=$FULL_SHA python3 tools/build_radio.py \
+    -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o radio_sa193
+python3 tools/check_provenance.py radio_sa193.provenance
 
 # The control runs first inside radio_sa193 and aborts the whole run if Sa(192) does not come back
 # solvable. Resume: if a checkpoint exists, pass it - warm-starting a negative from this run's OWN
@@ -72,7 +88,8 @@ else
     echo "COLD run: any checkpoint in S3 is deliberately ignored"
 fi
 
-( tools/capped_run.sh --seconds $SECS --rss-gb 110 --label sa193 -- \\
+( RADIO_RUN_CONTEXT="sa193_launch; cache=\${CACHE:-none}" \\
+  tools/capped_run.sh --seconds $SECS --rss-gb 110 --label sa193 -- \\
       ./radio_sa193 \$CACHE > /root/run/out_sa193.txt 2>/root/run/sa193.err ) &
 SOLVER_WRAPPER=\$!
 sleep 20

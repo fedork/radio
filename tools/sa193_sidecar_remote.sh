@@ -5,7 +5,7 @@
 #
 # Example (from /root/run4):
 #   tools/sa193_sidecar_remote.sh --prefix run4 --binary radio_sa193_v4 \
-#       --build bca3a2e --peer radio_sa193_v3 --rss-gb 60 \
+#       --build 0123456789abcdef0123456789abcdef01234567 --peer radio_sa193_v3 --rss-gb 60 \
 #       --idle-solvers radio_sa193_v3,radio_sa193_v4
 
 set -euo pipefail
@@ -36,6 +36,10 @@ done
 
 [[ "$PREFIX" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid prefix: $PREFIX" >&2; exit 64; }
 [[ "$BINARY" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid binary name: $BINARY" >&2; exit 64; }
+[[ "$BUILD" =~ ^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$ ]] || {
+    echo "--build must be a full 40- or 64-digit source commit hash" >&2
+    exit 64
+}
 [[ "$PEER" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid peer name: $PEER" >&2; exit 64; }
 [[ "$RSS_GB" =~ ^[0-9]+$ && "$RSS_GB" -gt 0 ]] || { echo "invalid RSS cap" >&2; exit 64; }
 [[ "$SECONDS_CAP" =~ ^[0-9]+$ && "$SECONDS_CAP" -gt 0 ]] || { echo "invalid time cap" >&2; exit 64; }
@@ -59,10 +63,11 @@ RUN_DIR=$(pwd -P)
 }
 
 for needed in radiobase.c radio_sa193.c parse_out.sh tools/capped_run.sh \
+              tools/build_radio.py tools/check_provenance.py \
               tools/sa193_watchdog.sh tools/sa193_idle_shutdown.sh; do
     [[ -f "$needed" ]] || { echo "missing $RUN_DIR/$needed" >&2; exit 66; }
 done
-for existing in "$BINARY" out_sa193.txt sa193.err run.meta wrapper.pid solver.pid watchdog.pid; do
+for existing in "$BINARY" "$BINARY.provenance" out_sa193.txt sa193.err run.meta wrapper.pid solver.pid watchdog.pid; do
     [[ ! -e "$existing" ]] || { echo "refusing to overwrite $RUN_DIR/$existing" >&2; exit 73; }
 done
 
@@ -88,8 +93,10 @@ DISK_KB=$(df -Pk "$RUN_DIR" | awk 'NR == 2 {print $4}')
     exit 70
 }
 
-chmod +x parse_out.sh tools/*.sh
-clang -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o "$BINARY"
+chmod +x parse_out.sh tools/*.sh tools/*.py
+RADIO_SOURCE_COMMIT="$BUILD" python3 tools/build_radio.py \
+    -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o "$BINARY"
+python3 tools/check_provenance.py "$BINARY.provenance"
 
 START_UTC=$(date -u +%FT%TZ)
 SEG="seg-${START_UTC//[:T-]/}-${BUILD}"
@@ -106,10 +113,11 @@ SEG="seg-${START_UTC//[:T-]/}-${BUILD}"
     printf 's3_prefix=s3://%s/%s/\n' "$BUCKET" "$PREFIX"
     printf 'mem_available_gib=%s\n' "$((AVAILABLE_KB / 1048576))"
     printf 'disk_available_gib=%s\n' "$((DISK_KB / 1048576))"
-    sha256sum radiobase.c radio_sa193.c "$BINARY" tools/sa193_watchdog.sh \
-              tools/capped_run.sh tools/sa193_idle_shutdown.sh
+    sha256sum tools/sa193_watchdog.sh tools/capped_run.sh tools/sa193_idle_shutdown.sh
+    cat "$BINARY.provenance"
 } > run.meta
 
+RADIO_RUN_CONTEXT="cold; prefix=$PREFIX; peer=$PEER" \
 setsid nohup tools/capped_run.sh --seconds "$SECONDS_CAP" --rss-gb "$RSS_GB" \
     --label "$BINARY" -- "./$BINARY" > out_sa193.txt 2> sa193.err < /dev/null &
 WRAPPER_PID=$!

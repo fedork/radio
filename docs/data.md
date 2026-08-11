@@ -164,3 +164,7 @@ Small enough to live in git, and too valuable to risk:
 2. **Archive before deleting.** The K=9 walk was lost this way.
 3. Raw output, not distilled. `parse_out.sh` output can be regenerated; witness data cannot.
 4. When a row here is cited as the source for a `data/*.csv` fact, the tag must exist.
+5. New solver logs must contain a complete `radio-provenance-v1` block and pass
+   `tools/check_provenance.py`. `tools/artifacts.sh push` enforces this. The
+   `RADIO_ALLOW_LEGACY_PROVENANCE=1` override is only for a historical/pre-banner log, and its
+   missing provenance must be stated in this inventory.

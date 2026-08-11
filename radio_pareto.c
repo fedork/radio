@@ -10,7 +10,7 @@
 // in particular never fires on the Sa ladder, because no single search there gets near the
 // 1000s / 100s / 10s / MIN_DEADLINE budget cascade.
 //
-//   clang -O3 -DMAX_K=8 -DMAX_N=258 radio_pareto.c -o radio_pareto
+//   tools/build_radio.py -O3 -DMAX_K=8 -DMAX_N=258 radio_pareto.c -o radio_pareto
 //   tools/capped_run.sh --seconds 3600 --rss-gb 16 -- ./radio_pareto 8 56 55 > out.txt
 //
 // Usage: radio_pareto <k> <n1> <n2> [cache_file]

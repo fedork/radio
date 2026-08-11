@@ -8,7 +8,7 @@
 // sixteen k=9 roots fails on exactly one split, whose only possible refutation is a two-part k=8
 // child (for Sb(112:81) it is Sb(74:40, 41:38)). See docs/certificate.md.
 //
-//   clang -O3 -DMAX_K=<k> -DMAX_N=<sum of all sides> radio_one.c -o radio_one
+//   tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<sum of all sides> radio_one.c -o radio_one
 //   ./radio_one [cache] <k> <n1> <m1> [<n2> <m2> ...]
 //
 // Exit 0 solvable, 1 unsolvable, 2 MAYBE (deadline), 3 usage. MAYBE is not a refutation.
