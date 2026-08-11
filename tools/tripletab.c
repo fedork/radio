@@ -5,12 +5,14 @@
  * pair table avoids asking the solver about triples already refuted by one of
  * their pairs.
  *
- *   clang -O3 -DMAX_K=4 -DMAX_N=96 tools/tripletab.c -o tripletab
+ *   tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=96 tools/tripletab.c -o tripletab
  *   ./tripletab 4 16 data/pairs_k4.txt
  *
- * Stdout contains only the six-integer table rows; solver chatter is silenced.
+ * Stdout starts with provenance comments, then contains six-integer table rows; solver chatter is
+ * silenced. Consumers use read_int_table.h and ignore non-row lines.
  */
 #include "../radiobase.c"
+#include "read_int_table.h"
 #include <unistd.h>
 
 #define AXIS 64
@@ -42,15 +44,17 @@ int main(int argc, char **argv) {
         fprintf(stderr, "axis limit %d exceeds compile-time AXIS=%d\n", limit, AXIS);
         return 2;
     }
+    /* Keep the table self-identifying even on a compiler without constructor support, but leave
+       engine initialization behind the stdout redirect so the table itself stays clean. */
+    radio_print_provenance();
 
     FILE *pf = fopen(argv[3], "r");
     if (!pf) {
         fprintf(stderr, "cannot open pair table %s\n", argv[3]);
         return 2;
     }
-    int a, b, c, d;
-    while (fscanf(pf, "%d %d %d %d", &a, &b, &c, &d) == 4)
-        set_pair(a, b, c, d);
+    int row[6];
+    while (radio_read_int_row(pf, row, 4)) set_pair(row[0], row[1], row[2], row[3]);
     fclose(pf);
 
     int table_fd = dup(STDOUT_FILENO);

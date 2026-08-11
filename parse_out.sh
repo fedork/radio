@@ -1,3 +1,24 @@
 #!/bin/bash
-grep -o "^can.* in [0-9]\+" | sed -e "s/can't solve /- /" -e "s/can solve /+ /" -e "s/ size=[0-9/]* / /" -e "s/Sa(/a /" -e "s/) in / /" -e "s/Sb(/b /" -e "s/)\[/ t /" -e "s/] in / /" -e "s/]//" -e "s/[:,]/ /g"
-
+# Convert verdicts to cache facts while retaining all comment metadata (provenance, certificate and
+# segment-chain headers). POSIX awk's leftmost-longest match duplicates grep's former greedy
+# `^can.* in [0-9]+`.
+awk '
+    /^#/ {
+        print
+        next
+    }
+    match($0, /^can.* in [0-9]+/) {
+        line = substr($0, RSTART, RLENGTH)
+        sub(/^can\047t solve /, "- ", line)
+        sub(/^can solve /, "+ ", line)
+        sub(/ size=[0-9\/]* /, " ", line)
+        sub(/Sa\(/, "a ", line)
+        sub(/\) in /, " ", line)
+        sub(/Sb\(/, "b ", line)
+        sub(/\)\[/, " t ", line)
+        sub(/] in /, " ", line)
+        sub(/]/, "", line)
+        gsub(/[:,]/, " ", line)
+        print line
+    }
+'

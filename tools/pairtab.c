@@ -1,7 +1,7 @@
 /* Build the complete current-solver table for pairs of individually solvable parts.
 
    Usage:
-     clang -O3 -DMAX_K=4 -DMAX_N=64 tools/pairtab.c -o /tmp/pairtab4
+     tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=64 tools/pairtab.c -o /tmp/pairtab4
      /tmp/pairtab4 4 16 > /tmp/pairs_k4.txt
 
    Exact four-integer stdout lines are the solvable pairs `n1 m1 n2 m2`.  radiobase also prints

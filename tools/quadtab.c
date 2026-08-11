@@ -2,12 +2,13 @@
  *
  * The exact pair and triple tables are necessary gates and eliminate most
  * combinations before the solver is called.  Stdout contains only rows of
- * eight non-negative integers.
+ * a provenance comment block followed by rows of eight non-negative integers.
  *
- *   clang -O3 -DMAX_K=4 -DMAX_N=128 tools/quadtab.c -o quadtab
+ *   tools/build_radio.py -O3 -DMAX_K=4 -DMAX_N=128 tools/quadtab.c -o quadtab
  *   ./quadtab 4 16 pairs_k4.txt triples_k4.txt
  */
 #include "../radiobase.c"
+#include "read_int_table.h"
 #include <unistd.h>
 
 #define AXIS 64
@@ -51,12 +52,14 @@ int main(int argc,char **argv) {
     }
     int level=atoi(argv[1]), limit=atoi(argv[2]);
     if(limit>=AXIS){fprintf(stderr,"axis limit too large\n");return 2;}
+    /* See tripletab.c: provenance belongs in the table, engine chatter does not. */
+    radio_print_provenance();
 
     memset(single_id,0xff,sizeof(single_id));
     FILE *pf=fopen(argv[3],"r");
     if(!pf){fprintf(stderr,"cannot open %s\n",argv[3]);return 2;}
-    int a,b,c,d,e,g;
-    while(fscanf(pf,"%d %d %d %d",&a,&b,&c,&d)==4) set_pair(a,b,c,d);
+    int row[8];
+    while(radio_read_int_row(pf,row,4)) set_pair(row[0],row[1],row[2],row[3]);
     fclose(pf);
 
     int table_fd=dup(STDOUT_FILENO);
@@ -77,8 +80,8 @@ int main(int argc,char **argv) {
     if(!triple_ok){fprintf(stderr,"cannot allocate triple table\n");return 2;}
     FILE *tf=fopen(argv[4],"r");
     if(!tf){fprintf(stderr,"cannot open %s\n",argv[4]);return 2;}
-    while(fscanf(tf,"%d %d %d %d %d %d",&a,&b,&c,&d,&e,&g)==6)
-        set_triple(a,b,c,d,e,g);
+    while(radio_read_int_row(tf,row,6))
+        set_triple(row[0],row[1],row[2],row[3],row[4],row[5]);
     fclose(tf);
 
     long long total=0,triple_feasible=0,solvable=0;

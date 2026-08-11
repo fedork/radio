@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "read_int_table.h"
 
 #define AXIS 64
 #define MAX_PARTS 16
@@ -124,9 +125,9 @@ int main(int argc, char **argv) {
 
     FILE *f = fopen(argv[1], "r");
     if (!f) { fprintf(stderr, "cannot open %s\n", argv[1]); return 2; }
-    int a,b,c,d,e,g;
-    while (fscanf(f,"%d %d %d %d %d %d",&a,&b,&c,&d,&e,&g)==6)
-        set_triple(a,b,c,d,e,g);
+    int row[8];
+    while (radio_read_int_row(f,row,6))
+        set_triple(row[0],row[1],row[2],row[3],row[4],row[5]);
     fclose(f);
 
     int input=2;
@@ -136,9 +137,8 @@ int main(int argc, char **argv) {
         if(!quad_ok){fprintf(stderr,"cannot allocate quad table\n");return 2;}
         f=fopen(argv[input++],"r");
         if(!f){fprintf(stderr,"cannot open %s\n",argv[input-1]);return 2;}
-        int h,j;
-        while(fscanf(f,"%d %d %d %d %d %d %d %d",&a,&b,&c,&d,&e,&g,&h,&j)==8)
-            set_quad(a,b,c,d,e,g,h,j);
+        while(radio_read_int_row(f,row,8))
+            set_quad(row[0],row[1],row[2],row[3],row[4],row[5],row[6],row[7]);
         fclose(f);
     }
 

@@ -5,12 +5,13 @@
  * whole splits survive all exact two-part child subsets, and how many also
  * survive all exact three-part child subsets.
  *
- *   clang -O3 tools/subset_census.c -o subset_census
- *   ./subset_census 5 pairs_k4.txt triples_k4.txt states.txt
+ *   tools/build_radio.py -O3 tools/subset_census.c -o subset_census
+ *   tools/run_with_provenance.py ./subset_census 5 pairs_k4.txt triples_k4.txt states.txt
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "read_int_table.h"
 
 #define MAX_PARTS 16
 #define MAX_OPTIONS 4096
@@ -180,14 +181,14 @@ int main(int argc, char **argv) {
 
     FILE *f = fopen(argv[2], "r");
     if (!f) { fprintf(stderr, "cannot open %s\n", argv[2]); return 2; }
-    int a,b,c,d,e,g;
-    while (fscanf(f, "%d %d %d %d", &a,&b,&c,&d) == 4) set_pair(a,b,c,d);
+    int row[6];
+    while (radio_read_int_row(f, row, 4)) set_pair(row[0],row[1],row[2],row[3]);
     fclose(f);
     f = fopen(argv[3], "r");
     if (!f) { fprintf(stderr, "cannot open %s\n", argv[3]); return 2; }
     long long triple_rows = 0;
-    while (fscanf(f, "%d %d %d %d %d %d", &a,&b,&c,&d,&e,&g) == 6) {
-        set_triple(a,b,c,d,e,g);
+    while (radio_read_int_row(f, row, 6)) {
+        set_triple(row[0],row[1],row[2],row[3],row[4],row[5]);
         triple_rows++;
     }
     fclose(f);

@@ -3,6 +3,45 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/resource.h>
+#include <sys/utsname.h>
+
+#ifdef __APPLE__
+#include <crt_externs.h>
+#include <sys/sysctl.h>
+#endif
+
+/*
+ * Build provenance is normally injected by tools/build_radio.py through a generated forced-include
+ * header.  Keep an explicit fallback for direct compiler invocations: old habits must produce an
+ * obviously incomplete record, not a log which can later be mistaken for an identified build.
+ */
+#ifndef RADIO_BUILD_PROVENANCE_AVAILABLE
+#define RADIO_BUILD_PROVENANCE_AVAILABLE 0
+#define RADIO_BUILD_PROVENANCE_COMPLETE 0
+#define RADIO_BUILD_ID "unknown-direct-build"
+#define RADIO_GIT_COMMIT "unknown"
+#define RADIO_GIT_IDENTITY_SOURCE "unknown"
+#define RADIO_GIT_SOURCE_DIRTY "unknown"
+#define RADIO_GIT_WORKTREE_DIRTY "unknown"
+#define RADIO_BUILD_UTC "unknown"
+#define RADIO_BUILD_HOST "unknown"
+#define RADIO_BUILD_UNAME "unknown"
+#define RADIO_BUILD_CWD "unknown"
+#define RADIO_COMPILER_VERSION "unknown"
+#define RADIO_COMPILER_SHA256 "unknown"
+#define RADIO_BUILD_TOOL_SHA256 "unknown"
+#define RADIO_PROVENANCE_INJECTION "unknown"
+#define RADIO_BUILD_ARGC 0
+#define RADIO_BUILD_ENV_COUNT 0
+#define RADIO_SOURCE_COUNT 0
+static const char *const radio_provenance_build_argv[1] = {NULL};
+static const char *const radio_provenance_build_env_names[1] = {NULL};
+static const char *const radio_provenance_build_env_values[1] = {NULL};
+static const char *const radio_provenance_source_paths[1] = {NULL};
+static const char *const radio_provenance_source_sha256[1] = {NULL};
+#endif
 
 #ifdef DEBUG
 #define debug_printf(...) do{ printf( __VA_ARGS__ ); fflush(stdout);} while( 0 )
@@ -2357,6 +2396,7 @@ void parse_file(char *file_name) {
     printf("\nreading file %s\n", file_name);
     char buff[BUFSIZE];
     int line_count=0;
+    int comment_continuation=0;
 
     while(fgets(buff, BUFSIZE - 1, fp) != NULL)
     {
@@ -2369,8 +2409,15 @@ void parse_file(char *file_name) {
             fflush(stdout);
         }
         debug_printf("\nINPUT: %s\n", buff);
-        if (buff[0] == '#') {           // provenance header - see tools/checkpoint.sh
-            printf("cache header: %s", buff);
+        if (comment_continuation || buff[0] == '#') {
+            /* A provenance argument can legally be longer than BUFSIZE.  fgets then returns its
+               continuation without a leading '#'; remember that state so an exact long argument
+               cannot be mistaken for a cache fact on replay. */
+            /* Echo cache metadata verbatim. parse_out.sh preserves comment lines, so a generic
+               warm-started segment carries the provenance/certificate headers of its inputs even
+               outside the specialised Sa(193) checkpoint wrappers. */
+            fputs(buff, stdout);
+            comment_continuation = strchr(buff, '\n') == NULL;
             continue;
         }
         char* token = strtok(buff, " ");
@@ -2424,7 +2471,278 @@ void parse_file(char *file_name) {
     fflush(stdout);
 }
 
+/* ------------------------------------------------------------------------- provenance
+ *
+ * Every durable solver output starts with this block.  Lines are comments so they are harmless in
+ * cache files (parse_file deliberately skips '#') and witness extractors can ignore them.  Values
+ * use a small byte-exact escape language: backslash, newline, carriage return and tab have their
+ * usual C spellings; other non-printable/non-ASCII bytes are \xHH.  Argument boundaries are kept by
+ * printing one indexed field per argument rather than a lossy shell command string.
+ */
+
+static int radio_provenance_printed;
+
+static void radio_provenance_value(const char *key, const char *value) {
+    const unsigned char *p = (const unsigned char *)(value ? value : "");
+    printf("# %s=", key);
+    for (; *p; p++) {
+        switch (*p) {
+            case '\\': printf("\\\\"); break;
+            case '\n': printf("\\n"); break;
+            case '\r': printf("\\r"); break;
+            case '\t': printf("\\t"); break;
+            default:
+                if (*p >= 0x20 && *p <= 0x7e) putchar(*p);
+                else printf("\\x%02x", *p);
+        }
+    }
+    putchar('\n');
+}
+
+static void radio_provenance_number(const char *key, unsigned long long value) {
+    printf("# %s=%llu\n", key, value);
+}
+
+static int radio_provenance_runtime_argv(void) {
+    int count = 0;
+    int complete = 1;
+#ifdef __APPLE__
+    int argc = *_NSGetArgc();
+    char **argv = *_NSGetArgv();
+    radio_provenance_value("runtime_argv_source", "libSystem _NSGetArgv");
+    for (int i = 0; i < argc; i++) {
+        char key[64];
+        snprintf(key, sizeof(key), "run_arg[%d]", i);
+        radio_provenance_value(key, argv[i]);
+    }
+    count = argc;
+#elif defined(__linux__)
+    FILE *fp = fopen("/proc/self/cmdline", "rb");
+    if (fp != NULL) {
+        size_t len = 0, cap = 128;
+        char *arg = (char *)malloc(cap);
+        radio_provenance_value("runtime_argv_source", "/proc/self/cmdline");
+        if (arg != NULL) {
+            int ch;
+            while ((ch = fgetc(fp)) != EOF) {
+                if (ch != 0) {
+                    if (len + 1 >= cap) {
+                        size_t new_cap = cap * 2;
+                        char *grown = (char *)realloc(arg, new_cap);
+                        if (grown == NULL) {
+                            complete = 0;
+                            break;
+                        }
+                        arg = grown;
+                        cap = new_cap;
+                    }
+                    arg[len++] = (char)ch;
+                } else {
+                    char key[64];
+                    arg[len] = 0;
+                    snprintf(key, sizeof(key), "run_arg[%d]", count++);
+                    radio_provenance_value(key, arg);
+                    len = 0;
+                }
+            }
+            if (ferror(fp)) complete = 0;
+            if (len > 0) {
+                char key[64];
+                arg[len] = 0;
+                snprintf(key, sizeof(key), "run_arg[%d]", count++);
+                radio_provenance_value(key, arg);
+            }
+            free(arg);
+        }
+        fclose(fp);
+    } else {
+        complete = 0;
+        radio_provenance_value("runtime_argv_source", "unavailable");
+    }
+#else
+    complete = 0;
+    radio_provenance_value("runtime_argv_source", "unavailable on this platform");
+#endif
+    radio_provenance_number("run_arg_count", (unsigned long long)count);
+    radio_provenance_value("runtime_argv_complete", complete && count > 0 ? "yes" : "no");
+    return complete && count > 0;
+}
+
+static void radio_provenance_cpu_model(void) {
+#ifdef __APPLE__
+    char model[512];
+    size_t size = sizeof(model);
+    if (sysctlbyname("machdep.cpu.brand_string", model, &size, NULL, 0) == 0 && size > 0) {
+        model[sizeof(model) - 1] = 0;
+        radio_provenance_value("runtime_cpu_model", model);
+        return;
+    }
+#elif defined(__linux__)
+    FILE *fp = fopen("/proc/cpuinfo", "r");
+    if (fp != NULL) {
+        char line[1024];
+        while (fgets(line, sizeof(line), fp) != NULL) {
+            if (strncmp(line, "model name", 10) == 0 || strncmp(line, "Hardware", 8) == 0) {
+                char *value = strchr(line, ':');
+                if (value != NULL) {
+                    value++;
+                    while (*value == ' ' || *value == '\t') value++;
+                    value[strcspn(value, "\r\n")] = 0;
+                    radio_provenance_value("runtime_cpu_model", value);
+                    fclose(fp);
+                    return;
+                }
+            }
+        }
+        fclose(fp);
+    }
+#endif
+    radio_provenance_value("runtime_cpu_model", "unknown");
+}
+
+static unsigned long long radio_provenance_physical_memory(void) {
+#ifdef __APPLE__
+    uint64_t bytes = 0;
+    size_t size = sizeof(bytes);
+    if (sysctlbyname("hw.memsize", &bytes, &size, NULL, 0) == 0) return bytes;
+#endif
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGESIZE);
+    if (pages > 0 && page_size > 0)
+        return (unsigned long long)pages * (unsigned long long)page_size;
+    return 0;
+}
+
+static void radio_provenance_rlimit(const char *name, int resource) {
+    struct rlimit limit;
+    char key[96];
+    if (getrlimit(resource, &limit) != 0) return;
+    snprintf(key, sizeof(key), "runtime_rlimit.%s.soft", name);
+    if (limit.rlim_cur == RLIM_INFINITY) radio_provenance_value(key, "infinity");
+    else radio_provenance_number(key, (unsigned long long)limit.rlim_cur);
+    snprintf(key, sizeof(key), "runtime_rlimit.%s.hard", name);
+    if (limit.rlim_max == RLIM_INFINITY) radio_provenance_value(key, "infinity");
+    else radio_provenance_number(key, (unsigned long long)limit.rlim_max);
+}
+
+static void radio_print_provenance(void) {
+    if (radio_provenance_printed) return;
+    radio_provenance_printed = 1;
+    /* tools/run_with_provenance.py is the generic path for standalone utilities.  If somebody uses
+       it for a radiobase driver too, it has already verified the binary and emitted the same block. */
+    if (getenv("RADIO_PROVENANCE_WRAPPER_EMITTED") != NULL) return;
+
+    printf("# radio-provenance-v1 begin\n");
+    radio_provenance_value("artifact", "solver-output");
+    radio_provenance_value("provenance_complete",
+                           RADIO_BUILD_PROVENANCE_COMPLETE ? "yes" : "no");
+    radio_provenance_value("build_id", RADIO_BUILD_ID);
+    radio_provenance_value("git_commit", RADIO_GIT_COMMIT);
+    radio_provenance_value("git_identity_source", RADIO_GIT_IDENTITY_SOURCE);
+    radio_provenance_value("git_source_dirty", RADIO_GIT_SOURCE_DIRTY);
+    radio_provenance_value("git_worktree_dirty", RADIO_GIT_WORKTREE_DIRTY);
+    radio_provenance_value("build_utc", RADIO_BUILD_UTC);
+    radio_provenance_value("build_host", RADIO_BUILD_HOST);
+    radio_provenance_value("build_uname", RADIO_BUILD_UNAME);
+    radio_provenance_value("build_cwd", RADIO_BUILD_CWD);
+    radio_provenance_value("compiler_version", RADIO_COMPILER_VERSION);
+    radio_provenance_value("compiler_executable_sha256", RADIO_COMPILER_SHA256);
+    radio_provenance_value("build_tool_sha256", RADIO_BUILD_TOOL_SHA256);
+    radio_provenance_value("provenance_injection", RADIO_PROVENANCE_INJECTION);
+    radio_provenance_number("compile_arg_count", RADIO_BUILD_ARGC);
+    for (int i = 0; i < RADIO_BUILD_ARGC; i++) {
+        char key[64];
+        snprintf(key, sizeof(key), "compile_arg[%d]", i);
+        radio_provenance_value(key, radio_provenance_build_argv[i]);
+    }
+    radio_provenance_number("build_env_count", RADIO_BUILD_ENV_COUNT);
+    for (int i = 0; i < RADIO_BUILD_ENV_COUNT; i++) {
+        char key[64];
+        snprintf(key, sizeof(key), "build_env[%d].name", i);
+        radio_provenance_value(key, radio_provenance_build_env_names[i]);
+        snprintf(key, sizeof(key), "build_env[%d].value", i);
+        radio_provenance_value(key, radio_provenance_build_env_values[i]);
+    }
+    radio_provenance_number("source_count", RADIO_SOURCE_COUNT);
+    for (int i = 0; i < RADIO_SOURCE_COUNT; i++) {
+        char key[64];
+        snprintf(key, sizeof(key), "source[%d].path", i);
+        radio_provenance_value(key, radio_provenance_source_paths[i]);
+        snprintf(key, sizeof(key), "source[%d].sha256", i);
+        radio_provenance_value(key, radio_provenance_source_sha256[i]);
+    }
+    radio_provenance_number("define.MAX_K", MAX_K);
+    radio_provenance_number("define.MAX_N", MAX_N);
+
+    char stamp[64] = "unknown";
+    time_t now = time(NULL);
+    struct tm utc;
+    if (gmtime_r(&now, &utc) != NULL)
+        strftime(stamp, sizeof(stamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
+    radio_provenance_value("run_utc", stamp);
+    radio_provenance_runtime_argv();
+
+    char cwd[4096];
+    radio_provenance_value("runtime_cwd", getcwd(cwd, sizeof(cwd)) ? cwd : "unknown");
+    char host[256] = "unknown";
+    if (gethostname(host, sizeof(host)) != 0) strcpy(host, "unknown");
+    host[sizeof(host) - 1] = 0;
+    radio_provenance_value("runtime_host", host);
+    struct utsname uts;
+    if (uname(&uts) == 0) {
+        radio_provenance_value("runtime_os", uts.sysname);
+        radio_provenance_value("runtime_kernel_release", uts.release);
+        radio_provenance_value("runtime_kernel_version", uts.version);
+        radio_provenance_value("runtime_arch", uts.machine);
+    } else {
+        radio_provenance_value("runtime_os", "unknown");
+        radio_provenance_value("runtime_kernel_release", "unknown");
+        radio_provenance_value("runtime_kernel_version", "unknown");
+        radio_provenance_value("runtime_arch", "unknown");
+    }
+    long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    radio_provenance_number("runtime_logical_cpus", cpus > 0 ? (unsigned long long)cpus : 0);
+    radio_provenance_number("runtime_physical_memory_bytes", radio_provenance_physical_memory());
+    radio_provenance_number("runtime_pointer_bits", 8ULL * sizeof(void *));
+    radio_provenance_cpu_model();
+    radio_provenance_rlimit("CPU_seconds", RLIMIT_CPU);
+    radio_provenance_rlimit("address_space_bytes", RLIMIT_AS);
+    radio_provenance_rlimit("data_bytes", RLIMIT_DATA);
+    radio_provenance_rlimit("stack_bytes", RLIMIT_STACK);
+    radio_provenance_rlimit("open_files", RLIMIT_NOFILE);
+
+    const char *safe_env[] = {
+        "LANG", "LC_ALL", "TZ", "OMP_NUM_THREADS", "RADIO_RUNNER", "RADIO_RUN_LABEL",
+        "RADIO_LIMIT_WALL_SECONDS", "RADIO_LIMIT_RSS_GIB",
+        "RADIO_LIMIT_PHYSICAL_FOOTPRINT_GIB", "RADIO_RUN_CONTEXT", "TWO_SIDED_ONLY",
+        "TRACE_INDEX", "BENCH_K", "NODECAP", "TIMECAP", "MINIMAL_K", "TOPDOWN", "PASSES",
+        "RADIO_PROBE_INIT"
+    };
+    for (size_t i = 0; i < sizeof(safe_env) / sizeof(safe_env[0]); i++) {
+        const char *value = getenv(safe_env[i]);
+        if (value != NULL) {
+            char key[96];
+            snprintf(key, sizeof(key), "runtime_env.%s", safe_env[i]);
+            radio_provenance_value(key, value);
+        }
+    }
+    printf("# radio-provenance-v1 end\n");
+    fflush(stdout);
+}
+
+/* Clang/GCC run this after the C runtime is ready but before main.  Keeping the init() call too is
+   intentional: the guard makes it a no-op, while nonstandard toolchains without constructor
+   attributes still get provenance on the normal solver path.  The constructor covers usage errors
+   and focused regressions which return without calling the expensive engine initializer. */
+#if defined(__clang__) || defined(__GNUC__)
+__attribute__((constructor))
+static void radio_provenance_constructor(void) {
+    radio_print_provenance();
+}
+#endif
+
 void init(){
+    radio_print_provenance();
 #ifdef MEASURE_CACHE_L1
     atexit(print_cache_l1_stats);
 #endif

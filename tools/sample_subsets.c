@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "read_int_table.h"
 
 #define AXIS 64
 #define MAX_PARTS 16
@@ -89,10 +90,10 @@ int main(int argc,char **argv){
     for(int n=1;n<=32;n++)for(int m=1;m<=32;m++)if(solvable5(n,m))single_id[n][m]=single_count++;
     triple_ok=calloc((size_t)single_count*single_count*single_count,1);
     if(!triple_ok)return 2;
-    FILE *f=fopen(argv[2],"r");int a,b,c,d,e,g;
-    if(!f)return 2;while(fscanf(f,"%d %d %d %d",&a,&b,&c,&d)==4)set_pair(a,b,c,d);fclose(f);
+    FILE *f=fopen(argv[2],"r");int row[6];
+    if(!f)return 2;while(radio_read_int_row(f,row,4))set_pair(row[0],row[1],row[2],row[3]);fclose(f);
     f=fopen(argv[3],"r");if(!f)return 2;
-    while(fscanf(f,"%d %d %d %d %d %d",&a,&b,&c,&d,&e,&g)==6)set_triple(a,b,c,d,e,g);fclose(f);
+    while(radio_read_int_row(f,row,6))set_triple(row[0],row[1],row[2],row[3],row[4],row[5]);fclose(f);
     long long samples=atoll(argv[5]);
     f=fopen(argv[4],"r");if(!f)return 2;char line[1024];
     while(fgets(line,sizeof(line),f)){
