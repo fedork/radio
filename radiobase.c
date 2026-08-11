@@ -51,26 +51,29 @@
 
 #define DEADLINE_RATIO 10
 #define MIN_DEADLINE 3
-#define DEADLINE_POLL_MASK 0xffffu
 
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
 #define FAST_ONLY 3
 #define SUBSPLIT_DEADLINE (clock() + CLOCKS_PER_SEC * 1)
 
-/* Return whether a bounded search has exhausted its budget.  The first negative verdict made
-   while searching this state earns one grace period; observing that same global count again must
-   not keep moving the deadline.  In particular, the deadline remains enforceable when the search
-   makes no negative progress at all. */
+/* A bounded search must contribute new negative facts before it may bail.  This is the depth-first
+   progress guarantee: without it, a whole pass can consume its budget in prefixes and return MAYBE
+   without leaving anything reusable in the cache.  At exactly the minimum count, keep extending
+   the grace window so the dive can produce another fact; once it moves beyond that count, expiry
+   is enforceable.  This is the historical state machine, deliberately restored. */
 static int deadline_expired(clock_t *deadline, clock_t start, clock_t now,
-                            long long cant_solve_count, long long cant_solve_count_min,
-                            int *progress_grace_given) {
-    if (!*progress_grace_given && cant_solve_count == cant_solve_count_min) {
+                            long long cant_solve_count, long long cant_solve_count_min) {
+    if (cant_solve_count < cant_solve_count_min) return FALSE;
+    if (cant_solve_count == cant_solve_count_min) {
         clock_t new_deadline = now + (now - start) * 5;
-        *progress_grace_given = TRUE;
         if (new_deadline > *deadline) *deadline = new_deadline;
     }
     return now > *deadline;
+}
+
+static clock_t child_deadline_for_pass(int pass, clock_t deadline) {
+    return pass < 2 ? deadline : NO_DEADLINE;
 }
 
 typedef struct {
@@ -1240,7 +1243,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
        the 8-part near-saturated shape: any state that turns out expensive gets the prune. */
     int rb_here = 0;
     long long cant_solve_count_min = cant_solve_count + 1; // min progress before bailing out
-    int deadline_progress_grace_given = FALSE;
     clock_t deadline = 0;
     if (parent_deadline == NO_DEADLINE) {
         deadline = start + CLOCKS_PER_SEC * (1000);
@@ -1357,7 +1359,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
         
         
-        clock_t child_deadline = pass<2 ? deadline : NO_DEADLINE;
+        clock_t child_deadline = child_deadline_for_pass(pass, deadline);
         clock_t middle_child_deadline = child_deadline;
 
         
@@ -1475,19 +1477,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     skipped_some = 1;
                 } else {
                     totalsplits++;
-                    /* Complete leaves can be very sparse in long, information-tight states.  A
-                       bounded child therefore polls while enumerating prefixes as well; sampling
-                       every 2^16 candidates keeps clock() out of the hot loop while bounding the
-                       overshoot.  Returning MAYBE here cannot create a negative verdict. */
-                    if (!no_deadline && !(totalsplits & DEADLINE_POLL_MASK)) {
-                        clock_t t = clock();
-                        if (deadline_expired(&deadline, start, t, cant_solve_count,
-                                             cant_solve_count_min,
-                                             &deadline_progress_grace_given)) {
-                            if (rb_here) rb_release();
-                            return MAYBE;
-                        }
-                    }
+                    /* Do not poll the deadline while this is still only a partial split.  In
+                       pass 2 the first complete candidate is the handoff to an unresolved child
+                       with NO_DEADLINE.  Bailing here bypasses that depth-first dive and can make
+                       an expensive pass return MAYBE without producing a single reusable fact. */
                     /* `>=`, not `==`. rb_on is global, so only one state holds the tables at a time; with
                        equality a state whose trigger instant fell while another was armed lost its
                        only chance and ran the rest unpruned. Arming later is never worse than never
@@ -1539,11 +1532,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
                         debug_printf("can solve\n");
                         if (i == size_1) {
-                            if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
+                            if (cant_solve_count >= cant_solve_count_min
+                                && (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE)) {
                                 clock_t t = clock();
                                 if (deadline_expired(&deadline, start, t, cant_solve_count,
-                                                     cant_solve_count_min,
-                                                     &deadline_progress_grace_given)) {
+                                                     cant_solve_count_min)) {
                                     if (no_deadline) {
                                         //                                    deadline=0;  // now do full solution
                                         // double deadline
