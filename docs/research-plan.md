@@ -194,21 +194,25 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 now has two distinct tracks while `run3` continues remotely. The solver track has a first bounded
-ordering approximation in `45c34fd`: long candidates receive a geometric local probe while the
-one/two-segment constructive spine keeps the shared parent budget. It reproduces the cold
-`Sa(192)` path in 376.293 CPU seconds, but must still be measured on a retained `Sa(193)` segment;
-do not add split history before that test. The theory track should work from the exact `k=10,m=6`
-mixed-child boundary toward a parametric large-k construction or obstruction, and only then recover
-small k backwards. Do not use witness-tree shape as evidence that either track has a unique
-continuation.
+P6 now has two distinct tracks while `run3` and cold current-engine `run8` continue remotely. The
+solver track's bounded ordering approximation is deployed in run8: long candidates receive a
+geometric local probe while the one/two-segment constructive spine keeps the shared parent budget.
+It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the remote control has now
+passed in 471.6 CPU seconds. Use the retained run8 prefix to compare natural `Sa(193)` progress,
+matched call cost and memory against run3. Do not add split history before that comparison matures.
+The theory track should work from
+the exact `k=10,m=6` mixed-child boundary toward a parametric large-k construction or obstruction,
+and only then recover small k backwards. Do not use witness-tree shape as evidence that either track
+has a unique continuation.
 
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`
 control passes at 0.35 GB peak RSS and 711.7 CPU seconds, with no remaining measured premium over the
 734.5-second pre-compaction control. AWS `run7` and the same-chain local continuation used the
 now-obsolete `e648e83` progress-gated pass-2 scheduler and were retired on 2026-08-11 after their raw
-segments and closed checkpoints were preserved. Run3 remains the untouched live incumbent. Neither
-`c13b5d3` nor `e648e83` is a valid performance baseline for the new scheduler. H3 still sits awkwardly—the answer is probably
-192, the evidence is probably right, and neither "probably" belongs in a paper.  Resume only from a
-run's own output and retain every raw segment; compact does not mean bounded.
+segments and closed checkpoints were preserved. Run3 remains the untouched live incumbent; run8 is
+the cold `9395218` bounded-probe comparison, guarded at 60 GiB beside run3's 40 GiB. Neither
+`c13b5d3` nor `e648e83` is a valid performance baseline for the new scheduler. H3 still sits
+awkwardly—the answer is probably 192, the evidence is probably right, and neither "probably" belongs
+in a paper. Resume only from a run's own output and retain every raw segment; compact does not mean
+bounded.

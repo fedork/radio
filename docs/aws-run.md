@@ -8,17 +8,18 @@ findings go to [journal.md](journal.md) as usual.
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| active solvers | `run3` only: live incumbent, `MAX_K=10 MAX_N=193`; run7 was retired 2026-08-11 22:13 UTC |
+| active solvers | `run3` incumbent plus cold current-engine `run8`; both `MAX_K=10 MAX_N=193` |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| memory guards | `run3` retains its 40 GiB wrapper on the 123 GiB host |
-| completion | a 20-minute final-upload grace period, then instance-initiated stop once run3 is gone |
+| memory guards | 40 GiB for `run3` plus 60 GiB for `run8` on the 123 GiB host |
+| completion | a 20-minute final-upload grace period, then instance-initiated stop once both solvers are gone |
 
 Each run is internally serialized: one process and cache handle all sixteen top-level states in
-sequence. Run7 was launched beside run3 with a separate directory, binary, watchdog and S3 prefix;
-neither loaded the other's cache. Its scheduler is now known to stall, so the retained timing is
-diagnostic rather than a performance baseline. Run3 was not touched when run7 was stopped.
+sequence. Run8 is cold and isolated from run3 by directory, binary, cache, raw log, watchdog and S3
+prefix. It reads run3's log only in a bounded-memory monitoring process; neither solver loads the
+other's cache. Run7's scheduler is known to stall, so its retained timing is diagnostic rather than
+a performance baseline.
 
 | prefix | build | started UTC | state / binary |
 |---|---|---|---|
@@ -27,6 +28,7 @@ diagnostic rather than a performance baseline. Run3 was not touched when run7 wa
 | `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | stopped; old scheduler; `/root/run5/radio_sa193_v5` |
 | `run6/` | broken zero-progress deadline/prefix-poll experiment (`c13b5d3`) | 2026-08-11 05:45:09 | stopped and archived; `/root/run6/radio_sa193_v6` |
 | `run7/` | progress-gated pass-2 `NO_DEADLINE` handoff (`e648e83`) | 2026-08-11 15:45:30 | stopped 2026-08-11 22:13:30; archived; `/root/run7/radio_sa193_v7` |
+| `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | active; `/root/run8/radio_sa193_v8` |
 
 All rows name frozen binaries, not aliases for current `main`. The original run4/run5 snapshots did
 not by themselves prove a livelock, but run7 later reproduced the same information-tight 14-part
@@ -45,8 +47,19 @@ The final checkpoint is `run7/sa193.checkpoint`, SHA-256
 `b7e63923275caa4d486fbefd5cd912cf80d8a530c36372fbf14cece2b8cae545`. Because the run predates
 embedded provenance, its exact source archive, frozen binary, `run.meta`, final memory profile,
 stderr and watchdog log are retained under `run7/` too. All were streamed back and hash-verified;
-the compressed source and raw-log streams also passed `zstd -t`. A replacement should use `45c34fd`
-or later, but starting another multi-hour run requires an explicit check-in.
+the compressed source and raw-log streams also passed `zstd -t`.
+
+Run8 is that replacement. Its embedded provenance names full commit
+`9395218dcbdd90d8f6a208b15da1878ff75f6ee1`, `-O3 -DMAX_K=10 -DMAX_N=193`, no cache argument and
+the enabled `Sa(192)` control. The binary SHA-256 is
+`d9ae6e5feea4700be742504e345e2af09c910d790330b37457755cd89d4ac950`; the exact source archive is
+`run8/source/radio-9395218.tar.zst`, SHA-256
+`38837a2fb0f66036733d139301c0d2b9378e437be22e6266477fad50fb31ea69`. The source archive, frozen
+binary, provenance sidecar and `run.meta` were streamed back from S3 and hash-checked immediately
+after launch. Launch and independent survival checks are SSM commands
+`0d7a7f49-1033-4429-844f-df87860cbe4f` and `40e28f6c-397b-422b-bb20-55463cdc347c`.
+Its mandatory cold control returned `SOLVABLE` in 471.6 CPU seconds and the process continued into
+`Sa(193)`; run3's same-host control was 540.7 seconds.
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
@@ -76,13 +89,19 @@ no syntactic marker, and given an engine change trapped the last run. It is also
 tools/sa193_status.sh --compare --watch
 ```
 
-This prints live run3 beside run7's final diagnostic snapshot. `--prefix run7` selects only that
-stopped run and `--all` also includes the other historical prefixes. Each live `STATUS` gets
-refreshed every 10 minutes with verdict count, cache size and RSS. Also in the bucket:
+This prints compact live rows for run3 and run8, followed by the latest exact-call comparison.
+`--candidate run7` selects run7's final diagnostic snapshot and `--all` prints the verbose history.
+Run8 refreshes every five minutes; run3's older watchdog refreshes every ten. The comparison chooses
+the run with fewer completed roots (then fewer verdicts), takes its six slowest completed calls and
+joins them to run3 by exact printed `(state,k)`. `took` is inclusive CPU, not wall time; exact self
+time is therefore shown only as the aggregate-by-level difference. A missing peer call is printed
+as `-`, never inferred from surrounding progress.
 
 | key | what |
 |---|---|
 | `run3/STATUS` | latest active status snapshot |
+| `run8/STATUS` | latest bounded-probe status snapshot |
+| `run8/COMPARE` | latest streaming exact-state comparison against run3 |
 | `run7/STATUS` | final snapshot, explicitly reporting `solver process GONE` |
 | `runN/sa193.checkpoint` | same-run restart checkpoint, refreshed hourly |
 | `runN/seg-*/out_sa193.txt.zst` | immutable per-segment raw log, refreshed hourly and finalized at exit |

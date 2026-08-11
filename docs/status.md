@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-11** (bounded probes validated locally in `45c34fd`;
-obsolete AWS `run7` and its local counterpart retired; `run3` remains the live incumbent).
+don't know it. Last refreshed **2026-08-11** (cold AWS `run8` passed its positive control and is
+now searching `Sa(193)` beside the untouched `run3` incumbent).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -170,24 +170,43 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-The live AWS incumbent is on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot
-from **2026-08-11 22:14 UTC**:
+The two live AWS solvers are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot
+from **2026-08-11 22:56 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 1,651,912 verdicts, **25.50 GB**, 1 of 16 |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 1.66 M verdicts, **25.51 GB**, 1 of 16 |
 | `run4/` — compact cache at frozen commit `6af384e` | stopped, archived; old scheduler | 103,773 verdicts, **0.29 GB**, control never returned |
 | `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped, archived; old scheduler | 103,769 verdicts, **0.29 GB**, control never returned |
 | `run6/` — broken deadline experiment at `c13b5d3` | stopped, archived | control SOLVABLE in 922.0 s; 618,816 raw lines, 1.37 GB peak RSS |
 | `run7/` — progress-gated pass-2 dive at `e648e83` | stopped and archived; obsolete scheduler | 104,931 verdicts; control never returned; **0.29 GB** peak RSS |
+| `run8/` — compact cache + bounded probes at `9395218` | **fresh and alive** | control SOLVABLE in **471.6 s**; 165.8 K verdicts, **0.61 GB**, 0 of 16 |
 
-Use `tools/sa193_status.sh --compare [--watch]` for live run3 beside run7's final diagnostic
-snapshot; `--all` also prints the stopped historical sessions and must not be read as proof that
-those processes remain alive.
+Use `tools/sa193_status.sh --compare [--watch]` for compact live run3/run8 rows and the exact-call
+comparison; `--all` prints the stopped historical sessions and must not be read as proof that those
+processes remain alive.
 `run3`'s `Sa(192)` control took 540.7 s.  It has completed one of the 16 top-level states and remains
 dominated by k=7 while exploring `Sb(111:82)@9`.
+
+Run8 started cold at 2026-08-11 22:46:06 UTC with the `Sa(192)` control enabled. Its full embedded
+commit is `9395218dcbdd90d8f6a208b15da1878ff75f6ee1`; the 60 GiB wrapper and run3's existing 40 GiB
+wrapper jointly reserve about 23 GiB of the host. An independent post-launch check found exactly
+one solver of each name, run8 using one core, 96 GiB still available and no swap. The idle guard now
+watches both exact names. The source archive, frozen binary, sidecar and `run.meta` are retained
+under `run8/`; hashes and SSM command IDs are in [aws-run.md](aws-run.md).
+
+The mandatory remote happy-path gate passed: `result CONTROL Sa(192) in 10 = SOLVABLE (471.6 s)`.
+This is 0.872x run3's 540.7-second control on the same host. It validates this execution sufficiently
+to continue into `Sa(193)`; it is not evidence about the final negative yet.
+
+The run8 watchdog scans both live raw prefixes every five minutes with bounded state. It chooses the
+run that is behind by completed roots and verdict count, ranks its six slowest completed calls, and
+joins exact `(state,k)` keys in the peer log. The first cycle found all six matches. Per-call `took`
+is inclusive CPU; the logs cannot assign old abandoned `MAYBE` work to individual parents, so the
+monitor does not invent per-call self time. It reports exact aggregate self time by level as
+`inclusive(k)-inclusive(k-1)` and shows process wall/CPU separately.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
 25.50 GB with 1.64 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
@@ -487,16 +506,15 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 
 ## Immediate next steps
 
-0. **Keep watching `run3`; decide whether a bounded-probe replacement is worth the AWS slot.**
-   Run7 and the old-policy local continuation are retired and preserved. Any new remote sidecar
-   should be built from `45c34fd` or later through `tools/build_radio.py`; a multi-hour replacement
-   still requires an explicit check-in. `tools/sa193_status.sh --compare --watch` now shows live run3
-   beside run7's explicitly stopped final snapshot.
+0. **Keep watching cold `run8` beside run3.** Run8 is the bounded-probe replacement and should run
+   to a verdict unless its 60 GiB guard, the positive control, or another concrete health signal
+   fails. `tools/sa193_status.sh --compare --watch` gives compact wall/CPU/progress/memory rows plus
+   matched slow calls. Do not restart either live cold cache merely to pick up later monitoring edits.
 
-1. **If a new `Sa(193)` segment is started, measure scheduler progress as well as memory.** The cold
-   `Sa(192)` result validates the happy path, but a retained `Sa(193)` segment is still needed to
-   compare bounded probes against run3's natural search. Missing verdicts remain `MAYBE`, not
-   negatives, and no obsolete checkpoint should be used as a cross-build proof source.
+1. **Evaluate run8 by scheduler progress and memory, not raw verdict count alone.** Its cold
+   `Sa(192)` control has passed; now compare completed roots, exact matched calls, level self time and
+   RSS against run3. Missing verdicts remain `MAYBE`, not negatives, and no obsolete checkpoint
+   should be used as a cross-build proof source.
 
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the

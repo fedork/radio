@@ -4899,5 +4899,67 @@ that run eventually ends.
 
 The 22:14 UTC run3 snapshot remained healthy and unchanged by the retirement operation: one of
 sixteen top-level states complete, 1,651,912 verdicts, 25.50 GiB RSS, and its `Sa(192)` control
-SOLVABLE in 540.7 seconds. No bounded-probe run was started automatically; a new multi-hour sidecar
-still requires an explicit decision.
+SOLVABLE in 540.7 seconds. At that cutoff no bounded-probe run had been started automatically; the
+explicit decision and launch follow immediately below.
+
+## 2026-08-11 — bounded-probe AWS run8 launched with a live exact-state comparison
+
+The user explicitly chose to spend the AWS slot on a new cold run. A read-only pre-launch inventory
+(SSM `e779f668-8060-4240-84ff-537622d69d22`, 22:45:24 UTC) found exactly one incumbent
+`radio_sa193_v3`, no `radio_sa193_v8`, 96 GiB available RAM, no swap and 196 GiB free disk. The old
+idle guard still named the already-retired run7, so it had to be broadened as part of the atomic
+sidecar launch rather than left as a latent shutdown hazard.
+
+Commit `9395218` added a streaming live comparison and was pushed to main before the source bundle
+was made. `tools/sa193_compare.py` scans both raw logs with bounded state, chooses the run behind by
+completed roots and then verdict count, retains its six largest inclusive `took` calls and joins
+their exact `(state,k)` keys in the peer. The compact status shows each process's wall age, CPU,
+roots, control, verdicts, RSS, log size and freshness. Historical output does not contain enough
+call-boundary information to allocate abandoned `MAYBE` work to a particular parent's exclusive
+time, so the tool does **not** manufacture per-verdict self measurements. It separately reports the
+exact aggregate-by-level identity `self(k)=inclusive(k)-inclusive(k-1)` when non-negative. Unit tests
+cover positive witness tails, lag selection, exact matching and the self calculation; a 73 MB local
+pair took 2.3 seconds and about 15 MB maximum RSS to compare.
+
+Run8 started at **2026-08-11 22:46:06 UTC** under SSM launch command
+`0d7a7f49-1033-4429-844f-df87860cbe4f`. It is a genuinely cold invocation of
+`./radio_sa193_v8`, with the positive `Sa(192)` control enabled, built through
+`tools/build_radio.py -O3 -DMAX_K=10 -DMAX_N=193` from full commit
+`9395218dcbdd90d8f6a208b15da1878ff75f6ee1`. The embedded build id is
+`c296e0bc477e73ecb8ed5e82e5a128938cbb50015db67dfca2bf87d2848b9e08`; the binary SHA-256 is
+`d9ae6e5feea4700be742504e345e2af09c910d790330b37457755cd89d4ac950`. The exact compressed
+source archive is `run8/source/radio-9395218.tar.zst`, SHA-256
+`38837a2fb0f66036733d139301c0d2b9378e437be22e6266477fad50fb31ea69`.
+
+The resource envelope is deliberate: run3 keeps its 40 GiB guard, run8 has 60 GiB, and the combined
+100 GiB ceiling leaves about 23 GiB of the 123 GiB host outside the solver caps. Run8 has the ten-year
+accident backstop rather than an intended time deadline. Its status and exact comparison refresh
+every five minutes; raw segments and same-run checkpoints retain the existing hourly/final path. A
+new idle guard names exactly `radio_sa193_v3,radio_sa193_v8` and stops the instance only after both
+are gone plus the final-upload grace period.
+
+The launching SSM command returned successfully, and an independent command after it returned
+(`40e28f6c-397b-422b-bb20-55463cdc347c`) found exactly one solver of each name. Run8 solver PID
+756288, wrapper 756283, watchdog 756320 and idle guard 756328 were all detached under PID 1 where
+expected; run8 was using one core, 96 GiB remained available and swap was still zero. The
+raw output passed `tools/check_provenance.py`. The source archive, frozen binary, provenance sidecar
+and `run.meta` were immediately copied to S3 and streamed back; all four hashes matched. Preservation
+command: `62ebb6fc-e2cf-4654-a39a-2b2a001c66ba`.
+
+The first live comparison completed at 22:46:19 UTC. Run8 was correctly selected as behind with
+8,771 internal verdicts and no completed 193-coin root; every one of its six selected slow calls had
+an exact run3 match. The tiny early calls were 0.77x–0.81x run3's inclusive CPU, which proves the join
+works but is **not** yet a performance conclusion about the hard path. The 22:51:29 cycle selected
+six k=8 calls taking 13–81 CPU seconds in run8; all six matched run3 at 0.94x–1.02x. At 5m14s CPU
+run8 was making visible progress inside the control root `Sb(112:80)@9`, with 73.0 K verdicts and
+0.23 GiB RSS.
+
+The happy-path gate then passed. A read-only check at 22:54:04 UTC found
+`result CONTROL Sa(192) in 10 = SOLVABLE (471.6 s)` and the solver already running inside
+`Sa(193)` at about 0.44 GiB RSS. This is 0.872x run3's 540.7-second same-host control and establishes
+that the bounded-probe build can follow the constructive path in the retained remote environment.
+The next normal watchdog cycle at 22:56:37 UTC reported 165,635 definitive `Sb` lines and 0.61 GiB
+RSS. Its six slowest calls all matched run3: the control root `Sb(112:80)@9` took 345 versus 414 CPU
+seconds (0.83x), while the five selected k=8 calls ranged from 0.90x to 1.02x. This is the first useful
+live comparison, but it is still the shared control prefix, not natural `Sa(193)` evidence. Run3 was
+not signalled, restarted or modified, and both solvers are intended to continue.
