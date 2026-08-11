@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (level-lazy split tables; `run3` is the only
-freshly reporting cold run).
+don't know it. Last refreshed **2026-08-10** (last-segment Pareto cache deployed; `run3` is the
+only freshly reporting remote cold run).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -19,7 +19,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Bound by `MAX_N` and cell selection at *compile* time; to detect it live, use `vmmap -summary PID` (`Physical footprint`) plus `vm_stat` swapins, not RSS. The 2026-08-10 local `Sa(193)` trial independently reproduced the gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
-| **The k≤7 oracle does not fit in 24 GB at full coin range.** | The cache trie scales ~`MAX_N²`: 4.04 GB at `MAX_N=132`, ~20 GB at `MAX_N=262`. A k=8-rooted run spent 3 h 50 m loading and never finished. Loading that looks like it is "decelerating" is swapping. Mapping a *known* k=5 state needs only k=4 solving, so obtain states some other way and skip the large oracle entirely. |
+| **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
@@ -197,30 +197,28 @@ process emitted 232,725 verdicts, but after entering `Sa(193)` its `vmmap` footp
 **7.1 GB**, of which **5.9 GB was swapped**, while the wrapper reported only 2.77 GB peak RSS.
 CPU utilisation had fallen to about 44% and no top-level k=9 state had completed.  This is an
 abort, not a refutation.  It shows that the level-lazy split tables do not by themselves make a
-full 24 GB local run practical; compacting or bounding the result cache remains prerequisite.
+full 24 GB local run practical.  This is now the pre-compaction baseline, not the operational state
+of current `main`.
 The raw log is archived as `sa193-local-2026-08-10:out_sa193.txt` and its same-run parsed checkpoint
 remains locally at `/Users/fedor/radio-runs/sa193-local-713b7d6-trial1/sa193.checkpoint`.
 
 Checkpoint replay now explains the footprint.  The k=5..7 cache roots reserve **5.20 GiB** for
 90.7 million live transitions; the 232,725 exact facts occupy only 8.0 MiB in parsed form.  Two
 different multipliers are involved: eager dominance-closure materialisation (especially positive
-k=5/6 facts) and sparse dense arrays (especially negative k=7).  The first implementation target is
-not a hash table or eviction: land the validated rollback for `cacheCantSolve` arrays whose recursive
-insertion adds nothing, then prototype the last-segment front described below against the pointer
-trie before combining it with dense uint32 arena offsets per k.  The rollback alone models the heavy
-roots at 3.82 GiB; rollback plus uint32 dense slots, before folding, at 1.91 GiB.  See
-[`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt) for the exact
-counts and the separately labelled adaptive-layout estimates.
+k=5/6 facts) and sparse dense arrays (especially negative k=7).  The exact shape counts and discarded
+intermediate layout models remain in
+[`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt).
 
-The best closure-minimising design is now local rather than a global antichain oracle: store maximal
-positive and minimal negative Pareto fronts for the last part at every exact trie prefix.  A semantic
-fold of the replay shrinks the rollback trie from 512.30 million to 70.15 million dense slots; tagged
-uint32 branch handles plus packed non-singleton fronts model the heavy roots at **291.7 MiB**.  The
-12.65 million fronts average only 1.348 points and no sign exceeds 19, while single-part states get
-full dominance and negative prefix refutation is preserved.  This supersedes the 6.82 MiB global
-positive-bitmap index as the first prototype; that remains a fallback if one folded dimension is
-insufficient.  Neither design is deployed or has a solver-throughput result yet.  Exact counts and
-layout assumptions are in [`../evidence/cache_shape_sa193_local.txt`](../evidence/cache_shape_sa193_local.txt).
+The local design is now deployed: maximal-positive and minimal-negative Pareto fronts store the last
+part at every exact prefix, with tagged uint32 child descriptors and inline singleton fronts.  The
+same k=5..7 replay requests **499,877,916 bytes**, down **11.174x / 91.05%** from 5,585,395,760;
+the process peaks at 0.60 GB RSS.  Across 4,164,958 exact, mutated and deterministic random queries,
+every old verdict is preserved and 4,622 `MAYBE` answers become sound positive-front hits.  The full
+`Sa(192)` control remains SOLVABLE in 819.9 CPU seconds versus 734.5 before the change (+11.63%),
+while peaking at **0.41 GB RSS** without swap decay.  This makes a bounded local `Sa(193)`
+continuation credible; it does not bound future cache growth or prove that the full refutation fits.
+Implementation measurements and commands are in
+[`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
 
 Historical lesson, retained without treating the old processes as live: before full-star
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
@@ -394,21 +392,25 @@ of the parent remains possible.  Do not promote that one-point correction to a f
    includes full-star expansion but predates level-lazy split tables. Do not discard its 21-hour
    cold cache merely to adopt an allocation change.
 
+1. **Run the compact current-main `Sa(193)` derivation locally under live inventory.** Its cold
+   `Sa(192)` gate has passed at 0.41 GB peak RSS; resume only from that run's own checkpoint, retain
+   raw output, and keep watching physical footprint because the cache is compact, not bounded.
+
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the
 former added zero marginal rejections on the A+B monster, and the latter regressed negatives. Full
 star expansion is different: it is an arbitrary-part-count global theorem and is now deployed.
 
-1. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
+2. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
    bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
    finding an `R_1` or `R_2` witness is already known not to do that. Keep any deeper check bounded
    and fallback-safe.
-2. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
+3. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
-3. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
+4. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
    invariant from a fit into a derivation, and needs no new compute.
-4. `... 432 9` — discriminates the profile model (432) from the closed form (431).
-5. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
+5. `... 432 9` — discriminates the profile model (432) from the closed form (431).
+6. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
    here needing no compute at all. An exchange argument is the natural shape; the surviving
    obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).

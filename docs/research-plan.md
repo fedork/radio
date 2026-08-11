@@ -193,6 +193,9 @@ theory track should work from the exact `k=10,m=6` mixed-child boundary toward a
 construction or obstruction, and only then recover small k backwards. Do not use witness-tree shape
 as evidence that either track has a unique continuation.
 
-H3 sits awkwardly: the answer is probably 192, the evidence is probably right, and neither
-"probably" belongs in a paper. Since the draft only claims optimality through k=9, nothing is
-blocked - so re-running the 16 states is worth doing when spare compute exists, not before.
+The result-cache prerequisite for a local H3 run is now delivered.  Last-segment positive/negative
+Pareto fronts reduce the measured k=5..7 checkpoint storage 11.2x; the full `Sa(192)` control passes
+at 0.41 GB peak RSS for an 11.6% CPU premium.  H3 still sits awkwardly—the answer is probably 192,
+the evidence is probably right, and neither "probably" belongs in a paper—but a bounded local
+current-main continuation is now the next useful compute rather than a swap experiment.  Resume only
+from that run's own output and retain the raw log; compact does not mean bounded.

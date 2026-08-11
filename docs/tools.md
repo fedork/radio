@@ -2,7 +2,7 @@
 
 ## Layout
 
-`radiobase.c` (~1950 lines) is the entire engine. Every other `.c` at the repo root is a
+`radiobase.c` (~2350 lines) is the entire engine. Every other `.c` at the repo root is a
 `main()` wrapped around it, selected by `#include "radiobase.c"`. There is no build system;
 each driver is a single `clang` invocation.
 
@@ -21,7 +21,7 @@ preferred entry points.
 |---|---|
 | `(n1:n2)` pair -> `sbb` integer id; level-keyed split tables built lazily | `init`, `ensure_splits` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
-| Result cache: a trie over sorted `sbb` ids, closed downward for can-solve and upward for can't-solve | `cacheCanSolve`, `cacheCantSolve` |
+| Result cache: exact-prefix trie with maximal-positive/minimal-negative Pareto fronts in its last part | `cacheCanSolve`, `cacheCantSolve`, `checkCache` |
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST-restricted first pass, exhaustive second pass, deadlines | `canSolveB` |
 | Unit-group stripping before search | start of `canSolveB` |
 | Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
@@ -51,6 +51,24 @@ gate, and `tools/split_memory_probe.c` isolates persistent split-allocation requ
 query; their headers contain the comparison commands.  These are regression/measurement drivers
 for the C solver, not independent evidence for a mathematical verdict.
 
+### Result-cache allocation
+
+Each prefix-trie edge is a tagged `uint32_t` descriptor.  A front-only node with at most one point
+of each sign is encoded inline; larger fronts use a small vector or front record.  A node with a
+longer suffix owns a dense `uint32_t` branch array whose slots 0 and 1 store its positive and
+negative front descriptors.  Positive fronts are consulted only for the query's final part;
+negative fronts refute any extension of the matching prefix.
+
+This remains an unbounded cache, but it no longer materialises last-part dominance as child nodes.
+On the retained `MAX_N=193` checkpoint, k=5..7 requested storage fell from 5.59 GB to 0.50 GB.  The
+full `Sa(192)` control cost 11.6% more CPU and peaked at 0.41 GB RSS.  Exact layout, query-regression
+and throughput measurements are in
+[`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
+
+`tools/cache_query_regression.c` verifies every exact fact in a parsed cache, then writes one byte
+per targeted mutation and deterministic random query.  Compile it against two engine versions and
+compare the complete byte files; do not replace this with a hash when changing cache semantics.
+
 ### Memory: `radio_canon_search_generic` will eat your machine
 
 `TreeNode` embeds `int sb[5120]` and `int split_m[10240]`, so **one node is 61,488 bytes**. The
@@ -77,8 +95,8 @@ clang -O3 -DMAX_K=9 -DMAX_N=485 -DMAX_STATE_SIZE=1024 radio_canon_search_generic
 ### Capping the other drivers
 
 Those compile-time bounds exist only in `radio_canon_search_generic`. `radio`, `radio_one`,
-`radio_full` and the Pareto walkers grow an unbounded result-cache trie instead — the 2023
-`Sa(193)` run reached ~90 GB that way — and `ulimit -t` bounds CPU, not memory. For those:
+`radio_full` and the Pareto walkers still grow an unbounded (now compact) result-cache trie — the
+pre-compaction 2023 `Sa(193)` run reached ~90 GB — and `ulimit -t` bounds CPU, not memory. For those:
 
 ```
 tools/capped_run.sh --seconds 3600 --rss-gb 16 --label sa113 -- ./radio_k9 > out.txt
@@ -89,7 +107,7 @@ survives redirecting the driver's stdout), and exits 124 on timeout / 137 on mem
 Wall time is quantised to `--poll` (default 5s); the drivers' own `took N` lines are exact.
 
 On macOS this is only a **resident-set** guard, not a bound on the solver's allocated heap.
-Swapped anonymous pages leave RSS: the 2026-08-10 local `Sa(193)` trial showed 2.77 GB peak RSS
+Swapped anonymous pages leave RSS: the pre-compaction 2026-08-10 local `Sa(193)` trial showed 2.77 GB peak RSS
 while `vmmap -summary` measured a 7.1 GB physical footprint, 5.9 GB of it swapped.  Sample
 `Physical footprint` as well as `vm_stat` for any long local run.  Linux/AWS did not show this
 gap because the solver heap remained resident there.

@@ -102,8 +102,10 @@ total             12,645,090       14,795,667        2,247,969
 # 32-bit parent handle because an sbb id needs 14 bits; a branch node stores a singleton point inline
 # in its sign's descriptor.  Only larger fronts use packed uint16 lists.  Those lists total 25.3 MiB.
 # A deliberately pessimistic model giving every front a separate aligned record is 461.7 MiB; the
-# corresponding tagged dense-uint64 model is 559.3 MiB.  All exclude allocator/growth slack and have
-# not been implemented or timed in the solver.
+# corresponding tagged dense-uint64 model is 559.3 MiB.  These figures exclude allocator/growth
+# slack.  The subsequently deployed tagged-uint32 implementation is measured separately in
+# cache_last_front_2026-08-10.txt: direct incremental insertion retains 91.13 million branch slots
+# and requests 499.88 MB, so this read-only 291.7 MiB fold was optimistic rather than a benchmark.
 #
 # Fronts are small: 17,043,636 points / 12,645,090 nodes = 1.348 points per front node; 10,081,569
 # nodes (79.7%) have exactly one point, only 8,377 nodes contain both signs, and no sign has more

@@ -4332,9 +4332,60 @@ throughput measurements, but they are much stronger than the global positive-ant
 both signs keep prefix closure, single-part queries receive full dominance, and average lookup
 overhead is roughly one or two point comparisons per visited prefix.
 
-This now becomes the first cache prototype after the already-validated zero-update rollback.  Use a
-tagged front-only node plus a branch node whose slots 0/1 hold positive/negative front descriptors;
-larger fronts come from small packed slabs.  Negative insertion should free any dominated child
-branches because the new front makes them unreachable.  Validate against the old trie on exact and
-mutated checkpoint queries, all 1,039 deterministic regression cases and ASan+UBSan before measuring
-the `Sa(192)` control and a bounded local `Sa(193)` phase.
+This became the first cache prototype.  The following entry records its implementation, the places
+where the layout model was optimistic, and the completed correctness/memory/throughput gates.
+
+## 2026-08-10 — last-segment Pareto cache deployed: 11.2x smaller for 11.6% control CPU
+
+The last-part folding is now implemented in `radiobase.c`.  A trie edge is a tagged `uint32_t`:
+empty, an inline positive/negative singleton pair, a handle to a front-only record, or a handle to a
+dense `uint32_t` branch array.  Branch slots 0 and 1 hold the two front descriptors.  A front point
+uses 16 bits at `MAX_N=193` and 32 bits when `MAX_SBB` is larger; the latter fallback syntax-compiles
+at `MAX_N=1030`.  This is one implementation for every layer, not a special short-state side cache.
+
+Two prototypes were necessary.  The semantic prototype put a pointer and two front fields in every
+child slot.  It cut the k=5 replay from 161.70 million to 62.54 million slots, but doubled a slot to
+16 bytes: peak RSS moved only from 1.42 to 1.19 GB.  That rejected the tempting claim that folding
+alone was enough.  The tagged 4-byte representation is the actual memory change.
+
+Incremental insertion also exposed a subtle difference from a read-only fold.  A parsed fact may be
+semantically redundant even though the old trie adds another closure marker, so replay accepts a
+zero-update insertion; a freshly solved zero-update still trips the diagnostic.  More importantly,
+returning from an entire negative recursive call when its first part hit the local front lost two
+old negative answers in 1.81 million mutated k=5 queries.  The safe optimization is per edge: skip a
+candidate child already refuted by the front, but continue the other segment permutations.  That
+restored every old negative and reduced the final combined replay from 637 to 500 MB requested.
+
+On the local `Sa(193)` checkpoint's k=5..7 layers, the pre-change trie reserves 5,585,395,760 bytes.  The
+implemented cache requests **499,877,916 bytes**, an **11.174x / 91.05% reduction**; its replay peaks
+at 597,213,184 resident bytes including fixed solver tables.  The earlier 291.7 MiB model was
+optimistic because direct incremental insertion retains 91.13 million branch slots rather than the
+read-only fold's 70.15 million and because handle growth slack is real.  The implementation still
+comfortably beats the deliberately pessimistic pointer-node prototype.
+
+`tools/cache_query_regression.c` makes the semantic comparison reproducible.  Across **4,164,958**
+exact, targeted-mutated and deterministic random queries at k=5..7, every old `FALSE` and `TRUE` is
+preserved.  The only changes are **4,622 `MAYBE -> TRUE`** answers.  This strengthening is intended:
+folding an exact positive child into a 2-D front soundly answers componentwise-smaller last parts
+that the old canonical closure did not always materialise.  Every exact checkpoint line is checked
+against its recorded sign before the mutation pass begins.
+
+The deterministic 1,039-answer corpus matches exactly.  It and a 10,000-fact replay pass
+ASan+UBSan.  `radio_print` renders its 24-node default tree under both sanitizers and the independent
+witness checker accepts it.  The main drivers and pair/triple/quad/FAST tools compile against the
+new API.
+
+The throughput cost is real but bounded.  On the warmed residual positive
+`Sb(29:6,19:9,13:12,36:3)@6`, both engines find `[8:1,8:4,11:11,19:2]` after 37,899 top-level splits:
+the old engine uses 32.8 solve seconds / 55 wall seconds / 2.40 GB peak RSS, and the compact one uses
+42.3 / 65 / 0.78 GB.  The decisive cold `Sa(192)` control then returns **SOLVABLE in 819.9 CPU
+seconds**, versus 734.5 before the change (**+11.63%**), with **0.41 GB peak RSS** and no utilization
+decay.  A roughly twelve-percent control premium is acceptable because the old engine entered swap
+before completing one `Sa(193)` root; the compact engine makes a local continuation credible.
+
+The complete commands, layout accounting and caveats are in
+[`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).  The
+17 MB control chatter was not archived: `Sa(192)`
+already has canonical witness proofs, so this run is performance/correctness validation rather than
+a new mathematical claim.  No local solver from these measurements remains alive; the pre-change
+remote `run3` watcher is untouched.

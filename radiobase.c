@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <time.h>
 
 #ifdef DEBUG
@@ -212,37 +213,403 @@ void printSb(int *sb, int size){
 #endif
 #endif
 
-typedef struct node {
-    struct node *next;
-#ifndef OPT
-    int size;
+/* Each trie edge is a 32-bit tagged descriptor.  Most terminal nodes contain one positive and/or
+   negative point and pack both directly into that descriptor.  Nodes with descendants point to a
+   dense uint32 branch array; its otherwise-unused slots 0 and 1 hold the two front descriptors. */
+typedef uint32_t node_descriptor;
+
+#define NODE_TAG_MASK       0xc0000000u
+#define NODE_RECORD_TAG     0x40000000u
+#define NODE_BRANCH_TAG     0x80000000u
+#define NODE_HANDLE_MASK    0x3fffffffu
+#define NODE_INLINE_BITS    14u
+#define NODE_INLINE_MASK    ((1u << NODE_INLINE_BITS) - 1u)
+
+#define FRONT_VECTOR_TAG    0x80000000u
+#define FRONT_HANDLE_MASK   0x7fffffffu
+
+#if MAX_SBB <= UINT16_MAX
+typedef uint16_t front_point;
+#else
+typedef uint32_t front_point;
 #endif
-} node_struct;
 
-struct node can_solve_marker[1];
-struct node cant_solve_marker[1];
+typedef struct {
+    uint32_t len;
+    uint32_t cap;
+    front_point sbb[];
+} front_vector;
 
-struct node sb_cache_root[MAX_K+1];
+typedef struct {
+    uint32_t positive;
+    uint32_t negative;
+} front_record;
+
+typedef struct {
+    uint32_t width;
+    uint32_t slot[];
+} branch_array;
+
+node_descriptor sb_cache_root[MAX_K + 1];
 
 long long alloc_count = 0;
 long long alloc_size = 0;
+long long branch_alloc_size = 0;
+long long front_alloc_count = 0;
+long long front_alloc_size = 0;
+long long redundant_cache_replays = 0;
 
-void alloc_next(struct node* n, int arrsize){
-    struct node * next;
-    int size = (arrsize)*sizeof(struct node);
-    next = (struct node *)malloc(size);
-    alloc_count++;
-    alloc_size+=arrsize;
-    if (next == NULL){
-        printf("\nout of memory\n");
+static branch_array **branch_handles;
+static uint32_t branch_handles_len = 1;
+static uint32_t branch_handles_cap;
+static uint32_t branch_free_handle;
+
+static front_vector **front_handles;
+static uint32_t front_handles_len = 1;
+static uint32_t front_handles_cap;
+static uint32_t front_free_handle;
+
+static front_record *front_records;
+static uint32_t front_records_len = 1;
+static uint32_t front_records_cap;
+static uint32_t front_record_free;
+static uint32_t front_record_live;
+
+static int cache_replay_depth;
+
+static void *grow_handle_table(void *old, uint32_t oldcap, uint32_t newcap, size_t item_size,
+                               const char *what) {
+    void *p = realloc(old, (size_t)newcap * item_size);
+    if (p == NULL) {
+        printf("\nout of memory growing %s handle table\n", what);
         exit(1);
     }
-    memset(next, 0, size);
-    debug_printf("in alloc n=%p next=%p arrsize=%d\n", n, next, arrsize);
-    n->next = next;
+    memset((char *)p + (size_t)oldcap * item_size, 0,
+           (size_t)(newcap - oldcap) * item_size);
+    return p;
+}
+
+static inline branch_array *branch_for(uint32_t descriptor) {
+    uint32_t handle = descriptor & NODE_HANDLE_MASK;
 #ifndef OPT
-    n->size = arrsize;
+    if ((descriptor & NODE_TAG_MASK) != NODE_BRANCH_TAG || handle == 0 ||
+        handle >= branch_handles_len || branch_handles[handle] == NULL) {
+        printf("\ninvalid branch descriptor %u\n", descriptor);
+        exit(19);
+    }
 #endif
+    return branch_handles[handle];
+}
+
+static uint32_t alloc_branch(uint32_t width) {
+    uint32_t handle;
+    if (branch_free_handle) {
+        handle = branch_free_handle;
+        branch_free_handle = (uint32_t)(uintptr_t)branch_handles[handle];
+    } else {
+        if (branch_handles_len >= branch_handles_cap) {
+            uint32_t newcap = branch_handles_cap ? branch_handles_cap * 2 : 1024;
+            branch_handles = (branch_array **)grow_handle_table(
+                branch_handles, branch_handles_cap, newcap, sizeof(*branch_handles), "branch");
+            branch_handles_cap = newcap;
+        }
+        handle = branch_handles_len++;
+        if (handle > NODE_HANDLE_MASK) {
+            printf("\nout of branch handles\n");
+            exit(1);
+        }
+    }
+    size_t bytes = sizeof(branch_array) + (size_t)width * sizeof(uint32_t);
+    branch_array *b = (branch_array *)calloc(1, bytes);
+    if (b == NULL) {
+        printf("\nout of memory allocating cache branch\n");
+        exit(1);
+    }
+    b->width = width;
+    branch_handles[handle] = b;
+    alloc_count++;
+    alloc_size += width;
+    branch_alloc_size += (long long)bytes;
+    return NODE_BRANCH_TAG | handle;
+}
+
+static void release_branch(uint32_t descriptor) {
+    uint32_t handle = descriptor & NODE_HANDLE_MASK;
+    branch_array *b = branch_for(descriptor);
+    size_t bytes = sizeof(branch_array) + (size_t)b->width * sizeof(uint32_t);
+    alloc_count--;
+    alloc_size -= b->width;
+    branch_alloc_size -= (long long)bytes;
+    free(b);
+    branch_handles[handle] = (branch_array *)(uintptr_t)branch_free_handle;
+    branch_free_handle = handle;
+}
+
+static inline front_vector *front_vector_for(uint32_t descriptor) {
+    uint32_t handle = descriptor & FRONT_HANDLE_MASK;
+#ifndef OPT
+    if (!(descriptor & FRONT_VECTOR_TAG) || handle == 0 || handle >= front_handles_len ||
+        front_handles[handle] == NULL) {
+        printf("\ninvalid front descriptor %u\n", descriptor);
+        exit(19);
+    }
+#endif
+    return front_handles[handle];
+}
+
+static uint32_t alloc_front_vector(uint32_t a, uint32_t b) {
+    uint32_t handle;
+    if (front_free_handle) {
+        handle = front_free_handle;
+        front_free_handle = (uint32_t)(uintptr_t)front_handles[handle];
+    } else {
+        if (front_handles_len >= front_handles_cap) {
+            uint32_t newcap = front_handles_cap ? front_handles_cap * 2 : 1024;
+            front_handles = (front_vector **)grow_handle_table(
+                front_handles, front_handles_cap, newcap, sizeof(*front_handles), "front");
+            front_handles_cap = newcap;
+        }
+        handle = front_handles_len++;
+        if (handle > FRONT_HANDLE_MASK) {
+            printf("\nout of front handles\n");
+            exit(1);
+        }
+    }
+    uint32_t cap = 4;
+    size_t bytes = sizeof(front_vector) + (size_t)cap * sizeof(front_point);
+    front_vector *v = (front_vector *)malloc(bytes);
+    if (v == NULL) {
+        printf("\nout of memory allocating Pareto front\n");
+        exit(1);
+    }
+    v->len = 2;
+    v->cap = cap;
+    v->sbb[0] = (front_point)a;
+    v->sbb[1] = (front_point)b;
+    front_handles[handle] = v;
+    front_alloc_count++;
+    front_alloc_size += (long long)bytes;
+    return FRONT_VECTOR_TAG | handle;
+}
+
+static void release_front_vector(uint32_t descriptor) {
+    if (!(descriptor & FRONT_VECTOR_TAG)) return;
+    uint32_t handle = descriptor & FRONT_HANDLE_MASK;
+    front_vector *v = front_vector_for(descriptor);
+    size_t bytes = sizeof(front_vector) + (size_t)v->cap * sizeof(front_point);
+    free(v);
+    front_alloc_count--;
+    front_alloc_size -= (long long)bytes;
+    front_handles[handle] = (front_vector *)(uintptr_t)front_free_handle;
+    front_free_handle = handle;
+}
+
+static front_vector *grow_front_vector(uint32_t descriptor) {
+    uint32_t handle = descriptor & FRONT_HANDLE_MASK;
+    front_vector *old = front_vector_for(descriptor);
+    uint32_t oldcap = old->cap;
+    uint32_t newcap = oldcap * 2;
+    size_t oldbytes = sizeof(front_vector) + (size_t)oldcap * sizeof(front_point);
+    size_t newbytes = sizeof(front_vector) + (size_t)newcap * sizeof(front_point);
+    front_vector *v = (front_vector *)realloc(old, newbytes);
+    if (v == NULL) {
+        printf("\nout of memory growing Pareto front\n");
+        exit(1);
+    }
+    v->cap = newcap;
+    front_handles[handle] = v;
+    front_alloc_size += (long long)(newbytes - oldbytes);
+    return v;
+}
+
+static inline front_record *front_record_for(uint32_t descriptor) {
+    uint32_t handle = descriptor & NODE_HANDLE_MASK;
+#ifndef OPT
+    if ((descriptor & NODE_TAG_MASK) != NODE_RECORD_TAG || handle == 0 ||
+        handle >= front_records_len) {
+        printf("\ninvalid front-record descriptor %u\n", descriptor);
+        exit(19);
+    }
+#endif
+    return &front_records[handle];
+}
+
+static uint32_t alloc_front_record(uint32_t positive, uint32_t negative) {
+    uint32_t handle;
+    if (front_record_free) {
+        handle = front_record_free;
+        front_record_free = front_records[handle].positive;
+    } else {
+        if (front_records_len >= front_records_cap) {
+            uint32_t newcap = front_records_cap ? front_records_cap * 2 : 1024;
+            front_record *records = (front_record *)realloc(
+                front_records, (size_t)newcap * sizeof(*front_records));
+            if (records == NULL) {
+                printf("\nout of memory growing front-record arena\n");
+                exit(1);
+            }
+            memset(records + front_records_cap, 0,
+                   (size_t)(newcap - front_records_cap) * sizeof(*front_records));
+            front_records = records;
+            front_records_cap = newcap;
+        }
+        handle = front_records_len++;
+        if (handle > NODE_HANDLE_MASK) {
+            printf("\nout of front-record handles\n");
+            exit(1);
+        }
+    }
+    front_records[handle].positive = positive;
+    front_records[handle].negative = negative;
+    front_record_live++;
+    return NODE_RECORD_TAG | handle;
+}
+
+static void release_front_record(uint32_t descriptor) {
+    uint32_t handle = descriptor & NODE_HANDLE_MASK;
+    (void)front_record_for(descriptor);
+    front_records[handle].positive = front_record_free;
+    front_records[handle].negative = 0;
+    front_record_free = handle;
+    front_record_live--;
+}
+
+static inline int part_greater_equal(int a, int b) {
+    return sbb_to_n1[a] >= sbb_to_n1[b] && sbb_to_n2[a] >= sbb_to_n2[b];
+}
+
+static int front_has_greater_equal(uint32_t descriptor, int sbb) {
+    if (descriptor == 0) return 0;
+    if (!(descriptor & FRONT_VECTOR_TAG)) return part_greater_equal((int)descriptor, sbb);
+    front_vector *v = front_vector_for(descriptor);
+    for (uint32_t i = 0; i < v->len; i++)
+        if (part_greater_equal((int)v->sbb[i], sbb)) return 1;
+    return 0;
+}
+
+static int front_has_lesser_equal(uint32_t descriptor, int sbb) {
+    if (descriptor == 0) return 0;
+    if (!(descriptor & FRONT_VECTOR_TAG)) return part_greater_equal(sbb, (int)descriptor);
+    front_vector *v = front_vector_for(descriptor);
+    for (uint32_t i = 0; i < v->len; i++)
+        if (part_greater_equal(sbb, (int)v->sbb[i])) return 1;
+    return 0;
+}
+
+static int add_front_descriptor(uint32_t *field, int positive, int sbb) {
+    uint32_t descriptor = *field;
+    if (descriptor == 0) {
+        *field = (uint32_t)sbb;
+        return 1;
+    }
+    if (!(descriptor & FRONT_VECTOR_TAG)) {
+        int old = (int)descriptor;
+        int old_covers_new = positive ? part_greater_equal(old, sbb)
+                                      : part_greater_equal(sbb, old);
+        if (old_covers_new) return 0;
+        int new_covers_old = positive ? part_greater_equal(sbb, old)
+                                      : part_greater_equal(old, sbb);
+        if (new_covers_old) {
+            *field = (uint32_t)sbb;
+            return 1;
+        }
+        *field = alloc_front_vector((uint32_t)old, (uint32_t)sbb);
+        return 1;
+    }
+
+    front_vector *v = front_vector_for(descriptor);
+    for (uint32_t i = 0; i < v->len; i++) {
+        int old = (int)v->sbb[i];
+        int old_covers_new = positive ? part_greater_equal(old, sbb)
+                                      : part_greater_equal(sbb, old);
+        if (old_covers_new) return 0;
+    }
+    uint32_t w = 0;
+    for (uint32_t i = 0; i < v->len; i++) {
+        int old = (int)v->sbb[i];
+        int new_covers_old = positive ? part_greater_equal(sbb, old)
+                                      : part_greater_equal(old, sbb);
+        if (!new_covers_old) v->sbb[w++] = v->sbb[i];
+    }
+    if (w == 0) {
+        release_front_vector(descriptor);
+        *field = (uint32_t)sbb;
+        return 1;
+    }
+    if (w == v->cap) v = grow_front_vector(descriptor);
+    v->sbb[w++] = (front_point)sbb;
+    v->len = w;
+    return 1;
+}
+
+static void node_fronts(uint32_t node, uint32_t *positive, uint32_t *negative) {
+    uint32_t tag = node & NODE_TAG_MASK;
+    if (tag == NODE_BRANCH_TAG) {
+        branch_array *b = branch_for(node);
+        *positive = b->slot[0];
+        *negative = b->slot[1];
+    } else if (tag == NODE_RECORD_TAG) {
+        front_record *r = front_record_for(node);
+        *positive = r->positive;
+        *negative = r->negative;
+    } else {
+        *positive = node & NODE_INLINE_MASK;
+        *negative = (node >> NODE_INLINE_BITS) & NODE_INLINE_MASK;
+    }
+}
+
+static int can_inline_fronts(uint32_t positive, uint32_t negative) {
+#if MAX_SBB <= NODE_INLINE_MASK
+    return !(positive & FRONT_VECTOR_TAG) && !(negative & FRONT_VECTOR_TAG) &&
+           positive <= NODE_INLINE_MASK && negative <= NODE_INLINE_MASK;
+#else
+    return positive == 0 && negative == 0;
+#endif
+}
+
+static uint32_t inline_fronts(uint32_t positive, uint32_t negative) {
+    return positive | (negative << NODE_INLINE_BITS);
+}
+
+static void set_front_only(uint32_t *node, uint32_t positive, uint32_t negative) {
+    uint32_t old = *node;
+    if ((old & NODE_TAG_MASK) == NODE_BRANCH_TAG) {
+        printf("\ninternal error replacing live cache branch with fronts\n");
+        exit(19);
+    }
+    if (can_inline_fronts(positive, negative)) {
+        if ((old & NODE_TAG_MASK) == NODE_RECORD_TAG) release_front_record(old);
+        *node = inline_fronts(positive, negative);
+    } else if ((old & NODE_TAG_MASK) == NODE_RECORD_TAG) {
+        front_record *r = front_record_for(old);
+        r->positive = positive;
+        r->negative = negative;
+    } else {
+        *node = alloc_front_record(positive, negative);
+    }
+}
+
+static int add_node_front(uint32_t *node, int positive, int sbb) {
+    uint32_t p, q;
+    node_fronts(*node, &p, &q);
+    uint32_t opposite = positive ? q : p;
+    if ((positive && front_has_lesser_equal(opposite, sbb)) ||
+        (!positive && front_has_greater_equal(opposite, sbb))) {
+        printf("\ncontradictory cache fronts while adding %s %s\n",
+               positive ? "positive" : "negative", sbb_to_str[sbb]);
+        exit(2);
+    }
+    uint32_t *field = positive ? &p : &q;
+    int updated = add_front_descriptor(field, positive, sbb);
+    if (!updated) return 0;
+    if ((*node & NODE_TAG_MASK) == NODE_BRANCH_TAG) {
+        branch_array *b = branch_for(*node);
+        b->slot[0] = p;
+        b->slot[1] = q;
+    } else {
+        set_front_only(node, p, q);
+    }
+    return 1;
 }
 
 int clamp_sbb(int sbb, int pairs_remaining, int n_remaining) {
@@ -251,250 +618,187 @@ int clamp_sbb(int sbb, int pairs_remaining, int n_remaining) {
     return sbb2;
 }
 
-void free_children(struct node *n, int arrsize, int pairs_remaining, int n_remaining) {
-    if (n->next == NULL || n->next == can_solve_marker || n->next == cant_solve_marker) return;
-//    debug_printf("can't marker %p\n", cant_solve_marker);
-//    debug_printf("can marker %p\n", can_solve_marker);
-    debug_printf("in free n=%p arrsize=%d pairs_remaining=%d n_remaining=%d\n", n, arrsize, pairs_remaining, n_remaining);
-#ifndef OPT
-    if (n->size != arrsize) {
-        printf("size difference, allocated: %d, wanted to free %d\n", n->size, arrsize);
-        exit(11);
+static branch_array *ensure_branch(uint32_t *node, uint32_t width) {
+    if ((*node & NODE_TAG_MASK) == NODE_BRANCH_TAG) {
+        branch_array *b = branch_for(*node);
+        if (b->width != width) {
+            printf("\ncache branch width mismatch: have %u, need %u\n", b->width, width);
+            exit(11);
+        }
+        return b;
     }
-#endif
-    int sbb;
-    for (sbb=2; sbb<arrsize; sbb++) {
-        debug_printf("in free_children sbb=%d(%s)\n", sbb, sbb_to_str[sbb]);
-        struct node *child = &(n->next[sbb]);
-        int new_pairs_remaining = pairs_remaining - sb_pairs[sbb];
-        int new_n_remaining = n_remaining - sbb_to_n1[sbb] - sbb_to_n2[sbb];
-        int sbb2 = clamp_sbb(sbb, new_pairs_remaining, new_n_remaining);
-        debug_printf("in free_children sbb2=%d(%s)\n", sbb2, sbb_to_str[sbb2]);
-        if (sbb2 > 1) free_children(child, sbb2+1, new_pairs_remaining, new_n_remaining);
-    }
-    alloc_count--;
-    alloc_size-=arrsize;
-    free(n->next);
+    uint32_t positive, negative;
+    node_fronts(*node, &positive, &negative);
+    if ((*node & NODE_TAG_MASK) == NODE_RECORD_TAG) release_front_record(*node);
+    *node = alloc_branch(width);
+    branch_array *b = branch_for(*node);
+    b->slot[0] = positive;
+    b->slot[1] = negative;
+    return b;
 }
 
-int cacheCanSolve(struct node *n, int* sb, int size, int k, int max_sbb, int pairs_remaining, int n_remaining){
-    //	printf("size = %d\n",size);
-#ifdef DEBUG
-    printf("in cacheCanSolve n=%p n->next=%p max_sbb=%d pairs_remaining=%d ", n, n->next, max_sbb, pairs_remaining);
-    printSb(sb, size);
-    printf("\n");
-#endif
-#ifndef OPT
-    if (n->next == cant_solve_marker) {
-        printf("\nencountered cant_solve_marker when caching can solve\n");
-        fflush(stdout);
-        exit(2);
-    }
-#endif
-    if (size<1) {
-        if (n->next == can_solve_marker) {
-            debug_printf("already cached, returning 0\n");
-            return 0;
+static void clear_node(uint32_t *node) {
+    uint32_t descriptor = *node;
+    uint32_t tag = descriptor & NODE_TAG_MASK;
+    if (tag == NODE_BRANCH_TAG) {
+        branch_array *b = branch_for(descriptor);
+        for (uint32_t sbb = 2; sbb < b->width; sbb++) {
+            if (b->slot[sbb] == 0) continue;
+            clear_node(&b->slot[sbb]);
         }
-        if (n->next == NULL) {
-            debug_printf("was NULL, setting \n");
-            n->next = can_solve_marker;
-        } else {
-            if (n->next[0].next == can_solve_marker){
-                debug_printf("already cached, returning 0\n");
-                return 0;
-            }
-            debug_printf("n->next[0].next = can_solve_marker\n");
-            n->next[0].next = can_solve_marker;
-        }
-        return 1;
+        release_front_vector(b->slot[0]);
+        release_front_vector(b->slot[1]);
+        release_branch(descriptor);
+    } else if (tag == NODE_RECORD_TAG) {
+        front_record *r = front_record_for(descriptor);
+        release_front_vector(r->positive);
+        release_front_vector(r->negative);
+        release_front_record(descriptor);
     }
-    int updated =0;
-    max_sbb=clamp_sbb(max_sbb, pairs_remaining, n_remaining);
-#ifdef DEBUG
-    printf("in cacheCanSolve size=%d max_sbb=%d after ", size, max_sbb);
-    printSb(&max_sbb, 1);
-    printf("\n");
-#endif
-    if (n->next == NULL || n->next == can_solve_marker) {
-        alloc_next(n, max_sbb+1);
+    *node = 0;
+}
+
+static void fold_empty_branch(uint32_t *node) {
+    if ((*node & NODE_TAG_MASK) != NODE_BRANCH_TAG) return;
+    uint32_t descriptor = *node;
+    branch_array *b = branch_for(descriptor);
+    for (uint32_t sbb = 2; sbb < b->width; sbb++)
+        if (b->slot[sbb] != 0) return;
+    uint32_t positive = b->slot[0];
+    uint32_t negative = b->slot[1];
+    release_branch(descriptor);
+    *node = 0;
+    set_front_only(node, positive, negative);
+}
+
+int cacheCanSolve(uint32_t *node, int *sb, int size, int k, int max_sbb,
+                  int pairs_remaining, int n_remaining) {
+    if (size < 1) {
+        printf("\nempty positive cache insertion\n");
+        exit(3);
     }
-    if(n->next[0].next != can_solve_marker) {
-        n->next[0].next = can_solve_marker;
-        updated++;
+    int updated = add_node_front(node, 1, *sb);
+    if (size == 1) return updated;
+    max_sbb = clamp_sbb(max_sbb, pairs_remaining, n_remaining);
+    branch_array *b = ensure_branch(node, (uint32_t)max_sbb + 1);
+    int minSbb = sb[1]; /* Unit Group Triviality Lemma. */
+    int *lesser = sbb_lesser[*sb];
+    while (*lesser >= minSbb) {
+        int sbb2 = *lesser++;
+        updated += cacheCanSolve(&b->slot[sbb2], sb + 1, size - 1, k, sbb2,
+                                 pairs_remaining - sb_pairs[sbb2],
+                                 n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2]);
     }
-    
-    int sbb=*sb;
-    int *lesser;
-    int minSbb = size>1?sb[1]:2; // see Unit Group Triviality Lemma
-    //		printf("minSbb = %d\n",minSbb);
-    int sbb2;
-    lesser = sbb_lesser[sbb];
-    while(1) {
-        sbb2 = *lesser;
-        if (sbb2<minSbb) break;
-//        debug_printf("sbb2 = %d(%s)\n", sbb2, sbb_to_str[sbb2]);
-#ifndef OPT
-        if (sbb2 >= n->size) {
-            printf("FAIL: sbb2 = %d but n->size = %d\n", sbb2, n->size);
-            exit(12);
-        }
-#endif
-        updated+=cacheCanSolve(&(n->next)[sbb2], sb+1, size-1,k, sbb2, pairs_remaining - sb_pairs[sbb2], n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2]);
-        lesser++;
-    }
-    debug_printf("updated=%d\n", updated);
+    fold_empty_branch(node);
     return updated;
 }
 
-int cacheCantSolve(struct node *n, int* sb_orig, int size, int k, int max_sbb, int pairs, int pairs_remaining, int n_remaining){
-    
-    debug_printf("in cache n=%p n->next=%p can't solve size=%d max_sbb=%d before pairs=%d, pairs_remaining=%d ", n, n->next, size, max_sbb, pairs, pairs_remaining);
-    
-#ifdef DEBUG
-    printSb(sb_orig, size);
-    printf("\n");
-#endif
-    
-    //    printf("size=%d\n",size);
-    if (n->next == cant_solve_marker) {
-        debug_printf("already cached, returning 0\n");
-        return 0;
+int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, int pairs,
+                   int pairs_remaining, int n_remaining) {
+    if (size < 1) {
+        printf("\nempty negative cache insertion\n");
+        exit(3);
     }
     max_sbb = clamp_sbb(max_sbb, pairs_remaining, n_remaining);
-    debug_printf("in can't solve size=%d max_sbb=%d(%s) after\n", size, max_sbb, sbb_to_str[max_sbb]);
-    if (size < 1) {
-#ifndef OPT
-        if (n->next == can_solve_marker) {
-            printf("\nencountered can_solve_marker when caching can't solve (1)\n");
-            exit(3);
+    if (size == 1) {
+        int updated = add_node_front(node, 0, *sb_orig);
+        if (updated && (*node & NODE_TAG_MASK) == NODE_BRANCH_TAG) {
+            branch_array *b = branch_for(*node);
+            int *greater = sbb_greater[*sb_orig];
+            while (*greater <= max_sbb) {
+                int sbb2 = *greater++;
+                if (b->slot[sbb2] == 0) continue;
+                clear_node(&b->slot[sbb2]);
+            }
+            fold_empty_branch(node);
         }
-#endif
-        if (n->next != NULL) {
-            debug_printf("before free\n");
-            free_children(n, max_sbb+1, pairs_remaining, n_remaining);
-            debug_printf("after free\n");
-        }
-        n->next = cant_solve_marker;
-        return 1;
+        return updated;
     }
-    struct node *oldnext = n->next;
-    if (oldnext == NULL || oldnext == can_solve_marker) {
-        //            printf("arrsize=%d\n",arrsize);
-        debug_printf("before alloc\n");
-        alloc_next(n, max_sbb+1);
-        debug_printf("after alloc\n");
-        if (oldnext == can_solve_marker) {
-            n->next[0].next = can_solve_marker; // if it was solvable, don't lose that
-        }
-    }
+
+    uint32_t positive_front, negative_front;
+    node_fronts(*node, &positive_front, &negative_front);
+    branch_array *b = NULL;
     int updated = 0;
-    int tmp;
-    int i;
     int sb[size];
-    memcpy(sb, sb_orig, size*sizeof(int));
-    for (i=0; i < size; i++) {
-        if (i>0) {
-            tmp = sb[i];
-            sb[i]=sb[0];
-            sb[0]=tmp;
+    memcpy(sb, sb_orig, (size_t)size * sizeof(int));
+    for (int i = 0; i < size; i++) {
+        if (i > 0) {
+            int tmp = sb[i];
+            sb[i] = sb[0];
+            sb[0] = tmp;
         }
         int sbb = *sb;
-        debug_printf("i=%d sbb=%d\n", i, sbb);
-        int *greater;
-        greater = sbb_greater[sbb];
+        int *greater = sbb_greater[sbb];
         int pairs_without_this = pairs - sb_pairs[sbb];
-        debug_printf("pairs_without_this=%d\n",pairs_without_this);
         int max_pairs = power3[k] - pairs_without_this;
-        debug_printf("max_pairs=%d\n",max_pairs);
-        while(1) {
-            int sbb2 = *greater;
-            if (size==1 || sbb2>=sb[1]) {
-                debug_printf("sbb2=%d %s\n", sbb2, sbb_to_str[sbb2]);
-                if (sbb2>max_sbb) break;
+        while (1) {
+            int sbb2 = *greater++;
+            if (sbb2 >= sb[1]) {
+                if (sbb2 > max_sbb) break;
                 int pairs_new = sb_pairs[sbb2];
-                debug_printf("pairs_new=%d\n",pairs_new);
-                if (pairs_new>max_pairs) break;
-                int next_pairs_remaining = pairs_remaining - pairs_new;
-                debug_printf("sbb2 = %d(%s)\n", sbb2, sbb_to_str[sbb2]);
-                int next_n_remaining = n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2];
-//                if (next_n_remaining > 2) {
-#ifndef OPT
-                    if (sbb2 >= n->size) {
-                        printf("FAIL: sbb2 = %d but n->size = %d\n", sbb2, n->size);
-                        exit(13);
-                    }
-#endif
-                    updated+=cacheCantSolve(&(n->next)[sbb2],sb+1, size-1,k, sbb2, pairs_without_this+pairs_new, next_pairs_remaining, next_n_remaining);
-//                }
+                if (pairs_new > max_pairs) break;
+                /* The front is checked before this edge on lookup.  Descendants below a part it
+                   already refutes are unreachable, but other part permutations in this call may
+                   still add information, so skip this edge rather than returning from the call. */
+                if (front_has_lesser_equal(negative_front, sbb2)) continue;
+                if (b == NULL) b = ensure_branch(node, (uint32_t)max_sbb + 1);
+                int next_pairs = pairs_remaining - pairs_new;
+                int next_n = n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2];
+                updated += cacheCantSolve(&b->slot[sbb2], sb + 1, size - 1, k, sbb2,
+                                          pairs_without_this + pairs_new, next_pairs, next_n);
             }
-            greater++;
         }
     }
-    
+    if (b != NULL) fold_empty_branch(node);
     return updated;
 }
 
 void cache(int *sb, int size, int canSolve, int k, int pairs) {
-    
-#ifdef DEBUG
-    printf("\nin cache for ");
-    printSb(sb, size);
-    printf(" cs=%d k=%d pairs=%d\n", canSolve, k, pairs);
-    fflush(stdout);
-#endif
-    
     long long alloc_count_before = alloc_count;
     long long alloc_size_before = alloc_size;
-    
-    int updated;
-    if (canSolve) {
-        updated = cacheCanSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, power3[k], MAX_N);
-    } else {
-        updated = cacheCantSolve(&sb_cache_root[k],sb,size,k, MAX_SBB, pairs, power3[k], MAX_N);
-    }
-    debug_printf(" cache=%lld/%lld(%+lld/%+lld)", alloc_count, alloc_size, alloc_count-alloc_count_before, alloc_size-alloc_size_before);
-    
+    int updated = canSolve
+        ? cacheCanSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, power3[k], MAX_N)
+        : cacheCantSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, pairs, power3[k], MAX_N);
+    debug_printf(" cache=%lld/%lld(%+lld/%+lld) fronts=%lld/%lld",
+                 alloc_count, alloc_size, alloc_count - alloc_count_before,
+                 alloc_size - alloc_size_before, front_alloc_count, front_alloc_size);
 #ifndef OPT_2
-    if (updated == 0) {
-        printf("\nupdated == 0 when caching result\n");
+    if (updated == 0 && cache_replay_depth == 0) {
+        printf("\nupdated == 0 when caching result sign=%d k=%d ", canSolve, k);
+        printSb(sb, size);
+        printf("\n");
         fflush(stdout);
         exit(4);
     }
 #endif
+    if (updated == 0 && cache_replay_depth != 0) redundant_cache_replays++;
 }
 
 int checkCache(int *sb, int size, int k) {
-    int i;
-    struct node *n=&sb_cache_root[k];
-    for (i=0; i <= size; i++) {
-        //		printf("checkcache i=%d\n",i);
-        if(n->next == cant_solve_marker){
-            //			printf("checkcache can't solve: n->cant=%d k=%d\n", n->cant, k);
-            return FALSE;
+    uint32_t node = sb_cache_root[k];
+    for (int i = 0; i < size; i++) {
+        uint32_t tag = node & NODE_TAG_MASK;
+        uint32_t positive = 0, negative;
+        branch_array *b = NULL;
+        if (tag == NODE_BRANCH_TAG) {
+            b = branch_for(node);
+            negative = b->slot[1];
+            if (i == size - 1) positive = b->slot[0];
+        } else if (tag == NODE_RECORD_TAG) {
+            front_record *r = front_record_for(node);
+            negative = r->negative;
+            if (i == size - 1) positive = r->positive;
         } else {
-            if (i==size) {
-                if (n->next == can_solve_marker){
-                    //				printf("checkcache can solve: n->can=%d k=%d\n", n->can, k);
-                    return TRUE;
-                    //                } else {
-                    //                    if (n->not_fast) return MAYBE_SLOW;
-                } else if (n->next == NULL) {
-                    return MAYBE;
-                } else if (n->next[0].next == NULL) {
-                    return MAYBE;
-                } else {
-                    return TRUE;
-                }
-            }
-            if (n->next == NULL || n->next == can_solve_marker) {
-                //				printf("checkcache n->next is null, return 2");
-                return MAYBE;
-            }
-            n = &(n->next)[sb[i]];
+            negative = (node >> NODE_INLINE_BITS) & NODE_INLINE_MASK;
+            if (i == size - 1) positive = node & NODE_INLINE_MASK;
         }
+        int sbb = sb[i];
+        if (front_has_lesser_equal(negative, sbb)) return FALSE;
+        if (i == size - 1 && front_has_greater_equal(positive, sbb)) return TRUE;
+        if (b == NULL) return MAYBE;
+        if ((uint32_t)sbb >= b->width) return MAYBE;
+        node = b->slot[sbb];
     }
-    //	printf("checkcache n->next is null, return 2");
     return MAYBE;
 }
 
@@ -1909,6 +2213,7 @@ void parse_file(char *file_name) {
         printf("Failed to open file '%s'\n", file_name);
         exit(14);
     }
+    cache_replay_depth++;
     printf("\nreading file %s\n", file_name);
     char buff[BUFSIZE];
     int line_count=0;
@@ -1974,6 +2279,7 @@ void parse_file(char *file_name) {
         }
     }
     fclose(fp);
+    cache_replay_depth--;
     printf("done\n");
     fflush(stdout);
 }
@@ -1996,9 +2302,7 @@ void init(){
         sa_cant[i] = k;
         //      printf("can't solve %d in %d pairs = %d power3 = %d\n", i,k,saPairs(i),power3[k+1]);
     }
-    for (i=0; i<=MAX_K; i++) {
-        sb_cache_root[i].next = NULL;
-    }
+    memset(sb_cache_root, 0, sizeof(sb_cache_root));
     
     int n1, n2, sbb;
     sbb=0;
