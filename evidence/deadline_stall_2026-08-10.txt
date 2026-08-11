@@ -1,0 +1,108 @@
+# Sa(192) control stall: debugger reconstruction and regression, 2026-08-10
+
+Scope
+-----
+
+The affected cold sessions were AWS `run4` (compact cache, frozen bundle `6af384e`) and
+`run5` (compact cache plus exact L1, frozen commit `290a892`).  Both remained runnable on one
+core with a small, stable footprint, but stopped writing verdicts before the mandatory Sa(192)
+control returned.  A missing control line is not a verdict; this file records an engine liveness
+bug, not a mathematical result.
+
+Debugger evidence
+-----------------
+
+I rebuilt each frozen source on the instance with `clang -O3 -g`.  Extracted `.text` sections
+matched the running binaries byte-for-byte:
+
+  run4 live/debug SHA-256  6606d606b5a848927391df65a3b24041d4fa880fa54c42121d2098e802bfa25c
+  run5 live/debug SHA-256  f3ea042b0b9b2378b52a1a016c1a965bf71e2bcc33e41894401b0cd6f9cee744
+
+That comparison is SSM command `39e27445-d0f3-4eaf-89de-55a9e6ee6df7`.  Therefore the DWARF
+backtraces below describe the exact live instructions rather than merely similar builds.
+
+GDB attached read-only, captured frames/locals, and detached.  Run4 command
+`3fe5a0e3-fc0e-4a9f-8b29-7a2f0ca0f24d` found this ancestry:
+
+  canSolveA(192,10)
+    Sb(112:80)@9, top split index 3664
+      middle Sb(48:48,64:32)@8
+        4-part @7
+          8-part @6
+            14-part @5
+
+The bounded k=5 frame was in exhaustive pass 2 with `pairs=243=3^5`,
+`max_pairs_1=81`, `totalsplits=144042842325`, and an already-expired deadline.  Its local
+`cant_solve_count_min` was 98,356 while the global `cant_solve_count` was still 98,355.
+Run5 command `af8cbbcc-a06e-4f88-84f1-ba7642a8a3e6` found the same ancestry and same counters;
+its k=5 frame was still in pass 1 after 10,516,061,204 candidates.  Thus the exact-state L1 did
+not change the failure.
+
+Mapping the live SBB ids back to coordinates reconstructed the shared child as
+
+  Sb(9:4,8:4,8:1,5:5,15:1,5:3,6:3,7:2,5:3,11:1,8:2,11:1,14:1,13:1)@5.
+
+Its pair mass recomputes to 243.  This is the exact state used by the local replay below.
+
+Cause and repair
+----------------
+
+The old complete-candidate block wrapped the clock/deadline test in
+
+  cant_solve_count >= cant_solve_count_min
+
+so a search producing no new negative verdict could never observe its expired deadline.  There
+was a second liveness hole: while the count equalled the minimum, every visit recomputed
+`deadline = max(deadline, now + 5*(now-start))`; a single new negative could therefore slide the
+deadline indefinitely.  Finally, the clock was sampled only when a complete long-state candidate
+survived every prefix filter, so even a corrected leaf check could overshoot badly when leaves
+were sparse.
+
+The repair makes the deadline independent of negative progress.  The first observed negative may
+grant the existing five-times-elapsed grace once per `canSolveB` call.  Bounded searches also poll
+every 65,536 admitted prefix candidates; unbounded roots retain their existing iterative behaviour.
+A deadline return is `MAYBE`, never `FALSE`, so the change cannot manufacture a refutation.
+
+Exact before/after replay
+-------------------------
+
+The retained run4 checkpoint was 3,684,161 bytes with SHA-256
+`2a5dfb8014305f6f22fc8420bf219f6bc07a56258362ae2a9917a0039594960d`.  A scratch driver loaded
+it, asked the reconstructed state at k=5, and supplied a finite five-second parent budget.  Both
+binaries used `MAX_K=10`, `MAX_N=193`, and `clang -O3`.
+
+Frozen run4 engine:
+
+  [capped_run] deadline-old: TIMEOUT after 12s | exit 124 | wall 17s | peak RSS 0.24 GB
+
+Patched engine:
+
+  REACH: 12782758 tested, 2253279 pruned (17.6%)
+  PROBE result=2 cpu=3.002 negatives=0
+  [capped_run] deadline-fixed: completed | exit 0 | wall 10s | peak RSS 0.23 GB
+
+`result=2` is `MAYBE`.  The 3.002-second return matches the configured minimum child budget and,
+critically, occurs with zero new negatives.  The 12.8 million prefixes in three CPU seconds also
+show why sampling every 2^16 prefixes is cheap and why waiting only for complete leaves was weak.
+
+Other gates
+-----------
+
+  * `tools/deadline_regression.c` passes the zero-progress and one-shot-grace cases.
+  * The cache-query corpus emitted 4,164,958 verdict bytes with the established counts:
+    k=5 1,811,621; k=6 1,773,102; k=7 580,235.  Concatenated SHA-256 was
+    `2b1e91a4a5855736e1aee15eb89a05c7fb2cd6bbaeae05b00c3c9aee23ab64e2`.
+  * `tools/split_regression.c` emitted 1,038 answers plus its summary (1,039 `CHECK` lines),
+    and optimized output matched ASan+UBSan output byte-for-byte.
+  * `radio_sa193.c` syntax-compiles at `MAX_N=1030`.
+  * Loading the active local run's own checkpoint reproduced the mandatory positive control from
+    cache: `result CONTROL Sa(192) in 10 = SOLVABLE`.
+
+Run disposition
+---------------
+
+After the state and cause were independently reproduced, run4 and run5 no longer had diagnostic
+value.  Their wrappers were terminated at 2026-08-11 05:37:59 UTC by SSM command
+`ab7765b7-00da-4c3f-a94d-48c785947251`; both solver processes exited, while run3 and its watchdog
+remained alive.  Their own watchdogs were left running to make final immutable S3 uploads.  This is
+an aborted-engine record, not evidence for or against Sa(192) or Sa(193).
