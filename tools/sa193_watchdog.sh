@@ -314,6 +314,12 @@ while :; do
         # Final upload: the raw log is the archival artifact, and its parsed form is the restart
         # checkpoint. Warm-starting a negative from a run's OWN output is sound.
         if [[ -n "$BUCKET" ]]; then
+            # The hourly path uploads the profile, but the run can end almost an hour later.  Keep
+            # the final sample beside the final raw log rather than leaving a stale profile that
+            # looks complete merely because the key exists.
+            [[ -n "${PROFILE:-}" && -s "$PROFILE" ]] && \
+                aws s3 cp "$PROFILE" "s3://$BUCKET/$PREFIX/seg-$SEG/memprofile.csv" \
+                    >/dev/null 2>&1 || true
             head -c "$(stat -c%s "$LOG")" "$LOG" | zstd -q -19 -c | aws s3 cp - "s3://$BUCKET/$PREFIX/seg-$SEG/out_sa193.txt.zst" >/dev/null 2>&1 || true
             { echo "# radio-cert v1 sa193 cold segment $SEG, final, generated $(date -u +%FT%TZ)";
               head -c "$(stat -c%s "$LOG")" "$LOG" | ./parse_out.sh; } | tee >(aws s3 cp - "s3://$BUCKET/$PREFIX/seg-$SEG/sa193.checkpoint" >/dev/null 2>&1) \

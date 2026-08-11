@@ -4848,5 +4848,56 @@ answers with no diagnostic. `tools/deadline_regression.c` now locks exhausted-pa
 the short shared spine, the long local slice and expired cache-miss behaviour. Repository table,
 witness and documentation checks are run again after this record is rendered.
 
-Run3 was not touched. Run7 and the local `e648e83` continuation were left alive pending archival and
-an explicit decision to start a multi-hour replacement, but neither is now a scheduler baseline.
+At that validation cutoff, run3 was not touched and run7 plus the local `e648e83` continuation were
+left alive pending archival. They were retired later the same day as recorded below; neither is a
+scheduler baseline.
+
+## 2026-08-11 — obsolete `e648e83` runs retired; run3 remains live
+
+PID 19088 was the solver for the same-chain local continuation, not a current-main validation run.
+Both it and AWS run7 used the superseded `e648e83` progress-gated pass-2 scheduler, so continuing to
+spend CPU on them could not evaluate the bounded-probe policy. They were deliberately stopped after
+the bounded-probe control and exact saturated-state replay had already established the replacement.
+No file or checkpoint was deleted.
+
+The local solver received `TERM` at 2026-08-11 22:12:33 UTC. It had run since 15:49:16, reproduced
+the inherited positive control from cache, and written 188,172 lines / 19,919,478 bytes in
+`/Users/fedor/radio-runs/sa193-local-depth-e648e83-resume3/out_sa193.txt`. The primary supervisor was
+the Bash process whose script had been edited in place and, as anticipated, exited without a
+completion marker. The independent immutable guard then generated
+`sa193.recovery.checkpoint`: 1,118,898 lines, 42,433,056 bytes, SHA-256
+`ba6ba91fdad83681b36a1b79c126060dc1607857cdf57ed34b18bb3ca65e2f7a`. Its recorded hash matches the
+file, and removing its two recovery-header lines produces exactly the same SHA-256 as a fresh
+`inherited checkpoint + parse_out.sh(raw segment)` stream. Solver 19088, supervisor 19059 and guard
+28814 all exited. The earlier raw segments and every intermediate checkpoint remain in their
+original run directories. They are also archived as `sa193-local-chain-2026-08-11`: four separately
+hashed raw segments, the closed recovery checkpoint and a metadata tar with each `run.meta`, frozen
+binary, monitor/completion/stderr and recovery machinery. All raw segments lack the later embedded
+provenance banner, so the uploader's legacy override was explicit and the limitation is recorded in
+`docs/data.md`; all four audits found zero contradictions.
+
+On AWS, a read-only identity check first found exactly one run3 solver (PID 375197) and exactly one
+run7 solver (PID 688080), with run7's `run.meta` naming build `e648e83`. Only PID 688080 received
+`TERM`, at 22:13:30 UTC. Its wrapper closed with exit 143 after 23,282 wall seconds and 0.29 GiB peak
+RSS; run3 remained alive throughout. Waking only run7's watchdog sleep caused immediate finalization
+rather than waiting for its next ten-minute cycle. The final status reports 104,931 definitive
+internal verdicts, zero completed top-level states, and no returned `Sa(192)` control. The saturated
+k=5 activation had reached 20,460 CPU seconds and 280,116,882,707 admitted prefixes.
+
+The S3 raw segment under
+`run7/seg-seg-20260811154530Z-e648e83/out_sa193.txt.zst` passed `zstd -t`; decompression gives 104,936
+lines / 11,065,274 bytes and SHA-256
+`a79d31d9b11bf97679451087b90978f7fdc3b8874847bda2ebca305142ddb72c`, exactly matching the EBS log.
+The final checkpoint is 3,738,869 bytes with SHA-256
+`b7e63923275caa4d486fbefd5cd912cf80d8a530c36372fbf14cece2b8cae545`. Because run7 predates the
+embedded provenance banner, its exact source archive, frozen binary, `run.meta`, stderr and
+watchdog log were copied beside it and streamed back for hash verification. The final memory profile
+was also uploaded manually: the watchdog's exit path refreshed the raw log and checkpoint but, in
+spite of the documentation, only its hourly path uploaded the profile. The source now uploads the
+profile on exit as well; the live run3 watchdog is a frozen older copy and must still be checked when
+that run eventually ends.
+
+The 22:14 UTC run3 snapshot remained healthy and unchanged by the retirement operation: one of
+sixteen top-level states complete, 1,651,912 verdicts, 25.50 GiB RSS, and its `Sa(192)` control
+SOLVABLE in 540.7 seconds. No bounded-probe run was started automatically; a new multi-hour sidecar
+still requires an explicit decision.

@@ -8,18 +8,17 @@ findings go to [journal.md](journal.md) as usual.
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| active solvers | `run3`: live incumbent; `run7`: diagnosed-obsolete progress-gated scheduler at `e648e83`, retained pending archival; both `MAX_K=10 MAX_N=193` |
+| active solvers | `run3` only: live incumbent, `MAX_K=10 MAX_N=193`; run7 was retired 2026-08-11 22:13 UTC |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| memory guards | `run3` 40 GiB + `run7` 60 GiB = 100 GiB on the 123 GiB host |
-| completion | a 20-minute final-upload grace period, then instance-initiated stop once both solvers are gone |
+| memory guards | `run3` retains its 40 GiB wrapper on the 123 GiB host |
+| completion | a 20-minute final-upload grace period, then instance-initiated stop once run3 is gone |
 
-Each run remains internally serialized: one process and cache handle all sixteen top-level states
-in sequence.  The two builds run side by side on separate cores and have separate directories,
-binary names, watchdogs and S3 prefixes; none loads another run's cache. Run7 was launched as a
-matched-host comparison, but its scheduler is now known to stall, so its timing is diagnostic rather
-than a performance baseline.
+Each run is internally serialized: one process and cache handle all sixteen top-level states in
+sequence. Run7 was launched beside run3 with a separate directory, binary, watchdog and S3 prefix;
+neither loaded the other's cache. Its scheduler is now known to stall, so the retained timing is
+diagnostic rather than a performance baseline. Run3 was not touched when run7 was stopped.
 
 | prefix | build | started UTC | state / binary |
 |---|---|---|---|
@@ -27,18 +26,27 @@ than a performance baseline.
 | `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | stopped; old scheduler; `/root/run4/radio_sa193_v4` |
 | `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | stopped; old scheduler; `/root/run5/radio_sa193_v5` |
 | `run6/` | broken zero-progress deadline/prefix-poll experiment (`c13b5d3`) | 2026-08-11 05:45:09 | stopped and archived; `/root/run6/radio_sa193_v6` |
-| `run7/` | progress-gated pass-2 `NO_DEADLINE` handoff (`e648e83`) | 2026-08-11 15:45:30 | active but obsolete; `/root/run7/radio_sa193_v7` |
+| `run7/` | progress-gated pass-2 `NO_DEADLINE` handoff (`e648e83`) | 2026-08-11 15:45:30 | stopped 2026-08-11 22:13:30; archived; `/root/run7/radio_sa193_v7` |
 
 All rows name frozen binaries, not aliases for current `main`. The original run4/run5 snapshots did
 not by themselves prove a livelock, but run7 later reproduced the same information-tight 14-part
-child beneath a finite parent and remained there for 19,859 CPU seconds after 270.7 billion admitted
-prefixes. Its pass-2 `NO_DEADLINE` handoff and negative-progress gate remove the finite escape when
-the compact cache adds no fact. `c13b5d3` represents the opposite bad extreme: it could poll before a
-complete child was tried. Definitive printed verdicts from both builds remain sound, but neither is a
-timing baseline. The exact frames, final state machine, regression hashes and disposition are in
+child beneath a finite parent. Its final snapshot had spent 20,460 CPU seconds and admitted
+280,116,882,707 prefixes in that activation without returning the `Sa(192)` control. Its pass-2
+`NO_DEADLINE` handoff and negative-progress gate remove the finite escape when the compact cache adds
+no fact. `c13b5d3` represents the opposite bad extreme: it could poll before a complete child was
+tried. Definitive printed verdicts from both builds remain sound, but neither is a timing baseline.
+The exact frames, final state machine, regression hashes and disposition are in
 [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
-Archive run7's current raw segment and checkpoint before stopping it. A replacement should use
-`45c34fd` or later, but starting another multi-hour run requires an explicit check-in.
+
+Run7's final raw segment is
+`run7/seg-seg-20260811154530Z-e648e83/out_sa193.txt.zst`: 104,936 lines and 11,065,274 bytes after
+decompression, SHA-256 `a79d31d9b11bf97679451087b90978f7fdc3b8874847bda2ebca305142ddb72c`.
+The final checkpoint is `run7/sa193.checkpoint`, SHA-256
+`b7e63923275caa4d486fbefd5cd912cf80d8a530c36372fbf14cece2b8cae545`. Because the run predates
+embedded provenance, its exact source archive, frozen binary, `run.meta`, final memory profile,
+stderr and watchdog log are retained under `run7/` too. All were streamed back and hash-verified;
+the compressed source and raw-log streams also passed `zstd -t`. A replacement should use `45c34fd`
+or later, but starting another multi-hour run requires an explicit check-in.
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
@@ -68,13 +76,14 @@ no syntactic marker, and given an engine change trapped the last run. It is also
 tools/sa193_status.sh --compare --watch
 ```
 
-This prints active `run3` and `run7` together.  `--prefix run7` selects only the diagnosed old run and
-`--all` also includes the stopped/historical prefixes.  Each live `STATUS` gets refreshed every 10 minutes
-with verdict count, cache size and RSS.  Also in the bucket:
+This prints live run3 beside run7's final diagnostic snapshot. `--prefix run7` selects only that
+stopped run and `--all` also includes the other historical prefixes. Each live `STATUS` gets
+refreshed every 10 minutes with verdict count, cache size and RSS. Also in the bucket:
 
 | key | what |
 |---|---|
-| `run3/STATUS`, `run7/STATUS` | latest active status snapshots |
+| `run3/STATUS` | latest active status snapshot |
+| `run7/STATUS` | final snapshot, explicitly reporting `solver process GONE` |
 | `runN/sa193.checkpoint` | same-run restart checkpoint, refreshed hourly |
 | `runN/seg-*/out_sa193.txt.zst` | immutable per-segment raw log, refreshed hourly and finalized at exit |
 | `runN/seg-*/memprofile.csv` | time/RSS/verdict profile used for the comparison |

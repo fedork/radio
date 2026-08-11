@@ -26,6 +26,13 @@ is normal; tying cancellation to such a mutation therefore removes the finite es
 it is most needed.  A read-only status snapshot at 2026-08-11 21:26 UTC recorded 19,859 CPU seconds
 in this activation and no completed `Sa(192)` control.
 
+The run was deliberately stopped at 2026-08-11 22:13:30 UTC. Its final snapshot recorded 20,460 CPU
+seconds and 280,116,882,707 admitted prefixes in the same activation, 104,931 definitive internal
+verdicts, and still no completed control. The finalized raw segment has 104,936 lines and SHA-256
+`a79d31d9b11bf97679451087b90978f7fdc3b8874847bda2ebca305142ddb72c`; the finalized checkpoint
+has SHA-256 `b7e63923275caa4d486fbefd5cd912cf80d8a530c36372fbf14cece2b8cae545`. Both are under the
+private `run7/` S3 prefix together with the exact source archive, frozen binary and launch metadata.
+
 The earlier debugger observations remain valid historical evidence: run4/run5 reached the same
 state, and commit `c13b5d3`'s prefix poll could return before any complete child was tried.  What is
 superseded is the proposed cure.  Neither an unconditional pass-2 dive nor a zero-budget prefix
@@ -115,7 +122,7 @@ These failures are part of the result, not future suggestions:
 ## Run disposition
 
 Run6 remains a broken zero-progress/prefix-poll experiment; its printed definitive verdicts are
-sound, but its timing is not a comparison baseline.  Run7 is now diagnostic evidence for the
-opposite failure and should not be described as a healthy mandatory dive.  Run3 remains the live
-incumbent and is unaffected.  Preserve the old raw logs/checkpoints before stopping or replacing
-either sidecar; do not use a missing line from any of them as a negative verdict.
+sound, but its timing is not a comparison baseline. Run7 is retained diagnostic evidence for the
+opposite failure and was stopped only after its raw log, checkpoint, profile, source and launch
+metadata were archived and verified. Run3 remains the live incumbent and was unaffected. Do not use
+a missing line from any interrupted sidecar as a negative verdict.

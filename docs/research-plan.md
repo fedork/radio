@@ -206,9 +206,9 @@ continuation.
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`
 control passes at 0.35 GB peak RSS and 711.7 CPU seconds, with no remaining measured premium over the
-734.5-second pre-compaction control. AWS `run7` and the same-chain local continuation are still alive
-but use the now-obsolete `e648e83` progress-gated pass-2 scheduler; preserve them before retirement.
-Run3 remains the untouched live incumbent. Neither `c13b5d3` nor `e648e83` is a valid performance
-baseline for the new scheduler. H3 still sits awkwardly—the answer is probably
+734.5-second pre-compaction control. AWS `run7` and the same-chain local continuation used the
+now-obsolete `e648e83` progress-gated pass-2 scheduler and were retired on 2026-08-11 after their raw
+segments and closed checkpoints were preserved. Run3 remains the untouched live incumbent. Neither
+`c13b5d3` nor `e648e83` is a valid performance baseline for the new scheduler. H3 still sits awkwardly—the answer is probably
 192, the evidence is probably right, and neither "probably" belongs in a paper.  Resume only from a
 run's own output and retain every raw segment; compact does not mean bounded.

@@ -22,7 +22,9 @@ INSTANCE=i-0005d74f985c52ae1
 #   run5  + bounded exact-state L1 before majorization/cache lookup (290a892)
 #   run6  + broken zero-progress deadline/prefix polling experiment (c13b5d3)
 #   run7  + restored depth-first progress and pass-2 NO_DEADLINE handoff (e648e83)
-# `--prefix runN` reads one; `--all` reads every prefix listed in render() below.
+# `--prefix runN` reads one; `--all` reads every prefix listed in render() below. Run3 is the only
+# live solver as of 2026-08-11; run7 remains in the comparison view as the final snapshot of the
+# diagnosed scheduler failure.
 PREFIX=run
 BOTH=0
 COMPARE=0
@@ -39,15 +41,23 @@ done
 
 show() {
     local PREFIX="$1"
-    local mod age now
+    local mod age now snapshot age_note
     mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" --key "$PREFIX/STATUS" \
             --query LastModified --output text 2>/dev/null)
-    aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$PREFIX/STATUS" - 2>/dev/null
+    snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$PREFIX/STATUS" - 2>/dev/null)
+    printf '%s\n' "$snapshot"
     if [[ -n "$mod" ]]; then
         now=$(date -u +%s)
         age=$(( now - $(date -u -j -f "%Y-%m-%dT%H:%M:%S" "${mod%%+*}" +%s 2>/dev/null || echo "$now") ))
-        printf '\n  status written     %s  (%d min ago%s)\n' "$mod" $(( age / 60 )) \
-            "$( (( age > 1800 )) && printf ', STALE - watchdog may be dead' )"
+        age_note=
+        if (( age > 1800 )); then
+            if grep -q 'solver process  *GONE' <<<"$snapshot"; then
+                age_note=', final snapshot'
+            else
+                age_note=', STALE - watchdog may be dead'
+            fi
+        fi
+        printf '\n  status written     %s  (%d min ago%s)\n' "$mod" $(( age / 60 )) "$age_note"
     fi
     printf '  instance           %s\n' \
         "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$INSTANCE" \
@@ -68,7 +78,7 @@ banner() {
 render() {
     if (( COMPARE )); then
         banner run3 "full-star incumbent"
-        banner run7 "depth-first compact sidecar"
+        banner run7 "depth-first compact sidecar (stopped)"
     elif (( BOTH )); then
         banner run  "original build"
         banner run2 "A+B optimisations"
@@ -76,7 +86,7 @@ render() {
         banner run4 "compact cache (stopped prematurely)"
         banner run5 "exact L1 (stopped prematurely)"
         banner run6 "broken deadline experiment (aborted)"
-        banner run7 "compact cache + exact L1 + restored depth-first deadlines"
+        banner run7 "compact cache + exact L1 (stopped: obsolete deadlines)"
     else
         show "$PREFIX"
     fi
