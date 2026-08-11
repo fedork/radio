@@ -18,16 +18,19 @@ INSTANCE=i-0005d74f985c52ae1
 #   run   original build (2026-08-05)
 #   run2  + A+B k=6 optimisations (efadab0)
 #   run3  + full star-expansion majorization (3cf1406)
+#   run4  + level-lazy tables and compact last-segment Pareto cache (7ceb59d)
 # `--prefix runN` reads one; `--all` reads every prefix in RUNS below.
 PREFIX=run
 BOTH=0
+COMPARE=0
 WATCH=0
 while (( $# )); do
     case "$1" in
         --prefix) PREFIX="$2"; shift 2 ;;
         --both|--all) BOTH=1; shift ;;
+        --compare) COMPARE=1; shift ;;
         --watch)  WATCH=1; shift ;;
-        *) echo "usage: $0 [--prefix runN] [--all] [--watch]" >&2; exit 2 ;;
+        *) echo "usage: $0 [--prefix runN] [--all|--compare] [--watch]" >&2; exit 2 ;;
     esac
 done
 
@@ -60,10 +63,14 @@ banner() {
     show "$p"
 }
 render() {
-    if (( BOTH )); then
+    if (( COMPARE )); then
+        banner run3 "full-star incumbent"
+        banner run4 "compact-cache sidecar"
+    elif (( BOTH )); then
         banner run  "original build"
         banner run2 "A+B optimisations"
         banner run3 "A+B + star-expansion majorization"
+        banner run4 "compact last-segment Pareto cache"
     else
         show "$PREFIX"
     fi
