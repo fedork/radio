@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-10** (last-segment Pareto cache deployed; `run3` is the
-only freshly reporting remote cold run).
+don't know it. Last refreshed **2026-08-10** (compact `run4` launched beside `run3` for a matched-host
+time/memory comparison; the compact local run also remains active).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -168,28 +168,36 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-All three prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
-`tools/sa193_status.sh --all` at **2026-08-10 22:05 UTC**:
+All four prefixes are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB).  Snapshot from
+`tools/sa193_status.sh --compare` at **2026-08-11 01:37 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
-| `run/` — original | stale by 18 h 46 m; reported solver gone | 2,568,394 verdicts, 0 of 16 |
-| `run2/` — A+B | stale by 18 h 56 m; alive only at the last upload | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 22 h 04 m, 883,157 verdicts, **22.76 GB**, 0 of 16 |
+| `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
+| `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 1 d 01 h 36 m, 982,294 verdicts, **23.69 GB**, 0 of 16 |
+| `run4/` — compact cache on current source | **fresh and alive** | cold control just started, 1,743 verdicts, **0.17 GB**, 0 of 16 |
 
-Use `tools/sa193_status.sh --prefix run3 [--watch]` for the live stream; `--all` is still useful for
-the archived comparison, but must not be read as proof that a stale process remains alive.  `run3`'s
-`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 accounts for 69,169 s,
-or **90.4%** of measured CPU, while k=6 is 2.1%.  It is inside the first top-level
-`Sb(112:81)@9`, currently below `Sb(51:46,61:35)@8`.
+Use `tools/sa193_status.sh --compare [--watch]` for the matched live stream; `--all` also prints the
+stale historical runs and must not be read as proof that those processes remain alive.  `run3`'s
+`Sa(192)` control took 540.7 s.  Its current workload has moved upward: k=7 accounts for 83,737 s,
+or **90.9%** of measured CPU, while k=6 is 1.9%.  It is inside the first top-level
+`Sb(112:81)@9`, currently below `Sb(52:46,60:35)@8`.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
-22.76 GB with fewer than 0.9 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
+23.69 GB with 0.98 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
 so it does not by itself identify the cause; it does show that memory per verdict cannot be assumed
 stable across the changed search shape.  The result-cache trie remains the unbounded structure and
 the next memory target.  The level-lazy split-table change described below removes avoidable
 allocation, but is not deployed in `run3` and is not expected to account for tens of GB by itself.
-Do not restart a 21-hour cold run solely to pick it up.
+Do not restart a one-day cold run solely to pick it up.
+
+`run4` started cold at 2026-08-11 01:37:20 UTC from bundle commit `6af384e`; its source hashes match
+the compact implementation (`radiobase.c` SHA-256
+`99f84940b728312f774de0222f92151cf8c472d96824590ff0bead8ded6158b4`).  The remote log explicitly
+reports level-lazy split tables, `control=yes`, and `cache=(none, cold)`.  It has a 60 GiB RSS guard
+beside `run3`'s 40 GiB guard, leaving at least about 23 GiB outside the two solver caps.  This is a
+launch record only: its own `Sa(192)` gate had not completed at the snapshot.
 
 A current-main local trial (`713b7d6`, M4 Pro / 24 GB) was stopped deliberately rather than left
 to swap.  The cold `Sa(192)` control passed in **734.5 CPU seconds**.  In 1,152 wall seconds the
@@ -226,8 +234,12 @@ A new genuinely cold local derivation from source commit `7ceb59d` started at
 by the solver's own `vmmap` physical footprint at 20 GiB, not by RSS; raw output is retained and an
 hourly same-log checkpoint is generated.  At launch the log identified `cache=(none, cold)` and
 entered the required `Sa(192)` control normally.  The control had not completed at this writing, so
-this is an active-run record, not evidence for either `Sa(192)` or `Sa(193)`.  Read `status.txt` and
-`monitor.log` in that directory and verify the recorded PID before calling it live.  The sibling
+this was initially only a launch record.  It subsequently returned
+`result CONTROL Sa(192) in 10 = SOLVABLE (807.7 s)` and entered `Sa(193)`.  At 1,568 elapsed seconds
+it had a 1.0 GiB `vmmap` footprint and 242,348 emitted verdicts.  This validates the live engine and
+is much smaller than the pre-compact trial's 7.1 GiB footprint at 1,152 seconds; it is still not an
+`Sa(193)` verdict or a bound on later growth.  Read `status.txt` and `monitor.log` in that directory
+and verify the recorded PID before calling it live.  The sibling
 `cold1` directory is an empty launcher failure: a managed one-shot shell reaped both descendants
 despite `nohup`; it contains no solver result and must never be used as a checkpoint.
 
@@ -398,16 +410,15 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 
 ## Immediate next steps
 
-0. **Watch `run3`** (`tools/sa193_status.sh --prefix run3 --watch`). The `run/` and `run2/` status
-   objects are stale; inspect the instance before making any claim about those processes. `run3`
-   includes full-star expansion but predates level-lazy split tables. Do not discard its 21-hour
-   cold cache merely to adopt an allocation change.
+0. **Watch the matched remote comparison** (`tools/sa193_status.sh --compare --watch`).  Require
+   `run4`'s own `Sa(192)` control to pass before interpreting later progress.  `run3` includes
+   full-star expansion but predates level-lazy split tables and the compact cache; preserve both
+   cold sessions and compare elapsed CPU, RSS, current level and completed top-level states.
 
 1. **Watch the active compact local `Sa(193)` derivation** in
-   `/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  First require its own cold `Sa(192)`
-   gate to pass; the earlier 0.41 GB control was a separate validation run.  Resume only from this
-   run's own raw log/checkpoint, and keep watching physical footprint because the cache is compact,
-   not bounded.
+   `/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  Its own cold `Sa(192)` gate passed in
+   807.7 CPU seconds.  Resume only from this run's own raw log/checkpoint, and keep watching physical
+   footprint because the cache is compact, not bounded.
 
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the

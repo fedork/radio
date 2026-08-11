@@ -1,24 +1,29 @@
 # The `Sa(193)` AWS run — how to check on it, and how to stop it
 
-Started 2026-08-03 from commit `69ae856`. This page is the operational handle; the findings go
-to [journal.md](journal.md) as usual.
+This page is the operational handle for the cold runs hosted on the dedicated instance; the
+findings go to [journal.md](journal.md) as usual.
 
 ## What is running
-
-Launched **2026-08-05** from commit `0a468ca`, `tools/sa193_launch.sh --days 7`.
 
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| what | `radio_sa193`, `MAX_K=10 MAX_N=193` — the `Sa(192)` control, then `canSolveA(193, 10)` |
+| active solvers | `run3`: full-star build; `run4`: compact last-segment Pareto cache; both `MAX_K=10 MAX_N=193` |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| cap | 7 days, self-terminating; ~$250 of instance time |
+| memory guards | `run3` 40 GiB RSS + `run4` 60 GiB RSS = at most 100 GiB on the 123 GiB host |
+| completion | a 20-minute final-upload grace period, then instance-initiated stop once both solvers are gone |
 
-**Serialized on purpose.** One process, one cache, all sixteen top-level states in sequence. Sixteen
-parallel cold jobs would each rebuild the shared low-k work; the 2023 run's later states were only
-affordable because of that reuse.
+Each run remains internally serialized: one process and cache handle all sixteen top-level states
+in sequence.  The two builds run side by side on separate cores only to give a matched-host
+time/memory comparison.  They have separate directories, binary names, watchdogs and S3 prefixes;
+neither loads the other's cache.
+
+| prefix | build | started UTC | directory / binary |
+|---|---|---|---|
+| `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | `/root/run3/radio_sa193_v3` |
+| `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | `/root/run4/radio_sa193_v4` |
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
@@ -45,16 +50,19 @@ no syntactic marker, and given an engine change trapped the last run. It is also
 ## Checking on it
 
 ```
-aws-vault exec default -- aws s3 cp s3://radio-sa193-393287594714/run/STATUS -
+tools/sa193_status.sh --compare --watch
 ```
 
-`STATUS` gets a line every 10 minutes with verdict count, cache size and RSS. Also in the bucket:
+This prints `run3` and `run4` together.  `--prefix run4` selects only the compact run and `--all`
+also includes the two stale historical prefixes.  Each `STATUS` gets refreshed every 10 minutes
+with verdict count, cache size and RSS.  Also in the bucket:
 
 | key | what |
 |---|---|
-| `run/STATUS` | progress log, appended every 10 min |
-| `run/112_80.cache`, `run/112_81.cache` | checkpoints, refreshed every 10 min |
-| `run/out_112_8*.txt.zst` | raw logs, refreshed hourly and at the end |
+| `run3/STATUS`, `run4/STATUS` | latest status snapshots |
+| `runN/sa193.checkpoint` | same-run restart checkpoint, refreshed hourly |
+| `runN/seg-*/out_sa193.txt.zst` | immutable per-segment raw log, refreshed hourly and finalized at exit |
+| `runN/seg-*/memprofile.csv` | time/RSS/verdict profile used for the comparison |
 | `bench/r7iz.4xlarge.txt` | the k=9 ladder benchmark used to size this |
 
 Is it alive?
@@ -67,16 +75,20 @@ aws-vault exec default -- aws ec2 describe-instances \
 
 ## Stopping it
 
+Do not terminate the instance while either cold session is valuable.  To stop it while preserving
+the EBS volume and both run directories:
+
 ```
-aws-vault exec default -- aws ec2 terminate-instances --instance-ids i-0b8ca7169585b7cc1
+aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52ae1
 ```
 
-Safe at any time — the checkpoint in S3 is at most 10 minutes stale, and a restart re-runs only
-the top-level call while every completed sub-state is a cache hit.
+The active idle guard does this automatically only after both named solvers have gone, then waits
+20 minutes so both watchdogs can finalize their S3 artifacts.  A manual stop is an interruption,
+not a proof; S3 checkpoints are at most about one hour stale and the full EBS logs remain intact.
 
 ## Resuming
 
-Relaunch with the same user-data and pass the checkpoint as `radio_one`'s leading argument.
+Relaunch the desired build and pass **that prefix's own** checkpoint as the driver's leading argument.
 **The checkpoint is sound to warm-start a negative from**, unlike `cache-2025:parsed_260.txt`
 — see the trap in [status.md](status.md). Every checkpoint carries a header naming the build,
 the state and the generation time, and `parse_file` skips `#` lines, so the two can never be
@@ -87,13 +99,13 @@ confused. Only warm-start from a file that has that header.
 - **r7iz.4xlarge.** The Graviton option (`x2gd`, half the price for the same 128 GB) is
   unavailable: the ARM vCPU quota on this account is **0**. The x86 quota is 5000 with ~1372 in
   use, so there is room to go bigger if memory demands it.
-- **128 GB.** For job (1) only. Measured 2.32 KB of trie per insert at this geometry; the 2023 run
+- **128 GB.** The pre-compact engine measured 2.32 KB of trie per insert at this geometry; the 2023 run
   reached ~90 GB. Note this also bounds how large a warm cache can be loaded: the filtered
   `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, which at that
   rate is ~25 GB of trie before the search starts. Filter harder, or size the instance for it.
   The current engine visits about half as many states, so the estimate is 40–60 GB with 90 GB
-  pessimistic. `capped_run.sh --rss-gb 110` kills cleanly *before* the OOM killer, so a memory
-  overrun preserves the checkpoint instead of losing it — resume on a larger instance.
+  pessimistic.  The active comparison instead caps the two concurrent solvers at 40 + 60 GiB, which
+  reserves about 23 GiB for the OS and file cache even if both reach their caps.
 - **On-demand, not spot.** Spot is ~$0.54/hr against $1.49, but the run is single-threaded and
   we are paying for RAM; the saving is not worth interruption handling on an unattended run.
 - **AWS is slower than the laptop.** The k=9 ladder takes 391 s on r7iz against 261 s on the

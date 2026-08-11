@@ -4415,3 +4415,41 @@ together, with neither stderr nor `completion.txt`.  Nothing mathematical ran fa
 The replacement keeps the supervisor in the foreground of a persistent execution session.  This is
 a durable operational trap: under a managed shell, verify survival after the launching command
 returns; `nohup` by itself is not evidence of detachment.
+
+## 2026-08-10 — compact AWS `run4` launched beside `run3` for a matched-host comparison
+
+The compact engine is now also running cold on the existing `r7iz.4xlarge`, rather than replacing
+the irreplaceable `run3` cache.  A pre-launch read-only inventory found 123 GiB RAM, 98 GiB available,
+no swap, 196 GiB free disk, and only one solver: `run3` at 23.66 GiB RSS and one full core.  The old
+cloud-init shutdown risk recorded on 2026-08-09 is no longer live: `cloud-final.service` exited
+successfully on 2026-08-06 and no pending shutdown process exists.
+
+`run4` started at 2026-08-11 01:37:20 UTC in `/root/run4`, from source bundle commit `6af384e`.
+The binary is `radio_sa193_v4` (SHA-256
+`9c1a3de315f210e53171672e0d28a00e1ab6aa8d3264bc030b96d930bbd0f84c`); its `radiobase.c` SHA-256
+is `99f84940b728312f774de0222f92151cf8c472d96824590ff0bead8ded6158b4`.  The first raw lines report
+`split_index_size = 74504 (level-lazy mode)` and
+`control=yes, cache=(none, cold)`.  PID 542146 and `run3` PID 375197 both measured approximately
+100% of one core after launch.  The first watchdog snapshot reported 1,743 verdicts and 0.17 GB RSS;
+the control was still running, so none of these launch facts is a mathematical verdict.
+
+The comparison is isolated at every mutable boundary: distinct directory, binary name, cache,
+raw log, watchdog, `memprofile.csv`, immutable segment name, and S3 prefix `run4/`.  Its watchdog and
+hourly same-run checkpoints are otherwise identical to `run3`, so
+`tools/sa193_status.sh --compare --watch` gives the intended elapsed-time/RSS/progress comparison.
+The SSM launch command was `df314504-e0eb-4830-b5a6-07d1da1520de`; `run.meta` on the instance holds
+the remaining hashes and PIDs.
+
+Memory is bounded jointly, not independently guessed: `run3` retains its 40 GiB RSS cap and `run4`
+has 60 GiB, so the two solvers cannot consume more than 100 GiB of the 123 GiB host.  `run4`'s wall
+backstop is ten years—an accident guard, not a schedule—so it should run to a verdict or a concrete
+failure.  A separate idle guard watches both exact binary names.  Only after both are gone does it
+wait another 20 minutes for the 10-minute watchdogs' final uploads, then issues instance shutdown;
+the EC2 shutdown behaviour is `stop`, preserving the EBS volume rather than terminating it.
+
+During the AWS staging, the independent local `cold2` run passed its own control:
+`result CONTROL Sa(192) in 10 = SOLVABLE (807.7 s)`.  At 1,568 elapsed seconds its supervisor
+reported 242,348 verdicts and a 1.0 GiB physical footprint.  The pre-compact local trial had already
+reached 7.1 GiB at 1,152 seconds, so this is the first live-search confirmation that the checkpoint
+replay reduction persists beyond the control.  It remains an early measurement, not an upper bound
+and not a verdict on `Sa(193)`.
