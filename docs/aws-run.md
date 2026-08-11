@@ -93,9 +93,10 @@ This prints compact live rows for run3 and run8, followed by the latest exact-ca
 `--candidate run7` selects run7's final diagnostic snapshot and `--all` prints the verbose history.
 Run8 refreshes every five minutes; run3's older watchdog refreshes every ten. The comparison chooses
 the run with fewer completed roots (then fewer verdicts), takes its six slowest completed calls and
-joins them to run3 by exact printed `(state,k)`. `took` is inclusive CPU, not wall time; exact self
-time is therefore shown only as the aggregate-by-level difference. A missing peer call is printed
-as `-`, never inferred from surrounding progress.
+joins them to run3 by exact printed `(state,k)`. Under each compact run row, the current recursive
+stack is shown from the k=9 root down to the active level. `took` is inclusive CPU, not wall time;
+there is no by-level timing comparison or invented per-verdict self time. A missing peer call is
+printed as `-`, never inferred from surrounding progress.
 
 | key | what |
 |---|---|

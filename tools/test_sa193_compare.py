@@ -45,8 +45,8 @@ class CompareTest(unittest.TestCase):
             self.assertIn("30", output)
             self.assertIn("20", output)
             self.assertIn("1.50x", output)
-            # k=5 aggregate self: 30 - 10 versus 20 - 5.
-            self.assertRegex(output, r"k=5\s+30 / 20\s+20 / 15")
+            self.assertIn("slow calls (inclusive CPU) from run8", output)
+            self.assertNotIn("inclusive / self", output)
 
 
 if __name__ == "__main__":

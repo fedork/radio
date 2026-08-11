@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Build a compact, exact comparison of two live Sa(193) raw logs.
+"""Compare the slowest exact calls from the less-advanced of two live Sa(193) logs.
 
-Per-verdict `took` is inclusive CPU time.  The historical logs do not contain call boundaries
-needed to assign exclusive time to individual verdicts, but aggregate self time by level is exact
-when non-negative: inclusive(k) - inclusive(k-1).  Keep those two measurements separate rather
-than manufacturing per-state precision.
+Per-verdict `took` is inclusive CPU time. Historical logs cannot assign exclusive time to an
+individual verdict, so report only measurements the exact-state join actually supports.
 """
 
 from __future__ import annotations
@@ -49,8 +47,6 @@ class Summary:
     verdicts: int = 0
     k9_verdicts: int = 0
     top_done: set[int] = dataclasses.field(default_factory=set)
-    inclusive: dict[int, float] = dataclasses.field(default_factory=dict)
-    counts: dict[int, int] = dataclasses.field(default_factory=dict)
     top_slow: list[Verdict] = dataclasses.field(default_factory=list)
 
     @property
@@ -58,13 +54,6 @@ class Summary:
         # Root completions are the real progress. K=9 and total verdict counts are only tie-breakers
         # while two runs sit inside the same root count.
         return len(self.top_done), self.k9_verdicts, self.verdicts
-
-    def self_seconds(self, level: int) -> float | None:
-        if level not in self.inclusive:
-            return None
-        value = self.inclusive[level] - self.inclusive.get(level - 1, 0.0)
-        # An unfinished ancestor can leave lower-level time without its enclosing `took` line.
-        return value if value >= 0 else None
 
 
 def parse_verdict(line: str, line_no: int) -> Verdict | None:
@@ -91,10 +80,6 @@ def scan(path: Path, label: str, top: int) -> Summary:
             if verdict is None:
                 continue
             summary.verdicts += 1
-            summary.counts[verdict.level] = summary.counts.get(verdict.level, 0) + 1
-            summary.inclusive[verdict.level] = (
-                summary.inclusive.get(verdict.level, 0.0) + verdict.seconds
-            )
             if verdict.level == 9:
                 summary.k9_verdicts += 1
                 mass = MASS_RE.search(verdict.state)
@@ -149,43 +134,9 @@ def format_summary(a: Summary, b: Summary) -> str:
     lines = [
         f"compare {now}  behind={behind.label} "
         f"({len(behind.top_done)}/16 roots, {behind.verdicts} verdicts)",
-        "call=inclusive CPU; self=aggregate CPU by level",
+        f"slow calls (inclusive CPU) from {behind.label}"
+        f"             {behind.label:>8} {peer.label:>8}   ratio",
     ]
-
-    levels = sorted(
-        {verdict.level for verdict in behind.top_slow}
-        | set(behind.inclusive)
-        | set(peer.inclusive),
-        reverse=True,
-    )
-    # Keep the table small and focused on levels that have measurable self time or selected calls.
-    selected_levels = {verdict.level for verdict in behind.top_slow}
-    levels = [
-        level
-        for level in levels
-        if level in selected_levels
-        or behind.self_seconds(level) is not None
-        or peer.self_seconds(level) is not None
-    ][:8]
-    lines.append(f"level       {behind.label:>17}       {peer.label:>17}")
-    lines.append("          inclusive / self      inclusive / self")
-    for level in levels:
-        b_inclusive = compact_number(behind.inclusive.get(level, 0.0))
-        p_inclusive = compact_number(peer.inclusive.get(level, 0.0))
-        b_self_value = behind.self_seconds(level)
-        p_self_value = peer.self_seconds(level)
-        b_self = "-" if b_self_value is None else compact_number(b_self_value)
-        p_self = "-" if p_self_value is None else compact_number(p_self_value)
-        lines.append(
-            f"k={level:<2} {b_inclusive:>10} / {b_self:<7} "
-            f"{p_inclusive:>10} / {p_self:<7}"
-        )
-
-    lines.append("")
-    lines.append(
-        f"slow calls selected from {behind.label}"
-        f"                    {behind.label:>8} {peer.label:>8}   ratio"
-    )
     for verdict in behind.top_slow:
         other = matches.get(verdict.key)
         state = short_state(verdict.state)

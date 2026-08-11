@@ -4916,10 +4916,11 @@ completed roots and then verdict count, retains its six largest inclusive `took`
 their exact `(state,k)` keys in the peer. The compact status shows each process's wall age, CPU,
 roots, control, verdicts, RSS, log size and freshness. Historical output does not contain enough
 call-boundary information to allocate abandoned `MAYBE` work to a particular parent's exclusive
-time, so the tool does **not** manufacture per-verdict self measurements. It separately reports the
-exact aggregate-by-level identity `self(k)=inclusive(k)-inclusive(k-1)` when non-negative. Unit tests
-cover positive witness tails, lag selection, exact matching and the self calculation; a 73 MB local
-pair took 2.3 seconds and about 15 MB maximum RSS to compare.
+time, so the tool does **not** manufacture per-verdict self measurements. The launch version also
+reported the aggregate-by-level identity `self(k)=inclusive(k)-inclusive(k-1)` when non-negative;
+the follow-up entry below records why that block was removed from the live view. Its initial unit
+tests covered positive witness tails, lag selection, exact matching and the aggregate calculation;
+a 73 MB local pair took 2.3 seconds and about 15 MB maximum RSS to compare.
 
 Run8 started at **2026-08-11 22:46:06 UTC** under SSM launch command
 `0d7a7f49-1033-4429-844f-df87860cbe4f`. It is a genuinely cold invocation of
@@ -4963,3 +4964,18 @@ RSS. Its six slowest calls all matched run3: the control root `Sb(112:80)@9` too
 seconds (0.83x), while the five selected k=8 calls ranged from 0.90x to 1.02x. This is the first useful
 live comparison, but it is still the shared control prefix, not natural `Sa(193)` evidence. Run3 was
 not signalled, restarted or modified, and both solvers are intended to continue.
+
+## 2026-08-11 — live comparison keeps stacks and drops by-level timing
+
+The first compact view overcorrected: it reduced each run's useful recursive stack to one line and
+spent most of the remaining space on aggregate timing by level. The user correctly preferred the
+old root-to-active-level stacks and found the by-level comparison unhelpful. The view now prints the
+full current stack beneath each one-line run summary, then only the lagging run's exact matched slow
+calls. The comparator no longer accumulates or emits by-level totals.
+
+Run8's remote monitor is part of its frozen launch provenance and still uploads the first-format
+`COMPARE` object. Rather than edit a live archived source tree or make `run.meta` lie about its tool
+hash, `tools/sa193_status.sh` strips that obsolete block client-side. Future launches emit the new
+format directly. At 23:12 UTC the resulting live view showed three active levels for run3 and four
+for run8; run8 was inside `Sb(112:81)@9`, at 220.2 K status verdicts and 0.74 GiB RSS. Both solvers
+remained live, with run3 still one completed root ahead.

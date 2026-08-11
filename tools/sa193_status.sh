@@ -77,7 +77,7 @@ compact_duration() {
 }
 
 compact_row() {
-    local p="$1" snapshot mod status wall cpu roots control verdicts rss log age updated current
+    local p="$1" snapshot mod status wall cpu roots control verdicts rss log age updated
     if ! object_exists "$p/STATUS"; then
         printf '%-6s %-5s %-9s %-9s %-5s %-10s %-9s %-7s %-6s %s\n' \
             "$p" "-" "-" "-" "-" "pending" "-" "-" "-" "-"
@@ -112,10 +112,13 @@ compact_row() {
     printf '%-6s %-5s %-9s %-9s %-5s %-10s %-9s %-7s %-6s %s\n' \
         "$p" "$status" "${wall:--}" "$cpu" "${roots:--}" "$control" "$verdicts" \
         "${rss:--}" "${log:--}" "$updated"
-    current=$(awk '/^    k=/{
-        sub(/^    /,""); if (length($0)>155) $0=substr($0,1,152) "..."; print; exit
-    }' <<<"$snapshot")
-    [[ -n "$current" ]] && printf '       %s\n' "$current"
+    # Keep the useful old view: the current recursive path from the root down to the active level.
+    # STATUS already caps each activity line at 200 characters; omit its prose legend here.
+    awk '
+        /^  latest activity per level/ { in_stack=1; next }
+        /^  time by level/ { in_stack=0 }
+        in_stack && /^    k=/ { sub(/^    /, "       "); print }
+    ' <<<"$snapshot"
 }
 
 show() {
@@ -164,7 +167,14 @@ render() {
         printf '\n'
         if object_exists "$CANDIDATE/COMPARE"; then
             aws-vault exec --server default -- aws s3 cp \
-                "s3://$BUCKET/$CANDIDATE/COMPARE" - 2>/dev/null
+                "s3://$BUCKET/$CANDIDATE/COMPARE" - 2>/dev/null | awk '
+                    # Run8 was launched with the first comparator. Hide its now-retired by-level
+                    # block client-side rather than altering the frozen remote monitor files.
+                    /^call=inclusive CPU; self=/ { next }
+                    /^level[[:space:]]/ { drop=1; next }
+                    drop && /^slow calls selected/ { drop=0 }
+                    !drop { print }
+                '
         else
             printf 'comparison pending first %s watchdog cycle\n' "$CANDIDATE"
         fi
