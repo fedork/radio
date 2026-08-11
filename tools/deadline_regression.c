@@ -1,9 +1,8 @@
-/* Focused regression for canSolveB's deadline state machine.
+/* Focused regression for canSolveB's bounded-probe state machine.
 
-   A bounded child must produce new negative verdicts before returning MAYBE.  At exactly the
-   minimum progress count its grace window keeps moving so the depth-first dive can produce another
-   reusable fact; only progress beyond that count makes expiry enforceable.  Pass 2 must hand its
-   unresolved children NO_DEADLINE instead of repeatedly timing out at the same frontier.
+   A finite child may return MAYBE without a cache mutation, but it must never receive fresh time
+   beyond an exhausted parent.  Every speculative child remains finite; unresolved exhaustive
+   passes make monotone progress by doubling one local probe quantum instead of saving a split.
 
      tools/build_radio.py -O2 -DMAX_K=2 -DMAX_N=8 tools/deadline_regression.c -o /tmp/deadline_regression
      /tmp/deadline_regression
@@ -16,28 +15,32 @@
 #include RADIOBASE_PATH
 
 int main(void) {
-    clock_t deadline = 200;
+    /* An exhausted parent stays exhausted; no per-child three-second refill. */
+    assert(search_deadline(99, 100, 4) == 99);
+    assert(search_deadline(120, 100, 4) == 120);
 
-    /* No progress: expiry is deliberately suppressed until the subtree contributes a fact. */
-    assert(!deadline_expired(&deadline, 100, 201, 0, 1));
-    assert(deadline == 200);
+    /* A long child receives one tenth only when the parent has enough time to divide. */
+    assert(search_deadline(100 + CLOCKS_PER_SEC * 100, 100, 4)
+           == 100 + CLOCKS_PER_SEC * 10);
+    /* The reliable one/two-segment construction keeps the shared parent cap. */
+    assert(search_deadline(100 + CLOCKS_PER_SEC * 100, 100, 2)
+           == 100 + CLOCKS_PER_SEC * 100);
+    assert(deadline_expired(200, 201));
+    assert(!deadline_expired(200, 200));
 
-    /* At the minimum count, five times the elapsed work is granted. */
-    deadline = 200;
-    assert(!deadline_expired(&deadline, 100, 201, 1, 1));
-    assert(deadline == 706);
+    /* A long speculative child gets its local quantum, without weakening a nearer finite cap. */
+    assert(probe_child_deadline(100 + CLOCKS_PER_SEC * 5, 100, PROBE_SECONDS, 4)
+           == 100 + CLOCKS_PER_SEC * PROBE_SECONDS);
+    assert(probe_child_deadline(120, 100, PROBE_SECONDS, 4) == 120);
+    /* Short states preserve the constructive spine's full shared cap. */
+    assert(probe_child_deadline(100 + CLOCKS_PER_SEC * 5, 100, PROBE_SECONDS, 2)
+           == 100 + CLOCKS_PER_SEC * 5);
 
-    /* The unchanged minimum count deliberately keeps the grace window moving. */
-    assert(!deadline_expired(&deadline, 100, 707, 1, 1));
-    assert(deadline == 3742);
-
-    /* Once another fact arrives, an already-expired budget may bail immediately. */
-    assert(deadline_expired(&deadline, 100, 3743, 2, 1));
-    assert(deadline == 3742);
-
-    /* Exhaustive pass 2 delegates unresolved children without a deadline. */
-    assert(child_deadline_for_pass(1, 123) == 123);
-    assert(child_deadline_for_pass(2, 123) == NO_DEADLINE);
+    /* Even a cache miss with an already-expired parent returns MAYBE immediately. */
+    init();
+    int state = getSbb(3, 2);
+    clock_t expired = clock() ? clock() - 1 : 0;
+    assert(canSolveB(&state, 1, 2, expired) == MAYBE);
 
     puts("deadline regression passed");
     return 0;

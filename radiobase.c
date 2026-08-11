@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/resource.h>
@@ -90,29 +91,48 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 
 #define DEADLINE_RATIO 10
 #define MIN_DEADLINE 3
+#define DEADLINE_POLL_MASK 0xffffu
+#ifndef PROBE_SECONDS
+#define PROBE_SECONDS 2
+#endif
 
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
 #define FAST_ONLY 3
-#define SUBSPLIT_DEADLINE (clock() + CLOCKS_PER_SEC * 1)
 
-/* A bounded search must contribute new negative facts before it may bail.  This is the depth-first
-   progress guarantee: without it, a whole pass can consume its budget in prefixes and return MAYBE
-   without leaving anything reusable in the cache.  At exactly the minimum count, keep extending
-   the grace window so the dive can produce another fact; once it moves beyond that count, expiry
-   is enforceable.  This is the historical state machine, deliberately restored. */
-static int deadline_expired(clock_t *deadline, clock_t start, clock_t now,
-                            long long cant_solve_count, long long cant_solve_count_min) {
-    if (cant_solve_count < cant_solve_count_min) return FALSE;
-    if (cant_solve_count == cant_solve_count_min) {
-        clock_t new_deadline = now + (now - start) * 5;
-        if (new_deadline > *deadline) *deadline = new_deadline;
-    }
-    return now > *deadline;
+/* A finite child gets a fraction of the time still owned by its parent.  In particular, an
+   exhausted parent never manufactures a fresh MIN_DEADLINE interval for each child it tries; that
+   was the source of zero-work retry loops. */
+static clock_t search_deadline(clock_t parent_deadline, clock_t start, int size) {
+    if (parent_deadline == NO_DEADLINE)
+        return start + CLOCKS_PER_SEC * 1000;
+    if (parent_deadline <= start)
+        return parent_deadline;
+    /* One- and two-segment states are the constructive spine: their diagonal/opposed-branch
+       ordering is reliable enough to spend the caller's shared budget directly.  Dividing at
+       these two layers starved the first genuinely long descendant before it reached its witness. */
+    if (size <= 2)
+        return parent_deadline;
+    clock_t remaining = parent_deadline - start;
+    if (remaining > CLOCKS_PER_SEC * MIN_DEADLINE * DEADLINE_RATIO)
+        return start + remaining / DEADLINE_RATIO;
+    return parent_deadline;
 }
 
-static clock_t child_deadline_for_pass(int pass, clock_t deadline) {
-    return pass < 2 ? deadline : NO_DEADLINE;
+static int deadline_expired(clock_t deadline, clock_t now) {
+    return now > deadline;
+}
+
+/* Long states give each speculative child the current local quantum as well as sharing their
+   absolute cap.  Short states keep the cap itself: those are the reliable constructive spine, and
+   slicing it at every level prevents the first long child from ever receiving enough total time.
+   The caller doubles the long-state quantum after every unresolved exhaustive pass, so a saturated
+   cache cannot repeat the same bounded work forever and no split history is needed. */
+static clock_t probe_child_deadline(clock_t child_cap, clock_t now,
+                                    unsigned int probe_seconds, int size) {
+    if (size <= 2) return child_cap;
+    clock_t local = now + CLOCKS_PER_SEC * (clock_t)probe_seconds;
+    return local < child_cap ? local : child_cap;
 }
 
 typedef struct {
@@ -1220,6 +1240,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     if (newsize == 0) return TRUE; // if we only had unit groups
     
     size = newsize;
+    int shared_probe = size <= 2;
     if (size>1) sort1(tmp, size);
     int query_size = size;
     cache_l1_entry *l1_entry;
@@ -1248,6 +1269,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //        debug_printf("returning ck=%d\n", ck);
         return ck;
     }
+    if (parent_deadline != NO_DEADLINE && parent_deadline != FAST_ONLY
+        && deadline_expired(parent_deadline, clock()))
+        return MAYBE;
     
     int size_1 = size-1;
     int size2 = size*2;
@@ -1281,26 +1305,14 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
        cheap states - the overwhelming majority - never pay anything. That also avoids privileging
        the 8-part near-saturated shape: any state that turns out expensive gets the prune. */
     int rb_here = 0;
-    long long cant_solve_count_min = cant_solve_count + 1; // min progress before bailing out
-    clock_t deadline = 0;
-    if (parent_deadline == NO_DEADLINE) {
-        deadline = start + CLOCKS_PER_SEC * (1000);
-    } else {
-//        if (start > ) return MAYBE;
-//        int deadline_ratio = size;
-        int deadline_ratio = DEADLINE_RATIO;
-        if (parent_deadline > start && parent_deadline - start > CLOCKS_PER_SEC * MIN_DEADLINE * deadline_ratio) {
-            deadline = start + ((parent_deadline - start) / deadline_ratio);
-        } else {
-            deadline = start + CLOCKS_PER_SEC * MIN_DEADLINE + 300;
-        }
-    }
+    clock_t deadline = search_deadline(parent_deadline, start, size);
     
     //    printf("k=%d parent_deadline=%llu start=%llu deadline=%llu\n", k, parent_deadline, start, deadline);
     
     int cont2=1;
     int skipped_some;
     int pass = 0;
+    unsigned int probe_seconds = PROBE_SECONDS;
     int max_solvable_maybe = 0;
     int fast_solve;
     while (cont2) {
@@ -1347,19 +1359,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             fast_solve = TRUE && size > 2 && k >= FAST_MIN_K;
         }
         
-        // Deadlines restored 2026-08-04 after disabling them trapped a real run. They are
-        // the only escape from an intractable subtree: Sb(112:80) in 9 - a state with a
-        // KNOWN solution - sank 39 minutes into one 13-part k=5 node of mass 243 = 3^5
-        // (exactly information-tight, so nothing prunes), evaluating 119 billion split
-        // combinations to clear 1 of its 52 splits.
-        //
-        // Removing them bought nothing. A printed `can't solve` is emitted only when
-        // !skipped_some, so negatives are exhaustive with deadlines in place - the
-        // "guarantee" I removed them for was already there. And a NO_DEADLINE root
-        // iteratively deepens (`deadline += deadline - start`) until it concludes, so top
-        // level answers stay definitive. Measured cost on the k=9 ladder: 266s vs 267s with
-        // identical verdicts.
-        int no_deadline = /*size <=2 || */(pass==1 && size <= 4) || parent_deadline == NO_DEADLINE;
+        // Every child call is bounded, including children of a NO_DEADLINE proof.  An unresolved
+        // exhaustive pass doubles probe_seconds and starts over, so this is iterative deepening
+        // rather than a same-budget retry.  Finite calls stop at their shared absolute deadline.
+        int no_deadline = parent_deadline == NO_DEADLINE;
         
 //        int no_deadline = (pass==1);
         
@@ -1398,21 +1401,6 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
         
         
-        clock_t child_deadline = child_deadline_for_pass(pass, deadline);
-        clock_t middle_child_deadline = child_deadline;
-
-        
-//        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
-//        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size <=3)? NO_DEADLINE : deadline;
-
-//
-//        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size < 3)? NO_DEADLINE : deadline;
-//        clock_t middle_child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
-//
-//        clock_t child_deadline = (parent_deadline == NO_DEADLINE && size == 1)? NO_DEADLINE : deadline;
-//        clock_t middle_child_deadline = deadline;
-
-//        clock_t child_deadline = NO_DEADLINE;
         //    fflush(stdout);
         
         i = 0;
@@ -1440,9 +1428,15 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                         if (parent_deadline == NO_DEADLINE) {
                             // double deadline
                             deadline += (deadline - start);
-                        } else {
-                            // do not bail out until you make at least some progress
-//                            if (clock()>deadline && cant_solve_count>=cant_solve_count_min) return MAYBE;
+                        }
+                        if (pass >= 2) {
+                            if (!no_deadline && deadline_expired(deadline, clock())) {
+                                cont2=0;
+                            } else if (probe_seconds <= UINT_MAX / 2) {
+                                /* Monotone work allowance replaces the old cache-progress gate:
+                                   even with zero new verdicts, the next pass is not the same pass. */
+                                probe_seconds *= 2;
+                            }
                         }
                     }
                     break;
@@ -1516,10 +1510,15 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     skipped_some = 1;
                 } else {
                     totalsplits++;
-                    /* Do not poll the deadline while this is still only a partial split.  In
-                       pass 2 the first complete candidate is the handoff to an unresolved child
-                       with NO_DEADLINE.  Bailing here bypasses that depth-first dive and can make
-                       an expensive pass return MAYBE without producing a single reusable fact. */
+                    /* Complete candidates can be extremely sparse in information-tight long
+                       states.  Polling every 2^16 admitted prefixes bounds a finite probe without
+                       putting clock() in the hottest loop.  A NO_DEADLINE proof is never polled
+                       here, so exhaustive work remains exhaustive. */
+                    if (!no_deadline && !(totalsplits & DEADLINE_POLL_MASK)
+                        && deadline_expired(deadline, clock())) {
+                        if (rb_here) rb_release();
+                        return MAYBE;
+                    }
                     /* `>=`, not `==`. rb_on is global, so only one state holds the tables at a time; with
                        equality a state whose trigger instant fell while another was armed lost its
                        only chance and ran the rest unpruned. Arming later is never worse than never
@@ -1571,19 +1570,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #endif
                         debug_printf("can solve\n");
                         if (i == size_1) {
-                            if (cant_solve_count >= cant_solve_count_min
-                                && (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE)) {
+                            if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
                                 clock_t t = clock();
-                                if (deadline_expired(&deadline, start, t, cant_solve_count,
-                                                     cant_solve_count_min)) {
+                                if (deadline_expired(deadline, t)) {
                                     if (no_deadline) {
-                                        //                                    deadline=0;  // now do full solution
-                                        // double deadline
-//                                        deadline+= (deadline - start);
-                                        // bump deadline
                                         deadline = t + 10 * CLOCKS_PER_SEC;
-//                                        cont=0;
-//                                        break;
                                     } else {
                                         { if (rb_here) rb_release(); return MAYBE; }
                                     }
@@ -1595,27 +1586,42 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                                     printSb(sb0, size);
                                     printSb(sb1, size2);
                                     printSb(sb2, size);
-                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu\n", (t - start)/CLOCKS_PER_SEC, (deadline - start) / CLOCKS_PER_SEC, splitindex[0], splitsarr[0]->size, totalsplits);
+                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu",
+                                           (t - start)/CLOCKS_PER_SEC,
+                                           (deadline - start) / CLOCKS_PER_SEC,
+                                           splitindex[0], splitsarr[0]->size, totalsplits);
+                                    if (shared_probe) printf(" probe=shared\n");
+                                    else printf(" probe=%us\n", probe_seconds);
                                     fflush(stdout);
                                     progress = t + PROGRESS_INTERVAL;
                                 }
                             }
-                            clock_t cd = (/*size<=2 && */ totalsplits<5) ? NO_DEADLINE : child_deadline;
-                            if ((cs0 = (cs0==MAYBE?canSolveB(sb0, i+1, k_1, cd):cs0)) != TRUE) {
-                                if (cs0 != FALSE)
-                                    skipped_some = 1;
-                            } else if ((cs2 = (cs2==MAYBE?canSolveB(sb2, i+1, k_1, cd):cs2)) != TRUE) {
-                                if (cs2 != FALSE)
-                                    skipped_some = 1;
-                            } else if((cs1 = (cs1==MAYBE?canSolveB(sb1, (i+1) * 2, k_1, cd):cs1))  != TRUE) {
-                                if (cs1!=FALSE)
-                                    skipped_some = 1;
-                            } else {
+                            clock_t cd = probe_child_deadline(deadline, clock(), probe_seconds, size);
+                            /* MAYBE in one branch must not hide an easy refutation in another.
+                               Probe all still-possible children, stopping only after a FALSE. */
+                            if (cs0 == MAYBE)
+                                cs0 = canSolveB(sb0, i+1, k_1, cd);
+                            if (cs0 != FALSE && cs2 == MAYBE)
+                                cs2 = canSolveB(sb2, i+1, k_1, cd);
+                            if (cs0 != FALSE && cs2 != FALSE && cs1 == MAYBE)
+                                cs1 = canSolveB(sb1, (i+1) * 2, k_1, cd);
+
+                            if (cs0 == TRUE && cs2 == TRUE && cs1 == TRUE) {
                                 //can solve
                                 canSolve=TRUE;
                                 cont=0;
                                 cont2=0;
                                 break;
+                            }
+                            if (cs0 != FALSE && cs2 != FALSE && cs1 != FALSE)
+                                skipped_some = 1;
+
+                            /* A child may have consumed the remainder of this probe's shared
+                               allowance.  Unwind now instead of starting another candidate with
+                               an already-expired parent budget. */
+                            if (!no_deadline && deadline_expired(deadline, clock())) {
+                                if (rb_here) rb_release();
+                                return MAYBE;
                             }
                         } else {
                             i++;
@@ -1744,6 +1750,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printf(" took 0.%03ld", t * 1000/CLOCKS_PER_SEC);
     if (rb_here) rb_release();
     printf(" totalsplits=%llu pass=%d fast_solve=%d", totalsplits, pass, fast_solve);
+    if (shared_probe) printf(" probe=shared");
+    else printf(" probe=%us", probe_seconds);
 #ifdef MEASURE_FAST_REPLAY
     if (fast_replay_capture && k == 5 && parent_deadline == NO_DEADLINE) {
         fast_replay_pass = pass;
