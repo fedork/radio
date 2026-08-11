@@ -4,6 +4,7 @@
 # in S3 for detail.
 #
 #   tools/sa193_watchdog.sh --log FILE --pid PID [--bucket B] [--topic ARN] [--prefix run]
+#       [--compare-log FILE --compare-label run3 --compare-top 6]
 #
 # --prefix separates concurrent runs in the same bucket. The A+B run started 2026-08-09 shares the
 # instance with the original, so it writes under run2/ and its status is fetched with
@@ -18,6 +19,7 @@
 set -uo pipefail
 
 LOG= PID= BUCKET= TOPIC= INTERVAL=600 HEARTBEAT=21600 PREFIX=run
+COMPARE_LOG= COMPARE_LABEL=peer COMPARE_TOP=6
 while (( $# )); do
     case "$1" in
         --log) LOG="$2"; shift 2 ;;
@@ -27,10 +29,17 @@ while (( $# )); do
         --topic) TOPIC="$2"; shift 2 ;;
         --interval) INTERVAL="$2"; shift 2 ;;
         --heartbeat) HEARTBEAT="$2"; shift 2 ;;
+        --compare-log) COMPARE_LOG="$2"; shift 2 ;;
+        --compare-label) COMPARE_LABEL="$2"; shift 2 ;;
+        --compare-top) COMPARE_TOP="$2"; shift 2 ;;
         *) echo "unknown arg $1" >&2; exit 2 ;;
     esac
 done
 [[ -n "$LOG" && -n "$PID" ]] || { echo "need --log and --pid" >&2; exit 2; }
+[[ "$COMPARE_TOP" =~ ^[0-9]+$ && "$COMPARE_TOP" -ge 1 && "$COMPARE_TOP" -le 20 ]] || {
+    echo "--compare-top must be between 1 and 20" >&2
+    exit 2
+}
 
 START=$(date +%s)
 LAST_BEAT=0
@@ -275,7 +284,15 @@ while :; do
     fi
     if [[ -n "$BUCKET" ]]; then
         printf '%s\n' "$S" | aws s3 cp - "s3://$BUCKET/$PREFIX/STATUS" --content-type text/plain >/dev/null 2>&1 || true
-
+        # Compare the live raw prefixes, not the at-most-hourly compressed snapshots.  This runs
+        # only at the watchdog cadence and uses a streaming parser with bounded state, so it does
+        # not build another verdict cache beside the solver.
+        if [[ -n "$COMPARE_LOG" && -r "$COMPARE_LOG" && -f tools/sa193_compare.py ]]; then
+            python3 tools/sa193_compare.py --label "$PREFIX" --peer-label "$COMPARE_LABEL" \
+                --top "$COMPARE_TOP" "$LOG" "$COMPARE_LOG" \
+                | aws s3 cp - "s3://$BUCKET/$PREFIX/COMPARE" --content-type text/plain \
+                    >/dev/null 2>&1 || true
+        fi
     fi
 
     # $4 is the count: the line is "  top-level states done   N of 16", so $5 is the word "of".

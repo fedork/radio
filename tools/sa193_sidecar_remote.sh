@@ -5,7 +5,8 @@
 #
 # Example (from /root/run4):
 #   tools/sa193_sidecar_remote.sh --prefix run4 --binary radio_sa193_v4 \
-#       --build 0123456789abcdef0123456789abcdef01234567 --peer radio_sa193_v3 --rss-gb 60 \
+#       --build 0123456789abcdef0123456789abcdef01234567 \
+#       --peer radio_sa193_v3 --peer-prefix run3 --rss-gb 60 \
 #       --idle-solvers radio_sa193_v3,radio_sa193_v4
 
 set -euo pipefail
@@ -14,8 +15,10 @@ PREFIX=run4
 BINARY=radio_sa193_v4
 BUILD=unknown
 PEER=radio_sa193_v3
+PEER_PREFIX=run3
 IDLE_SOLVERS=
 RSS_GB=60
+WATCH_INTERVAL=600
 # Ten years is an accident backstop, not an intended deadline.  The run should end by verdict.
 SECONDS_CAP=315360000
 BUCKET=radio-sa193-393287594714
@@ -27,8 +30,10 @@ while (( $# )); do
         --binary) BINARY="$2"; shift 2 ;;
         --build) BUILD="$2"; shift 2 ;;
         --peer) PEER="$2"; shift 2 ;;
+        --peer-prefix) PEER_PREFIX="$2"; shift 2 ;;
         --idle-solvers) IDLE_SOLVERS="$2"; shift 2 ;;
         --rss-gb) RSS_GB="$2"; shift 2 ;;
+        --watch-interval) WATCH_INTERVAL="$2"; shift 2 ;;
         --seconds) SECONDS_CAP="$2"; shift 2 ;;
         *) echo "unknown argument: $1" >&2; exit 64 ;;
     esac
@@ -41,7 +46,15 @@ done
     exit 64
 }
 [[ "$PEER" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid peer name: $PEER" >&2; exit 64; }
+[[ "$PEER_PREFIX" =~ ^[a-zA-Z0-9_-]+$ ]] || {
+    echo "invalid peer prefix: $PEER_PREFIX" >&2
+    exit 64
+}
 [[ "$RSS_GB" =~ ^[0-9]+$ && "$RSS_GB" -gt 0 ]] || { echo "invalid RSS cap" >&2; exit 64; }
+[[ "$WATCH_INTERVAL" =~ ^[0-9]+$ && "$WATCH_INTERVAL" -ge 60 ]] || {
+    echo "watch interval must be at least 60 seconds" >&2
+    exit 64
+}
 [[ "$SECONDS_CAP" =~ ^[0-9]+$ && "$SECONDS_CAP" -gt 0 ]] || { echo "invalid time cap" >&2; exit 64; }
 [[ -n "$IDLE_SOLVERS" ]] || {
     echo "need --idle-solvers with every solver that must keep the host alive" >&2
@@ -64,7 +77,8 @@ RUN_DIR=$(pwd -P)
 
 for needed in radiobase.c radio_sa193.c parse_out.sh tools/capped_run.sh \
               tools/build_radio.py tools/check_provenance.py \
-              tools/sa193_watchdog.sh tools/sa193_idle_shutdown.sh; do
+              tools/sa193_watchdog.sh tools/sa193_compare.py \
+              tools/sa193_idle_shutdown.sh; do
     [[ -f "$needed" ]] || { echo "missing $RUN_DIR/$needed" >&2; exit 66; }
 done
 for existing in "$BINARY" "$BINARY.provenance" out_sa193.txt sa193.err run.meta wrapper.pid solver.pid watchdog.pid; do
@@ -75,6 +89,11 @@ PEER_COUNT=$(pgrep -xc "$PEER" || true)
 [[ "$PEER_COUNT" == 1 ]] || {
     echo "expected exactly one incumbent $PEER, found $PEER_COUNT" >&2
     exit 69
+}
+PEER_LOG="/root/$PEER_PREFIX/out_sa193.txt"
+[[ -r "$PEER_LOG" ]] || {
+    echo "peer log is not readable: $PEER_LOG" >&2
+    exit 66
 }
 if pgrep -x "$BINARY" >/dev/null 2>&1; then
     echo "target process $BINARY is already running" >&2
@@ -108,12 +127,16 @@ SEG="seg-${START_UTC//[:T-]/}-${BUILD}"
     printf 'cache=none (cold)\n'
     printf 'control=Sa(192) in 10, enabled\n'
     printf 'peer=%s pid=%s\n' "$PEER" "$(pgrep -x "$PEER")"
+    printf 'peer_prefix=%s\n' "$PEER_PREFIX"
+    printf 'peer_log=%s\n' "$PEER_LOG"
     printf 'rss_limit_gib=%s\n' "$RSS_GB"
     printf 'wall_backstop_seconds=%s\n' "$SECONDS_CAP"
+    printf 'watch_interval_seconds=%s\n' "$WATCH_INTERVAL"
     printf 's3_prefix=s3://%s/%s/\n' "$BUCKET" "$PREFIX"
     printf 'mem_available_gib=%s\n' "$((AVAILABLE_KB / 1048576))"
     printf 'disk_available_gib=%s\n' "$((DISK_KB / 1048576))"
-    sha256sum tools/sa193_watchdog.sh tools/capped_run.sh tools/sa193_idle_shutdown.sh
+    sha256sum tools/sa193_watchdog.sh tools/sa193_compare.py \
+        tools/capped_run.sh tools/sa193_idle_shutdown.sh
     cat "$BINARY.provenance"
 } > run.meta
 
@@ -152,7 +175,9 @@ fi
 setsid nohup env SEG="$SEG" PROFILE="$RUN_DIR/memprofile.csv" \
     tools/sa193_watchdog.sh --log "$RUN_DIR/out_sa193.txt" --pid "$SOLVER_PID" \
     --bucket "$BUCKET" --topic "$TOPIC" --prefix "$PREFIX" \
-    --interval 600 --heartbeat 21600 >> wd.log 2>&1 < /dev/null &
+    --interval "$WATCH_INTERVAL" --heartbeat 21600 \
+    --compare-log "$PEER_LOG" --compare-label "$PEER_PREFIX" --compare-top 6 \
+    >> wd.log 2>&1 < /dev/null &
 WATCHDOG_PID=$!
 printf '%s\n' "$WATCHDOG_PID" > watchdog.pid
 

@@ -22,22 +22,101 @@ INSTANCE=i-0005d74f985c52ae1
 #   run5  + bounded exact-state L1 before majorization/cache lookup (290a892)
 #   run6  + broken zero-progress deadline/prefix polling experiment (c13b5d3)
 #   run7  + restored depth-first progress and pass-2 NO_DEADLINE handoff (e648e83)
-# `--prefix runN` reads one; `--all` reads every prefix listed in render() below. Run3 is the only
-# live solver as of 2026-08-11; run7 remains in the comparison view as the final snapshot of the
-# diagnosed scheduler failure.
+#   run8  + compact cache and bounded long-state probes (current main at launch)
+# `--prefix runN` reads one; `--all` reads every prefix listed in render() below. The default live
+# comparison is run3 against run8; override the candidate with `--candidate runN` for archaeology.
 PREFIX=run
 BOTH=0
 COMPARE=0
 WATCH=0
+CANDIDATE=run8
 while (( $# )); do
     case "$1" in
         --prefix) PREFIX="$2"; shift 2 ;;
+        --candidate) CANDIDATE="$2"; shift 2 ;;
         --both|--all) BOTH=1; shift ;;
         --compare) COMPARE=1; shift ;;
         --watch)  WATCH=1; shift ;;
-        *) echo "usage: $0 [--prefix runN] [--all|--compare] [--watch]" >&2; exit 2 ;;
+        *) echo "usage: $0 [--prefix runN] [--all|--compare] [--candidate runN] [--watch]" >&2; exit 2 ;;
     esac
 done
+[[ "$CANDIDATE" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid candidate prefix" >&2; exit 2; }
+
+object_exists() {
+    aws-vault exec --server default -- aws s3 ls "s3://$BUCKET/$1" >/dev/null 2>&1
+}
+
+object_age_minutes() {
+    local mod="$1" now
+    now=$(date -u +%s)
+    printf '%s' $(( (now - $(date -u -j -f "%Y-%m-%dT%H:%M:%S" \
+        "${mod%%+*}" +%s 2>/dev/null || echo "$now")) / 60 ))
+}
+
+compact_count() {
+    awk -v n="$1" 'BEGIN {
+        if (n >= 1000000) printf "%.2fM", n/1000000
+        else if (n >= 1000) printf "%.1fk", n/1000
+        else printf "%d", n
+    }'
+}
+
+compact_duration() {
+    local seconds="${1:-0}"
+    [[ "$seconds" =~ ^[0-9]+$ ]] || { printf '%s' '-'; return; }
+    if (( seconds >= 86400 )); then
+        printf '%dd%02dh%02dm' $((seconds / 86400)) $((seconds % 86400 / 3600)) \
+            $((seconds % 3600 / 60))
+    elif (( seconds >= 3600 )); then
+        printf '%dh%02dm' $((seconds / 3600)) $((seconds % 3600 / 60))
+    elif (( seconds >= 60 )); then
+        printf '%dm%02ds' $((seconds / 60)) $((seconds % 60))
+    else
+        printf '%ss' "$seconds"
+    fi
+}
+
+compact_row() {
+    local p="$1" snapshot mod status wall cpu roots control verdicts rss log age updated current
+    if ! object_exists "$p/STATUS"; then
+        printf '%-6s %-5s %-9s %-9s %-5s %-10s %-9s %-7s %-6s %s\n' \
+            "$p" "-" "-" "-" "-" "pending" "-" "-" "-" "-"
+        return
+    fi
+    mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" \
+        --key "$p/STATUS" --query LastModified --output text 2>/dev/null)
+    snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$p/STATUS" - 2>/dev/null)
+    status=$(sed -n 's/^  solver process  *//p' <<<"$snapshot")
+    [[ "$status" == alive ]] && status=live || status=done
+    wall=$(sed -n 's/^  solver running for  *//p' <<<"$snapshot" | tr -d ' ')
+    cpu=$(awk '$1 == "cpu" {sub(/s$/, "", $2); print $2; exit}' <<<"$snapshot")
+    cpu=$(compact_duration "$cpu")
+    roots=$(awk '/top-level states done/{print $4 "/16"}' <<<"$snapshot")
+    verdicts=$(awk '$1 == "verdicts" && $2 ~ /^[0-9]+$/ {print $2; exit}' <<<"$snapshot")
+    verdicts=$(compact_count "${verdicts:-0}")
+    rss=$(sed -n 's/^  resident memory  *//p' <<<"$snapshot" | sed 's/ GB$/G/')
+    log=$(sed -n 's/^  log size  *//p' <<<"$snapshot" | tr -d ' ')
+    control=$(sed -n 's/^  control  *//p' <<<"$snapshot")
+    if [[ "$control" == result\ CONTROL* ]]; then
+        control=$(awk 'match($0, /\([0-9.]+ s\)/) {
+            value=substr($0,RSTART+1,RLENGTH-2); gsub(/ /,"",value); print "ok:" value
+        }' <<<"$control")
+    else
+        control=pending
+    fi
+    age=$(object_age_minutes "$mod")
+    updated="${age}m"
+    if (( age > 30 )); then
+        [[ "$status" == done ]] && updated="${age}m-final" || updated="${age}m-STALE"
+    fi
+    printf '%-6s %-5s %-9s %-9s %-5s %-10s %-9s %-7s %-6s %s\n' \
+        "$p" "$status" "${wall:--}" "$cpu" "${roots:--}" "$control" "$verdicts" \
+        "${rss:--}" "${log:--}" "$updated"
+    current=$(awk '/^    k=/{
+        sub(/^    /,""); if (length($0)>155) $0=substr($0,1,152) "..."; print; exit
+    }' <<<"$snapshot")
+    [[ -n "$current" ]] && printf '       %s\n' "$current"
+}
 
 show() {
     local PREFIX="$1"
@@ -77,8 +156,21 @@ banner() {
 }
 render() {
     if (( COMPARE )); then
-        banner run3 "full-star incumbent"
-        banner run7 "depth-first compact sidecar (stopped)"
+        printf 'Sa(193) live comparison  %s\n' "$(date -u +%FT%TZ)"
+        printf '%-6s %-5s %-9s %-9s %-5s %-10s %-9s %-7s %-6s %s\n' \
+            RUN STATE WALL CPU ROOT CONTROL VERDICTS RSS LOG UPDATE
+        compact_row run3
+        compact_row "$CANDIDATE"
+        printf '\n'
+        if object_exists "$CANDIDATE/COMPARE"; then
+            aws-vault exec --server default -- aws s3 cp \
+                "s3://$BUCKET/$CANDIDATE/COMPARE" - 2>/dev/null
+        else
+            printf 'comparison pending first %s watchdog cycle\n' "$CANDIDATE"
+        fi
+        printf '\ninstance %s  %s\n' "$INSTANCE" \
+            "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$INSTANCE" \
+                 --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null)"
     elif (( BOTH )); then
         banner run  "original build"
         banner run2 "A+B optimisations"
@@ -87,6 +179,7 @@ render() {
         banner run5 "exact L1 (stopped prematurely)"
         banner run6 "broken deadline experiment (aborted)"
         banner run7 "compact cache + exact L1 (stopped: obsolete deadlines)"
+        banner run8 "compact cache + bounded probes"
     else
         show "$PREFIX"
     fi
