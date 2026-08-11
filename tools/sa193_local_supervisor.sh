@@ -1,5 +1,5 @@
 #!/bin/bash
-# Supervise one cold local radio_sa193 run without imposing a time limit.
+# Supervise one cold or same-run-resumed local radio_sa193 run without a time limit.
 #
 # Usage:
 #   tools/sa193_local_supervisor.sh RUN_DIR [FOOTPRINT_GIB] [SAME_RUN_CHECKPOINT]
@@ -34,7 +34,7 @@ META="$RUN_DIR/run.meta"
 STOP_REASON="$RUN_DIR/stop.reason"
 INTERVAL=120
 CHECKPOINT_INTERVAL=3600
-VMAP_TIMEOUT=20
+FOOTPRINT_TIMEOUT=20
 MIN_DISK_KIB=$((10 * 1024 * 1024))
 HARD_BYTES=$(awk -v gib="$FOOTPRINT_GIB" 'BEGIN { printf "%.0f", gib * 1024 * 1024 * 1024 }')
 
@@ -92,14 +92,15 @@ write_checkpoint() {
     } > "$tmp" && mv "$tmp" "$CHECKPOINT"
 }
 
-bounded_vmmap() {
-    # `vmmap` can itself hang while sampling a busy solver.  That previously froze both the memory
-    # guard and hourly checkpoints indefinitely.  Kill only the diagnostic child after a short
-    # timeout; five consecutive failed samples still stop the solver through the existing guard.
-    vmmap -summary "$SOLVER_PID" 2>/dev/null &
+bounded_footprint() {
+    # macOS top documents MEM as the process's physical footprint and returns it without walking
+    # every VM region.  `vmmap -summary` did that walk and could hang for many minutes on this
+    # solver, freezing both the guard and checkpoint cadence.  Bound even the cheaper probe so a
+    # diagnostic child can never wedge the supervisor again.
+    /usr/bin/top -l 1 -pid "$SOLVER_PID" -stats pid,mem 2>/dev/null &
     local probe_pid=$!
     (
-        sleep "$VMAP_TIMEOUT"
+        sleep "$FOOTPRINT_TIMEOUT"
         kill -TERM "$probe_pid" 2>/dev/null || exit 0
         sleep 1
         kill -KILL "$probe_pid" 2>/dev/null || true
@@ -151,7 +152,8 @@ BASE_SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
     printf 'minimum_free_disk_gib=10\n'
     printf 'monitor_interval_seconds=%s\n' "$INTERVAL"
     printf 'checkpoint_interval_seconds=%s\n' "$CHECKPOINT_INTERVAL"
-    printf 'vmmap_timeout_seconds=%s\n' "$VMAP_TIMEOUT"
+    printf 'footprint_probe=top MEM (documented physical memory footprint)\n'
+    printf 'footprint_probe_timeout_seconds=%s\n' "$FOOTPRINT_TIMEOUT"
     printf 'baseline_swap=%s\n' "$BASE_SWAP"
     printf 'radio_sa193_c_sha256=%s\n' "$SOURCE_SHA"
     printf 'radiobase_c_sha256=%s\n' "$BASE_SHA"
@@ -179,7 +181,7 @@ printf '%s START supervisor=%s solver=%s caffeinate=%s hard_footprint=%sGiB\n' \
     "$START_UTC" "$$" "$SOLVER_PID" "$CAFFEINATE_PID" "$FOOTPRINT_GIB" >> "$MONITOR_LOG"
 
 LAST_CHECKPOINT=$START_EPOCH
-VMAP_FAILURES=0
+FOOTPRINT_FAILURES=0
 
 while kill -0 "$SOLVER_PID" 2>/dev/null; do
     NOW_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -191,17 +193,18 @@ while kill -0 "$SOLVER_PID" 2>/dev/null; do
     DISK_KIB=$(df -k "$RUN_DIR" | awk 'NR == 2 {print $4}')
     SWAP=$(sysctl -n vm.swapusage 2>/dev/null || printf unavailable)
     FREE_PERCENT=$(memory_pressure 2>/dev/null | awk -F': ' '/System-wide memory free percentage/ {print $2; exit}')
-    VMAP=$(bounded_vmmap)
-    VMAP_STATUS=$?
-    [ "$VMAP_STATUS" -eq 0 ] || VMAP=
-    FOOTPRINT_RAW=$(printf '%s\n' "$VMAP" | awk '/^Physical footprint:/ {print $3; exit}')
+    FOOTPRINT_TABLE=$(bounded_footprint)
+    FOOTPRINT_STATUS=$?
+    [ "$FOOTPRINT_STATUS" -eq 0 ] || FOOTPRINT_TABLE=
+    FOOTPRINT_RAW=$(printf '%s\n' "$FOOTPRINT_TABLE" |
+        awk -v pid="$SOLVER_PID" '$1 == pid {print $2; exit}')
     FOOTPRINT_BYTES=unknown
 
     if [ -n "$FOOTPRINT_RAW" ]; then
         FOOTPRINT_BYTES=$(human_bytes "$FOOTPRINT_RAW")
-        VMAP_FAILURES=0
+        FOOTPRINT_FAILURES=0
     else
-        VMAP_FAILURES=$((VMAP_FAILURES + 1))
+        FOOTPRINT_FAILURES=$((FOOTPRINT_FAILURES + 1))
     fi
 
     {
@@ -220,7 +223,7 @@ while kill -0 "$SOLVER_PID" 2>/dev/null; do
         printf 'free_disk_kib=%s\n' "$DISK_KIB"
         printf 'memory_free=%s\n' "${FREE_PERCENT:-unavailable}"
         printf 'swap=%s\n' "$SWAP"
-        printf 'vmmap_consecutive_failures=%s\n' "$VMAP_FAILURES"
+        printf 'footprint_probe_consecutive_failures=%s\n' "$FOOTPRINT_FAILURES"
     } > "$STATUS.tmp" && mv "$STATUS.tmp" "$STATUS"
 
     printf '%s elapsed=%ss ps=[%s] footprint=%s lines=%s bytes=%s disk_kib=%s free=%s swap=[%s]\n' \
@@ -231,8 +234,8 @@ while kill -0 "$SOLVER_PID" 2>/dev/null; do
         terminate_solver "physical footprint ${FOOTPRINT_RAW} reached the ${FOOTPRINT_GIB} GiB ceiling"
         break
     fi
-    if [ "$VMAP_FAILURES" -ge 5 ]; then
-        terminate_solver "vmmap failed for five consecutive samples; the physical-memory guard is no longer trustworthy"
+    if [ "$FOOTPRINT_FAILURES" -ge 5 ]; then
+        terminate_solver "physical-footprint probe failed for five consecutive samples; the memory guard is no longer trustworthy"
         break
     fi
     if [ -n "$DISK_KIB" ] && [ "$DISK_KIB" -lt "$MIN_DISK_KIB" ]; then
