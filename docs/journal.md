@@ -4389,3 +4389,29 @@ The complete commands, layout accounting and caveats are in
 already has canonical witness proofs, so this run is performance/correctness validation rather than
 a new mathematical claim.  No local solver from these measurements remains alive; the pre-change
 remote `run3` watcher is untouched.
+
+## 2026-08-10 — cold compact `Sa(193)` run launched locally with a 20 GiB footprint guard
+
+The current compact engine is now running the full cold driver from commit `7ceb59d` in
+`/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  It started at
+2026-08-11 01:12:42 UTC with no cache argument, the `Sa(192)` control enabled, and no wall-time
+limit.  The compiled binary SHA-256 is
+`c3972f6777fb2fe5b71fb54c307065501629e0c5197e96c2f2beebe186c4335b`; source and supervisor hashes
+are recorded beside it in `run.meta`.  The initialization banner confirms `cache=(none, cold)`.
+The control had not completed at this journal cutoff, so this records only a launch, not a verdict.
+
+`tools/sa193_local_supervisor.sh` owns the run.  Every two minutes it records CPU, RSS, virtual size,
+`vmmap` physical footprint, system swap, memory pressure, log size, and free disk.  It has exactly
+four automatic stop conditions: a 20 GiB process footprint, less than 10 GiB free disk, five
+consecutive `vmmap` failures (the guard can no longer be trusted), or the solver's own exit.  It also
+keeps macOS awake and regenerates a same-log parsed checkpoint hourly.  The append-only raw log is
+itself enough to regenerate that checkpoint after a crash, so rescanning it every few minutes would
+only add long-run I/O.
+
+The first directory, `sa193-local-front-7ceb59d-cold1`, is a launch failure and contains zero bytes
+of solver output.  Starting the supervisor with `nohup` inside a short managed command did not
+detach it from that command's process-tree cleanup: solver, supervisor and `caffeinate` disappeared
+together, with neither stderr nor `completion.txt`.  Nothing mathematical ran far enough to record.
+The replacement keeps the supervisor in the foreground of a persistent execution session.  This is
+a durable operational trap: under a managed shell, verify survival after the launching command
+returns; `nohup` by itself is not evidence of detachment.

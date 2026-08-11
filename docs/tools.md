@@ -112,6 +112,19 @@ while `vmmap -summary` measured a 7.1 GB physical footprint, 5.9 GB of it swappe
 `Physical footprint` as well as `vm_stat` for any long local run.  Linux/AWS did not show this
 gap because the solver heap remained resident there.
 
+For the deliberately unbounded-time local `Sa(193)` run, use
+`tools/sa193_local_supervisor.sh RUN_DIR [FOOTPRINT_GIB]`.  `RUN_DIR` must contain a newly compiled
+`radio_sa193`; the supervisor always invokes it with no cache argument, keeps the machine awake,
+samples its `vmmap` physical footprint every two minutes, regenerates a same-log checkpoint hourly,
+and refuses to overwrite an existing attempt.  It has no time limit.  It stops on the requested
+footprint ceiling, less than 10 GiB free disk, or five consecutive failures of the physical-memory
+measurement.  Inspect `status.txt`, `monitor.log`, and the PID files in `RUN_DIR`.
+
+In an ordinary terminal the supervisor may be put under `nohup`.  A managed one-shot command may
+reap its whole descendant process group after returning despite `nohup`; in that environment keep
+the supervisor in the foreground of a persistent execution session.  An empty log and the absence
+of `completion.txt` distinguish that launcher failure from a solver exit.
+
 ### The canonical search does not always work, even unrestricted
 
 It is a *hypothesis* about solution shape, and the hypothesis fails at small k. `Sb(46:6)` in 6

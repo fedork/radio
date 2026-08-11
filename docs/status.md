@@ -220,6 +220,17 @@ continuation credible; it does not bound future cache growth or prove that the f
 Implementation measurements and commands are in
 [`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
 
+A new genuinely cold local derivation from source commit `7ceb59d` started at
+2026-08-11 01:12:42 UTC in
+`/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  It has no wall-time limit and is guarded
+by the solver's own `vmmap` physical footprint at 20 GiB, not by RSS; raw output is retained and an
+hourly same-log checkpoint is generated.  At launch the log identified `cache=(none, cold)` and
+entered the required `Sa(192)` control normally.  The control had not completed at this writing, so
+this is an active-run record, not evidence for either `Sa(192)` or `Sa(193)`.  Read `status.txt` and
+`monitor.log` in that directory and verify the recorded PID before calling it live.  The sibling
+`cold1` directory is an empty launcher failure: a managed one-shot shell reaped both descendants
+despite `nohup`; it contains no solver result and must never be used as a checkpoint.
+
 Historical lesson, retained without treating the old processes as live: before full-star
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
 majorization removes that mode strongly enough that `run3` is instead dominated by k=7.  Optimising
@@ -392,9 +403,11 @@ of the parent remains possible.  Do not promote that one-point correction to a f
    includes full-star expansion but predates level-lazy split tables. Do not discard its 21-hour
    cold cache merely to adopt an allocation change.
 
-1. **Run the compact current-main `Sa(193)` derivation locally under live inventory.** Its cold
-   `Sa(192)` gate has passed at 0.41 GB peak RSS; resume only from that run's own checkpoint, retain
-   raw output, and keep watching physical footprint because the cache is compact, not bounded.
+1. **Watch the active compact local `Sa(193)` derivation** in
+   `/Users/fedor/radio-runs/sa193-local-front-7ceb59d-cold2`.  First require its own cold `Sa(192)`
+   gate to pass; the earlier 0.41 GB control was a separate validation run.  Resume only from this
+   run's own raw log/checkpoint, and keep watching physical footprint because the cache is compact,
+   not bounded.
 
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the
