@@ -8,9 +8,8 @@
 # the `-` gives "the following arguments are required: paths", which is what this script exists to
 # save you from.
 #
-# `age` matters as much as the contents. The watchdog writes every 10 minutes, so a snapshot up to
-# ten minutes old is normal and says nothing is wrong; one that is hours old means the watchdog died
-# even though the solver may still be running fine.
+# `age` matters as much as the contents. Live watchdogs write every 5-10 minutes, so that much age is
+# normal and says nothing is wrong; hours means the watchdog died even if the solver is still alive.
 set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 BUCKET=radio-sa193-393287594714

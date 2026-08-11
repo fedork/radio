@@ -4973,9 +4973,51 @@ old root-to-active-level stacks and found the by-level comparison unhelpful. The
 full current stack beneath each one-line run summary, then only the lagging run's exact matched slow
 calls. The comparator no longer accumulates or emits by-level totals.
 
-Run8's remote monitor is part of its frozen launch provenance and still uploads the first-format
-`COMPARE` object. Rather than edit a live archived source tree or make `run.meta` lie about its tool
-hash, `tools/sa193_status.sh` strips that obsolete block client-side. Future launches emit the new
-format directly. At 23:12 UTC the resulting live view showed three active levels for run3 and four
-for run8; run8 was inside `Sb(112:81)@9`, at 220.2 K status verdicts and 0.74 GiB RSS. Both solvers
-remained live, with run3 still one completed root ahead.
+Run8 initially continued uploading the first-format `COMPARE` object from its frozen launch helper,
+so `tools/sa193_status.sh` stripped that obsolete block client-side without touching the live tree.
+The separately versioned helper update in the next entry then made the refined comparison live while
+retaining the original helper and launch metadata. At 23:12 UTC the stack view showed three active
+levels for run3 and four for run8; run8 was inside `Sb(112:81)@9`, at 220.2 K status verdicts and
+0.74 GiB RSS. Both solvers remained live, with run3 still one completed root ahead.
+
+## 2026-08-11 — windowed self estimates and active-adjusted level totals
+
+There is a useful middle ground between claiming exact per-call exclusive time and showing none.
+For each completed level-k verdict, maintain the cumulative inclusive `took` total at k-1. The
+difference in that counter since the previous level-k verdict is the completed child work in the
+usual depth-first interval, so
+
+```
+estimated self(k verdict) = took(k verdict) - intervening took(k-1 verdicts).
+```
+
+The first verdict at each level has no left boundary and is printed `-`. A `MAYBE` return without a
+verdict, cache reuse or unusual interleaving can misattribute time, so the output deliberately labels
+the field `~self`; negative estimates remain visible but do not get a ratio. On the retained 73 MB
+local pair, adding the estimator kept the comparison at 2.12 seconds and about 15 MB maximum RSS.
+
+The per-level totals solve a different problem and remain useful per run. The compact view now keeps
+each root-to-active stack and prints `CPU by level i/s (+active)` beneath it. Before recomputing the
+level self differences, it adds the current elapsed value from every visible `[solving]` frame to
+that level's completed inclusive total. This turns the formerly missing current ancestors into a
+much closer live accounting without presenting the levels as a cross-run comparison. The Unicode
+fixed-width status table needs positional parsing because its figure spaces are both padding and
+digit-group separators; `tools/sa193_level_times.py` implements that parser and has a synthetic
+active-frame regression test.
+
+Commit `4cd002e` was pushed before the live helper was changed. The replacement comparison helper's
+SHA-256 is `a8599a71b4a6bc3cc4b1e4ad0c8b6485722ba932bf297d5cc294de438a316ccd`; the launch helper's was
+`dc7900942c3cc25f626be26f86b51b3ceb3b5c008d3402adefca1793f8ade097`. SSM command
+`73df22ca-30a2-4d18-b357-896d1e772e82` copied both into versioned `run8/monitor-updates/` paths,
+preserved the original metadata as `run.meta.launch`, atomically replaced only the helper, appended
+the old/new hashes and full commit to `run.meta`, and regenerated `run8/COMPARE`. The original and
+updated metadata hashes are respectively
+`223c05d123e2ba58fd427e1f4744bc0e7e9f87345d35e29577848e9b38684de7` and
+`5c39223c1fe5f1055404e44ddf23e7932935ecbbc6eaa376bf027f3c2090358c`. No solver process or binary
+was touched.
+
+The first live refined join at 23:32:51 UTC selected the same six slow calls. The first k=9 call had
+no prior k=9 boundary, hence `345/-` versus `414/-`. The five k=8 calls had estimated self times of
+4.719–16 seconds in run8 and 4.678–15 seconds in run3; their inclusive ratios were 0.90x–1.02x and
+estimated-self ratios 0.77x–1.06x. At 23:33 the separate run8 level profile, including 2,260 seconds
+of visible active k=9 work, read `k9 2.6k/2.1k`; run8 remained inside `Sb(112:81)@9`, at 0.92 GiB RSS.

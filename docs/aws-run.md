@@ -61,6 +61,15 @@ after launch. Launch and independent survival checks are SSM commands
 Its mandatory cold control returned `SOLVABLE` in 471.6 CPU seconds and the process continued into
 `Sa(193)`; run3's same-host control was 540.7 seconds.
 
+The solver remains exactly that frozen build. Its comparison helper alone was updated after launch
+to commit `4cd002e` (SHA-256
+`a8599a71b4a6bc3cc4b1e4ad0c8b6485722ba932bf297d5cc294de438a316ccd`) so the live exact-state join
+can report estimated self time. The original helper, original `run.meta` and replacement helper are
+all retained under `run8/` (the helpers under `monitor-updates/`); the appended metadata records both
+hashes. SSM command:
+`73df22ca-30a2-4d18-b357-896d1e772e82`. No solver, cache, deadline, watchdog process or raw output
+was changed.
+
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
 
@@ -94,9 +103,11 @@ This prints compact live rows for run3 and run8, followed by the latest exact-ca
 Run8 refreshes every five minutes; run3's older watchdog refreshes every ten. The comparison chooses
 the run with fewer completed roots (then fewer verdicts), takes its six slowest completed calls and
 joins them to run3 by exact printed `(state,k)`. Under each compact run row, the current recursive
-stack is shown from the k=9 root down to the active level. `took` is inclusive CPU, not wall time;
-there is no by-level timing comparison or invented per-verdict self time. A missing peer call is
-printed as `-`, never inferred from surrounding progress.
+stack is shown from the k=9 root down to the active level, followed by that run's compact per-level
+`inclusive/self` profile. Visible `still solving ... elapsed` time is added to the corresponding
+level before the self differences are taken. `took` is inclusive CPU, not wall time. Per-call
+`~self` subtracts all k-1 verdict time since the previous k verdict; it is an estimate, and the first
+call at a level is shown as unknown. A missing peer call is printed as `-`, never inferred.
 
 | key | what |
 |---|---|
