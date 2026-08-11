@@ -12,6 +12,7 @@
 # ten minutes old is normal and says nothing is wrong; one that is hours old means the watchdog died
 # even though the solver may still be running fine.
 set -uo pipefail
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 BUCKET=radio-sa193-393287594714
 INSTANCE=i-0005d74f985c52ae1
 # Concurrent runs share the instance from 2026-08-09, each under its own S3 prefix:
@@ -76,6 +77,11 @@ compact_duration() {
     fi
 }
 
+compact_level_times() {
+    local snapshot="$1"
+    python3 "$SCRIPT_DIR/sa193_level_times.py" <<<"$snapshot"
+}
+
 compact_row() {
     local p="$1" snapshot mod status wall cpu roots control verdicts rss log age updated
     if ! object_exists "$p/STATUS"; then
@@ -119,6 +125,7 @@ compact_row() {
         /^  time by level/ { in_stack=0 }
         in_stack && /^    k=/ { sub(/^    /, "       "); print }
     ' <<<"$snapshot"
+    compact_level_times "$snapshot"
 }
 
 show() {

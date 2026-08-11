@@ -26,7 +26,7 @@ MASS_RE = re.compile(r"\[(\d+),(\d+)\]$")
 FIRST_PART_RE = re.compile(r"^Sb\((\d+):")
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class Verdict:
     state: str
     level: int
@@ -34,6 +34,7 @@ class Verdict:
     seconds: float
     splits: int
     line_no: int
+    estimated_self: float | None = None
 
     @property
     def key(self) -> tuple[str, int]:
@@ -56,6 +57,30 @@ class Summary:
         return len(self.top_done), self.k9_verdicts, self.verdicts
 
 
+@dataclasses.dataclass
+class SelfEstimator:
+    """Estimate a call's self time from the post-order verdict stream.
+
+    Between consecutive level-k verdicts, level-(k-1) `took` values are the completed direct-child
+    work in the usual depth-first case. MAYBE calls and cache effects make this an estimate, and the
+    first verdict at each level has no left boundary, so leave that one unknown.
+    """
+
+    inclusive_by_level: dict[int, float] = dataclasses.field(default_factory=dict)
+    lower_at_previous: dict[int, float] = dataclasses.field(default_factory=dict)
+
+    def observe(self, verdict: Verdict) -> Verdict:
+        lower_total = self.inclusive_by_level.get(verdict.level - 1, 0.0)
+        previous = self.lower_at_previous.get(verdict.level)
+        estimated_self = None if previous is None else verdict.seconds - (lower_total - previous)
+        self.lower_at_previous[verdict.level] = lower_total
+        self.inclusive_by_level[verdict.level] = (
+            self.inclusive_by_level.get(verdict.level, 0.0) + verdict.seconds
+        )
+        verdict.estimated_self = estimated_self
+        return verdict
+
+
 def parse_verdict(line: str, line_no: int) -> Verdict | None:
     match = VERDICT_RE.match(line)
     if not match:
@@ -74,11 +99,13 @@ def parse_verdict(line: str, line_no: int) -> Verdict | None:
 def scan(path: Path, label: str, top: int) -> Summary:
     summary = Summary(label=label, path=path)
     heap: list[tuple[float, int, Verdict]] = []
+    estimator = SelfEstimator()
     with path.open("r", encoding="utf-8", errors="replace") as source:
         for line_no, line in enumerate(source, 1):
             verdict = parse_verdict(line, line_no)
             if verdict is None:
                 continue
+            verdict = estimator.observe(verdict)
             summary.verdicts += 1
             if verdict.level == 9:
                 summary.k9_verdicts += 1
@@ -103,10 +130,14 @@ def find_matches(path: Path, keys: set[tuple[str, int]]) -> dict[tuple[str, int]
     matches: dict[tuple[str, int], Verdict] = {}
     if not keys:
         return matches
+    estimator = SelfEstimator()
     with path.open("r", encoding="utf-8", errors="replace") as source:
         for line_no, line in enumerate(source, 1):
             verdict = parse_verdict(line, line_no)
-            if verdict is not None and verdict.key in keys:
+            if verdict is None:
+                continue
+            verdict = estimator.observe(verdict)
+            if verdict.key in keys:
                 matches[verdict.key] = verdict
     return matches
 
@@ -127,6 +158,17 @@ def short_state(state: str, width: int = 70) -> str:
     return state[: width - 1] + "…"
 
 
+def timing_pair(verdict: Verdict) -> str:
+    self_time = "-" if verdict.estimated_self is None else compact_number(verdict.estimated_self)
+    return f"{compact_number(verdict.seconds)}/{self_time}"
+
+
+def ratio(value: float | None, peer_value: float | None) -> str:
+    if value is None or peer_value is None or value < 0 or peer_value <= 0:
+        return "-"
+    return f"{value / peer_value:.2f}x"
+
+
 def format_summary(a: Summary, b: Summary) -> str:
     behind, peer = sorted((a, b), key=lambda item: item.progress_key)
     matches = find_matches(peer.path, {verdict.key for verdict in behind.top_slow})
@@ -134,19 +176,22 @@ def format_summary(a: Summary, b: Summary) -> str:
     lines = [
         f"compare {now}  behind={behind.label} "
         f"({len(behind.top_done)}/16 roots, {behind.verdicts} verdicts)",
-        f"slow calls (inclusive CPU) from {behind.label}"
-        f"             {behind.label:>8} {peer.label:>8}   ratio",
+        f"slow calls (CPU incl/~self) from {behind.label}"
+        f"          {behind.label:>13} {peer.label:>13}    i×/~s×",
     ]
     for verdict in behind.top_slow:
         other = matches.get(verdict.key)
         state = short_state(verdict.state)
         if other is None:
-            comparison = f"{compact_number(verdict.seconds):>8} {'-':>8} {'-':>7}"
+            comparison = f"{timing_pair(verdict):>13} {'-':>13} {'-':>10}"
         else:
-            ratio = "-" if other.seconds == 0 else f"{verdict.seconds / other.seconds:.2f}x"
+            ratios = (
+                f"{ratio(verdict.seconds, other.seconds)}/"
+                f"{ratio(verdict.estimated_self, other.estimated_self)}"
+            )
             comparison = (
-                f"{compact_number(verdict.seconds):>8} "
-                f"{compact_number(other.seconds):>8} {ratio:>7}"
+                f"{timing_pair(verdict):>13} "
+                f"{timing_pair(other):>13} {ratios:>10}"
             )
             if other.outcome != verdict.outcome:
                 comparison += "  OUTCOME-MISMATCH"
