@@ -5148,3 +5148,118 @@ control gates the execution but is not yet a result about `Sa(193)`. The next or
 snapshot independently recorded 165,654 verdicts, 0.60 GiB RSS and zero suppressions. Its first
 completed matched k=9 call, `Sb(112:80)@9`, took 352 seconds against run8's 345 (1.02x), consistent
 with the intended near-zero overhead before the new guard actually fires.
+
+## 2026-08-12 — recursive Pareto lifting finds a new four-part solution, but greedy depth two fails
+
+The new hypothesis was to make the observed one- and two-part constructive prefix explicit, then
+recurse on the corresponding four-part state one level down.  The lower long state may need a
+componentwise Pareto upgrade before its split is useful; singleton leaves remain exact under the
+Singleton Majorization Theorem.  This suggested a construction, not merely another scalar score.
+
+The rigid-prefix preflight was encouraging.  Reading the complete k=7 frontier against its k=6
+front from `data/pareto_sb.csv` and the archived `fullsolve-2026:out_k7.txt`, all 32 one-part Pareto
+roots have a winning first cut based on a corresponding lower-front point.  All 31 roots with a
+nontrivial two-part continuation admit the expected opposing-front second cut.  This is an empirical
+census, not a uniqueness statement: many roots have additional winning cuts.  It validates the
+proposed source of a four-lineage template without claiming that the prefix determines the rest of
+the tree.
+
+A literal attempt to place the whole lower four-part state unchanged into one pure child had zero
+information-feasible candidates.  The obstruction is a vertex budget: a pure child fixes too much
+of every component, leaving the other pure/mixed outcomes over capacity.  The correct recursion is
+one level deeper—take a *solving split* of the lower four-part state, then lift that cut.
+
+That move has an exact geometric core.  For aligned parent component `P=(N:M)`, lower component
+`T=(n:m)` and lower cut `s=(a:b)`, require
+
+```
+a <= x <= a + N - n
+b <= y <= b + M - m.
+```
+
+The parent selected, complementary and two mixed rectangles then componentwise contain their lower
+counterparts.  This is the lift-box lemma, now proved in
+`docs/theorems/recursive-pareto-lift.md`.  Its logical direction is deliberately explicit there:
+the box preserves lower lineages, but lower-child solvability does not prove solvability after
+enlargement.
+
+`tools/pareto_lift_probe.c` implements the bounded experiment.  It centres the box at the
+coordinatewise proportional lift, scales the lower split's three outcome masses to the parent mass
+with exact apportionment, visits increasing `L1` shells, and orders a shell by total deviation from
+those three targets.  Cached false children screen a candidate; other children get a strict local
+deadline.  An inverse diagnostic enumerates lower cuts capable of producing a known parent cut.
+The tool is standalone and research-only: no `radiobase.c` order, cache fact or proof rule changed.
+
+The primary aligned example is
+
+```
+P  = [45:10,33:15,32:14,23:20] @7, mass 1853
+T  = [24:5,19:9,19:8,15:13]    @6, mass 638
+s  = [3:0,11:5,15:7,7:6], lower masses 202/239/197
+```
+
+The scaled target is `587/694/572` and the proportional centre is
+`[6:0,19:8,25:12,11:9]`.  The final probe found a new split
+
+```
+[10:1,19:8,26:13,10:9], masses 590/701/562
+```
+
+at radius 8, structural rank 5.  Its three children independently solved at k=6.  Final wall cost
+was 15 seconds and peak RSS 0.16 GB.  Ordinary search with the same warm cache found a different
+split after 155,795 admitted top-level splits, 57 solver seconds and 65 wall seconds, peak RSS
+0.28 GB.  This is about a 4.3x wall improvement on one positive path, not a broad speedup claim.
+
+The adjacent lower point
+
+```
+T' = [24:4,19:9,19:9,15:13]
+s' = [3:0,8:4,15:8,7:6], lower masses 194/240/199
+```
+
+gave target `568/703/582` and found
+
+```
+[11:1,16:7,27:13,11:10], masses 584/702/567
+```
+
+at radius 12, rank 274, in 70 wall seconds and 0.18 GB peak RSS.  Assigning the two equal `19:9`
+components the other way found nothing within radius 12 in 76 seconds.  The conclusion is not that
+the other mapping is globally impossible; it is that normalized sorting loses information needed
+by this heuristic.  Lineage labels from the preceding cuts must survive.
+
+Several negative controls narrowed the construction claim:
+
+- Three exact k=5 descendants of the first template were aligned under its k=6 state.  Their lift
+  boxes were exhausted (maximum useful radii at most 16) without a cache-open k=6 split.  For one
+  known parent cut, inverse enumeration checked 20,000 possible lower cuts, of which 4,385 passed
+  the information bound and none were cache-open.  Low-k degeneration is therefore substantial.
+- Recursing through the successful k=7 split gave lower selected child
+  `L=[3:0,11:5,15:7,7:6]@5` and parent child
+  `R=[10:1,19:8,26:13,10:9]@6`.  Lifting the first solving split found for `L` exhaustively visited
+  all 774,144 points in the lift box; 66,822 passed the information bound and zero were cache-open.
+  The run took 6 wall seconds because these are warm negative lookups.
+- Greedy componentwise upgrading of `L` inside the parent-conditioned box had the same unique
+  endpoint under maximum- and minimum-gain walks:
+  `U=[10:1,11:5,15:7,7:6]`, mass 212 against child capacity 243.  Lifting the first solving split
+  found for `U` visited the complete 48,384-point box.  There were 4,509 information-feasible and
+  19 cache-open candidates, but strict local solves accepted none; wall cost was 5 seconds.
+
+Thus the lift-box lemma survives, but the greedy full construction does not: one lower witness,
+one maximal upgrade and its first solving split need not extend even one more node.  A scalable
+construction needs a choice property over multiple Pareto upgrades and multiple inequivalent splits,
+or lookahead that couples the three branches.  Consistent with the prior decision about m=6, the
+next useful corpus should be at larger k and then work backward through degeneracies.
+
+One tempting ranking modification was rejected.  Prioritising candidates by the number of children
+already positive in the warm cache moved the primary winner from rank 5 to rank 17 and wall time
+from 15 to 21 seconds.  This gives cache history too much credit and supports keeping split hints
+structural and transient.
+
+The five positive-path/performance logs and two paired capped-run summaries are retained and
+round-trip verified as `pareto-lift-2026-08-12`.  Each of the five solver outputs has complete
+embedded provenance.  The final probe build id is
+`8e00909e402767e947f90080ad0bbc6173e3e22f5f9b3672b48290ad5c0edfd6`; its source hashes identify
+the then-uncommitted probe exactly.  Failed diagnostic logs were small and deliberately not
+archived; their complete states, bounds and measured costs are recorded above so the experiments
+are not repeated accidentally.

@@ -47,8 +47,10 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   [`../evidence/pareto_certification_k1_8.txt`](../evidence/pareto_certification_k1_8.txt),
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
-- **Three theorems** — Singleton Majorization, Unit-Group Elimination and Subgraph
-  Monotonicity, all proved. The third is elementary but was load-bearing and unwritten: it is
+- **Three theorems plus the lift-box lemma** — Singleton Majorization, Unit-Group Elimination and
+  Subgraph Monotonicity are proved; so is the new geometric core of recursive Pareto lifting. The
+  latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
+  but was load-bearing and unwritten: it is
   what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
   on, and what lets a negative certificate store antichains instead of closures.
 - **16 verified witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
@@ -161,8 +163,8 @@ Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
 fixed-small-m exact recurrence `tools/search_singletonization.cpp`.
 
-Artifact store `fedork/radio-data` (private): 11 tags, 26 assets plus a manifest per tag,
-about 393 MB stored, `check-index` green.
+Artifact store `fedork/radio-data` (private): 12 tags, 33 assets plus a manifest per tag,
+about 394 MB stored, `check-index` green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -479,6 +481,39 @@ therefore does not distinguish it from the real winning split. On a residual fou
 isolated `R_2` took 6.3 Python CPU seconds and still passed, while the warmed exact solver refuted it
 in 0.1 seconds; `R_3` hit a 30-second cap.
 
+### Recursive Pareto lifting: a sharp first step, open recursion (2026-08-12)
+
+The proposed long-state construction now has an exact local lemma.  For aligned lower template
+`T <= P` and lower cut `s`, every lineage-preserving lift is in
+
+```
+s <= X <= s + (P - T).
+```
+
+Every lower selected/complement/mixed rectangle is then a componentwise substate of its parent
+counterpart.  This proves the search box, not the enlarged children: they still require exact
+verification.  Full proof and the distinction are in
+[recursive-pareto-lift.md](theorems/recursive-pareto-lift.md).
+
+The rigid prefix premise checks out empirically.  Across all 32 one-part k=7 Pareto roots, a winning
+first cut can be chosen from the corresponding k=6 frontier; in all 31 cases with a nontrivial
+two-part continuation, opposing lower-front lineages give a winning second cut.  The new probe then
+lifts the resulting four-part template by preserving its three outcome proportions.  On
+`Sb(45:10,33:15,32:14,23:20)@7`, it found a new solution at radius 8, structural rank 5, in 15 wall
+seconds.  Ordinary search under the same warm cache took 65 wall / 57 solver seconds and admitted
+155,795 top-level splits.  An adjacent lower-front point also found a different solution, but
+swapping its two equal `19:9` lineages did not succeed within the same radius: inherited component
+identity matters.
+
+Greedy full recursion fails at the next low-k node.  The direct lower split's complete 774,144-point
+lift box had no cache-open candidate.  A unique greedy Pareto upgrade produced 19 cache-open
+candidates in its smaller box, but exact local probes accepted none.  Therefore one lower witness,
+one maximal upgrade and its first split are not a construction.  The open object is a choice theorem
+over an antichain of Pareto upgrades and inequivalent solving splits, preferably tested first at
+larger k where degeneration is weaker.  The implementation remains the standalone
+`tools/pareto_lift_probe.c`; no production search order or cache semantics changed.  Fully
+provenanced positive-path logs are archived as `pareto-lift-2026-08-12`.
+
 One safe `R_0` deployment landed on 2026-08-10: split-table construction omits a local cut when one
 of that part's child substates already fails counting or full-star majorization at `k-1`. Subgraph
 monotonicity proves that later parts cannot rescue it. Tables are now exact-sized contiguous blocks
@@ -553,7 +588,10 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
    bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
    finding an `R_1` or `R_2` witness is already known not to do that. Current `main` takes 26.6
    solve seconds and 37,899 top-level splits after the exact-L1 change. Keep any deeper check
-   bounded and fallback-safe.
+   bounded and fallback-safe.  For the separate recursive Pareto-lift track, move upward in k before
+   adding solver code: retain several parent-conditioned Pareto upgrades and inequivalent splits,
+   preserve lineage labels through equal components, and measure whether one branch survives at the
+   next recursive node.  One greedy low-k path is already known to fail.
 3. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
 4. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`

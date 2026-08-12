@@ -105,6 +105,7 @@ re-verify from first principles, so its era does not matter.
 | `bounded-probe-2026-08-11` | cold `Sa(192)` control plus focused k=5/7/8/9 scheduler replays; all carry complete embedded build/run provenance | 15.8 M | 1,038-answer regression and sanitizer gates passed; performance/positive-path evidence only |
 | `bounded-probe-rejected-2026-08-11` | universal two-second probe experiments: the enclosing k=8 pass timed out and the cold control re-entered an unbounded pass-2 dive | 57.0 M | rejected performance experiments; no negative claim |
 | `sa193-local-chain-2026-08-11` | four interrupted local `Sa(193)` segments, their closed recovery checkpoint, and a metadata tar containing each `run.meta`, frozen binary, monitor/completion/stderr and recovery guard | 157 M | 0 contradictions in each raw segment; **pre-banner logs archived with the explicit legacy-provenance override**; sidecars supply commits, source/binary hashes, commands and limits; no `Sa(193)` verdict |
+| `pareto-lift-2026-08-12` | ordinary four-part control, two lower-template solutions, two recursive-lift successes and their capped-run sidecars | 12.9 M | fully provenanced positive-path/performance evidence; no negative or maximality claim |
 
 ### Not archived
 

@@ -311,6 +311,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/fast_replay.c` | replay logged long k=5 states from one forked warm-cache image, clearing all per-target cache/self-training effects |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
+| `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
@@ -331,6 +332,52 @@ tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=100 tools/tripletab.c -o /tmp/triplet
 The tables' positive and negative entries are exhaustive according to the current C solver. That is
 enough for a fallback-safe heuristic experiment, but it is not an independent certificate. Do not
 let a table negative prune an exhaustive proof search until the table has an adequate audit.
+
+### Recursive Pareto-lift probe
+
+The lift-box experiment starts with an aligned parent `P`, a componentwise lower template `T`, and
+a solving cut `s` of `T`.  It searches only
+
+```
+s <= X <= s + (P - T)
+```
+
+around the proportional coordinate lift, ranking candidates by how closely their three outcome
+masses preserve the lower split's proportions.  The box containment is a theorem, but it is only a
+necessary lineage condition: every proposed parent child is still checked by `canSolveB`.  Cache
+negatives screen candidates, misses receive the requested strict per-child deadline, and a caller
+must retain ordinary search as fallback.
+
+Build and reproduce the primary four-part example:
+
+```
+tools/build_radio.py -O3 -DMAX_K=7 -DMAX_N=192 \
+    tools/pareto_lift_probe.c -o /tmp/pareto_lift_probe
+
+/tmp/pareto_lift_probe CACHE 7 recursive 12 3000 200 \
+    45 10 24 5 3 0 \
+    33 15 19 9 11 5 \
+    32 14 19 8 15 7 \
+    23 20 15 13 7 6
+```
+
+The arguments after `recursive` are maximum `L1` radius, explicit-candidate budget per shell and
+strict probe milliseconds per child, followed by `(parent_n parent_m lower_n lower_m cut_n cut_m)`
+for each aligned part.  A zero lower coordinate is an intentional degeneration placeholder; its
+parent interval remains free and its centre is the midpoint.
+
+The diagnostic inverse form replaces radius with a known parent cut and enumerates lower cuts whose
+lift boxes contain it:
+
+```
+/tmp/pareto_lift_probe CACHE k inverse budget probe_ms \
+    parent_n parent_m lower_n lower_m parent_cut_n parent_cut_m [...]
+```
+
+Exit 0 means a split was found, 1 means the requested box/bound was exhausted, and 3 means the input
+or claimed lower/parent split was not verified within its local deadline.  Neither a miss nor an
+inverse miss is a proof of unsolvability.  The lemma, examples and current recursive obstruction are
+in [the theorem note](theorems/recursive-pareto-lift.md).
 
 The bundled hierarchy starts at full star-expansion majorization (`R_0`), adds one synchronized
 rectangle split per level, and becomes exact at `R_k`. Its small regression case and complete k=4

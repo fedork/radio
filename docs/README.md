@@ -14,6 +14,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [data.md](data.md) | Index of bulk artifacts and how to fetch them |
 | [journal.md](journal.md) | Running log. History, not fact. |
 | [theorems/](theorems/) | Proofs |
+| [theorems/recursive-pareto-lift.md](theorems/recursive-pareto-lift.md) | Proved lift-box lemma and the open recursive Pareto-lift programme |
 
 ## How facts are recorded
 

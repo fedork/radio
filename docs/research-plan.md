@@ -171,6 +171,24 @@ signal** that approximates deeper synchronization without recursively solving it
 exact-L1 baseline is 26.6 solve seconds with 37,899 top-level splits; compare both numbers, because
 a cache-only speed change and an ordering improvement answer different questions.
 
+**Recursive Pareto-lift track (2026-08-12).** A second bounded ordering signal now has a proved
+geometric core.  If a lower aligned template `T` uses cut `s`, every lineage-preserving parent cut
+lies in the box `s <= X <= s+(P-T)`; its four rectangles componentwise contain the corresponding
+lower rectangles.  Searching `L1` shells around the proportional lift and preserving the lower
+split's outcome proportions found a new solution of the four-part k=7 control at structural rank 5
+in 15 wall seconds, versus 65 wall / 57 solver seconds for ordinary search with the same warm cache.
+An adjacent lower point also succeeds, but only under the correct inherited assignment of two equal
+components.  See [the theorem note](theorems/recursive-pareto-lift.md) and the fully provenanced
+`pareto-lift-2026-08-12` artifacts.
+
+This is not ready for `radiobase.c`.  A literal second recursive step exhausted the complete lower
+split's lift box, and a greedy componentwise Pareto upgrade followed by its first solving split also
+failed.  The next experiment should target larger k, where degeneration is reduced, and retain the
+choice set rather than one fitted witness: enumerate a small antichain of parent-conditioned Pareto
+upgrades and several inequivalent solving splits for each.  Only after that corpus exists should the
+minimal production form be tried: a transient lineage-aware hint, one or two templates, a bounded
+pass, and unchanged fallback.  Split hints must influence order only; they are not cache facts.
+
 **Separate theoretical m=6 thread (updated 2026-08-10).** The first large-`k` classification is
 complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified
 singleton-majorized tree at 973.  This refutes both the closed form and `BBCD` profile, which
@@ -207,10 +225,11 @@ It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the re
 passed in 471.6 CPU seconds in run8 and 479.2 in proof-safe run9. Use run8 as the
 matched baseline for run9's natural `Sa(193)` progress, visible-attempt cost and memory, but use only
 run9 for a new negative claim. Do not add split history before that comparison matures.
-The theory track should work from
-the exact `k=10,m=6` mixed-child boundary toward a parametric large-k construction or obstruction,
-and only then recover small k backwards. Do not use witness-tree shape as evidence that either track
-has a unique continuation.
+The theory track now has two compatible large-k targets: work from the exact `k=10,m=6` mixed-child
+boundary toward a parametric construction/obstruction, and test whether recursive Pareto lifting
+stabilises once low-k degeneration disappears.  In both cases retain alternative Pareto upgrades
+and split classes, then recover small k backwards. Do not use witness-tree shape as evidence that
+either track has a unique continuation.
 
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`
