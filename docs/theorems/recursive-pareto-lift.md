@@ -203,6 +203,8 @@ U = Sb(10:1, 11:5, 15:7, 7:6),
 ```
 
 but lifting the first solving split found for `U` also exhausted its box without a solution.
+The candidate enumeration was complete, but each non-cached child had a 200 ms deadline; this is
+not an exhaustive refutation of those 19 cache-open candidates.
 
 This is a bounded-search observation, not a proof that no recursively lifted strategy exists: a
 different Pareto upgrade, a different solving split of the same upgrade, or a different earlier

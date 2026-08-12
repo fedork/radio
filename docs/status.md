@@ -507,7 +507,7 @@ identity matters.
 
 Greedy full recursion fails at the next low-k node.  The direct lower split's complete 774,144-point
 lift box had no cache-open candidate.  A unique greedy Pareto upgrade produced 19 cache-open
-candidates in its smaller box, but exact local probes accepted none.  Therefore one lower witness,
+candidates in its smaller box, but strict 200 ms-per-child probes accepted none.  Therefore one lower witness,
 one maximal upgrade and its first split are not a construction.  The open object is a choice theorem
 over an antichain of Pareto upgrades and inequivalent solving splits, preferably tested first at
 larger k where degeneration is weaker.  The implementation remains the standalone
