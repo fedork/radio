@@ -23,23 +23,27 @@ INSTANCE=i-0005d74f985c52ae1
 #   run6  + broken zero-progress deadline/prefix polling experiment (c13b5d3)
 #   run7  + restored depth-first progress and pass-2 NO_DEADLINE handoff (e648e83)
 #   run8  + compact cache and bounded long-state probes (current main at launch)
+#   run9  + rb-tainted implicit-contraction suppression
 # `--prefix runN` reads one; `--all` reads every prefix listed in render() below. The default live
-# comparison is run3 against run8; override the candidate with `--candidate runN` for archaeology.
+# comparison is run3 against run8; override either side for a newer matched comparison.
 PREFIX=run
 BOTH=0
 COMPARE=0
 WATCH=0
+BASELINE=run3
 CANDIDATE=run8
 while (( $# )); do
     case "$1" in
         --prefix) PREFIX="$2"; shift 2 ;;
+        --baseline) BASELINE="$2"; shift 2 ;;
         --candidate) CANDIDATE="$2"; shift 2 ;;
         --both|--all) BOTH=1; shift ;;
         --compare) COMPARE=1; shift ;;
         --watch)  WATCH=1; shift ;;
-        *) echo "usage: $0 [--prefix runN] [--all|--compare] [--candidate runN] [--watch]" >&2; exit 2 ;;
+        *) echo "usage: $0 [--prefix runN] [--all|--compare] [--baseline runN] [--candidate runN] [--watch]" >&2; exit 2 ;;
     esac
 done
+[[ "$BASELINE" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid baseline prefix" >&2; exit 2; }
 [[ "$CANDIDATE" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "invalid candidate prefix" >&2; exit 2; }
 
 object_exists() {
@@ -168,7 +172,7 @@ render() {
         printf 'Sa(193) live comparison  %s\n' "$(date -u +%FT%TZ)"
         printf '%-6s %-5s %-9s %-9s %-5s %-10s %-9s %-7s %-6s %s\n' \
             RUN STATE WALL CPU ROOT CONTROL VERDICTS RSS LOG UPDATE
-        compact_row run3
+        compact_row "$BASELINE"
         compact_row "$CANDIDATE"
         printf '\n'
         if object_exists "$CANDIDATE/COMPARE"; then
@@ -196,6 +200,7 @@ render() {
         banner run6 "broken deadline experiment (aborted)"
         banner run7 "compact cache + exact L1 (stopped: obsolete deadlines)"
         banner run8 "compact cache + bounded probes"
+        banner run9 "rb-safe implicit contraction"
     else
         show "$PREFIX"
     fi

@@ -44,6 +44,7 @@ done
 START=$(date +%s)
 LAST_BEAT=0
 LAST_DONE=-1
+LAST_RB_SUPPRESSED=-1
 LAST_UPLOAD=0
 # A run may span more than one process lifetime. Fixed keys would let segment two overwrite segment
 # one, and segment two CITES facts proved in segment one - losing it recreates the exact defect that
@@ -89,6 +90,17 @@ status() {
     local scan
     scan=$(awk '
         /solve/ { v++ }
+        /contraction=rb-suppressed:/ {
+            rb_suppressed++
+            if (match($0, /contraction=rb-suppressed:[0-9]+/)) {
+                target = substr($0, RSTART + 26, RLENGTH - 26) + 0
+                match($0, /Sb\([^)]*\)/)
+                state = substr($0, RSTART, RLENGTH)
+                p = index($0, "] in ")
+                level = p ? substr($0, p + 5, 2) + 0 : 0
+                rb_last = state " in " level " target-size=" target
+            }
+        }
         match($0, /\] in [0-9]+ /) {
             k = substr($0, RSTART + 5, RLENGTH - 6) + 0
             cnt[k]++
@@ -157,6 +169,8 @@ status() {
             n = 0; for (x in seen) n++
             printf "SIXTEEN %d\n", n
             printf "VERDICTS %d\n", v + 0
+            printf "RB_SUPPRESSED %d\n", rb_suppressed + 0
+            if (rb_suppressed) printf "RB_SUPPRESSED_LAST %s\n", rb_last
             for (k = 12; k >= 1; k--) if (k in cnt) printf "CNT %d %d\n", k, cnt[k]
             # Only from the current level UP. Levels below were last touched arbitrarily long
             # ago, so their "most recent" verdict is stale and placing it would mean scrolling
@@ -187,6 +201,9 @@ status() {
     printf '  top-level states done   %s of 16\n' "$(awk '/^SIXTEEN/{print $2}' <<<"$scan")"
     printf '  solver running for      %dd %02dh %02dm\n' $((elapsed/86400)) $((elapsed%86400/3600)) $((elapsed%3600/60))
     printf '  verdicts                %s\n' "$(awk '/^VERDICTS/{print $2}' <<<"$scan")"
+    printf '  rb-tainted contractions %s suppressed\n' \
+        "$(awk '$1 == "RB_SUPPRESSED" {print $2}' <<<"$scan")"
+    awk '/^RB_SUPPRESSED_LAST / {sub(/^RB_SUPPRESSED_LAST /, ""); print "  latest suppression      " $0}' <<<"$scan"
     printf '  resident memory         %s GB\n' "$rss"
     # Apparent size, not `du`. The log is on XFS, which speculatively preallocates blocks for a
     # growing file and trims them later, so `du` fluctuates and the log APPEARS TO SHRINK - 249M then
@@ -299,6 +316,7 @@ while :; do
     # Getting this wrong makes DONE a constant, which silently disables every milestone email and
     # leaves only the heartbeat - the failure is invisible because the heartbeat still arrives.
     DONE=$(printf '%s\n' "$S" | awk '/top-level states done/ {print $4}')
+    RB_SUPPRESSED=$(printf '%s\n' "$S" | awk '/rb-tainted contractions/ {print $3}')
     NOW=$(date +%s)
 
     # Exactly one email per cycle at most. The previous version sent TWO on every watchdog start:
@@ -320,12 +338,15 @@ while :; do
         if [[ -z "${SENT_FINAL:-}" ]]; then SENT_FINAL=1; notify "Sa(193): FINISHED" "$S"; fi
     elif [[ "$DONE" != "$LAST_DONE" ]]; then
         notify "Sa(193): $DONE of 16 done" "$S"
+    elif [[ "$LAST_RB_SUPPRESSED" != "-1" && "$RB_SUPPRESSED" != "$LAST_RB_SUPPRESSED" ]]; then
+        notify "Sa(193): rb-safe contraction $RB_SUPPRESSED" "$S"
     elif (( NOW - LAST_BEAT >= HEARTBEAT )); then
         notify "Sa(193): $DONE of 16, still running" "$S"; LAST_BEAT=$NOW
     fi
     # No "solver is GONE" branch: the exit path below already mails "run ended", and having both
     # meant two emails for one event.
     LAST_DONE="$DONE"
+    LAST_RB_SUPPRESSED="$RB_SUPPRESSED"
 
     if ! kill -0 "$PID" 2>/dev/null; then
         # Final upload: the raw log is the archival artifact, and its parsed form is the restart
