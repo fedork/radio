@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-10.
+entries. Last revised 2026-08-12.
 
 ## High-level goals
 
@@ -25,6 +25,11 @@ re-running those 16 states on a current build — and note that a warm start fro
 loading it would confirm them circularly, and it cannot be filtered by build era. See the
 warm-start warning in [data.md](data.md#warm-starting-from-parsed_260txt-two-traps). A sound
 negative needs a cold run, which is why this stays expensive.
+
+Cold `run9` is the current proof attempt. Run3 and run8 remain useful performance baselines but
+cannot settle H3: before `75814a7`, suffix reachability could promote a full-state obstruction to a
+false implicit shorter negative and poison the cache. Run9 began from an empty cache with that
+interaction disabled and reports every suppressed contraction.
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 `m=6` closed form and `BBCD` profile are now refuted by the exact `n(10,6)=973` frontier.  The
@@ -194,13 +199,14 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 now has two distinct tracks while `run3` and cold current-engine `run8` continue remotely. The
-solver track's bounded ordering approximation is deployed in run8: long candidates receive a
-geometric local probe while the one/two-segment constructive spine keeps the shared parent budget.
+P6 now has two distinct tracks while proof-safe cold `run9` and the retained run3/run8 baselines
+continue remotely. The solver track's bounded ordering approximation is deployed in run8/run9:
+long candidates receive a geometric local probe while the one/two-segment constructive spine keeps
+the shared parent budget.
 It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the remote control has now
-passed in 471.6 CPU seconds. Use the retained run8 prefix to compare natural `Sa(193)` progress,
-matched visible-attempt cost and memory against run3. Do not add split history before that
-comparison matures.
+passed in 471.6 CPU seconds in run8 and 479.2 in proof-safe run9. Use run8 as the
+matched baseline for run9's natural `Sa(193)` progress, visible-attempt cost and memory, but use only
+run9 for a new negative claim. Do not add split history before that comparison matures.
 The theory track should work from
 the exact `k=10,m=6` mixed-child boundary toward a parametric large-k construction or obstruction,
 and only then recover small k backwards. Do not use witness-tree shape as evidence that either track
@@ -212,7 +218,8 @@ control passes at 0.35 GB peak RSS and 711.7 CPU seconds, with no remaining meas
 734.5-second pre-compaction control. AWS `run7` and the same-chain local continuation used the
 now-obsolete `e648e83` progress-gated pass-2 scheduler and were retired on 2026-08-11 after their raw
 segments and closed checkpoints were preserved. Run3 remains the untouched live incumbent; run8 is
-the cold `9395218` bounded-probe comparison, guarded at 60 GiB beside run3's 40 GiB. Neither
+the cold `9395218` bounded-probe baseline, and run9 is the cold `e7fa747` proof run. Run9 has a
+60 GiB individual cap and is stopped first if all live solvers reach 108 GiB combined RSS. Neither
 `c13b5d3` nor `e648e83` is a valid performance baseline for the new scheduler. H3 still sits
 awkwardly—the answer is probably 192, the evidence is probably right, and neither "probably" belongs
 in a paper. Resume only from a run's own output and retain every raw segment; compact does not mean

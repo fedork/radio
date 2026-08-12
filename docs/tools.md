@@ -48,6 +48,7 @@ pre-banner historical file whose limitation is explicitly recorded in `docs/data
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: exact-prefix trie with maximal-positive/minimal-negative Pareto fronts in its last part | `cacheCanSolve`, `cacheCantSolve`, `checkCache` |
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, shared short-state budget and geometric long-state probes | `canSolveB` |
+| Joint suffix reachability; suppression of prefix contraction once it rejects | `rb_dead`, `rb_tainted_contraction` |
 | Unit-group stripping before search | start of `canSolveB` |
 | Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
 | `Sa` recursion | `canSolveA` |
@@ -61,6 +62,13 @@ fully built; there is no cut-level/chunk-level lazy machinery.  `canSolveB` init
 the first part's table and materialises a suffix table when depth-first search reaches that part.
 The joint reachability accelerator is the one bulk path: when it arms, it needs every suffix and
 builds the missing whole tables then.
+
+Reachability depends on that suffix, whereas implicit size contraction claims the shorter prefix is
+itself impossible. The two inferences cannot be combined: after any actual `rb_dead` rejection, a
+full negative is still exact but contraction is suppressed and the verdict carries
+`contraction=rb-suppressed:<candidate-size>`. `tools/rb_contraction_regression.sh` forces the path
+on a state whose candidate prefix is known positive; do not remove that test or weaken the guard to
+the final pass only, because iterative-deepening counters reset between passes.
 
 Each table is one exact-sized contiguous allocation containing its cut records, four stored order
 indices, and three cumulative counting arrays.  Before sizing it, `ensure_splits` removes a cut if

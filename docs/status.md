@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-12** (cold AWS `run8` is in pass 2 of its first `Sa(193)`
-root beside the untouched `run3` incumbent).
+don't know it. Last refreshed **2026-08-12** (proof-safe cold AWS `run9` is running beside the
+retained `run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -16,9 +16,10 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
+| **Do not use a negative derived by `run3` or `run8` as proof.** | Joint suffix reachability (`rb_dead`) was sound for rejecting the full state but incompatible with the older implicit-prefix contraction: it could cache a shorter negative that was actually solvable, then contaminate later searches. Forced counterexample: `Sb(5:3,2:2,2:2,2:2)@3` is unsolvable while its inferred `Sb(5:3)@3` negative is false. Builds containing `efadab0` but predating fix `75814a7` have no marker distinguishing affected contractions; this includes frozen run3 and run8. Cold `run9` suppresses contraction after an actual reachability rejection. Older exact lines independently rechecked without contraction may still be valid, and positive witnesses remain independently checkable. |
 | **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
-| **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. A printed `can't solve` is exhaustive either way, since it is emitted only when `!skipped_some`.) |
+| **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. In a proof-safe cache, a printed `can't solve` is exhaustive because it is emitted only when `!skipped_some`; the separate `rb_dead` trap explains why run3/run8 caches are not proof-safe.) |
 | **Do not restore either old deadline extreme.** | `c13b5d3` could return before trying a complete child; `e648e83` required a new negative cache fact and then handed pass 2 an unbounded child. Run7 demonstrated the latter failure for 20,460 CPU seconds in a finite-parent k=5 state after 280,116,882,707 prefixes. Current policy permits zero-progress `MAYBE`, never refills an expired parent, keeps the reliable one/two-segment spine on the shared budget, and probes longer states with a geometrically increasing local slice. See [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt). |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
@@ -170,38 +171,54 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-The two live AWS solvers are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot
-from **2026-08-12 01:00 UTC**:
+Three AWS solvers are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot from
+**2026-08-12 03:32 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 1.69 M verdicts, **25.51 GB**, 1 of 16 |
+| `run3/` — A+B + full-star majorization | **alive; performance only** | 1.71 M verdicts, **25.51 GB**, 1 of 16 |
 | `run4/` — compact cache at frozen commit `6af384e` | stopped, archived; old scheduler | 103,773 verdicts, **0.29 GB**, control never returned |
 | `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped, archived; old scheduler | 103,769 verdicts, **0.29 GB**, control never returned |
 | `run6/` — broken deadline experiment at `c13b5d3` | stopped, archived | control SOLVABLE in 922.0 s; 618,816 raw lines, 1.37 GB peak RSS |
 | `run7/` — progress-gated pass-2 dive at `e648e83` | stopped and archived; obsolete scheduler | 104,931 verdicts; control never returned; **0.29 GB** peak RSS |
-| `run8/` — compact cache + bounded probes at `9395218` | **fresh and alive** | pass 2 of `Sb(112:81)@9`; 508.1 K verdicts, **1.02 GB**, 0 of 16 |
+| `run8/` — compact cache + bounded probes at `9395218` | **alive; performance only** | 639.6 K verdicts, **1.15 GB**, 0 of 16 |
+| `run9/` — rb-safe contraction at `e7fa747` | **fresh and alive; proof run** | control SOLVABLE in **479.2 s**; 165.7 K verdicts, **0.60 GB**, 0 of 16 |
 
-Use `tools/sa193_status.sh --compare [--watch]` for compact live run3/run8 rows and the exact-call
-comparison; `--all` prints the stopped historical sessions and must not be read as proof that those
-processes remain alive.
+Use `tools/sa193_status.sh --compare --baseline run8 --candidate run9 [--watch]` for the matched
+run8/run9 comparison. The default remains the longer run3/run8 comparison; `--all` prints the stopped
+historical sessions and must not be read as proof that those processes remain alive.
 `run3`'s `Sa(192)` control took 540.7 s.  It has completed one of the 16 top-level states and remains
 dominated by k=7 while exploring `Sb(111:82)@9`.
 
 Run8 started cold at 2026-08-11 22:46:06 UTC with the `Sa(192)` control enabled. Its full embedded
-commit is `9395218dcbdd90d8f6a208b15da1878ff75f6ee1`; the 60 GiB wrapper and run3's existing 40 GiB
-wrapper jointly reserve about 23 GiB of the host. An independent post-launch check found exactly
-one solver of each name, run8 using one core, 96 GiB still available and no swap. The idle guard now
-watches both exact names. The source archive, frozen binary, sidecar and `run.meta` are retained
-under `run8/`; hashes and SSM command IDs are in [aws-run.md](aws-run.md).
+commit is `9395218dcbdd90d8f6a208b15da1878ff75f6ee1`. Its 60 GiB wrapper and run3's 40 GiB wrapper
+formed the original two-run envelope; run9's combined guard now caps all three solvers at 108 GiB.
+The source archive, frozen binary, sidecar and `run.meta` are retained under `run8/`; hashes and SSM
+command IDs are in [aws-run.md](aws-run.md).
 
-The mandatory remote happy-path gate passed: `result CONTROL Sa(192) in 10 = SOLVABLE (471.6 s)`.
+Run9 started cold at 2026-08-12 03:21:12 UTC from `e7fa747264476461a234bf78e49762ee77ad8d8d`.
+It changes only the unsound interaction: once `rb_dead` actually rejects a partial assignment, that
+invocation retains an exact full negative but cannot materialize an implicit shorter negative. Each
+such event prints `contraction=rb-suppressed:<size>`; its five-minute status reports the count and
+latest state. The exact source archive, binary, build sidecar and launch metadata were hash-verified
+through S3. Run9 has a 60 GiB individual guard; a separate **108 GiB combined-solver guard stops
+run9 first**, preserving run3/run8 and about 15 GiB of host headroom. The idle guard now names all
+three solvers.
+
+Run8's mandatory remote happy-path gate passed:
+`result CONTROL Sa(192) in 10 = SOLVABLE (471.6 s)`.
 This is 0.872x run3's 540.7-second control on the same host. It validates this execution sufficiently
 to continue into `Sa(193)`; it is not evidence about the final negative yet.
 
-The run8 watchdog scans both live raw prefixes every five minutes with bounded state. It chooses the
+Run9's independent cold control also passed:
+`result CONTROL Sa(192) in 10 = SOLVABLE (479.2 s)`. At 03:32 UTC the solver had continued into
+`Sa(193)`, all three solver processes and run9's wrapper/watchdog/joint/idle guards were alive, and
+95 GiB remained available with no swap. No tainted contraction had yet been suppressed. This gates
+the execution, not the final maximality claim.
+
+The run8 watchdog scans the run3 and run8 raw prefixes every five minutes with bounded state. It chooses the
 run that is behind by completed roots and verdict count, ranks its six slowest completed exact
 states, and joins `(state,k)` keys in the peer log. A verdict's `took` covers only its final
 activation, so the ranking and first timing column now add the last visible `elapsed` value from
@@ -515,15 +532,15 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 
 ## Immediate next steps
 
-0. **Keep watching cold `run8` beside run3.** Run8 is the bounded-probe replacement and should run
-   to a verdict unless its 60 GiB guard, the positive control, or another concrete health signal
-   fails. `tools/sa193_status.sh --compare --watch` gives compact wall/CPU/progress/memory rows plus
-   matched slow-state attempt floors. Do not restart either live cold cache merely to pick up later
-   monitoring edits.
+0. **Keep watching proof-safe cold `run9` beside run8.** Its positive `Sa(192)` control passed in
+   479.2 CPU seconds; it should now run to a verdict unless its individual/combined memory guard or another
+   concrete health signal fails. Use `tools/sa193_status.sh --compare --baseline run8 --candidate
+   run9 --watch`. Run3/run8 remain valuable matched performance histories, but their negative caches
+   predate the contraction fix and cannot establish H3.
 
-1. **Evaluate run8 by scheduler progress and memory, not raw verdict count alone.** Its cold
-   `Sa(192)` control has passed; now compare completed roots, active stacks, matched attempt floors,
-   `~self-final`, and RSS against run3. A `≥` attempt sum is only a visible-work floor; missing
+1. **Evaluate run9 by scheduler progress, suppression telemetry and memory, not raw verdict count
+   alone.** Compare completed roots, active stacks, matched attempt floors, `~self-final`, RSS, and
+   `rb-tainted contractions`. A `≥` attempt sum is only a visible-work floor; missing
    verdicts remain `MAYBE`, not negatives, and no obsolete checkpoint should be used as a
    cross-build proof source.
 

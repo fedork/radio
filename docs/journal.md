@@ -5077,3 +5077,74 @@ is `f2f4bc2af810abd950b793860d4f70cc13d368c9bcf30d978df7b24e7cefaf55`. The solve
 remained alive. No cache, deadline, raw log or solver process was changed. The next ordinary
 watchdog refresh at 01:00:38 UTC reproduced the new aggregate format, so the result does not depend
 on the manual deployment invocation.
+
+## 2026-08-12 — suffix reachability invalidated implicit contraction; proof-safe run9 launched
+
+The surprisingly cheap contraction
+`Sb(37:17,25:24,43:13)@7` is not itself a wrong verdict. A fresh cold current-engine query rejected
+it in 0.092 CPU seconds after 158,508 candidates, without contracting again; pre-reachability commit
+`5ad854e` independently rejected it in 0.377 seconds after 144,988 candidates. The cheapness comes
+from the state actually being easy to refute, not from the shortened line being accepted without a
+search.
+
+The audit nevertheless found a real soundness bug in the mechanism that produced that line.
+Implicit contraction promotes a full negative to a shorter prefix only when every rejection is
+prefix-local. `rb_dead`, introduced by `efadab0`, instead reasons about the joint reachability of the
+remaining suffix. A forced low-threshold build (`RB_TRIGGER=1`) supplies a concrete counterexample:
+
+```
+Sb(5:3,2:2,2:2,2:2)@3 = UNSOLVABLE
+Sb(5:3)@3             = SOLVABLE
+```
+
+The old engine inferred and cached the second line as negative while proving the first. This does
+not invalidate exact full-state rejection by `rb_dead`, but a false shortened cache entry can later
+invalidate unrelated negatives. Run3 and run8 both predate the fix and have no telemetry that can
+separate affected contractions, so they remain useful only as performance baselines. At an audit
+snapshot, run8 had emitted about 126,265 contractions among 542,186 negatives (23%). Its reachability
+watchdog had recorded 1,563 activations, 4,236,250,354 tested assignments and 1,359,453,352 pruned
+(32.09%). Those aggregates do not identify which individual contractions were tainted.
+
+Commit `75814a7` fixes the interaction narrowly. Each `canSolveB` invocation retains a taint after
+`rb_dead` actually rejects a partial assignment, across all iterative-deepening passes. An exhaustive
+full-state negative is still printed and cached; only its implicit shorter negative is suppressed,
+with `contraction=rb-suppressed:<candidate_size>` in the raw log. `RB_TRIGGER` is now compile-time
+overrideable solely so `tools/rb_contraction_regression.sh` can exercise the counterexample cheaply.
+The regression checks the exact full negative, the suppression marker, absence of the false prefix
+from a parsed cache, the prefix's independent positive solution and reachability telemetry.
+
+Validation passed the repository table, witness and documentation checks; the new forced regression;
+the joint-RSS-guard regression; eight status/comparison unit tests; the provenance regression; and a
+1,039-query optimized differential replay against parent `eefeae7` with identical output SHA-256
+`2cf020540919d6fe2f8da20636ecceb8f8d14ccc4d5a3cd599ac0a91e99eade2`. The forced counterexample was
+also clean under AddressSanitizer plus UndefinedBehaviorSanitizer. With the production trigger, the
+original shortened state remained an exact 158,508-candidate negative in 0.079 CPU seconds and
+emitted no suppression marker. The fix and its monitoring/launch support were pushed to `main` as
+`e7fa747264476461a234bf78e49762ee77ad8d8d`.
+
+Cold AWS `run9` began at 2026-08-12 03:21:12 UTC on the existing r7iz.4xlarge, beside retained run3
+and run8. It uses no cache and enables the `Sa(192)` control. Its embedded build ID is
+`219a8753a3caf79cf7a160cb220a7305b8d914d1bfd8989d52861d1cc1407de4`, and its binary SHA-256 is
+`4df4194f9201147b07199266fd66b35970e953dbddc7b799af3dcf60f019dac6`. The exact source archive is
+`s3://radio-sa193-393287594714/run9/source/radio-e7fa747.tar.zst`, 1,214,189 bytes, SHA-256
+`b6fd7d8bb76fbc6e020ffb0cc8d1a45ef3d618d9e3e3280bfc329801c74c1536`. Independent post-launch and
+S3 round-trip checks matched the source, binary, provenance sidecar, `run.meta` and launch manifest;
+SSM commands were `f766ce6b-1a8b-45a1-b929-2a65420899ee`,
+`78883034-52fd-42c7-a83d-3b5eae9eff46` and `7f9f7920-854e-4148-80d3-57c2588dce7a`.
+
+Run9 has its own 60 GiB guard. Because three independent caps could overcommit a 123 GiB host, a
+second guard sums the exact three named solver RSS values and terminates the newest run9 wrapper at
+108 GiB, preserving roughly 15 GiB for the host and the longer baselines. The idle guard now waits
+for all three solver names. The status/watchdog reports the suppression count and compares run9 to
+run8 by default when explicitly selected. Five minutes after launch run9 was alive at 71,811
+verdicts and 0.23 GiB RSS, with zero suppressed contractions. Its mandatory control then returned
+`Sa(192) = SOLVABLE` in 479.2 CPU seconds, versus run8's 471.6 seconds, and the same process continued
+into `Sa(193)`. Direct post-control checks at 03:30 UTC found it at 0.59 GiB RSS with zero suppression
+markers; all three solvers plus run9's wrapper, watchdog, combined-RSS guard and three-name idle
+guard were alive. The host retained 95 GiB available RAM, no swap and 196 GiB free disk. These checks
+were SSM commands `aa6e5298-9dea-44dc-82b7-28d78a3fbff2`,
+`451831b4-5e8c-4c5f-8621-0a3cd4095a6d`, and `b28ec8dc-8156-464a-b50e-7a828866e45b`. The positive
+control gates the execution but is not yet a result about `Sa(193)`. The next ordinary watchdog
+snapshot independently recorded 165,654 verdicts, 0.60 GiB RSS and zero suppressions. Its first
+completed matched k=9 call, `Sb(112:80)@9`, took 352 seconds against run8's 345 (1.02x), consistent
+with the intended near-zero overhead before the new guard actually fires.
