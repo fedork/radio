@@ -45,7 +45,7 @@ class CompareTest(unittest.TestCase):
             self.assertIn("30", output)
             self.assertIn("20", output)
             self.assertIn("1.50x", output)
-            self.assertIn("slow calls (CPU incl/~self) from run8", output)
+            self.assertIn("slow states (CPU attempt-sum≥/~self-final) from run8", output)
             self.assertNotIn("inclusive / self", output)
 
     def test_estimates_self_between_same_level_verdicts(self) -> None:
@@ -64,6 +64,77 @@ class CompareTest(unittest.TestCase):
             second = verdicts[("Sb(8:3)[24,11]", 4)]
             self.assertIsNone(first.estimated_self)
             self.assertEqual(second.estimated_self, 6)
+
+    def test_aggregates_visible_attempts_without_double_counting_final_episode(self) -> None:
+        state = "Sb(48:48,64:33)[4416,193]"
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "attempts.log"
+            log.write_text(
+                f"still solving in 8 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 60/999 left=1/2 totalsplits=1\n"
+                f"still solving in 8 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 971/999 left=1/2 totalsplits=2\n"
+                f"still solving in 8 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 61/3701 left=1/2 totalsplits=3\n"
+                f"still solving in 8 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 1147/3701 left=1/2 totalsplits=4\n"
+                f"can't solve {state} in 8 took 1181 totalsplits=53834 pass=1 fast_solve=0\n",
+                encoding="utf-8",
+            )
+            verdict = sa193_compare.scan(log, "run", 1).top_slow[0]
+            self.assertEqual(verdict.prior_attempt_floor, 971)
+            self.assertEqual(verdict.observed_attempt_seconds, 2152)
+            self.assertEqual(verdict.attempt_count, 2)
+            self.assertEqual(sa193_compare.timing_pair(verdict), "≥2.15k(2a)/-")
+
+    def test_short_final_retry_is_a_separate_attempt(self) -> None:
+        state = "Sb(48:48,64:33)[4416,193]"
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "attempts.log"
+            log.write_text(
+                f"still solving in 8 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 2602/2611 left=1/2 totalsplits=45149\n"
+                f"can't solve {state} in 8 took 14 totalsplits=53834 pass=1 fast_solve=0\n",
+                encoding="utf-8",
+            )
+            verdict = sa193_compare.scan(log, "run", 1).top_slow[0]
+            self.assertEqual(verdict.prior_attempt_floor, 2602)
+            self.assertEqual(verdict.observed_attempt_seconds, 2616)
+            self.assertEqual(verdict.attempt_count, 2)
+
+    def test_progress_from_final_attempt_is_not_added_twice(self) -> None:
+        state = "Sb(20:10)[200,30]"
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "attempts.log"
+            log.write_text(
+                f"still solving in 6 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 60/100 left=1/2 totalsplits=1\n"
+                f"can't solve {state} in 6 took 75 totalsplits=10 pass=1 fast_solve=0\n",
+                encoding="utf-8",
+            )
+            verdict = sa193_compare.scan(log, "run", 1).top_slow[0]
+            self.assertEqual(verdict.prior_attempt_floor, 0)
+            self.assertEqual(verdict.observed_attempt_seconds, 75)
+            self.assertEqual(verdict.attempt_count, 1)
+
+    def test_same_level_verdict_proves_progress_was_an_abandoned_attempt(self) -> None:
+        state = "Sb(20:10)[200,30]"
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "attempts.log"
+            log.write_text(
+                f"still solving in 6 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 60/100 left=1/2 totalsplits=1\n"
+                "can't solve Sb(21:9)[189,30] in 6 took 2 totalsplits=2 pass=1 fast_solve=0\n"
+                f"can't solve {state} in 6 took 75 totalsplits=10 pass=1 fast_solve=0\n",
+                encoding="utf-8",
+            )
+            verdicts = {
+                verdict.key: verdict for verdict in sa193_compare.scan(log, "run", 2).top_slow
+            }
+            verdict = verdicts[(state, 6)]
+            self.assertEqual(verdict.prior_attempt_floor, 60)
+            self.assertEqual(verdict.observed_attempt_seconds, 135)
+            self.assertEqual(verdict.attempt_count, 2)
 
 
 if __name__ == "__main__":
