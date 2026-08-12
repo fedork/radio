@@ -1131,7 +1131,9 @@ long long cant_solve_count=0;
    Built by bitmap convolution - R[i] = union over options of R[i+1] shifted by (k0,k2) - which is
    a few million word-ops for a whole state, ~1-2 ms. */
 #define RB_MAXCAP 800
+#ifndef RB_TRIGGER
 #define RB_TRIGGER 10000000LL      /* arm the prune once a state has cost this many candidates */
+#endif
 static int rb_on = 0, rb_cap = 0, rb_words = 0, rb_P = 0;
 static unsigned long long *rb_bits[17];
 static short *rb_mx[17];
@@ -1305,6 +1307,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
        cheap states - the overwhelming majority - never pay anything. That also avoids privileging
        the 8-part near-saturated shape: any state that turns out expensive gets the prune. */
     int rb_here = 0;
+    /* rb_dead uses the unassigned suffix, so a rejection proves only that the FULL state cannot
+       use this prefix.  The old implicit-contraction argument is prefix-local: if no assignment
+       reaches part q, the first q parts alone are impossible.  Once rb_dead has rejected anything,
+       that argument is no longer available for this invocation; retain the exact full negative but
+       never cache the tempting shorter one.  Keep this local across iterative-deepening passes. */
+    int rb_tainted_contraction = 0;
     clock_t deadline = search_deadline(parent_deadline, start, size);
     
     //    printf("k=%d parent_deadline=%llu start=%llu deadline=%llu\n", k, parent_deadline, start, deadline);
@@ -1544,6 +1552,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     int p2 = sb2p[i] = sb_pairs[sb2[i] = s[3]] + (i>0?sb2p[i-1]:0);
                     
                     int cs0, cs1, cs2;
+                    int within_cap = p0 <= max_pairs_1 && p1 <= max_pairs_1 && p2 <= max_pairs_1;
+                    int rb_rejected = 0;
                     
 #ifdef DEBUG
                     printSb(sb0, i+1);
@@ -1552,8 +1562,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     
                     debug_printf(" i=%d p0=%d p1=%d p2=%d\n", i, p0,p1,p2);
 #endif
-                    if ((p0 <= max_pairs_1) && (p1 <= max_pairs_1) && (p2 <= max_pairs_1)
-                        && !(rb_here && i + 1 < size && rb_dead(i + 1, p0, p1, p2))
+                    if (within_cap && rb_here && i + 1 < size) {
+                        rb_rejected = rb_dead(i + 1, p0, p1, p2);
+                        if (rb_rejected) rb_tainted_contraction = 1;
+                    }
+                    if (within_cap && !rb_rejected
                         && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY))
                         && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY))
                         && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
@@ -1728,10 +1741,12 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     } else {
         cant_solve_count++;
         printf("can't solve ");
-        if (max_solvable_maybe + 1 < size) {
+        int contraction_candidate_size = max_solvable_maybe + 1;
+        int contraction_suppressed = contraction_candidate_size < size && rb_tainted_contraction;
+        if (contraction_candidate_size < size && !contraction_suppressed) {
             debug_printf("max_solvable_maybe=%d\n", max_solvable_maybe);
             printf("size=%d/", size);
-            size = max_solvable_maybe + 1;
+            size = contraction_candidate_size;
             printf("%d ", size);
             // recompute pairs
             pairs = 0;
@@ -1752,6 +1767,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     printf(" totalsplits=%llu pass=%d fast_solve=%d", totalsplits, pass, fast_solve);
     if (shared_probe) printf(" probe=shared");
     else printf(" probe=%us", probe_seconds);
+    if (!canSolve && max_solvable_maybe + 1 < query_size && rb_tainted_contraction)
+        printf(" contraction=rb-suppressed:%d", max_solvable_maybe + 1);
 #ifdef MEASURE_FAST_REPLAY
     if (fast_replay_capture && k == 5 && parent_deadline == NO_DEADLINE) {
         fast_replay_pass = pass;
