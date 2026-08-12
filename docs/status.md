@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-11** (cold AWS `run8` passed its positive control and is
-now searching `Sa(193)` beside the untouched `run3` incumbent).
+don't know it. Last refreshed **2026-08-12** (cold AWS `run8` is in pass 2 of its first `Sa(193)`
+root beside the untouched `run3` incumbent).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -171,18 +171,18 @@ Do not run `gh auth switch`.
 ## Running now
 
 The two live AWS solvers are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot
-from **2026-08-11 23:38 UTC**:
+from **2026-08-12 01:00 UTC**:
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **fresh and alive** | 1.67 M verdicts, **25.50 GB**, 1 of 16 |
+| `run3/` — A+B + full-star majorization | **fresh and alive** | 1.69 M verdicts, **25.51 GB**, 1 of 16 |
 | `run4/` — compact cache at frozen commit `6af384e` | stopped, archived; old scheduler | 103,773 verdicts, **0.29 GB**, control never returned |
 | `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped, archived; old scheduler | 103,769 verdicts, **0.29 GB**, control never returned |
 | `run6/` — broken deadline experiment at `c13b5d3` | stopped, archived | control SOLVABLE in 922.0 s; 618,816 raw lines, 1.37 GB peak RSS |
 | `run7/` — progress-gated pass-2 dive at `e648e83` | stopped and archived; obsolete scheduler | 104,931 verdicts; control never returned; **0.29 GB** peak RSS |
-| `run8/` — compact cache + bounded probes at `9395218` | **fresh and alive** | exploring `Sb(112:81)@9`; 341.3 K verdicts, **0.93 GB**, 0 of 16 |
+| `run8/` — compact cache + bounded probes at `9395218` | **fresh and alive** | pass 2 of `Sb(112:81)@9`; 508.1 K verdicts, **1.02 GB**, 0 of 16 |
 
 Use `tools/sa193_status.sh --compare [--watch]` for compact live run3/run8 rows and the exact-call
 comparison; `--all` prints the stopped historical sessions and must not be read as proof that those
@@ -202,13 +202,16 @@ This is 0.872x run3's 540.7-second control on the same host. It validates this e
 to continue into `Sa(193)`; it is not evidence about the final negative yet.
 
 The run8 watchdog scans both live raw prefixes every five minutes with bounded state. It chooses the
-run that is behind by completed roots and verdict count, ranks its six slowest completed calls, and
-joins exact `(state,k)` keys in the peer log. The first cycle found all six matches. Per-call `took`
-is inclusive CPU. Per-call `~self` is the useful approximation suggested after the first view: from
-each k verdict, subtract all k-1 verdict time since the previous k verdict. `MAYBE` and cache effects
-make it approximate, and the first call at each level has no left boundary. The compact view keeps
-the recursive stack and a per-run level profile, but no side-by-side level comparison. The profile
-adds the visible elapsed time of current `still solving` frames before taking level differences.
+run that is behind by completed roots and verdict count, ranks its six slowest completed exact
+states, and joins `(state,k)` keys in the peer log. A verdict's `took` covers only its final
+activation, so the ranking and first timing column now add the last visible `elapsed` value from
+each earlier progress episode. Historical `MAYBE` returns have no exact timestamp: `≥` marks this
+attempt-sum floor, `(2a)` means two visible attempts, and a ratio involving a floor is prefixed `~`.
+Per-call `~self-final` still subtracts all k-1 verdict time since the previous k verdict and applies
+only to the final activation. `MAYBE` and cache effects make it approximate, and the first call at
+each level has no left boundary. The compact view keeps the recursive stack and a per-run level
+profile, but no side-by-side level comparison. The profile adds the visible elapsed time of current
+`still solving` frames before taking level differences.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
 25.50 GB with 1.64 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
@@ -265,12 +268,16 @@ bytes in the combined-checkpoint regression match compact baseline c146d9d exact
 measured tax for current runs; frozen `run4` does not contain it, while stopped `run5`/`run6`/`run7`
 do.
 
-For the proposed matched state `Sb(48:48,64:33)@8`, `run3` did **not** print a refutation.  It logged
-progress through 2,602 seconds, 45,149 tested split combinations and 565/1,225 outer options left,
-then produced no verdict line; record that outcome as `MAYBE`, not `FALSE`. The stopped run4 never
-reached it. Its retained read-only tracker artifact is therefore
-empty of target progress.  A meaningful comparison still requires a final verdict or an explicitly
-bounded non-verdict, not merely matching `still solving` lines.
+The proposed matched state `Sb(48:48,64:33)@8` now has definitive matching refutations. Run3 first
+logged an abandoned episode through 2,602 seconds, then much later returned `FALSE` in a 14-second
+warm retry; run8 used an approximately 999-second bounded probe and returned `FALSE` on a
+1,181-second retry. Both definitive calls report the same 53,834 admitted split combinations. The
+observable attempt floors are therefore `run8 ≥ 2,152 s` and `run3 ≥ 2,616 s`, not the misleading
+final-activation ratio `1181/14 = 84.36`. More importantly, the enclosing `Sb(112:81)@9` reached the
+run8 refutation and entered pass 2 at 4,881 CPU seconds; run3 reached the same refutation immediately
+before its 155,329-second root verdict. That is a 31.8x earlier phase transition, not yet an
+end-to-end root comparison: run8 remained in pass 2 at this snapshot. Exact raw line numbers and
+the lower-bound reconstruction are in the 2026-08-12 journal entry.
 
 A current-main local trial (`713b7d6`, M4 Pro / 24 GB) was stopped deliberately rather than left
 to swap.  The cold `Sa(192)` control passed in **734.5 CPU seconds**.  In 1,152 wall seconds the
@@ -511,12 +518,14 @@ of the parent remains possible.  Do not promote that one-point correction to a f
 0. **Keep watching cold `run8` beside run3.** Run8 is the bounded-probe replacement and should run
    to a verdict unless its 60 GiB guard, the positive control, or another concrete health signal
    fails. `tools/sa193_status.sh --compare --watch` gives compact wall/CPU/progress/memory rows plus
-   matched slow calls. Do not restart either live cold cache merely to pick up later monitoring edits.
+   matched slow-state attempt floors. Do not restart either live cold cache merely to pick up later
+   monitoring edits.
 
 1. **Evaluate run8 by scheduler progress and memory, not raw verdict count alone.** Its cold
-   `Sa(192)` control has passed; now compare completed roots, active stacks, matched `incl/~self`
-   calls and RSS against run3. Missing verdicts remain `MAYBE`, not negatives, and no obsolete
-   checkpoint should be used as a cross-build proof source.
+   `Sa(192)` control has passed; now compare completed roots, active stacks, matched attempt floors,
+   `~self-final`, and RSS against run3. A `≥` attempt sum is only a visible-work floor; missing
+   verdicts remain `MAYBE`, not negatives, and no obsolete checkpoint should be used as a
+   cross-build proof source.
 
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the

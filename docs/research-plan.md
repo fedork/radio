@@ -199,7 +199,8 @@ solver track's bounded ordering approximation is deployed in run8: long candidat
 geometric local probe while the one/two-segment constructive spine keeps the shared parent budget.
 It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the remote control has now
 passed in 471.6 CPU seconds. Use the retained run8 prefix to compare natural `Sa(193)` progress,
-matched call cost and memory against run3. Do not add split history before that comparison matures.
+matched visible-attempt cost and memory against run3. Do not add split history before that
+comparison matures.
 The theory track should work from
 the exact `k=10,m=6` mixed-child boundary toward a parametric large-k construction or obstruction,
 and only then recover small k backwards. Do not use witness-tree shape as evidence that either track

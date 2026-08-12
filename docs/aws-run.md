@@ -61,14 +61,15 @@ after launch. Launch and independent survival checks are SSM commands
 Its mandatory cold control returned `SOLVABLE` in 471.6 CPU seconds and the process continued into
 `Sa(193)`; run3's same-host control was 540.7 seconds.
 
-The solver remains exactly that frozen build. Its comparison helper alone was updated after launch
-to commit `4cd002e` (SHA-256
-`a8599a71b4a6bc3cc4b1e4ad0c8b6485722ba932bf297d5cc294de438a316ccd`) so the live exact-state join
-can report estimated self time. The original helper, original `run.meta` and replacement helper are
-all retained under `run8/` (the helpers under `monitor-updates/`); the appended metadata records both
-hashes. SSM command:
-`73df22ca-30a2-4d18-b357-896d1e772e82`. No solver, cache, deadline, watchdog process or raw output
-was changed.
+The solver remains exactly that frozen build. Its comparison helper alone was updated after launch,
+first to `4cd002e` for estimated self time and then to `58e3457` for visible-attempt aggregation.
+The current helper SHA-256 is
+`61af8b9512dec07fbcc621ff76bdb3386556c83d0bd515a7815093ab4ad6dd52`; the launch and intermediate
+helpers are retained under `run8/monitor-updates/`, and `run.meta` records every transition and
+hash. The update SSM commands are `73df22ca-30a2-4d18-b357-896d1e772e82` and
+`4d0d79db-43cb-4800-bb23-9b2843a5fb2a`. No solver, cache, deadline, watchdog process or raw output
+was changed; the frozen binary remains
+`d9ae6e5feea4700be742504e345e2af09c910d790330b37457755cd89d4ac950`.
 
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
@@ -101,13 +102,20 @@ tools/sa193_status.sh --compare --watch
 This prints compact live rows for run3 and run8, followed by the latest exact-call comparison.
 `--candidate run7` selects run7's final diagnostic snapshot and `--all` prints the verbose history.
 Run8 refreshes every five minutes; run3's older watchdog refreshes every ten. The comparison chooses
-the run with fewer completed roots (then fewer verdicts), takes its six slowest completed calls and
-joins them to run3 by exact printed `(state,k)`. Under each compact run row, the current recursive
-stack is shown from the k=9 root down to the active level, followed by that run's compact per-level
-`inclusive/self` profile. Visible `still solving ... elapsed` time is added to the corresponding
-level before the self differences are taken. `took` is inclusive CPU, not wall time. Per-call
-`~self` subtracts all k-1 verdict time since the previous k verdict; it is an estimate, and the first
-call at a level is shown as unknown. A missing peer call is printed as `-`, never inferred.
+the run with fewer completed roots (then fewer verdicts), takes its six slowest completed exact
+states and joins them to run3 by printed `(state,k)`. It groups a state's progress lines into
+attempts whenever `elapsed` resets or another same-level verdict proves that the activation
+returned. The final verdict's inclusive `took` is counted once; each abandoned visible attempt
+contributes its last observed elapsed value. Because historical logs do not print the exact time of
+a `MAYBE` return, `≥` marks the resulting attempt-sum floor, `(2a)` is the number of visible attempts,
+and its ratio is prefixed `~`. Short abandoned attempts with no progress line remain unknowable.
+
+Under each compact run row, the current recursive stack is shown from the k=9 root down to the active
+level, followed by that run's compact per-level `inclusive/self` profile. Visible
+`still solving ... elapsed` time is added to the corresponding level before the self differences
+are taken. Per-call `~self-final` subtracts all k-1 verdict time since the previous k verdict; it is
+an estimate for the final activation only, and the first call at a level is shown as unknown. A
+missing peer call is printed as `-`, never inferred.
 
 | key | what |
 |---|---|

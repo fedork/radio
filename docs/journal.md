@@ -5026,3 +5026,54 @@ The next ordinary watchdog cycle—not a manual one-shot—refreshed `COMPARE` i
 run3 solver, one run8 solver, one run8 watchdog and one two-name idle guard; the run8 binary hash was
 still `d9ae6e5feea4700be742504e345e2af09c910d790330b37457755cd89d4ac950`, with 95 GiB available and
 no swap.
+
+## 2026-08-12 — visible retries replace the misleading final-activation comparison
+
+The first genuinely hard matched state exposed a missing dimension in `took`. Both live raw logs
+now contain the definitive negative
+`Sb(48:48,64:33)[4416,193]@8`, with exactly 53,834 admitted split combinations in each build. The
+verdicts agree; the apparent `1181/14 = 84.36x` regression did not describe the work needed to reach
+them. Read-only SSM commands `926eb7fa-67c2-469c-9da5-d2c865893d98` and
+`f22aa329-8907-42a6-ac07-d8508027c129` reconstructed the progress episodes and estimator windows
+from the complete EBS logs.
+
+Run3's first visible episode spans raw lines 146,510–271,994 and reaches elapsed 2,602 with a current
+deadline of 2,611 and 45,149 tested combinations. It returns no verdict. Its later definitive retry
+at line 1,610,349 takes only 14 seconds because the enclosing root has meanwhile spent roughly
+152,000 seconds populating descendant facts. Run8 has a first episode at lines 164,321–204,753,
+ending at elapsed 971 against a 999-second cap, then a second episode at lines 465,038–478,744 and a
+definitive 1,181-second verdict at line 484,108. Counting the final call once and adding only the
+last observed elapsed of each abandoned episode gives conservative visible-attempt floors of
+`run8 ≥ 2,152 s` and `run3 ≥ 2,616 s`, an observed-floor ratio of 0.82x. These remain lower bounds:
+the old logs neither timestamp a `MAYBE` return nor reveal an abandoned attempt shorter than the
+60-second progress interval.
+
+The enclosing-root timing is a separate and stronger scheduling signal. The line immediately after
+run8's target verdict enters pass 2 of `Sb(112:81)@9` at elapsed 4,881. Run3's target verdict is
+immediately followed by that root's final 155,329-second negative. Thus run8 reached the phase
+transition 31.8x earlier, consistent with the bounded probe doing its intended job: stop the first
+speculative dive, develop other cache facts, then return with a larger allowance. This is not yet a
+31.8x root result; run8 was still in pass 2. The adjacent raw windows were captured by read-only SSM
+command `dfccb5f5-e068-4c48-9d21-c6b3bc838ab8`.
+
+Commit `58e3457` changes the streaming comparator to rank and compare these visible-attempt floors.
+It groups progress episodes on an elapsed reset; an intervening same-level verdict is also a sound
+episode boundary because recursive children have level k-1. The display now prints, for example,
+`run8 ≥2.15k(2a)/65`, `run3 ≥2.61k(2a)/0`, and `~0.82x/-`: `2a` means two visible attempts,
+the leading inequality marks the aggregate floor, the approximate ratio compares those floors, and
+`~self-final` remains scoped to the definitive activation. Lower-bound formatting is rounded down,
+never up. Seven synthetic tests cover long/long retries, long/sub-minute retries, a final attempt
+with progress, same-level boundaries, matching, parsing and self estimation. The helper was also
+run over both growing live logs before deployment; its bounded scan selected this state as the
+largest completed run8 attempt aggregate.
+
+Only the monitoring helper was deployed. SSM command `4d0d79db-43cb-4800-bb23-9b2843a5fb2a`
+preserved the prior and current helpers, atomically installed the `58e3457` version, regenerated and
+uploaded `COMPARE`, appended the transition to `run.meta`, and retained the exact output under
+`run8/monitor-updates/`. The current helper SHA-256 is
+`61af8b9512dec07fbcc621ff76bdb3386556c83d0bd515a7815093ab4ad6dd52`; the updated metadata SHA-256
+is `f2f4bc2af810abd950b793860d4f70cc13d368c9bcf30d978df7b24e7cefaf55`. The solver binary remained
+`d9ae6e5feea4700be742504e345e2af09c910d790330b37457755cd89d4ac950`, and both original solver PIDs
+remained alive. No cache, deadline, raw log or solver process was changed. The next ordinary
+watchdog refresh at 01:00:38 UTC reproduced the new aggregate format, so the result does not depend
+on the manual deployment invocation.
