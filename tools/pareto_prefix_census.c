@@ -28,7 +28,7 @@
  *   tools/build_radio.py -O3 -DMAX_K=8 -DMAX_N=768 \
  *       tools/pareto_prefix_census.c -o pareto_prefix_census
  *   ./pareto_prefix_census CACHE data/pareto_sb.csv ROOT_K \
- *       [MAX_UPGRADE_STATES [ROOT_LOG [EXACT_CACHE]]]
+ *       [MAX_UPGRADE_STATES [ROOT_LOG [EXACT_CACHE [SECOND_CHECKPOINT ...]]]]
  *
  * ROOT_LOG may contain the raw one-part `result in K can solve ... with [...]` records of a prior
  * exhaustive full-solution run.  Those cuts are re-verified exactly before use.  Supplying them
@@ -38,6 +38,11 @@
  * is an optional full cache file indexed by exact canonical state equality only; unlike CACHE it does not
  * materialize dominance closure.  This is useful when a large audited historical oracle is too
  * costly to replay into the trie.  Misses still fall through to the current exact solver.
+ * SECOND_CHECKPOINT is a prior raw census log.  Only a FIRST/LINEAGE block closed by a matching
+ * SECOND_SUMMARY is imported; an interrupted tail is ignored.  The recorded winning cuts are
+ * canonicalized, deduplicated, and re-verified exactly under the current engine before the block
+ * can replace enumeration.  Completeness still depends on the checkpoint having used this exact
+ * prefix enumerator, so retain its source snapshot and provenance beside the log.
  *
  * Output records beginning CENSUS are stable, tab-separated machine records.  Ordinary solver
  * verdicts may appear between them when a warm cache lacks a fact; those are useful provenance,
@@ -103,6 +108,7 @@ struct EnumContext {
     unsigned long long prefixes;
     unsigned long long local_options;
     unsigned long long cap_pruned;
+    unsigned long long frontier_pruned;
     unsigned long long cache_pruned;
     unsigned long long complete;
     unsigned long long exact_queries;
@@ -135,8 +141,10 @@ typedef struct {
     unsigned long long prefixes;
     unsigned long long complete;
     unsigned long long cap_pruned;
+    unsigned long long frontier_pruned;
     unsigned long long cache_pruned;
     unsigned long long exact_queries;
+    unsigned char imported;
 } SecondMemo;
 
 typedef struct {
@@ -172,12 +180,18 @@ static unsigned long long roots_with_strict_first;
 static unsigned long long second_invocations;
 static unsigned long long second_unique_states;
 static unsigned long long second_memo_hits;
+static unsigned long long second_imported_memos;
+static unsigned long long second_imported_blocks;
+static unsigned long long second_imported_winners_verified;
+static unsigned long long second_import_exact_queries;
 static unsigned long long second_winners;
 static unsigned long long second_opposed_winners;
 static unsigned long long first_prefixes;
 static unsigned long long second_prefixes;
 static unsigned long long first_complete;
 static unsigned long long second_complete;
+static unsigned long long first_frontier_pruned;
+static unsigned long long second_frontier_pruned;
 static unsigned long long supplied_root_winners[512];
 static unsigned long long supplied_root_strict[512];
 
@@ -418,6 +432,26 @@ static int exact_result(int *sb, int size, int k, unsigned long long *queries) {
     return result;
 }
 
+/* A solvable multi-component child remains solvable after every other component is removed.
+   Therefore each of the four rectangles induced by one component's cut must lie on or below the
+   proved one-part frontier at the child level.  This is an exact necessary condition whenever the
+   CSV contains a proven maximum; a missing frontier entry deliberately leaves the option alive. */
+static int component_within_proven_frontier(int k, int u, int v) {
+    if (u < v) { int t = u; u = v; v = t; }
+    if (v == 0 || u * v <= 1) return 1;
+    if (k < 0 || k > MAX_K || v > MAX_N / 2 || frontier[k][v] == 0) return 1;
+    return u <= frontier[k][v];
+}
+
+static int cut_within_component_frontier(const EnumContext *ctx, int i, int a, int b) {
+    int n = ctx->part[i].u, m = ctx->part[i].v;
+    int child_k = ctx->k - 1;
+    return component_within_proven_frontier(child_k, a, b)
+        && component_within_proven_frontier(child_k, n - a, m - b)
+        && component_within_proven_frontier(child_k, a, m - b)
+        && component_within_proven_frontier(child_k, n - a, b);
+}
+
 static void enumerate_rec(EnumContext *ctx, int i) {
     int cap = power3[ctx->k - 1];
     if (i == ctx->size) {
@@ -449,6 +483,11 @@ static void enumerate_rec(EnumContext *ctx, int i) {
             if (normalized_swapped) { int t = a; a = b; b = t; }
             ctx->local_options++;
             ctx->prefixes++;
+
+            if (!cut_within_component_frontier(ctx, i, a, b)) {
+                ctx->frontier_pruned++;
+                continue;
+            }
 
             int selected = getSbb(a, b);
             int complement = getSbb(nu - a, nv - b);
@@ -611,6 +650,270 @@ static void remember_second_winner(EnumContext *ctx) {
     }
 }
 
+static void second_cut_add_unique(SecondMemo *memo, int a0, int b0, int a1, int b1) {
+    for (size_t i = 0; i < memo->cuts_len; i++) {
+        SecondCut *old = &memo->cuts[i];
+        if (old->take_u[0] == a0 && old->take_v[0] == b0
+            && old->take_u[1] == a1 && old->take_v[1] == b1) return;
+    }
+    if (memo->cuts_len == memo->cuts_cap) {
+        size_t next_cap = memo->cuts_cap ? memo->cuts_cap * 2 : 16;
+        SecondCut *next = realloc(memo->cuts, next_cap * sizeof(*next));
+        if (!next) { fprintf(stderr, "out of memory growing imported second cuts\n"); exit(3); }
+        memo->cuts = next;
+        memo->cuts_cap = next_cap;
+    }
+    memo->cuts[memo->cuts_len++] = (SecondCut){{a0, a1}, {b0, b1}};
+}
+
+static SecondMemo *second_memo_find(const CanonState *state) {
+    for (size_t i = 0; i < second_memos_len; i++)
+        if (canon_equal(&second_memos[i].state, state)) return &second_memos[i];
+    return NULL;
+}
+
+static SecondMemo *second_memo_create_imported(const CanonState *state) {
+    if (second_memos_len == second_memos_cap) {
+        size_t next_cap = second_memos_cap ? second_memos_cap * 2 : 256;
+        SecondMemo *next = realloc(second_memos, next_cap * sizeof(*next));
+        if (!next) { fprintf(stderr, "out of memory growing imported second memos\n"); exit(3); }
+        second_memos = next;
+        second_memos_cap = next_cap;
+    }
+    SecondMemo *memo = &second_memos[second_memos_len++];
+    memset(memo, 0, sizeof(*memo));
+    memo->state = *state;
+    memo->imported = 1;
+    second_unique_states++;
+    second_imported_memos++;
+    return memo;
+}
+
+static int parse_pair_list(const char *value, LabelPart *out, int expected) {
+    const char *p = value;
+    for (int i = 0; i < expected; i++) {
+        char *end;
+        long u = strtol(p, &end, 10);
+        if (end == p || *end != ':') return 0;
+        p = end + 1;
+        long v = strtol(p, &end, 10);
+        if (end == p || u < 0 || v < 0 || u > INT_MAX || v > INT_MAX) return 0;
+        out[i] = (LabelPart){(int)u, (int)v};
+        if (i + 1 < expected) {
+            if (*end != ',') return 0;
+            p = end + 1;
+        } else if (*end != '\0') return 0;
+    }
+    return 1;
+}
+
+static int census_field(const char *line, const char *name, char *out, size_t cap) {
+    char needle[128];
+    if (snprintf(needle, sizeof(needle), "\t%s=", name) >= (int)sizeof(needle)) return 0;
+    const char *start = strstr(line, needle);
+    if (!start) return 0;
+    start += strlen(needle);
+    const char *end = strchr(start, '\t');
+    if (!end) end = start + strcspn(start, "\r\n");
+    size_t len = (size_t)(end - start);
+    if (len + 1 > cap) return 0;
+    memcpy(out, start, len);
+    out[len] = '\0';
+    return 1;
+}
+
+static unsigned long long census_ull_field(const char *line, const char *name, int required) {
+    char value[128];
+    if (!census_field(line, name, value, sizeof(value))) {
+        if (!required) return 0;
+        fprintf(stderr, "checkpoint record lacks %s: %s", name, line);
+        exit(2);
+    }
+    char *end;
+    unsigned long long parsed = strtoull(value, &end, 10);
+    if (*value == '\0' || *end != '\0') {
+        fprintf(stderr, "invalid checkpoint %s=%s\n", name, value);
+        exit(2);
+    }
+    return parsed;
+}
+
+typedef struct {
+    int active;
+    int root_n, root_m, first_u, first_v;
+    LabelPart two[2];
+    SecondMemo memo;
+} PendingSecondBlock;
+
+static void pending_second_clear(PendingSecondBlock *pending) {
+    free(pending->memo.cuts);
+    memset(pending, 0, sizeof(*pending));
+}
+
+static void verify_imported_second_cut(const CanonState *state, const SecondCut *cut) {
+    int selected[2], complement[2], mixed[4];
+    for (int i = 0; i < 2; i++) {
+        int n = sbb_to_n1[state->sb[i]], m = sbb_to_n2[state->sb[i]];
+        int a = cut->take_u[i], b = cut->take_v[i];
+        if (a < 0 || a > n || b < 0 || b > m) {
+            fprintf(stderr, "imported second cut is out of range\n");
+            exit(2);
+        }
+        selected[i] = getSbb(a, b);
+        complement[i] = getSbb(n - a, m - b);
+        mixed[2 * i] = getSbb(a, m - b);
+        mixed[2 * i + 1] = getSbb(n - a, b);
+    }
+    if (exact_result(selected, 2, root_k - 2, &second_import_exact_queries) != TRUE
+        || exact_result(complement, 2, root_k - 2, &second_import_exact_queries) != TRUE
+        || exact_result(mixed, 4, root_k - 2, &second_import_exact_queries) != TRUE) {
+        fprintf(stderr, "imported second winner failed current exact verification\n");
+        exit(5);
+    }
+    second_imported_winners_verified++;
+}
+
+static void commit_pending_second(PendingSecondBlock *pending, const char *summary) {
+    char root_value[128], first_value[128];
+    LabelPart root[1], first[1];
+    if (!census_field(summary, "root", root_value, sizeof(root_value))
+        || !census_field(summary, "first", first_value, sizeof(first_value))
+        || !parse_pair_list(root_value, root, 1) || !parse_pair_list(first_value, first, 1)
+        || root[0].u != pending->root_n || root[0].v != pending->root_m
+        || first[0].u != pending->first_u || first[0].v != pending->first_v) {
+        fprintf(stderr, "checkpoint SECOND_SUMMARY does not close its FIRST block\n");
+        exit(2);
+    }
+    unsigned long long winners = census_ull_field(summary, "winners", 1);
+    if (winners != pending->memo.cuts_len) {
+        fprintf(stderr, "checkpoint winner count mismatch: summary=%llu lineages=%zu\n",
+                winners, pending->memo.cuts_len);
+        exit(2);
+    }
+    pending->memo.prefixes = census_ull_field(summary, "prefixes", 1);
+    pending->memo.complete = census_ull_field(summary, "complete", 1);
+    pending->memo.cap_pruned = census_ull_field(summary, "cap_pruned", 1);
+    pending->memo.frontier_pruned = census_ull_field(summary, "frontier_pruned", 0);
+    pending->memo.cache_pruned = census_ull_field(summary, "cache_pruned", 1);
+    pending->memo.exact_queries = census_ull_field(summary, "exact_queries", 1);
+    CanonState state = full_canon_from_label(pending->two, 2);
+    pending->memo.state = state;
+
+    SecondMemo *memo = second_memo_find(&state);
+    if (!memo) {
+        memo = second_memo_create_imported(&state);
+        for (size_t i = 0; i < pending->memo.cuts_len; i++) {
+            verify_imported_second_cut(&state, &pending->memo.cuts[i]);
+            SecondCut *cut = &pending->memo.cuts[i];
+            second_cut_add_unique(memo, cut->take_u[0], cut->take_v[0],
+                                  cut->take_u[1], cut->take_v[1]);
+        }
+        if (memo->cuts_len != winners) {
+            fprintf(stderr, "checkpoint contains duplicate canonical second winners\n");
+            exit(2);
+        }
+        memo->prefixes = pending->memo.prefixes;
+        memo->complete = pending->memo.complete;
+        memo->cap_pruned = pending->memo.cap_pruned;
+        memo->frontier_pruned = pending->memo.frontier_pruned;
+        memo->cache_pruned = pending->memo.cache_pruned;
+        memo->exact_queries = pending->memo.exact_queries;
+        second_prefixes += memo->prefixes;
+        second_complete += memo->complete;
+        second_frontier_pruned += memo->frontier_pruned;
+    } else {
+        /* A complemented first cut can close the same canonical two-component state.  Its block
+           must transport to the identical canonical winner set; compare after canonicalization. */
+        if (memo->cuts_len != winners) {
+            fprintf(stderr, "checkpoint blocks disagree for one canonical second state\n");
+            exit(2);
+        }
+        for (size_t i = 0; i < pending->memo.cuts_len; i++) {
+            SecondCut *cut = &pending->memo.cuts[i];
+            size_t before = memo->cuts_len;
+            second_cut_add_unique(memo, cut->take_u[0], cut->take_v[0],
+                                  cut->take_u[1], cut->take_v[1]);
+            if (memo->cuts_len != before) {
+                fprintf(stderr, "checkpoint canonical winner sets disagree\n");
+                exit(2);
+            }
+        }
+    }
+    second_imported_blocks++;
+    pending_second_clear(pending);
+}
+
+static void load_second_checkpoint(const char *path) {
+    FILE *file = fopen(path, "r");
+    if (!file) { fprintf(stderr, "cannot open second checkpoint %s\n", path); exit(2); }
+    PendingSecondBlock pending = {0};
+    char line[16384];
+    while (fgets(line, sizeof(line), file)) {
+        if (strchr(line, '\n') == NULL && !feof(file)) {
+            fprintf(stderr, "checkpoint line exceeds %zu bytes\n", sizeof(line) - 1);
+            exit(2);
+        }
+        if (strncmp(line, "CENSUS\tFIRST\t", 13) == 0) {
+            pending_second_clear(&pending); /* discard an interrupted preceding block */
+            char root_value[128], first_value[128], two_value[256];
+            LabelPart root[1], first[1];
+            if (!census_field(line, "root", root_value, sizeof(root_value))
+                || !census_field(line, "take", first_value, sizeof(first_value))
+                || !census_field(line, "mixed", two_value, sizeof(two_value))
+                || !parse_pair_list(root_value, root, 1)
+                || !parse_pair_list(first_value, first, 1)
+                || !parse_pair_list(two_value, pending.two, 2)) {
+                fprintf(stderr, "malformed checkpoint FIRST record\n");
+                exit(2);
+            }
+            pending.active = 1;
+            pending.root_n = root[0].u; pending.root_m = root[0].v;
+            pending.first_u = first[0].u; pending.first_v = first[0].v;
+        } else if (pending.active && strncmp(line, "CENSUS\tLINEAGE\t", 15) == 0) {
+            char root_value[128], first_value[128], two_value[256], second_value[256];
+            LabelPart root[1], first[1], two[2], take[2];
+            if (!census_field(line, "root", root_value, sizeof(root_value))
+                || !census_field(line, "first", first_value, sizeof(first_value))
+                || !census_field(line, "two", two_value, sizeof(two_value))
+                || !census_field(line, "second", second_value, sizeof(second_value))
+                || !parse_pair_list(root_value, root, 1)
+                || !parse_pair_list(first_value, first, 1)
+                || !parse_pair_list(two_value, two, 2)
+                || !parse_pair_list(second_value, take, 2)
+                || root[0].u != pending.root_n || root[0].v != pending.root_m
+                || first[0].u != pending.first_u || first[0].v != pending.first_v) {
+                fprintf(stderr, "malformed or misplaced checkpoint LINEAGE record\n");
+                exit(2);
+            }
+            CanonState state = full_canon_from_label(two, 2);
+            int a[2] = {take[0].u, take[1].u}, b[2] = {take[0].v, take[1].v};
+            for (int oi = 0; oi < 2; oi++) {
+                if (two[oi].u < two[oi].v) { int t = a[oi]; a[oi] = b[oi]; b[oi] = t; }
+            }
+            int ca[2], cb[2];
+            unsigned used = 0;
+            for (int ci = 0; ci < 2; ci++) {
+                int found = -1;
+                for (int oi = 0; oi < 2; oi++) {
+                    int sbb = getSbb(two[oi].u, two[oi].v);
+                    if (!(used & (1u << oi)) && state.sb[ci] == sbb) { found = oi; break; }
+                }
+                if (found < 0) { fprintf(stderr, "cannot canonicalize checkpoint cut\n"); exit(6); }
+                used |= 1u << found; ca[ci] = a[found]; cb[ci] = b[found];
+            }
+            second_cut_add_unique(&pending.memo, ca[0], cb[0], ca[1], cb[1]);
+        } else if (pending.active && strncmp(line, "CENSUS\tSECOND_SUMMARY\t", 22) == 0) {
+            commit_pending_second(&pending, line);
+        }
+    }
+    pending_second_clear(&pending); /* intentionally drops an interrupted tail */
+    fclose(file);
+    printf("CENSUS\tSECOND_CHECKPOINT\tpath=%s\timported_memos=%llu"
+           "\tcompleted_blocks=%llu\twinners_verified=%llu\texact_queries=%llu\n",
+           path, second_imported_memos, second_imported_blocks,
+           second_imported_winners_verified, second_import_exact_queries);
+}
+
 static SecondMemo *second_memo_for(const LabelPart two[2], int *memo_hit) {
     CanonState state = full_canon_from_label(two, 2);
     for (size_t i = 0; i < second_memos_len; i++) {
@@ -644,6 +947,7 @@ static SecondMemo *second_memo_for(const LabelPart two[2], int *memo_hit) {
     memo->prefixes = enumeration.prefixes;
     memo->complete = enumeration.complete;
     memo->cap_pruned = enumeration.cap_pruned;
+    memo->frontier_pruned = enumeration.frontier_pruned;
     memo->cache_pruned = enumeration.cache_pruned;
     memo->exact_queries = enumeration.exact_queries;
     if (memo->cuts_len != enumeration.winners) {
@@ -652,6 +956,7 @@ static SecondMemo *second_memo_for(const LabelPart two[2], int *memo_hit) {
     }
     second_prefixes += enumeration.prefixes;
     second_complete += enumeration.complete;
+    second_frontier_pruned += enumeration.frontier_pruned;
     return memo;
 }
 
@@ -730,10 +1035,12 @@ static void first_winner(EnumContext *ctx) {
     SecondMemo *memo = second_memo_for(two, &memo_hit);
     replay_second_memo(two, memo, &second);
     printf("CENSUS\tSECOND_SUMMARY\troot=%d:%d\tfirst=%d:%d\twinners=%llu"
-           "\tprefixes=%llu\tcomplete=%llu\tcap_pruned=%llu\tcache_pruned=%llu"
-           "\texact_queries=%llu\tmemo_hit=%d\n",
+           "\tprefixes=%llu\tcomplete=%llu\tcap_pruned=%llu\tfrontier_pruned=%llu"
+           "\tcache_pruned=%llu"
+           "\texact_queries=%llu\tmemo_hit=%d\tmemo_imported=%d\n",
            n, m, a, b, (unsigned long long)memo->cuts_len, memo->prefixes, memo->complete,
-           memo->cap_pruned, memo->cache_pruned, memo->exact_queries, memo_hit);
+           memo->cap_pruned, memo->frontier_pruned, memo->cache_pruned,
+           memo->exact_queries, memo_hit, memo->imported);
 }
 
 static void load_frontier(const char *path) {
@@ -1116,10 +1423,11 @@ static void map_endpoints(void) {
         }
         printf("CENSUS\tFULL_SUMMARY\tid=U%06zu\twinners=%llu\tprefixes=%llu"
                "\tunit_extended_winners=%llu\tcomplete=%llu\tcap_pruned=%llu"
-               "\tcache_pruned=%llu\texact_queries=%llu\n",
+               "\tfrontier_pruned=%llu\tcache_pruned=%llu\texact_queries=%llu\n",
                endpoint_id, enumeration.winners, enumeration.prefixes,
                full.unit_extended_winners, enumeration.complete, enumeration.cap_pruned,
-               enumeration.cache_pruned, enumeration.exact_queries);
+               enumeration.frontier_pruned, enumeration.cache_pruned,
+               enumeration.exact_queries);
         fflush(stdout);
     }
 }
@@ -1221,10 +1529,10 @@ static void consume_root_log(const char *path, const int roots[][2], int root_co
 }
 
 int main(int argc, char **argv) {
-    if (argc < 4 || argc > 7) {
+    if (argc < 4) {
         fprintf(stderr,
                 "usage: %s CACHE PARETO_CSV ROOT_K "
-                "[MAX_UPGRADE_STATES [ROOT_LOG [EXACT_CACHE]]]\n",
+                "[MAX_UPGRADE_STATES [ROOT_LOG [EXACT_CACHE [SECOND_CHECKPOINT ...]]]]\n",
                 argv[0]);
         return 2;
     }
@@ -1245,13 +1553,15 @@ int main(int argc, char **argv) {
 
     init();
     load_frontier(argv[2]);
-    if (argc == 7) load_exact_oracle(argv[6]);
+    if (argc >= 7 && strcmp(argv[6], "-") != 0) load_exact_oracle(argv[6]);
     parse_file(argv[1]);
 
     int roots[512][2];
     int root_count = collect_roots(root_k, roots, 512);
     printf("CENSUS\tBEGIN\troot_k=%d\tresidual_k=%d\troots=%d\tupgrade_limit=%zu\n",
            root_k, residual_k, root_count, max_upgrade_states);
+
+    for (int i = 7; i < argc; i++) load_second_checkpoint(argv[i]);
 
     if (argc >= 6 && strcmp(argv[5], "-") != 0)
         consume_root_log(argv[5], roots, root_count);
@@ -1268,14 +1578,17 @@ int main(int argc, char **argv) {
             enumerate_winners(root, 1, root_k, first_winner, &ri, &enumeration);
             first_prefixes += enumeration.prefixes;
             first_complete += enumeration.complete;
+            first_frontier_pruned += enumeration.frontier_pruned;
         }
         roots_with_strict_first += supplied_root_strict[ri] > 0;
         printf("CENSUS\tROOT_SUMMARY\troot=%d:%d\twinners=%llu\tstrict_winners=%llu"
-               "\tprefixes=%llu\tcomplete=%llu\tcap_pruned=%llu\tcache_pruned=%llu"
+               "\tprefixes=%llu\tcomplete=%llu\tcap_pruned=%llu\tfrontier_pruned=%llu"
+               "\tcache_pruned=%llu"
                "\texact_queries=%llu\n",
                roots[ri][0], roots[ri][1], supplied_root_winners[ri],
                supplied_root_strict[ri], enumeration.prefixes, enumeration.complete,
-               enumeration.cap_pruned, enumeration.cache_pruned, enumeration.exact_queries);
+               enumeration.cap_pruned, enumeration.frontier_pruned,
+               enumeration.cache_pruned, enumeration.exact_queries);
         fflush(stdout);
     }
 
@@ -1283,12 +1596,17 @@ int main(int argc, char **argv) {
            "\tfirst_strict_winners=%llu\troots_with_strict_first=%llu"
            "\tsecond_invocations=%llu\tsecond_winners=%llu\tsecond_opposed_winners=%llu"
            "\tsecond_unique_states=%llu\tsecond_memo_hits=%llu"
+           "\tsecond_imported_memos=%llu\tsecond_imported_blocks=%llu"
+           "\tsecond_imported_winners_verified=%llu"
            "\tfirst_prefixes=%llu\tfirst_complete=%llu\tsecond_prefixes=%llu"
-           "\tsecond_complete=%llu\ttargets=%zu\n",
+           "\tsecond_complete=%llu\tfirst_frontier_pruned=%llu"
+           "\tsecond_frontier_pruned=%llu\ttargets=%zu\n",
            root_k, roots_seen, first_winners, first_strict_winners, roots_with_strict_first,
            second_invocations, second_winners, second_opposed_winners,
            second_unique_states, second_memo_hits,
-           first_prefixes, first_complete, second_prefixes, second_complete, targets_len);
+           second_imported_memos, second_imported_blocks, second_imported_winners_verified,
+           first_prefixes, first_complete, second_prefixes, second_complete,
+           first_frontier_pruned, second_frontier_pruned, targets_len);
 
     size_t degenerate = 0, four = 0, upgrade_seeds = 0, empty_core = 0;
     for (size_t i = 0; i < targets_len; i++) {

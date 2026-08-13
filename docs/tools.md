@@ -405,7 +405,8 @@ tools/build_radio.py -O3 -DMAX_K=8 -DMAX_N=336 \
 
 tools/capped_run.sh --seconds 14400 --rss-gb 16 --label pareto-census-k8 -- \
     /tmp/pareto_prefix_census DOMINANCE_CACHE data/pareto_sb.csv 8 2000000 \
-    ROOT_WINNER_LOG EXACT_CACHE > census-k8.out 2> census-k8.err
+    ROOT_WINNER_LOG EXACT_CACHE [SECOND_CHECKPOINT ...] \
+    > census-k8.out 2> census-k8.err
 
 tools/analyze_pareto_prefix_census.py --pareto-csv data/pareto_sb.csv census-k8.out
 tools/test_pareto_prefix_census.sh
@@ -420,6 +421,23 @@ therefore cheap and memory-bounded, while misses still fall through to `canSolve
 Only a deliberately selected cache slice should be replayed into the dominance trie for partial-
 prefix pruning.  This is a research-driver hook compiled through `RADIO_EXTERNAL_EXACT_LOOKUP`; an
 ordinary `radiobase.c` build has no hook, storage or lookup overhead.
+
+At every enumerated component cut, the driver also applies an exact local necessary condition: all
+four induced rectangles must lie on or below the proved one-part frontier at the child level.  A
+solvable multi-part child stays solvable after deleting all other components, so a rectangle beyond
+that frontier cannot be rescued by later parts.  Missing/unproved frontier entries do not prune.
+On the hard `Sb(62:10,82:7)@7` second state this reduces the raw Cartesian grid from 460,152 to
+25,080 choices before a solver query; an independent k=7 run retained exactly the same 450 first
+cuts and 2,956 labelled second-cut lineages as the unfiltered corpus.
+
+Long prefix censuses can resume from one or more raw `SECOND_CHECKPOINT` logs.  The importer ignores
+an interrupted tail and accepts only a `FIRST`/`LINEAGE` block closed by its matching
+`SECOND_SUMMARY`.  It canonicalizes and deduplicates the recorded winners, checks the summary count,
+and exactly re-verifies all three children of every distinct winner under the current engine.  The
+closed summary is the completeness claim, so retain the checkpoint's source snapshot and
+provenance and use this only when its prefix enumerator is known to match.  A k=7 replay of all 448
+closed blocks reproduced the complete labelled geometry and all 563 targets, 819 upgrade nodes and
+610 endpoints.
 
 The output's `CENSUS` records are stable TSV.  The analyzer refuses a log without `CENSUS END`,
 reconstructs both descendant levels and every final child from the logged cuts, checks masses,
