@@ -138,25 +138,27 @@ status() {
             last[k] = line; lastnr[k] = NR
         }
         # "still solving" lines are the real progress signal: they carry left=<remaining>/<total>
-        # splits at that level and elapsed=<used>/<budget> against the deadline, so they say how far
-        # through a level the search is. A completed verdict only says what finished, which at high k
-        # can be hours stale. Record the log position too, so staleness is visible - the k=9 line can
-        # still be the one from the control long after the control finished.
+        # splits at that level and elapsed=<used>/<budget> in scheduler nominal seconds. New
+        # builds derive that field deterministically from accepted-prefix work and append actual
+        # cpu=<seconds>; historical builds use CPU for elapsed directly. A completed verdict only
+        # says what finished, which at high k can be hours stale. Record the log position too, so
+        # staleness is visible - the k=9 line can still be the one from the control long afterward.
         /still solving in/ {
             match($0, /in [0-9]+/); sk = substr($0, RSTART + 3, RLENGTH - 3) + 0
             sline = $0
             sub(/^still solving in [0-9]+ /, "", sline)
             sub(/ trying .*elapsed /, "  elapsed ", sline)
-            # An "elapsed X/Y" with Y barely above X is NOT a budget about to expire. On pass 2 every
-            # descendant is given NO_DEADLINE (radiobase.c: child_deadline = pass<2 ? deadline :
-            # NO_DEADLINE), and such a node does not return MAYBE when it passes its deadline - it
-            # sets deadline = now + 10s and continues, forever. So Y tracks X at a fixed ~10s offset
-            # and the node runs until it concludes. Saying "99.7% of budget used" about that is
-            # exactly backwards: nothing is going to stop it.
+            # A new progress line says budget=unbounded exactly when this invocation received
+            # NO_DEADLINE. It extends its display limit rather than returning MAYBE. Old logs lack
+            # the marker, so retain the former <=12-second inference for them only; it can be less
+            # precise near the end of a genuinely finite historical call.
             if (match(sline, /elapsed [0-9]+\/[0-9]+/)) {
                 ef = substr(sline, RSTART + 8, RLENGTH - 8)
                 split(ef, ep, "/")
-                if (ep[2] - ep[1] <= 12) sub(/elapsed [0-9]+\/[0-9]+/, "elapsed " ef " (no deadline: auto-extends)", sline)
+                explicit_unbounded = sline ~ /budget=unbounded/
+                explicit_finite = sline ~ /budget=finite/
+                if (explicit_unbounded || (!explicit_finite && ep[2] - ep[1] <= 12))
+                    sub(/elapsed [0-9]+\/[0-9]+/, "elapsed " ef " (no deadline: auto-extends)", sline)
             }
             still[sk] = sline; stillnr[sk] = NR
         }
@@ -221,8 +223,8 @@ status() {
         "$(grep -m1 'result CONTROL' "$LOG" 2>/dev/null || echo 'not yet reported')"
     printf '\n  latest activity per level, from the level the search is on (k=%s) up to the root\n' \
         "$(awk '/^CURK/{print $2}' <<<"$scan")"
-    printf '  (solving: left=<splits remaining>/<total> is the progress; a deadline marked\n'
-    printf '   auto-extends is NOT expiring - pass-2 descendants get NO_DEADLINE and bump it 10s)\n'
+    printf '  (solving: left=<splits remaining>/<total> is the progress; a budget marked\n'
+    printf '   auto-extends is NOT expiring - that invocation received NO_DEADLINE)\n'
     awk '/^ACT/ { k=$2; kind=$3; age=$4; $1=""; $2=""; $3=""; $4=""; sub(/^    /,"")
                   printf "    k=%s [%s]%s %s\n", k, kind,
                          (age > 200000 ? " (stale)" : ""), $0 }' <<<"$scan"

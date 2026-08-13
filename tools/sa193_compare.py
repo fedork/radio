@@ -4,7 +4,9 @@
 Per-verdict `took` covers only the activation that finally returned a verdict.  A reset in the
 `elapsed` field of earlier progress lines exposes abandoned activations of the same exact state.
 Their last observed elapsed values give a conservative attempt-sum floor; historical logs do not
-record the exact time at which a MAYBE returned.  Exclusive time remains an estimate.
+record the exact point at which a MAYBE returned. New deterministic-budget verdicts carry their
+exact work and calibration rate, while historical verdicts fall back to process-CPU seconds.
+Exclusive CPU time remains an estimate.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ PROGRESS_RE = re.compile(
     r"^still solving in (\d+) .*?"
     r"(Sb\(.*?\)\[\d+,\d+\]) trying .*? elapsed (\d+)/(\d+)"
 )
+WORK_RE = re.compile(r" work=(\d+) rate=(\d+)")
 MASS_RE = re.compile(r"\[(\d+),(\d+)\]$")
 FIRST_PART_RE = re.compile(r"^Sb\((\d+):")
 
@@ -41,6 +44,7 @@ class Verdict:
     seconds: float
     splits: int
     line_no: int
+    effort_seconds: float | None = None
     estimated_self: float | None = None
     prior_attempt_floor: float = 0.0
     attempt_count: int = 1
@@ -51,7 +55,15 @@ class Verdict:
 
     @property
     def observed_attempt_seconds(self) -> float:
-        return self.seconds + self.prior_attempt_floor
+        return self.final_attempt_effort + self.prior_attempt_floor
+
+    @property
+    def final_attempt_effort(self) -> float:
+        return self.seconds if self.effort_seconds is None else self.effort_seconds
+
+    @property
+    def uses_work_budget(self) -> bool:
+        return self.effort_seconds is not None
 
     @property
     def has_abandoned_attempt(self) -> bool:
@@ -109,14 +121,15 @@ class AttemptTracker:
         pending = self.pending.pop(verdict.key, None)
         if pending is not None:
             # If the definitive activation itself emitted progress, its `took` includes the last
-            # episode. Otherwise that episode was abandoned too. Integer `elapsed` and `took` are
-            # both floors of the same CPU clock, so >= is the right association when no intervening
-            # same-level verdict gives us a stronger boundary.
+            # episode. Otherwise that episode was abandoned too. For historical logs, integer
+            # `elapsed` and `took` are floors of the same CPU clock. Deterministic-budget verdicts
+            # use their exact work/rate effort, matching the virtual elapsed field.
             same_level_boundary = (
                 self.level_epochs.get(verdict.level, 0) != pending.current_level_epoch
             )
             final_episode_is_visible = (
-                not same_level_boundary and verdict.seconds >= pending.current_elapsed
+                not same_level_boundary
+                and verdict.final_attempt_effort >= pending.current_elapsed
             )
             verdict.prior_attempt_floor = pending.earlier_floor
             verdict.attempt_count = pending.episodes
@@ -172,6 +185,12 @@ def parse_verdict(line: str, line_no: int) -> Verdict | None:
     if not match:
         return None
     outcome, state, level, seconds, splits = match.groups()
+    work_match = WORK_RE.search(line)
+    effort_seconds = None
+    if work_match is not None:
+        work, rate = (int(value) for value in work_match.groups())
+        if rate > 0:
+            effort_seconds = work / rate
     return Verdict(
         state=state,
         level=int(level),
@@ -179,6 +198,7 @@ def parse_verdict(line: str, line_no: int) -> Verdict | None:
         seconds=float(seconds),
         splits=int(splits),
         line_no=line_no,
+        effort_seconds=effort_seconds,
     )
 
 
@@ -283,7 +303,11 @@ def ratio(value: float | None, peer_value: float | None) -> str:
 
 def attempt_ratio(verdict: Verdict, peer: Verdict) -> str:
     result = ratio(verdict.observed_attempt_seconds, peer.observed_attempt_seconds)
-    if result != "-" and (verdict.has_abandoned_attempt or peer.has_abandoned_attempt):
+    if result != "-" and (
+        verdict.has_abandoned_attempt
+        or peer.has_abandoned_attempt
+        or verdict.uses_work_budget != peer.uses_work_budget
+    ):
         return f"~{result}"
     return result
 
@@ -295,7 +319,7 @@ def format_summary(a: Summary, b: Summary) -> str:
     lines = [
         f"compare {now}  behind={behind.label} "
         f"({len(behind.top_done)}/16 roots, {behind.verdicts} verdicts)",
-        f"slow states (CPU attempt-sum≥/~self-final) from {behind.label}"
+        f"slow states (attempt-effort≥/~CPU-self-final) from {behind.label}"
         f"       {behind.label:>15} {peer.label:>15}    a×/~s×",
     ]
     for verdict in behind.top_slow:

@@ -9,6 +9,7 @@ import sys
 
 TIME_LINE_RE = re.compile(r"^    k=(\d+)")
 ACTIVE_RE = re.compile(r"^    k=(\d+) \[solving\].*? elapsed (\d+)/\d+")
+ACTIVE_CPU_RE = re.compile(r" cpu=(\d+)")
 
 
 def compact_number(value: float) -> str:
@@ -41,7 +42,10 @@ def parse_status(status: str) -> tuple[dict[int, float], dict[int, float]]:
         if in_stack:
             match = ACTIVE_RE.match(line)
             if match:
-                active[int(match.group(1))] = float(match.group(2))
+                cpu_match = ACTIVE_CPU_RE.search(line)
+                active[int(match.group(1))] = float(
+                    cpu_match.group(1) if cpu_match else match.group(2)
+                )
         if in_times:
             match = TIME_LINE_RE.match(line)
             if not match:

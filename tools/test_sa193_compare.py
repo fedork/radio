@@ -45,7 +45,7 @@ class CompareTest(unittest.TestCase):
             self.assertIn("30", output)
             self.assertIn("20", output)
             self.assertIn("1.50x", output)
-            self.assertIn("slow states (CPU attempt-sum≥/~self-final) from run8", output)
+            self.assertIn("slow states (attempt-effort≥/~CPU-self-final) from run8", output)
             self.assertNotIn("inclusive / self", output)
 
     def test_estimates_self_between_same_level_verdicts(self) -> None:
@@ -116,6 +116,32 @@ class CompareTest(unittest.TestCase):
             self.assertEqual(verdict.prior_attempt_floor, 0)
             self.assertEqual(verdict.observed_attempt_seconds, 75)
             self.assertEqual(verdict.attempt_count, 1)
+
+    def test_work_budget_uses_virtual_effort_for_attempt_matching(self) -> None:
+        state = "Sb(20:10)[200,30]"
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "attempts.log"
+            log.write_text(
+                f"still solving in 6 pass=1 fast_solve=0 {state} trying Sb(1:1)[1,2] "
+                "elapsed 60/100 work=1200000000/2000000000 left=1/2 totalsplits=1 cpu=75\n"
+                f"can't solve {state} in 6 took 75 totalsplits=10 pass=1 fast_solve=0 "
+                "work=1400000000 rate=20000000\n",
+                encoding="utf-8",
+            )
+            verdict = sa193_compare.scan(log, "run", 1).top_slow[0]
+            self.assertEqual(verdict.seconds, 75)
+            self.assertEqual(verdict.effort_seconds, 70)
+            self.assertEqual(verdict.prior_attempt_floor, 0)
+            self.assertEqual(verdict.observed_attempt_seconds, 70)
+            self.assertEqual(verdict.attempt_count, 1)
+
+    def test_cross_budget_attempt_ratio_is_marked_approximate(self) -> None:
+        cpu = sa193_compare.Verdict("Sb(5:2)[10,7]", 3, "no", 10, 1, 1)
+        work = sa193_compare.Verdict(
+            "Sb(5:2)[10,7]", 3, "no", 12, 1, 1, effort_seconds=10
+        )
+        self.assertEqual(sa193_compare.attempt_ratio(work, cpu), "~1.00x")
+        self.assertEqual(sa193_compare.attempt_ratio(work, work), "1.00x")
 
     def test_same_level_verdict_proves_progress_was_an_abandoned_attempt(self) -> None:
         state = "Sb(20:10)[200,30]"

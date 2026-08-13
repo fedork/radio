@@ -34,6 +34,24 @@ class LevelTimesTest(unittest.TestCase):
         self.assertIn("k3 75/55", output)
         self.assertIn("k2 20/20", output)
 
+    def test_prefers_actual_cpu_from_work_budget_progress(self) -> None:
+        status = "\n".join(
+            [
+                "  latest activity per level, from the level the search is on (k=4) up to the root",
+                "    k=4 [solving] pass=1 elapsed 20/30 work=400000000/600000000 "
+                "left=1/2 totalsplits=1 cpu=7",
+                "  time by level - k, verdicts, inclusive, self, %cpu, splits",
+                time_line(4, 10, 100),
+                time_line(3, 20, 20),
+            ]
+        )
+        inclusive, active = sa193_level_times.parse_status(status)
+        self.assertEqual(inclusive, {4: 100, 3: 20})
+        self.assertEqual(active, {4: 7})
+        output = sa193_level_times.format_level_times(status)
+        self.assertIn("k4 107/87", output)
+        self.assertIn("k3 20/20", output)
+
 
 if __name__ == "__main__":
     unittest.main()

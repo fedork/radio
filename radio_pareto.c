@@ -6,9 +6,10 @@
 //
 // This is the generic replacement for radioSbPareto.c, which hardcodes k = 9 and MAX_N = 204.
 // It is a heavy, well-defined workload with a *known* answer for k <= 8, which makes it the
-// right benchmark for anything that only shows up on long searches - the deadline machinery
+// right benchmark for anything that only shows up on long searches - the finite-budget machinery
 // in particular never fires on the Sa ladder, because no single search there gets near the
-// 1000s / 100s / 10s / MIN_DEADLINE budget cascade.
+// 1000 / 100 / 10 nominal-second / MIN_DEADLINE budget cascade. The default nominal clock counts
+// accepted split prefixes; -DRADIO_CPU_BUDGET restores the historical process-CPU interpretation.
 //
 //   tools/build_radio.py -O3 -DMAX_K=8 -DMAX_N=258 radio_pareto.c -o radio_pareto
 //   tools/capped_run.sh --seconds 3600 --rss-gb 16 -- ./radio_pareto 8 56 55 > out.txt

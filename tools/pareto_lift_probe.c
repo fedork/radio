@@ -97,9 +97,7 @@ static int cmp_candidate(const void *va, const void *vb) {
 static int timed_true(int *sb, int size, int k, int probe_ms) {
     int result = canSolveB(sb, size, k, CACHE_ONLY);
     if (result != MAYBE) return result == TRUE;
-    clock_t allowance = (clock_t)((double)CLOCKS_PER_SEC * probe_ms / 1000.0);
-    if (allowance < 1) allowance = 1;
-    return canSolveB(sb, size, k, clock() + allowance) == TRUE;
+    return canSolveB(sb, size, k, radio_budget_after_milliseconds((uint64_t)probe_ms)) == TRUE;
 }
 
 static void append_candidate(const LiftCandidate *candidate) {

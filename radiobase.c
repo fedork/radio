@@ -97,8 +97,9 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #endif
 #ifndef RADIO_INITIAL_PROBE_SECONDS
 /* Research drivers may choose a larger first quantum for a narrowly scoped top-level exact
-   query.  Recursive children still receive their ordinary bounded deadlines unless the driver
-   explicitly says otherwise.  Production builds retain the historical two-second default. */
+   query.  Recursive children still receive their ordinary bounded allowances unless the driver
+   explicitly says otherwise.  The value is in nominal seconds: accepted-prefix work by default,
+   process CPU under RADIO_CPU_BUDGET. */
 #define RADIO_INITIAL_PROBE_SECONDS(k, size, parent_deadline) PROBE_SECONDS
 #endif
 
@@ -106,12 +107,82 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #define NO_DEADLINE 2
 #define FAST_ONLY 3
 
-/* A finite child gets a fraction of the time still owned by its parent.  In particular, an
+/* Deterministic accepted-prefix budgeting is the repository default.  RADIO_CPU_BUDGET retains a
+   matched fallback for controlled comparisons and archaeology. */
+#if defined(RADIO_WORK_BUDGET) && defined(RADIO_CPU_BUDGET)
+#error "choose at most one of RADIO_WORK_BUDGET and RADIO_CPU_BUDGET"
+#endif
+#if !defined(RADIO_WORK_BUDGET) && !defined(RADIO_CPU_BUDGET)
+#define RADIO_WORK_BUDGET 1
+#endif
+
+/* Search budgeting has two interchangeable clocks.  The default is a deterministic count of
+   accepted split prefixes across the complete recursive call tree; RADIO_CPU_BUDGET restores the
+   historical process-CPU clock for controlled comparisons.  The conversion constant is deliberately
+   only a scheduling calibration: correctness never depends on a finite call finishing, because
+   budget exhaustion returns MAYBE rather than FALSE.
+
+   Keep the work counter monotone for the lifetime of the process.  Limits are absolute, exactly as
+   the old clock_t deadlines were, so a child consumes its parent's allowance and an exhausted parent
+   cannot manufacture a fresh budget. */
+#if defined(RADIO_WORK_BUDGET) || defined(RADIO_MEASURE_WORK)
+/* Stay clear of the historical small integer sentinels CACHE_ONLY/NO_DEADLINE/FAST_ONLY when this
+   counter itself is the scheduling clock.  Subtracting the origin yields the diagnostic work. */
+#define RADIO_WORK_CLOCK_ORIGIN 1024ULL
+static uint64_t radio_work_clock = RADIO_WORK_CLOCK_ORIGIN;
+static inline void radio_budget_charge_split(void) {
+    if (radio_work_clock != UINT64_MAX) radio_work_clock++;
+}
+static inline uint64_t radio_work_units_used(void) {
+    return radio_work_clock - RADIO_WORK_CLOCK_ORIGIN;
+}
+#else
+static inline void radio_budget_charge_split(void) { }
+static inline uint64_t radio_work_units_used(void) { return 0; }
+#endif
+
+#ifdef RADIO_WORK_BUDGET
+#ifndef RADIO_WORK_UNITS_PER_SECOND
+#define RADIO_WORK_UNITS_PER_SECOND 20000000ULL
+#endif
+#define RADIO_BUDGET_UNITS_PER_SECOND ((uint64_t)RADIO_WORK_UNITS_PER_SECOND)
+static inline uint64_t radio_budget_now(void) { return radio_work_clock; }
+#else
+#define RADIO_BUDGET_UNITS_PER_SECOND ((uint64_t)CLOCKS_PER_SEC)
+static inline uint64_t radio_budget_now(void) { return (uint64_t)clock(); }
+#endif
+
+static uint64_t radio_budget_add(uint64_t base, uint64_t amount) {
+    return amount > UINT64_MAX - base ? UINT64_MAX : base + amount;
+}
+
+static uint64_t radio_budget_seconds(uint64_t seconds) {
+    return seconds > UINT64_MAX / RADIO_BUDGET_UNITS_PER_SECOND
+        ? UINT64_MAX : seconds * RADIO_BUDGET_UNITS_PER_SECOND;
+}
+
+static uint64_t radio_budget_after_seconds(uint64_t seconds) {
+    return radio_budget_add(radio_budget_now(), radio_budget_seconds(seconds));
+}
+
+static uint64_t radio_budget_after_milliseconds(uint64_t milliseconds) {
+    uint64_t seconds_part = milliseconds / 1000;
+    uint64_t millis_part = milliseconds % 1000;
+    uint64_t whole = radio_budget_seconds(seconds_part);
+    /* Divide before multiplying so a deliberately large calibration cannot overflow here. */
+    uint64_t fraction = (RADIO_BUDGET_UNITS_PER_SECOND / 1000) * millis_part
+        + (RADIO_BUDGET_UNITS_PER_SECOND % 1000) * millis_part / 1000;
+    uint64_t amount = radio_budget_add(whole, fraction);
+    if (amount == 0) amount = 1;
+    return radio_budget_add(radio_budget_now(), amount);
+}
+
+/* A finite child gets a fraction of the allowance still owned by its parent.  In particular, an
    exhausted parent never manufactures a fresh MIN_DEADLINE interval for each child it tries; that
    was the source of zero-work retry loops. */
-static clock_t search_deadline(clock_t parent_deadline, clock_t start, int size) {
+static uint64_t search_deadline(uint64_t parent_deadline, uint64_t start, int size) {
     if (parent_deadline == NO_DEADLINE)
-        return start + CLOCKS_PER_SEC * 1000;
+        return radio_budget_add(start, radio_budget_seconds(1000));
     if (parent_deadline <= start)
         return parent_deadline;
     /* One- and two-segment states are the constructive spine: their diagonal/opposed-branch
@@ -119,13 +190,13 @@ static clock_t search_deadline(clock_t parent_deadline, clock_t start, int size)
        these two layers starved the first genuinely long descendant before it reached its witness. */
     if (size <= 2)
         return parent_deadline;
-    clock_t remaining = parent_deadline - start;
-    if (remaining > CLOCKS_PER_SEC * MIN_DEADLINE * DEADLINE_RATIO)
+    uint64_t remaining = parent_deadline - start;
+    if (remaining > radio_budget_seconds(MIN_DEADLINE * DEADLINE_RATIO))
         return start + remaining / DEADLINE_RATIO;
     return parent_deadline;
 }
 
-static int deadline_expired(clock_t deadline, clock_t now) {
+static int deadline_expired(uint64_t deadline, uint64_t now) {
     return now > deadline;
 }
 
@@ -134,10 +205,11 @@ static int deadline_expired(clock_t deadline, clock_t now) {
    slicing it at every level prevents the first long child from ever receiving enough total time.
    The caller doubles the long-state quantum after every unresolved exhaustive pass, so a saturated
    cache cannot repeat the same bounded work forever and no split history is needed. */
-static clock_t probe_child_deadline(clock_t child_cap, clock_t now,
-                                    unsigned int probe_seconds, int size) {
+static uint64_t probe_child_deadline(uint64_t child_cap, uint64_t now,
+                                     unsigned int probe_seconds, int size) {
     if (size <= 2) return child_cap;
-    clock_t local = now + CLOCKS_PER_SEC * (clock_t)probe_seconds;
+    uint64_t quantum = radio_budget_seconds(probe_seconds);
+    uint64_t local = radio_budget_add(now, quantum);
     return local < child_cap ? local : child_cap;
 }
 
@@ -1205,7 +1277,7 @@ static inline int rb_dead(int nexti, int p0, int p1, int p2) {
     rb_pruned++; return 1;
 }
 
-int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
+int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
 #ifdef DEBUG1
     if(k>7) {
         printf("in canSolveB k=%d ", k);
@@ -1290,7 +1362,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         return ck;
     }
     if (parent_deadline != NO_DEADLINE && parent_deadline != FAST_ONLY
-        && deadline_expired(parent_deadline, clock()))
+        && deadline_expired(parent_deadline, radio_budget_now()))
         return MAYBE;
     
     int size_1 = size-1;
@@ -1317,8 +1389,9 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
        the prefix survives far enough to enter it. */
     splitsarr[0] = prepare_splits(tmp[0], k, size > 1);
     //full search
-    clock_t start = clock();
-    clock_t progress = start + PROGRESS_INTERVAL;
+    clock_t cpu_start = clock();
+    clock_t progress = cpu_start + PROGRESS_INTERVAL;
+    uint64_t budget_start = radio_budget_now();
     
     /* Reachability is armed by observed cost, not by a shape signature. A state that has already
        burned RB_TRIGGER candidate evaluations has earned the ~1-2 ms the tables take to build, and
@@ -1331,9 +1404,10 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
        that argument is no longer available for this invocation; retain the exact full negative but
        never cache the tempting shorter one.  Keep this local across iterative-deepening passes. */
     int rb_tainted_contraction = 0;
-    clock_t deadline = search_deadline(parent_deadline, start, size);
+    uint64_t deadline = search_deadline(parent_deadline, budget_start, size);
     
-    //    printf("k=%d parent_deadline=%llu start=%llu deadline=%llu\n", k, parent_deadline, start, deadline);
+    //    printf("k=%d parent_budget=%llu start=%llu limit=%llu\n",
+    //           k, parent_deadline, budget_start, deadline);
     
     int cont2=1;
     int skipped_some;
@@ -1342,6 +1416,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     if (probe_seconds == 0) probe_seconds = PROBE_SECONDS;
     int max_solvable_maybe = 0;
     int fast_solve;
+
     while (cont2) {
         pass++;
         // Pass 1 restricts groups 0..size-2 to FAST splits, leaving the LAST group free.
@@ -1388,7 +1463,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         
         // Every child call is bounded, including children of a NO_DEADLINE proof.  An unresolved
         // exhaustive pass doubles probe_seconds and starts over, so this is iterative deepening
-        // rather than a same-budget retry.  Finite calls stop at their shared absolute deadline.
+        // rather than a same-budget retry.  Finite calls stop at their shared absolute limit.
         int no_deadline = parent_deadline == NO_DEADLINE;
         
 //        int no_deadline = (pass==1);
@@ -1415,7 +1490,15 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 #ifdef DEBUG1
         clock_t t = clock();
         printf("solving in %d pass=%d ", k, pass);
-        printf("deadline=%lu ", deadline>t ? (deadline - t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0);
+#ifdef RADIO_WORK_BUDGET
+        printf("budget=%llu ",
+               (unsigned long long)(deadline > radio_budget_now()
+                   ? deadline - radio_budget_now() : 0));
+#else
+        printf("deadline=%llu ",
+               (unsigned long long)(deadline > (uint64_t)t
+                   ? (deadline - (uint64_t)t + CLOCKS_PER_SEC) / CLOCKS_PER_SEC : 0));
+#endif
         printSb(tmp, size);
         printf("\n");
 #ifdef DEBUG
@@ -1453,11 +1536,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
 //                        return MAYBE;
                     } else {
                         if (parent_deadline == NO_DEADLINE) {
-                            // double deadline
-                            deadline += (deadline - start);
+                            // double this root's absolute allowance
+                            deadline = radio_budget_add(deadline, deadline - budget_start);
                         }
                         if (pass >= 2) {
-                            if (!no_deadline && deadline_expired(deadline, clock())) {
+                            if (!no_deadline && deadline_expired(deadline, radio_budget_now())) {
                                 cont2=0;
                             } else if (probe_seconds <= UINT_MAX / 2) {
                                 /* Monotone work allowance replaces the old cache-progress gate:
@@ -1503,7 +1586,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
             while (s[4]<k) {
                 debug_printf("checking split solvability for %s -> [%d, %d], before: s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
                 int kk = s[4];
-                int dd = size > 1 ? deadline : CACHE_ONLY;
+                uint64_t dd = size > 1 ? deadline : CACHE_ONLY;
                 int ttt = canSolveB(s, 1, kk, dd);
                 if (ttt==TRUE) {
                     ttt = canSolveB(s+3, 1, kk, dd);
@@ -1537,12 +1620,17 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                     skipped_some = 1;
                 } else {
                     totalsplits++;
-                    /* Complete candidates can be extremely sparse in information-tight long
-                       states.  Polling every 2^16 admitted prefixes bounds a finite probe without
-                       putting clock() in the hottest loop.  A NO_DEADLINE proof is never polled
-                       here, so exhaustive work remains exhaustive. */
+                    radio_budget_charge_split();
+                    /* Accepted prefixes can be extremely sparse in information-tight long states.
+                       The deterministic clock is checked at every charged prefix.  The historical
+                       CPU fallback retains its every-2^16 poll to keep clock() out of the hottest
+                       loop.  A NO_DEADLINE proof is never stopped here, so exact work stays exact. */
+#ifdef RADIO_WORK_BUDGET
+                    if (!no_deadline && deadline_expired(deadline, radio_budget_now())) {
+#else
                     if (!no_deadline && !(totalsplits & DEADLINE_POLL_MASK)
-                        && deadline_expired(deadline, clock())) {
+                        && deadline_expired(deadline, radio_budget_now())) {
+#endif
                         if (rb_here) rb_release();
                         return MAYBE;
                     }
@@ -1603,32 +1691,53 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                         debug_printf("can solve\n");
                         if (i == size_1) {
                             if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
-                                clock_t t = clock();
-                                if (deadline_expired(deadline, t)) {
+                                uint64_t budget_now = radio_budget_now();
+                                if (deadline_expired(deadline, budget_now)) {
                                     if (no_deadline) {
-                                        deadline = t + 10 * CLOCKS_PER_SEC;
+                                        deadline = radio_budget_add(
+                                            budget_now, radio_budget_seconds(10));
                                     } else {
                                         { if (rb_here) rb_release(); return MAYBE; }
                                     }
                                 }
-                                if (t >= progress) {
+                                clock_t cpu_now = clock();
+                                if (cpu_now >= progress) {
                                     printf("still solving in %d pass=%d fast_solve=%d ", k, pass, fast_solve);
                                     printSb(tmp, size);
                                     printf(" trying ");
                                     printSb(sb0, size);
                                     printSb(sb1, size2);
                                     printSb(sb2, size);
-                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu",
-                                           (t - start)/CLOCKS_PER_SEC,
-                                           (deadline - start) / CLOCKS_PER_SEC,
+#ifdef RADIO_WORK_BUDGET
+                                    uint64_t work_used = radio_budget_now() - budget_start;
+                                    uint64_t work_limit = deadline > budget_start
+                                        ? deadline - budget_start : 0;
+                                    printf(" elapsed %llu/%llu work=%llu/%llu left=%d/%d totalsplits=%llu",
+                                           (unsigned long long)(work_used
+                                               / RADIO_BUDGET_UNITS_PER_SECOND),
+                                           (unsigned long long)(work_limit
+                                               / RADIO_BUDGET_UNITS_PER_SECOND),
+                                           (unsigned long long)work_used,
+                                           (unsigned long long)work_limit,
                                            splitindex[0], splitsarr[0]->size, totalsplits);
-                                    if (shared_probe) printf(" probe=shared\n");
-                                    else printf(" probe=%us\n", probe_seconds);
+                                    printf(" cpu=%lu", (unsigned long)
+                                           ((cpu_now - cpu_start) / CLOCKS_PER_SEC));
+#else
+                                    printf(" elapsed %lu/%lu left=%d/%d totalsplits=%llu",
+                                           (unsigned long)((cpu_now - cpu_start) / CLOCKS_PER_SEC),
+                                           (unsigned long)(deadline > budget_start
+                                               ? (deadline - budget_start) / CLOCKS_PER_SEC : 0),
+                                           splitindex[0], splitsarr[0]->size, totalsplits);
+#endif
+                                    if (shared_probe) printf(" probe=shared");
+                                    else printf(" probe=%us", probe_seconds);
+                                    printf(" budget=%s\n", no_deadline ? "unbounded" : "finite");
                                     fflush(stdout);
-                                    progress = t + PROGRESS_INTERVAL;
+                                    progress = cpu_now + PROGRESS_INTERVAL;
                                 }
                             }
-                            clock_t cd = probe_child_deadline(deadline, clock(), probe_seconds, size);
+                            uint64_t cd = probe_child_deadline(
+                                deadline, radio_budget_now(), probe_seconds, size);
                             /* MAYBE in one branch must not hide an easy refutation in another.
                                Probe all still-possible children, stopping only after a FALSE. */
                             if (cs0 == MAYBE)
@@ -1651,7 +1760,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
                             /* A child may have consumed the remainder of this probe's shared
                                allowance.  Unwind now instead of starting another candidate with
                                an already-expired parent budget. */
-                            if (!no_deadline && deadline_expired(deadline, clock())) {
+                            if (!no_deadline && deadline_expired(deadline, radio_budget_now())) {
                                 if (rb_here) rb_release();
                                 return MAYBE;
                             }
@@ -1776,7 +1885,7 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         printSb(tmp, size);
         printf(" in %d",k);
     }
-    clock_t t = clock()-start;
+    clock_t t = clock()-cpu_start;
     clock_t s = t/CLOCKS_PER_SEC;
     if (s>0)
         printf(" took %ld", s);
@@ -1788,6 +1897,11 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     else printf(" probe=%us", probe_seconds);
     if (!canSolve && max_solvable_maybe + 1 < query_size && rb_tainted_contraction)
         printf(" contraction=rb-suppressed:%d", max_solvable_maybe + 1);
+#ifdef RADIO_WORK_BUDGET
+    printf(" work=%llu rate=%llu",
+           (unsigned long long)(radio_budget_now() - budget_start),
+           (unsigned long long)RADIO_BUDGET_UNITS_PER_SECOND);
+#endif
 #ifdef MEASURE_FAST_REPLAY
     if (fast_replay_capture && k == 5 && parent_deadline == NO_DEADLINE) {
         fast_replay_pass = pass;
@@ -1818,7 +1932,7 @@ int minK(int sbb) {
         debug_printf("computing min_k for %s...\n", sbb_to_str[sbb]);
         kk=1;
         int rr;
-        while ((rr = canSolveB(&sbb, 1, kk, clock() + CLOCKS_PER_SEC * 1000)) == TRUE) kk++;
+        while ((rr = canSolveB(&sbb, 1, kk, radio_budget_after_seconds(1000))) == TRUE) kk++;
         debug_printf("min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
         if (rr == FALSE) sbb_to_min_k[sbb]=kk; // if we got maybe, assume false, but do not memorize
         debug_printf("cached min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
@@ -2717,6 +2831,13 @@ static void radio_print_provenance(void) {
     }
     radio_provenance_number("define.MAX_K", MAX_K);
     radio_provenance_number("define.MAX_N", MAX_N);
+#ifdef RADIO_WORK_BUDGET
+    radio_provenance_value("search_budget", "deterministic-accepted-prefixes");
+    radio_provenance_number("search_work_units_per_nominal_second",
+                            RADIO_BUDGET_UNITS_PER_SECOND);
+#else
+    radio_provenance_value("search_budget", "process-cpu-clock");
+#endif
 
     char stamp[64] = "unknown";
     time_t now = time(NULL);
