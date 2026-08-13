@@ -50,6 +50,13 @@
  */
 
 static int census_exact_lookup(const int *sb, int size, int k);
+static unsigned int census_exact_probe_seconds;
+#ifndef CENSUS_SECOND_EXACT_PROBE_SECONDS
+#define CENSUS_SECOND_EXACT_PROBE_SECONDS 16u
+#endif
+#define RADIO_INITIAL_PROBE_SECONDS(k, size, parent_deadline) \
+    ((parent_deadline) == NO_DEADLINE && (size) >= 4 && census_exact_probe_seconds \
+         ? census_exact_probe_seconds : PROBE_SECONDS)
 #define RADIO_EXTERNAL_EXACT_LOOKUP(sb, size, k) census_exact_lookup((sb), (size), (k))
 #include "../radiobase.c"
 
@@ -943,7 +950,10 @@ static SecondMemo *second_memo_for(const LabelPart two[2], int *memo_hit) {
         canonical[i].v = sbb_to_n2[state.sb[i]];
     }
     EnumContext enumeration;
+    unsigned int saved_probe_seconds = census_exact_probe_seconds;
+    census_exact_probe_seconds = CENSUS_SECOND_EXACT_PROBE_SECONDS;
     enumerate_winners(canonical, 2, root_k - 1, remember_second_winner, memo, &enumeration);
+    census_exact_probe_seconds = saved_probe_seconds;
     memo->prefixes = enumeration.prefixes;
     memo->complete = enumeration.complete;
     memo->cap_pruned = enumeration.cap_pruned;
@@ -1558,8 +1568,10 @@ int main(int argc, char **argv) {
 
     int roots[512][2];
     int root_count = collect_roots(root_k, roots, 512);
-    printf("CENSUS\tBEGIN\troot_k=%d\tresidual_k=%d\troots=%d\tupgrade_limit=%zu\n",
-           root_k, residual_k, root_count, max_upgrade_states);
+    printf("CENSUS\tBEGIN\troot_k=%d\tresidual_k=%d\troots=%d\tupgrade_limit=%zu"
+           "\tsecond_exact_probe_seconds=%u\n",
+           root_k, residual_k, root_count, max_upgrade_states,
+           (unsigned)CENSUS_SECOND_EXACT_PROBE_SECONDS);
 
     for (int i = 7; i < argc; i++) load_second_checkpoint(argv[i]);
 

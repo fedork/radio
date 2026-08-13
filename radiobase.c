@@ -95,6 +95,12 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #ifndef PROBE_SECONDS
 #define PROBE_SECONDS 2
 #endif
+#ifndef RADIO_INITIAL_PROBE_SECONDS
+/* Research drivers may choose a larger first quantum for a narrowly scoped top-level exact
+   query.  Recursive children still receive their ordinary bounded deadlines unless the driver
+   explicitly says otherwise.  Production builds retain the historical two-second default. */
+#define RADIO_INITIAL_PROBE_SECONDS(k, size, parent_deadline) PROBE_SECONDS
+#endif
 
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
@@ -1332,7 +1338,8 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
     int cont2=1;
     int skipped_some;
     int pass = 0;
-    unsigned int probe_seconds = PROBE_SECONDS;
+    unsigned int probe_seconds = RADIO_INITIAL_PROBE_SECONDS(k, size, parent_deadline);
+    if (probe_seconds == 0) probe_seconds = PROBE_SECONDS;
     int max_solvable_maybe = 0;
     int fast_solve;
     while (cont2) {

@@ -18,6 +18,8 @@ RADIO_RUN_CONTEXT='pareto-prefix unit-reserve regression' \
 
 tools/analyze_pareto_prefix_census.py --pareto-csv data/pareto_sb.csv --json \
     "$TMP/census.out" > "$TMP/analysis.json"
+grep -F $'CENSUS\tBEGIN\troot_k=3\tresidual_k=1\troots=4\tupgrade_limit=10000\tsecond_exact_probe_seconds=16' \
+    "$TMP/census.out" >/dev/null
 
 # Reusing only SECOND_SUMMARY-closed blocks must reproduce every labelled first/second geometry.
 # The exact-cache slot is `-`: each imported canonical winner is therefore re-verified by the
