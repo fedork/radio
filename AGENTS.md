@@ -66,13 +66,19 @@ Run `tools/check_witness.py` on any new tree **before** recording the result. Ru
 Note that a missing `can't solve` line does **not** mean unsolvable. `canSolveB` returns a
 tri-state and gives up with `MAYBE` when it hits a deadline, printing nothing.
 
-The deadline is a shared bound, not permission for a descendant to manufacture more time.  A finite
-state may return `MAYBE` with zero new cache facts; exhaustive pass 2 must remain finite.  One- and
-two-segment states keep the shared parent budget because they form the reliable constructive spine;
-longer states probe speculative children for two seconds and double that quantum after an unresolved
-full pass.  This monotone allowance prevents same-budget spinning without storing a preferred split.
-`tools/deadline_regression.c` locks the local invariants (revised 2026-08-11); measured context and the
-superseded policy are in `evidence/deadline_stall_2026-08-10.txt`.
+The finite search budget is a shared absolute bound, not permission for a descendant to manufacture
+more work.  The default clock is deterministic: one unit per accepted split prefix across the whole
+recursive tree, calibrated at 20,000,000 units per nominal second.  A finite state may return `MAYBE`
+with zero new cache facts; exhaustive pass 2 must remain finite.  One- and two-segment states keep the
+shared parent budget because they form the reliable constructive spine; longer states start with a
+40,000,000-unit speculative-child quantum and double it after an unresolved full pass.  This monotone
+allowance prevents same-budget spinning without storing a preferred split.  Compile with
+`-DRADIO_CPU_BUDGET` only for a controlled comparison with the historical process-CPU scheduler.
+Determinism here assumes the same binary, query and cache history; FAST promotion makes history part
+of the input even though hardware speed no longer chooses the finite stopping point.
+`tools/deadline_regression.c` and `tools/work_budget_regression.sh` lock the invariants (revised
+2026-08-13); measured context is in `evidence/deadline_stall_2026-08-10.txt` and
+`evidence/work_budget_rb_root_2026-08-13.txt`.
 
 ## Be skeptical of what you read here
 

@@ -10,6 +10,15 @@ trap 'rm -rf "$tmp"' EXIT
 
 python3 tools/build_radio.py -O3 -DMAX_K=3 -DMAX_N=20 -DRB_TRIGGER=1 \
     radio_one.c -o "$tmp/radio_one" >/dev/null
+python3 tools/build_radio.py -O3 -DMAX_K=3 -DMAX_N=20 \
+    tools/rb_root_probe.c -o "$tmp/rb_root_probe" >/dev/null
+
+# The same counterexample also exercises the standalone root relaxation: the four-part state has no
+# first split satisfying the three child-mass caps, while its solvable prefix passes the condition.
+"$tmp/rb_root_probe" 3 5 3 2 2 2 2 2 2 >"$tmp/root-full.out" 2>"$tmp/root-full.err"
+grep -F 'result=DEAD' "$tmp/root-full.out" >/dev/null
+"$tmp/rb_root_probe" 3 5 3 >"$tmp/root-prefix.out" 2>"$tmp/root-prefix.err"
+grep -F 'result=ALIVE' "$tmp/root-prefix.out" >/dev/null
 
 if "$tmp/radio_one" 3 5 3 2 2 2 2 2 2 >"$tmp/full.out" 2>"$tmp/full.err"; then
     echo "expected the four-part state to be unsolvable" >&2

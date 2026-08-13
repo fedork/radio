@@ -1,8 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-13** (proof-safe cold AWS `run9` and the resumed k=8
-Pareto-prefix census are running beside the retained `run3`/`run8` performance baselines).
+don't know it. Last refreshed **2026-08-13** (deterministic-budget and root-reachability experiments;
+proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
+`run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -19,8 +20,8 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not use a negative derived by `run3` or `run8` as proof.** | Joint suffix reachability (`rb_dead`) was sound for rejecting the full state but incompatible with the older implicit-prefix contraction: it could cache a shorter negative that was actually solvable, then contaminate later searches. Forced counterexample: `Sb(5:3,2:2,2:2,2:2)@3` is unsolvable while its inferred `Sb(5:3)@3` negative is false. Builds containing `efadab0` but predating fix `75814a7` have no marker distinguishing affected contractions; this includes frozen run3 and run8. Cold `run9` suppresses contraction after an actual reachability rejection. Older exact lines independently rechecked without contraction may still be valid, and positive witnesses remain independently checkable. |
 | **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
-| **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a deadline, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when deadlines were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. In a proof-safe cache, a printed `can't solve` is exhaustive because it is emitted only when `!skipped_some`; the separate `rb_dead` trap explains why run3/run8 caches are not proof-safe.) |
-| **Do not restore either old deadline extreme.** | `c13b5d3` could return before trying a complete child; `e648e83` required a new negative cache fact and then handed pass 2 an unbounded child. Run7 demonstrated the latter failure for 20,460 CPU seconds in a finite-parent k=5 state after 280,116,882,707 prefixes. Current policy permits zero-progress `MAYBE`, never refills an expired parent, keeps the reliable one/two-segment spine on the shared budget, and probes longer states with a geometrically increasing local slice. See [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt). |
+| **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a finite budget, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when budgets were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. In a proof-safe cache, a printed `can't solve` is exhaustive because it is emitted only when `!skipped_some`; the separate `rb_dead` trap explains why run3/run8 caches are not proof-safe.) |
+| **Do not restore either old budget extreme.** | `c13b5d3` could return before trying a complete child; `e648e83` required a new negative cache fact and then handed pass 2 an unbounded child. Run7 demonstrated the latter failure for 20,460 CPU seconds in a finite-parent k=5 state after 280,116,882,707 prefixes. Current policy permits zero-progress `MAYBE`, never refills an exhausted parent, keeps the reliable one/two-segment spine on the shared allowance, and probes longer states with a geometrically increasing local slice. New builds count accepted split prefixes deterministically at 20,000,000 units per nominal second; `-DRADIO_CPU_BUDGET` is the historical fallback. See [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt) and [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt). |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
@@ -194,6 +195,12 @@ historical sessions and must not be read as proof that those processes remain al
 `run3`'s `Sa(192)` control took 540.7 s.  It has completed one of the 16 top-level states and remains
 dominated by k=7 while exploring `Sb(111:82)@9`.
 
+Every run in this table is a frozen process-CPU-budget binary. The 2026-08-13 deterministic-budget
+default does not alter or restart any of them. New work-clock verdicts append `work=<units>` and
+`rate=<units-per-nominal-second>`; the comparison tool uses that effort for attempt accounting, keeps
+`took` for actual CPU/self time, and marks a ratio approximate when the two sides use different
+budget bases.
+
 Run8 started cold at 2026-08-11 22:46:06 UTC with the `Sa(192)` control enabled. Its full embedded
 commit is `9395218dcbdd90d8f6a208b15da1878ff75f6ee1`. Its 60 GiB wrapper and run3's 40 GiB wrapper
 formed the original two-run envelope; run9's combined guard now caps all three solvers at 108 GiB.
@@ -230,7 +237,8 @@ Per-call `~self-final` still subtracts all k-1 verdict time since the previous k
 only to the final activation. `MAYBE` and cache effects make it approximate, and the first call at
 each level has no left boundary. The compact view keeps the recursive stack and a per-run level
 profile, but no side-by-side level comparison. The profile adds the visible elapsed time of current
-`still solving` frames before taking level differences.
+`still solving` frames before taking level differences. In new work-budget logs, `elapsed` is nominal
+work effort and the line separately appends `cpu=`; the level profile uses that actual CPU field.
 
 The memory profile is no longer the benign one inferred from the original build: `run3` has reached
 25.50 GB with 1.64 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
@@ -255,6 +263,22 @@ after an unresolved exhaustive pass.  The exact stuck k=5 state now returns `MAY
 second with zero new negatives.  A normal genuinely cold `Sa(192)` control completed in 376.293 CPU
 seconds (382 s wall, 0.18 GiB peak RSS), following `[48:32]`, `[16:15,45:23]`, then
 `[17:8,27:13,10:8,12:0]`.  The 1,038-answer regression and ASan+UBSan gates match prior main.
+
+The 2026-08-13 scheduler change preserves that state machine but replaces process CPU as the default
+allowance clock. One accepted per-part split prefix is one deterministic work unit across the whole
+recursive call tree; 20,000,000 units are one nominal second, so the initial long-state quantum is
+40,000,000 units. Two cold controls stopped at exactly 2,000,001 units in repeated runs and emitted
+identical ordered cache facts despite differing CPU time. The old clock remains available as
+`-DRADIO_CPU_BUDGET`. See
+[`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
+
+The proposed eager `rb_dead(0,0,0,0)` test was also measured and is **not enabled**. It is an exact
+first-test mass relaxation after theorem-filtering each part, but `ALIVE` does not solve any child.
+All 16 retained exhaustive multipart states passed it, including the sole known negative. In an
+independent 283-state k=3 census it added 5 refutations after parent star-majorization, while an eager
+hook saved only 0.091% recursive work on the hard k=5 positive and slightly slowed fixed-work probes
+of the saturated fourteen-part state. `tools/rb_root_probe.c` retains the diagnostic; ordinary search
+keeps the measured-cost trigger.
 
 Raw validation and rejected-experiment logs are archived as `bounded-probe-2026-08-11` and
 `bounded-probe-rejected-2026-08-11`.  Full control flow, build IDs and the two-stage correction are

@@ -1,0 +1,140 @@
+# Deterministic work budgets and the eager root-rb experiment
+
+Status: engine-scheduling measurement and rejected optimization experiment, 2026-08-13.  These are
+performance/engineering results, not mathematical frontier evidence.  The work began from commit
+`54486d6` in the isolated `work-budget-rb-root` worktree.  The eager hook described below was tested
+and removed; `tools/rb_root_probe.c` retains the diagnostic without changing ordinary search.
+
+## What one work unit means
+
+The counter advances exactly where `canSolveB` advances its local `totalsplits`: after a per-part
+split prefix survives permutation, counting-bound, cached per-split, and FAST-pass filters and is
+accepted for child construction.  It is process-global, so recursive children consume the same
+absolute allowance as their parent.  Cache hits and theorem checks do not pretend to be split work.
+
+The historical CPU-clock scheduler was compiled with `-DRADIO_CPU_BUDGET -DRADIO_MEASURE_WORK` and
+sampled cold with `tools/budget_probe.c`.  On the hard positive
+
+```
+Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)@5
+```
+
+it admitted 655,725, 1,664,084, 3,405,794 and 9,467,875 prefixes in nominal 50, 100, 200 and 500 ms
+CPU probes.  On the independent residual positive
+
+```
+Sb(29:6,19:9,13:12,36:3)@6
+```
+
+100 and 500 ms admitted 1,772,293 and 8,244,283 prefixes.  The observed range was about 13.1--18.9
+million prefixes per CPU second, including short-probe startup and the old 65,536-prefix clock-poll
+granularity.  The selected calibration is therefore deliberately round, not fitted:
+
+```
+RADIO_WORK_UNITS_PER_SECOND = 20,000,000
+```
+
+It makes a nominal work second slightly generous on these controls.  Correctness does not depend on
+the calibration because exhaustion returns `MAYBE`, never `FALSE`.
+
+At a fixed 100 nominal ms (2,000,000 units), two independent cold processes gave:
+
+| state | CPU seconds, run 1 / run 2 | final work | ordered cache facts | normalized SHA-256 |
+|---|---:|---:|---:|---|
+| hard k=5 positive above | 0.124117 / 0.128654 | 2,000,001 / 2,000,001 | 404 / 404 | `71425ae42401015d18b357f52e545680506114f880705d7bb3dd818656c8d32c` |
+| k=6 residual above | 0.115354 / 0.112591 | 2,000,001 / 2,000,001 | 1,234 / 1,234 | `67a7f9667e5ca65eb75ae879eee955f680f8d6139352afeadf97c23ee4a5b194` |
+
+The extra unit is intentional compatibility with the old `now > limit` expiry test.  Actual CPU
+varied; the stopping point and reusable facts did not. `tools/work_budget_regression.sh` preserves
+this as an executable cold-process check at a shorter allowance.
+
+An exact cold run of the hard k=5 positive also retained the same winning split, 110,510,443 local
+top-level prefixes and reachability totals (`42,430,348 tested, 2,940,923 pruned`) under both clocks.
+The CPU-clock build reported 7.1 solve seconds; the work-clock build reported 7.0 seconds and
+132,279,387 recursive work units.  Thus 20 million is close enough to preserve the scheduler's
+rough prior scale without claiming cross-machine timing equivalence.
+
+## What `rb_dead(0,0,0,0)` decides
+
+`tools/rb_root_probe.c` builds the ordinary theorem-filtered split table for every part and the same
+suffix reachability DP as the adaptive accelerator.  At the empty prefix,
+`rb_dead(0,0,0,0)` asks whether *some combination of those per-part cuts* can keep all three child
+pair masses at most `3^(k-1)`.  `DEAD` is therefore an exact necessary-condition refutation; `ALIVE`
+does not recursively solve a child and is not a positive verdict.  It is stronger than a literally
+mass-only Cartesian product because individually impossible per-part children were already removed
+by information and full-star-majorization filters.
+
+The broad retained corpus in `data/exhaustive_multipart.csv` contains 15 known positives and one
+known negative.  All 16 were root-`ALIVE`, including the exact negative
+`Sb(111:3,115:2,121:1)@7`.  The root relaxation therefore does not replace a representative real
+refutation.
+
+For a complete independent small census, enumerate every four-part multiset from
+`{(n:m): 2 <= n <= 5, 1 <= m <= n}` with total pair mass 22 through 27.  There are 283 states.
+`tools/refsolve.py`, whose search is independent of `radiobase.c`, classifies 216 solvable and 67
+unsolvable at k=3.  Root classification was:
+
+| exact class | parent star-majorization DEAD | additional root-rb DEAD | root ALIVE |
+|---|---:|---:|---:|
+| 216 positives | 0 | 0 | 216 |
+| 67 negatives | 40 | 5 | 22 |
+
+Thus the root DP had no false rejection, but added only 5 rejections among the 27 negatives left
+after the already-cheap parent theorem.  Those five all have mass 26 or 27; one is the contraction
+regression state `Sb(5:3,2:2,2:2,2:2)@3` (canonical multiset ordering differs in the enumerator).
+
+Representative standalone costs on this machine were:
+
+```
+Sb(45:17,31:23)@7                       table 0.332 ms, DP 4.111 ms, ALIVE
+Sb(111:3,115:2,121:1)@7                 table 0.044 ms, DP 1.755 ms, ALIVE
+Sb(29:6,19:9,13:12,36:3)@6             table 0.138 ms, DP 0.476 ms, ALIVE
+the hard eight-part k=5 positive above   table 0.068 ms, DP 0.074 ms, ALIVE
+the saturated fourteen-part k=5 state   table 0.068 ms, DP 0.102 ms, ALIVE
+```
+
+The current DP has `RB_MAXCAP=800`, so the root form is available through k=7 (`3^6=729`) and
+deliberately unavailable at k=8 (`3^7=2187`) and above; its quadratic cap table would otherwise
+grow quickly.
+
+## Eager construction was tested and rejected
+
+A temporary `RADIO_RB_EAGER_ROOT` hook built the table at entry for every eligible long state and
+returned `FALSE` on a root `DEAD`.  It was tested with both clocks, then removed.
+
+On the exact seven-second k=5 positive, eager and adaptive runs found the identical witness and
+reported the identical 110,510,443 top-level prefixes.  Recursive work fell only from 132,279,387
+to 132,159,499 (119,888 units, 0.091%).  CPU was 7.1 versus 6.9 seconds, below a useful timing
+resolution.  Eager reachability did more total queries: 43,846,612 tested / 2,969,825 pruned versus
+42,430,348 / 2,940,923 adaptively.
+
+The saturated fourteen-part state from the deadline investigation was then run cold for fixed work
+allowances.  Eager construction was consistently slightly slower in CPU and did not materially
+improve cache learning:
+
+| allowance | adaptive CPU / facts | eager CPU / facts | eager reachability |
+|---:|---:|---:|---:|
+| 2,000,000 | 0.079656 / 17 | 0.087980 / 17 | 456,548 tested, 50,703 pruned |
+| 10,000,000 | 0.380683 / 17 | 0.395393 / 18 | 2,095,500 tested, 149,570 pruned |
+| 40,000,000 | 1.661882 / 18 | 1.684627 / 18 | 9,078,178 tested, 1,341,287 pruned |
+
+At 40 million units the adaptive trigger had armed on its own and reported 6,921,698 tested /
+1,141,496 pruned.  The measurements support the existing cost-based trigger, not an a-priori shape
+rule or unconditional `rb_dead(0,0,0,0)` call.  The standalone probe remains useful for diagnosing a
+specific state without changing that decision.
+
+## Regression gates
+
+The default work-clock and `-DRADIO_CPU_BUDGET` builds both emitted the same 1,038 definitive
+one/two-part answers plus summary from `tools/split_regression.c`; normalized SHA-256:
+
+```
+2cf020540919d6fe2f8da20636ecceb8f8d14ccc4d5a3cd599ac0a91e99eade2
+```
+
+The ASan+UBSan work build emitted the same normalized hash with empty diagnostic output.  Both budget
+modes pass `tools/deadline_regression.c`; the default additionally proves that a tiny shared limit is
+consumed inside recursive multipart search.  `tools/rb_contraction_regression.sh` checks both the
+existing contraction guard and the new standalone root classification.  Monitoring parsers have
+synthetic tests for virtual effort versus actual CPU.  The ordinary table, witness, docs and
+provenance checks are the final repository gate.

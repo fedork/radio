@@ -47,7 +47,7 @@ pre-banner historical file whose limitation is explicitly recorded in `docs/data
 | `(n1:n2)` pair -> `sbb` integer id; level-keyed split tables built lazily | `init`, `ensure_splits` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: exact-prefix trie with maximal-positive/minimal-negative Pareto fronts in its last part | `cacheCanSolve`, `cacheCantSolve`, `checkCache` |
-| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, shared short-state budget and geometric long-state probes | `canSolveB` |
+| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, deterministic accepted-prefix budget, shared short-state allowance and geometric long-state probes | `canSolveB`, `radio_budget_charge_split` |
 | Joint suffix reachability; suppression of prefix contraction once it rejects | `rb_dead`, `rb_tainted_contraction` |
 | Unit-group stripping before search | start of `canSolveB` |
 | Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
@@ -197,22 +197,29 @@ and check for strays with `pgrep -f radio_canon` before starting another.
 
 Two behaviours to be aware of:
 
-- **`MAYBE` is a real answer.** Deadlines cause `canSolveB` to give up and return `MAYBE`
+- **`MAYBE` is a real answer.** Finite search budgets cause `canSolveB` to give up and return `MAYBE`
   rather than `FALSE`. A `can't solve` line in the output is a genuine negative; the absence
   of a line is not. A finite state may now bail without adding a cache fact, but it never gives an
   unresolved descendant `NO_DEADLINE` or refills an expired parent. One- and two-segment states
   retain the shared parent allowance; states with three or more segments give each speculative
-  child an initial two-second slice. An unresolved exhaustive pass doubles that local slice, so an
-  unbounded root still deepens monotonically without persisting a preferred split. Finite prefix
-  enumeration polls the shared deadline every 65,536 admitted prefixes. The exact run7 failure and
-  the superseded progress-gated policy are recorded in
-  [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
-- **The search is not byte-deterministic.** The FAST pass was briefly removed on 2026-08-03 and
+  child an initial 40,000,000-unit slice (two nominal seconds). An unresolved exhaustive pass
+  doubles that local slice, so an unbounded root still deepens monotonically without persisting a
+  preferred split. The repository default charges one unit at each accepted split prefix and checks
+  every charge; 20,000,000 units are one nominal second. The counter is absolute and process-global,
+  so recursive children consume the parent's allowance. `-DRADIO_CPU_BUDGET` restores the historical
+  process-CPU clock and its every-65,536-prefix poll for controlled comparisons. The state-machine
+  failure and work-clock calibration are recorded in
+  [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt) and
+  [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
+- **The search is not unconditionally byte-deterministic.** The FAST pass was briefly removed on 2026-08-03 and
   restored on 2026-08-04 after the solver sank into known-solvable branches. On a solution,
   `canSolveB` can promote a previously non-FAST option with `s[FAST] = 1`, so later search order
-  depends on which states the process has already solved. Deadlines add a second wall-clock
-  dependency. Compare verdicts and exact counters on controlled warm/cold baselines; do not use a
-  raw output `diff` as the only regression gate.
+  depends on which states the process has already solved. Given the same binary, query and cache
+  history, the default finite stopping point no longer depends on CPU speed or concurrent load;
+  progress-heartbeat positions and actual `took` CPU still do. The CPU fallback remains timing
+  dependent. Compare verdicts and exact counters on controlled warm/cold baselines; do not use a raw
+  output `diff` as the only regression gate. `tools/work_budget_regression.sh` compares ordered cache
+  facts from two independent cold work-budget processes.
 
 ## Choosing a driver
 
@@ -294,6 +301,44 @@ stop either at `[canonical U_k]` atom sub-multisets or at `[majorized G_k]` arbi
 sequences.  The checker verifies the former by multiplicity and the latter by every weak-
 majorization prefix.
 
+## Budget and root-reachability diagnostics
+
+`tools/budget_probe.c` runs one query with a finite allowance and reports both actual process CPU
+and accepted-prefix work.  Its millisecond argument means calibrated nominal milliseconds in the
+default build and CPU milliseconds in the fallback build:
+
+```
+tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=127 \
+    tools/budget_probe.c -o /tmp/budget_work
+tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=127 \
+    -DRADIO_CPU_BUDGET -DRADIO_MEASURE_WORK \
+    tools/budget_probe.c -o /tmp/budget_cpu
+
+/tmp/budget_work 100 5 15 3 14 3 17 2 8 4 11 2 10 2 19 1 15 1
+```
+
+Exit 0/1/2 means `TRUE`/`FALSE`/`MAYBE`. `tools/work_budget_regression.sh` is the short cold-process
+determinism gate; `tools/deadline_regression.c` checks local shared-bound arithmetic under both
+budget modes.
+
+`tools/rb_root_probe.c` isolates the proposed `rb_dead(0,0,0,0)` test without recursively solving a
+child or changing the production trigger:
+
+```
+tools/build_radio.py -O3 -DMAX_K=7 -DMAX_N=400 \
+    tools/rb_root_probe.c -o /tmp/rb_root_probe
+/tmp/rb_root_probe 7 111 3 115 2 121 1
+```
+
+It builds the same theorem-filtered per-part split tables and suffix reachability DP as `canSolveB`.
+`DEAD` is a sound necessary-condition refutation: no combination of remaining part cuts can keep all
+three child masses under `3^(k-1)`. `ALIVE` only means that this relaxation passes; it is not a full
+solver run. The default `RB_MAXCAP=800` permits root use through k=7 and reports `UNAVAILABLE` at k=8
+and above. A complete small census found modest incremental rejection after full-star majorization,
+and eager construction did not improve either a hard positive or the saturated deadline state, so
+ordinary search still arms the DP only after measured cost. Exact counts and timings are in
+[`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
+
 ## Split-heuristic research tools
 
 The 2026-08-09 long-state experiments use exact solvability of small child subsets. These are lab
@@ -309,6 +354,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/label_split_features.c` | join `WIN ... state=... take=...` logs to feature rows without relying on row samples |
 | `tools/sample_subsets.c` | sample pair/triple rejection and lookup cost on k=6 states too large to enumerate |
 | `tools/fast_replay.c` | replay logged long k=5 states from one forked warm-cache image, clearing all per-target cache/self-training effects |
+| `tools/budget_probe.c` | compare deterministic accepted-prefix allowances with the measured CPU fallback on one finite query |
+| `tools/rb_root_probe.c` | evaluate the complete first-test mass relaxation `rb_dead(0,0,0,0)` without enabling it in ordinary search |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
@@ -349,7 +396,7 @@ s <= X <= s + (P - T)
 around the proportional coordinate lift, ranking candidates by how closely their three outcome
 masses preserve the lower split's proportions.  The box containment is a theorem, but it is only a
 necessary lineage condition: every proposed parent child is still checked by `canSolveB`.  Cache
-negatives screen candidates, misses receive the requested strict per-child deadline, and a caller
+negatives screen candidates, misses receive the requested strict per-child budget, and a caller
 must retain ordinary search as fallback.
 
 Build and reproduce the primary four-part example:
@@ -379,7 +426,7 @@ lift boxes contain it:
 ```
 
 Exit 0 means a split was found, 1 means the requested box/bound was exhausted, and 3 means the input
-or claimed lower/parent split was not verified within its local deadline.  Neither a miss nor an
+or claimed lower/parent split was not verified within its local budget.  Neither a miss nor an
 inverse miss is a proof of unsolvability.  The lemma, examples and current recursive obstruction are
 in [the theorem note](theorems/recursive-pareto-lift.md).
 

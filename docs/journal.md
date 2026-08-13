@@ -5315,3 +5315,55 @@ SSM commands were `4a6606f5-6875-4dc6-9763-51c328160cdc` and
 `f5a47495-c697-4eba-bba1-02eafa3ceb1c`; frozen-binary preservation was
 `df8cd807-7a93-4211-87a0-eb5632d759d8`.  `tools/pareto_census_status.sh` performs one bounded status
 query and then exits; no local polling process is needed.
+## 2026-08-13 — deterministic accepted-prefix budgets; eager root reachability rejected
+
+The deadline state machine was sound after `45c34fd`, but its process-CPU clock still let hardware,
+concurrent load and short-poll overshoot decide which finite recursive calls returned `MAYBE`. The
+replacement keeps the state machine and changes only its clock: each accepted per-part split prefix,
+at the existing `totalsplits++` point, charges one process-global work unit. Finite limits remain
+absolute, so a recursive child consumes its parent's allowance and cannot mint a fresh interval.
+The initial long-state quantum and later doubling now operate in nominal work seconds. A compile-time
+`-DRADIO_CPU_BUDGET` fallback preserves the historical scheduler for controlled comparison.
+
+Calibration deliberately targeted rough continuity rather than a fitted machine constant. CPU-clock
+probes on two nontrivial states observed about 13.1--18.9 million accepted prefixes per second, so
+the default is 20,000,000 units per nominal second. Repeated cold 100-ms work probes stopped at
+exactly 2,000,001 units. The hard k=5 control emitted 404 ordered cache facts with identical SHA-256
+in both runs; the independent k=6 residual emitted 1,234, also with identical SHA-256. Actual CPU
+time differed. An exact run of the hard positive retained the same witness, 110,510,443 top-level
+prefixes and identical reachability totals under CPU and work clocks; it used 132,279,387 recursive
+work units. Exact hashes, timings and commands are in
+[`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
+
+The user-proposed `rb_dead(0,0,0,0)` test was isolated in `tools/rb_root_probe.c`. It is not a full
+refutation run: after per-part theorem filtering it asks only whether some Cartesian combination of
+first-test cuts can keep all three child masses under `3^(k-1)`. `DEAD` is an exact obstruction;
+`ALIVE` leaves every recursive child question open. All 16 retained exhaustive multipart states
+were `ALIVE`, including the known negative. An independent complete k=3 census over 283 four-part
+states found 216 positives, all `ALIVE`; among 67 negatives, parent star-majorization already rejected
+40, root reachability added 5, and 22 remained `ALIVE`. The added power is real but concentrated at
+mass saturation.
+
+A temporary eager hook was nevertheless measured, then removed. On the seven-second hard positive it
+saved 119,888 of 132,279,387 recursive units (0.091%) while building and querying reachability more
+often. On the saturated fourteen-part deadline state, fixed 2M/10M/40M-unit probes were slightly
+slower eagerly and produced 17/18/18 cache facts versus 17/17/18 adaptively. The result supports the
+existing `RB_TRIGGER` policy: build the DP only after a state demonstrates cost. The standalone root
+probe remains for diagnosis and `tools/rb_contraction_regression.sh` now locks its forced DEAD/ALIVE
+pair. An initial probe version called full `init()` at large `MAX_N` and became trapped constructing
+dominance closures it never used; those exact local processes were stopped, and the shipped probe
+uses a lightweight split/theorem initializer.
+
+The work budget is deterministic for the same binary, query and cache history, not across different
+histories: successful searches can still promote FAST options. Progress heartbeats remain CPU-timed
+but do not affect scheduling. New verdicts carry `work` and `rate`; progress lines carry nominal
+effort plus actual `cpu`. The Sa(193) comparison code uses work/rate for attempt effort, actual CPU
+for self-time, and marks cross-basis ratios approximate. Existing run3/run8/run9 binaries are frozen
+on the CPU scheduler and were not touched.
+
+Regression coverage now includes two cold processes with identical work stopping points/facts,
+shared recursive budget consumption, both scheduler modes, root reachability, monitoring parsers and
+the existing contraction guard. Default work, CPU fallback and ASan+UBSan builds all reproduce the
+same 1,038-answer normalized split-regression SHA-256. All work was performed in the isolated
+`work-budget-rb-root` worktree; the primary checkout's unrelated IDE/benchmark changes and every
+other chat's branches and processes were left untouched.

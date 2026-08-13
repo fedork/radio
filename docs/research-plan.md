@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-12.
+entries. Last revised 2026-08-13.
 
 ## High-level goals
 
@@ -30,6 +30,14 @@ Cold `run9` is the current proof attempt. Run3 and run8 remain useful performanc
 cannot settle H3: before `75814a7`, suffix reachability could promote a full-state obstruction to a
 false implicit shorter negative and poison the cache. Run9 began from an empty cache with that
 interaction disabled and reports every suppressed contraction.
+
+Run9 is a frozen process-CPU-budget binary and remains untouched. New builds preserve its shared
+finite-bound/geometric-deepening policy but schedule finite probes by deterministic accepted-prefix
+work, calibrated at 20,000,000 units per nominal second. This removes hardware/load timing from the
+stopping point for a fixed binary, query and cache history; it does not make a warm and cold search
+equivalent or change what constitutes a proof. The root `rb_dead(0,0,0,0)` relaxation was tested
+separately and was too weak to enable eagerly, so the existing measured-cost trigger remains. See
+[`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 `m=6` closed form and `BBCD` profile are now refuted by the exact `n(10,6)=973` frontier.  The

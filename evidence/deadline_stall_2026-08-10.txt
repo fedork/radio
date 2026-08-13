@@ -4,6 +4,12 @@ Status: measured engine diagnosis and performance evidence, 2026-08-11.  The ret
 in the private artifact tags `bounded-probe-2026-08-11` and
 `bounded-probe-rejected-2026-08-11`; every archived log passes the strict embedded-provenance check.
 
+Scheduler update, 2026-08-13: the shared-bound and geometric-deepening state machine below remains
+current, but new builds measure its allowance in deterministic accepted split prefixes rather than
+process CPU time.  References below to CPU-second slices and 65,536-prefix polling describe commit
+`45c34fd` and the frozen Sa(193) runs.  Calibration, new regression coverage, and the CPU fallback
+are in [`work_budget_rb_root_2026-08-13.txt`](work_budget_rb_root_2026-08-13.txt).
+
 ## Why this file changed twice
 
 The original 2026-08-10 account called the long run4/run5 child a deadline livelock.  The first
@@ -38,7 +44,7 @@ state, and commit `c13b5d3`'s prefix poll could return before any complete child
 superseded is the proposed cure.  Neither an unconditional pass-2 dive nor a zero-budget prefix
 retry is a usable scheduler.
 
-## Implemented state machine (`45c34fd`)
+## Implemented state machine (`45c34fd`, historical CPU-clock incarnation)
 
 The replacement keeps no split cursor, score or remembered winning split.
 

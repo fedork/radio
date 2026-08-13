@@ -14,6 +14,14 @@ They are evidence, not proof — they rest on the solver being correct.
 | `pareto_certification_k1_8.txt` | every `proven-exhaustive` cell of the Sb frontier for K=1..8, and the Sa sequence for k=1..9. 276 obligations, 276 located. |
 | `sa193_unsolvable_in_10.txt` | `Sa(193)` is not solvable in 10, hence `Sa(10) = 192` is maximal |
 
+Engineering investigations are retained separately because they explain solver policy rather than
+certify a frontier cell:
+
+| file | records |
+|---|---|
+| `deadline_stall_2026-08-10.txt` | why finite descendants must share an absolute allowance and long-state probes must deepen monotonically; CPU-clock incarnation used by the frozen Sa(193) runs |
+| `work_budget_rb_root_2026-08-13.txt` | calibration and regression of deterministic accepted-prefix budgets; exact meaning, measured power, and rejected eager use of `rb_dead(0,0,0,0)` |
+
 ## Regenerating and auditing
 
 ```
