@@ -312,6 +312,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
+| `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
+| `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
 
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
@@ -378,6 +380,55 @@ Exit 0 means a split was found, 1 means the requested box/bound was exhausted, a
 or claimed lower/parent split was not verified within its local deadline.  Neither a miss nor an
 inverse miss is a proof of unsolvability.  The lemma, examples and current recursive obstruction are
 in [the theorem note](theorems/recursive-pareto-lift.md).
+
+### Pareto-prefix census
+
+`pareto_prefix_census.c` builds the choice corpus that the one-template lift probe lacks.  For every
+proven one-part root in `data/pareto_sb.csv`, it retains every labelled winning first cut, every
+labelled winning cut of the resulting two-lineage mixed child, and the four-lineage mixed
+grandchild.  Canonical descendants are deduplicated only after their four labelled lineages have
+been written.  Empty and `1:1` lineages are then removed structurally by Unit-Group Elimination;
+the count of removed unit groups remains attached as a scalar capacity reserve.  The resulting
+zero-, one-, two-, three-, and four-part seeds are each traversed upward in their own fixed
+dimension to **every** globally maximal solvable residual state.  They are never padded with
+invented parts.  Endpoint maps enumerate every winning core cut and attach the exact multiplicity
+of valid labelled top-level assignments of the reserved unit groups, including the two shore
+choices that produce outcome 1.  This global residual antichain is
+intentionally broader than a particular parent-conditioned lift box; the raw lineage records and
+component-alignment counts permit narrower lineage-preserving filters afterward.
+
+Build with room for every represented upgrade and cap the run in the usual way:
+
+```
+tools/build_radio.py -O3 -DMAX_K=8 -DMAX_N=336 \
+    tools/pareto_prefix_census.c -o /tmp/pareto_prefix_census
+
+tools/capped_run.sh --seconds 14400 --rss-gb 16 --label pareto-census-k8 -- \
+    /tmp/pareto_prefix_census DOMINANCE_CACHE data/pareto_sb.csv 8 2000000 \
+    ROOT_WINNER_LOG EXACT_CACHE > census-k8.out 2> census-k8.err
+
+tools/analyze_pareto_prefix_census.py --pareto-csv data/pareto_sb.csv census-k8.out
+tools/test_pareto_prefix_census.sh
+```
+
+The optional root log supplies already-archived top-level cuts; pass `-` in that position to retain
+the exact cache while independently re-enumerating the first level.  Every supplied child is
+checked against the exact oracle or current solver, and a missing root is enumerated normally.  The
+optional exact cache is held in a flat full-state hash rather than inserted into the dominance trie.
+Exact hits are
+therefore cheap and memory-bounded, while misses still fall through to `canSolveB(...,NO_DEADLINE)`.
+Only a deliberately selected cache slice should be replayed into the dominance trie for partial-
+prefix pruning.  This is a research-driver hook compiled through `RADIO_EXTERNAL_EXACT_LOOKUP`; an
+ordinary `radiobase.c` build has no hook, storage or lookup overhead.
+
+The output's `CENSUS` records are stable TSV.  The analyzer refuses a log without `CENSUS END`,
+reconstructs both descendant levels and every final child from the logged cuts, checks masses,
+unit reserves, dominance, component-alignment multiplicities and all summary totals, and quotients
+final cuts by exact state automorphisms.  It reports the upgrade and solution distributions
+separately for each effective dimension, counts labelled unit-group extensions, and measures how
+far every first/second choice lies below the corresponding one-part frontier at the same smaller
+shore.  A completed census is still empirical current-solver evidence, not an independent negative
+certificate, unless its oracle negatives have separately been proved.
 
 The bundled hierarchy starts at full star-expansion majorization (`R_0`), adds one synchronized
 rectangle split per level, and becomes exact at `R_k`. Its small regression case and complete k=4

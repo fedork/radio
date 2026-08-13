@@ -28,6 +28,29 @@ Because the interval is finite and contains the solvable state `T`, at least one
 upgrade always exists; the hard question is whether any upgrade has a split compatible with the
 next parent lift.
 
+## Component-frontier box
+
+There is a stronger finite box for a global upgrade than the information bound alone suggests.
+
+> **Component-frontier lemma.** If `Sb(n1:m1, ..., nr:mr)` is solvable in `k`, then every
+> nontrivial component `Sb(ni:mi)` is solvable in `k`.
+
+Delete all other components.  The remaining graph is a subgraph of the original state, so the
+claim follows immediately from [Subgraph Monotonicity](subgraph-monotonicity.md).  Consequently,
+after normalizing each component, every solvable multi-part state lies in the Cartesian product of
+the one-part downset recorded by the same-`k` frontier in
+[`data/pareto_sb.csv`](../../data/pareto_sb.csv).
+
+This does not decide a multi-part state: several individually admissible components can still be
+jointly impossible.  It does make the global Pareto-upgrade search finite component by component,
+and rejects any successor that crosses the one-part frontier without a recursive solve.  Empty and
+`1:1` lineages do not require artificial components in this product.  Empty lineages disappear;
+`1:1` lineages disappear structurally but their count remains as reserved information capacity,
+exactly as required by the
+[Unit-Group Elimination Theorem](unit-group-elimination.md).  Forgetting that scalar reserve would
+permit a nominal upgrade whose non-unit core leaves no decision-tree leaves for the already-known
+unit cases.
+
 ## Lift-box lemma
 
 Consider one aligned component.  Let the parent component be

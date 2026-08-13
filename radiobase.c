@@ -1263,6 +1263,18 @@ int canSolveB(int *sb, int size, int k, clock_t parent_deadline){
         cache_l1_store(l1_entry, l1_hash, tmp, size, k, FALSE);
         return FALSE;
     }
+#ifdef RADIO_EXTERNAL_EXACT_LOOKUP
+    /* Research drivers may carry a compact exact-fact index beside the dominance trie.  This is
+       deliberately a compile-time hook: the production engine has no extra lookup or trust
+       boundary.  A hook must return MAYBE on absence and may only return definitive archived
+       facts for full canonical state equality.  Keep it after independent exact/necessary
+       theorem checks so an external research artifact can never override them. */
+    ck = RADIO_EXTERNAL_EXACT_LOOKUP(tmp, size, k);
+    if (ck == TRUE || ck == FALSE) {
+        cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
+        return ck;
+    }
+#endif
     //check cache
     ck = checkCacheTrie(tmp, size, k);
     cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
