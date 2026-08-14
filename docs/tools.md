@@ -380,9 +380,9 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_suffix_profile_regression.sh` | lock actual per-suffix call/prune accounting and the opt-in exact cutoff |
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
-| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a one-part frontier, the corrected four-segment assembly, or a fixed-residual variable-width slice with memo reuse |
+| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
-| `tools/singletonization_regression.sh` | lock the corrected four-segment assembly, exact variable-width synchronization boundaries, and memo-exhaustion abort semantics |
+| `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, exact variable-width synchronization, and memo-exhaustion abort semantics |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -578,6 +578,10 @@ tools/run_with_provenance.py /tmp/search_singletonization forced 10 10 973 6 477
 tools/run_with_provenance.py /tmp/search_singletonization frontier 10 6 974 973
 tools/run_with_provenance.py /tmp/search_singletonization \
     assembly 7 5 10 46 6 22 5 27 3 15 14
+tools/run_with_provenance.py /tmp/search_singletonization \
+    assembly-enumerate 7 10 data/pareto_sb.csv
+tools/run_with_provenance.py /tmp/search_singletonization \
+    assembly-rank 8 10 data/pareto_sb.csv
 tools/run_with_provenance.py /tmp/search_singletonization slice 4 4 2 5 6 11 2 9 2 3 2
 tools/run_with_provenance.py /tmp/search_singletonization \
     mixed-frontier 4 4 2 2 16 16 9 2 3 2 > /tmp/mixed-frontier.out
@@ -607,6 +611,26 @@ reported D maximum globally by subgraph monotonicity, even when `start_d<2^(pare
 otherwise `global_maximum=NO` is explicit.  The regression reproduces the proven `m=10` parent
 widths 12, 33, and 82 at parent levels 5, 6, and 7 respectively, and independently checks every
 positive branch tree.  These are finite construction controls, not an eventual-`q` theorem.
+
+`assembly-enumerate` automates the outer choice.  It accepts only contiguous normalized Pareto
+levels whose CSV rows are all source-carrying `max,proven-*` facts; a level containing a lower,
+upper, witness-only or legacy row aborts rather than being silently treated as complete.  It
+enumerates ordered A/B/C triples satisfying `beta<=alpha`, `alpha+gamma<=m`, `c<=a`, and the
+separately labelled working assumption `m<=2a`.  For each triple it finds the largest `d` allowed by
+full-star majorization, prints the complete resulting ranking, and then scans exact `d` values only
+while that triple can still tie the best exact construction already found.  An R_0 failure excludes
+larger values; arithmetic excludes a skipped lower suffix.  Consequently
+`optimization_complete=YES` is an exact maximum over this specified family, while
+`all_triple_dmax_exact=NO` only means that individual losing boundaries below the optimum were not
+needed.  All tied winners and their residual trees are printed.
+
+`assembly-rank` performs exactly the same validated triple enumeration and emits
+`assembly_ranking_result ... complete=YES bound=R0_NECESSARY`, then exits before the first exact
+query.  This separation matters at the next level: a complete static ranking remains a result even
+when one residual slice exceeds an external cap.  Full-star values are upper bounds, never
+construction claims.  The regression locks exact `m=10` family optima through parent level 7, the
+complete level-8 ranking, rejection of the incomplete level-9 Pareto input, and a level-8 two-part
+state showing that even a simple R_0-permitted target can be exactly negative.
 
 `slice` adds one variable part `(2^k-delta : variable_m)` to the listed fixed parts, scans `delta`
 from `start_delta` through `maximum_delta`, retains the exact memo, and stops at the first positive.

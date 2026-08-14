@@ -1,9 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-14** (corrected four-segment Pareto assembly; proof-safe cold
-AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained `run3`/`run8`
-performance baselines).
+don't know it. Last refreshed **2026-08-14** (complete proven-Pareto triple enumeration added to the
+corrected four-segment assembly; proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census
+are running beside the retained `run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -28,7 +28,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
-| **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum, and the optimizer deliberately refuses both. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
+| **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 
 ## Goals
 
@@ -160,12 +160,15 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   for sufficiently large `q`.  For `A=(a:alpha)@k-1` and
   `B=(b:beta),C=(c:gamma)@k-2`, the corrected picture makes the hard branch exactly
   `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, with parent candidate `a+b+d`.
-  `search_singletonization assembly` maximizes `d` directly.  Exact regressions recover the proven
-  `m=10` widths 12, 33 and 82 at parent levels 5, 6 and 7; at level 7, retaining the lower
-  `(alpha,beta,gamma)=(6,4,3)` pattern gives only 81, while choosing B-height 5 gives 82.  The generic
-  mixed-frontier/guarded-piece optimizer remains the recursive way to seek a scale-free D formula,
-  but its synthetic controls are not evidence for the diagram itself.  No eventual formula or new
-  Pareto datum is claimed.
+  `search_singletonization assembly-enumerate` now consumes only complete proven Pareto input
+  levels, exhausts the ordered triple family, ranks it by sound full-star D bounds, and exact-solves
+  every slice still able to tie the incumbent.  At `m=10` it certifies family optima 12, 33 and 82
+  at parent levels 5, 6 and 7, with respectively 2, 4 and 1 winning triples; all trees verify
+  (`tools/singletonization_regression.sh`).  `assembly-rank` completes the level-8 static stage—165
+  admissible triples, 37 surviving bounds—but exact optimization remains open; in particular its
+  simple target `Sb(50:4,39:6)@6` is negative.  The generic mixed-frontier/guarded-piece optimizer
+  remains the recursive route to a scale-free D formula.  No eventual formula or new Pareto datum
+  is claimed.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.
@@ -175,7 +178,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 `tools/extract_evidence.py` (`certify` / `audit`), `tools/artifacts.sh`
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
-fixed-small-m exact recurrence and corrected assembly mode in `tools/search_singletonization.cpp`,
+fixed-small-m exact recurrence and complete assembly rank/enumeration modes in
+`tools/search_singletonization.cpp`,
 together with its guarded-piece combiner `tools/optimize_mixed_frontier.py`.
 
 Artifact store `fedork/radio-data` (private): 12 tags, 33 assets plus a manifest per tag,

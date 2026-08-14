@@ -514,18 +514,46 @@ total height before Pareto filtering.
 
 ### Finite exact check and present boundary
 
-`tools/search_singletonization.cpp assembly` now executes (1) directly and scans `d` downward with
-one retained exact memo.  Three `m=10` controls use Pareto values from `data/pareto_sb.csv`; every
-positive branch tree is independently checked and every adjacent negative is exact:
+`tools/search_singletonization.cpp assembly` executes (1) directly and scans `d` downward with one
+retained exact memo.  Its `assembly-enumerate` mode now reads only source-carrying, proven-maximum
+rows from `data/pareto_sb.csv`, rejects a level containing unresolved rows, and enumerates every
+ordered A/B/C triple satisfying the three drawn inequalities plus the explicitly unproved
+`m<=2a` condition.  For each triple it binary-searches the full-star necessary condition to obtain
+a sound upper bound on `d`, ranks by `a+b+d`, and then runs the exact residual recurrence only while
+a triple can still tie the incumbent.  Larger `d` values are excluded by full-star majorization;
+smaller skipped values cannot tie by arithmetic.  Thus `optimization_complete=YES` certifies the
+widest member of this specified assembly family even when `all_triple_dmax_exact=NO` says that some
+irrelevant losing slices were not solved to their individual boundaries.  `assembly-rank` emits the
+entire static ranking and exits before exact search, so a difficult next-level slice cannot hide the
+completed enumeration.
+
+The exact `m=10` regression (source: `tools/singletonization_regression.sh`, with Pareto inputs
+sourced row-by-row by `data/pareto_sb.csv`) gives:
+
+- parent level 5: 68 admissible triples, 3 surviving the full-star bound, and exact family optimum
+  12, attained by 2 triples;
+- parent level 6: 133 admissible triples, 21 surviving the bound, and exact family optimum 33,
+  attained by 4 triples; and
+- parent level 7: 165 admissible triples, 37 surviving the bound, and exact family optimum 82,
+  attained uniquely by the displayed triple below.
+
+Every winning branch tree is independently checked.  In particular, the earlier hand controls are
+recovered:
 
 - at parent level 5, `A=(7:6)`, `B=(4:4)`, `C=(5:3)` give `d*=1` and candidate 12;
 - at parent level 6, `A=(19:6)`, `B=(10:4)`, `C=(12:3)` give `d*=4` and candidate 33; and
 - at parent level 7, a frontier-reaching triple is `A=(46:6)`, `B=(22:5)`, `C=(27:3)`, giving
   `S_D(14)=Sb(27:1,22:1,19:3,14:5)@5`, `d*=14`, and candidate 82.
 
-These reproduce the proven Pareto rows 12, 33, and 82.  They validate the corrected geometry and
-the finite D maximization, not the eventual-`q` assumption or completeness of the triple generator
-at untested levels.
+These reproduce the proven Pareto rows 12, 33, and 82.  They validate the corrected geometry, the
+finite D maximization, and completeness of the enumerated *working family* at those inputs—not the
+`m<=2a` hypothesis, the eventual-`q` assumption, or completeness among arbitrary constructions.
+
+At parent level 8 and `m=10`, `assembly-rank` completes without entering the hard exact recurrence:
+165 triples are admissible and 37 survive the full-star bound; the largest necessary candidate
+bound is 195 while the proven parent maximum is 189.  One especially simple width-189 target,
+`Sb(50:4,39:6)@6`, is exactly negative.  These are finite regression facts from
+`tools/singletonization_regression.sh`; the complete level-8 assembly optimum remains unresolved.
 
 The generic `slice` mode is the same finite D problem after the fixed three parts have been formed:
 it adds `(2^s-delta:h)` to arbitrary fixed residual parts and scans deficits upward.  Its independent
@@ -565,10 +593,11 @@ as a list: the `(2,2)` frontier has `2s-1` points.  What can stabilize is a fini
 description whose endpoints and sums depend on `s`.
 
 The corrected diagram removes the supposed missing A/B/C map: the three fixed parts are already
-given by (1).  The next finite step is to enumerate all admissible Pareto triples for a chosen `m`,
-rank them by sound D upper bounds, and evaluate enough exact slices to identify the widest candidate.
-The scale-free step is to fit and then prove eventual dyadic-polynomial formulae for `d*`—or for its
-guarded mixed-frontier pieces—while testing whether those descriptions survive atom refinement.
+given by (1), and the finite triple enumerator now exists.  The next finite step is to schedule the
+still-competitive level-8 slices without letting one hard negative block every later triple, while
+retaining an exact proof obligation for each skipped query.  The scale-free step is to fit and then
+prove eventual dyadic-polynomial formulae for `d*`—or for its guarded mixed-frontier pieces—while
+testing whether those descriptions survive atom refinement.
 
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 

@@ -234,13 +234,15 @@ the corrected diagram gives a concrete branch rather than a missing map.  For
 `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, then score the candidate `a+b+d`.
 The direct finite mode recovers the proven `m=10` widths at parent levels 5 through 7 and shows why
 all Pareto triples must be retained: the repeated `(6,4,3)` height choice falls one short at level 7,
-while B-height 5 reaches the frontier.  Next, automate enumeration of admissible A/B/C triples,
-rank them with sound D upper bounds, and evaluate exact slices until every still-competitive triple
-is decided or explicitly inconclusive.  In parallel, use guarded mixed-frontier pieces to seek an
-eventual formula for `d*` and an induction under atom refinement.  The exact generic piece checks
-through residual level 11 remain finite evidence only, and this track changes no Pareto datum;
-definitions and controls are in
-[conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
+while B-height 5 reaches the frontier.  That complete enumerator now exists: at each requested `m`
+it validates the proven Pareto input levels, exhausts ordered triples, emits a complete full-star
+ranking, and exact-solves all candidates still able to tie its incumbent.  It closes the `m=10`
+working family through parent level 7; the level-8 ranking completes but its exact optimization does
+not.  Next, add an exact resumable/per-slice schedule so one hard level-8 query cannot block cheaper
+later triples, and use guarded mixed-frontier pieces in parallel to seek an eventual formula for
+`d*` and an induction under atom refinement.  The exact generic piece checks through residual level
+11 remain finite evidence only, and this track changes no Pareto datum; definitions and controls are
+in [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 
 ## Ordering
 

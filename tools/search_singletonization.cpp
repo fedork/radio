@@ -3,9 +3,12 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <map>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -80,6 +83,29 @@ struct Counters {
     std::uint64_t options{};
     std::uint64_t assignments{};
     std::uint64_t prefix_rejects{};
+};
+
+struct ParetoPoint {
+    int k;
+    int m;
+    int n;
+    std::string status;
+    std::string source;
+};
+
+struct AssemblyTriple {
+    ParetoPoint a;
+    ParetoPoint b;
+    ParetoPoint c;
+    State fixed;
+    int d_upper;
+    int width_upper;
+};
+
+struct AssemblyWinner {
+    AssemblyTriple triple;
+    int d;
+    State branch;
 };
 
 std::vector<std::vector<int>> bases;
@@ -381,6 +407,171 @@ void print_tree(const State &state, int k, int depth, int indent = 0) {
     for (const State &child : children) print_tree(child, k - 1, depth - 1, indent + 2);
 }
 
+std::vector<std::string> parse_csv_line(const std::string &line) {
+    std::vector<std::string> fields;
+    std::string field;
+    bool quoted = false;
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char ch = line[i];
+        if (quoted) {
+            if (ch == '"') {
+                if (i + 1 < line.size() && line[i + 1] == '"') {
+                    field.push_back('"');
+                    ++i;
+                } else {
+                    quoted = false;
+                }
+            } else {
+                field.push_back(ch);
+            }
+        } else if (ch == ',') {
+            fields.push_back(std::move(field));
+            field.clear();
+        } else if (ch == '"' && field.empty()) {
+            quoted = true;
+        } else {
+            field.push_back(ch);
+        }
+    }
+    if (quoted) throw std::runtime_error("unterminated quoted CSV field");
+    fields.push_back(std::move(field));
+    return fields;
+}
+
+int parse_nonnegative_int(const std::string &text, const std::string &field, int line_number) {
+    if (text.empty())
+        throw std::runtime_error("empty " + field + " at CSV line " +
+                                 std::to_string(line_number));
+    std::size_t consumed = 0;
+    const long value = std::stol(text, &consumed);
+    if (consumed != text.size() || value < 0 || value > 2147483647L)
+        throw std::runtime_error("invalid " + field + " at CSV line " +
+                                 std::to_string(line_number));
+    return static_cast<int>(value);
+}
+
+std::map<int, std::vector<ParetoPoint>> load_proven_pareto(
+    const std::string &path, std::map<int, bool> &incomplete_levels) {
+    std::ifstream input(path);
+    if (!input) throw std::runtime_error("cannot open Pareto CSV: " + path);
+
+    std::string line;
+    if (!std::getline(input, line)) throw std::runtime_error("empty Pareto CSV: " + path);
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    const auto header = parse_csv_line(line);
+    std::map<std::string, std::size_t> column;
+    for (std::size_t i = 0; i < header.size(); ++i) {
+        if (!column.emplace(header[i], i).second)
+            throw std::runtime_error("duplicate Pareto CSV column: " + header[i]);
+    }
+    for (const std::string required : {"k", "m", "n1", "bound", "status", "source"})
+        if (!column.contains(required))
+            throw std::runtime_error("missing Pareto CSV column: " + required);
+
+    std::map<int, std::vector<ParetoPoint>> table;
+    int line_number = 1;
+    while (std::getline(input, line)) {
+        ++line_number;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+        const auto fields = parse_csv_line(line);
+        if (fields.size() != header.size())
+            throw std::runtime_error("wrong field count at CSV line " +
+                                     std::to_string(line_number));
+        auto get = [&](const std::string &name) -> const std::string & {
+            return fields[column.at(name)];
+        };
+        const int row_k = parse_nonnegative_int(get("k"), "k", line_number);
+        const bool proven_status =
+            get("status") == "proven-exhaustive" || get("status") == "proven-theorem";
+        if (get("bound") != "max" || !proven_status) {
+            incomplete_levels[row_k] = true;
+            continue;
+        }
+        if (get("source").empty())
+            throw std::runtime_error("proven maximum lacks source at CSV line " +
+                                     std::to_string(line_number));
+        ParetoPoint point{row_k,
+                          parse_nonnegative_int(get("m"), "m", line_number),
+                          parse_nonnegative_int(get("n1"), "n1", line_number),
+                          get("status"), get("source")};
+        if (point.k == 0 || point.m == 0 || point.n == 0)
+            throw std::runtime_error("zero dimension at CSV line " +
+                                     std::to_string(line_number));
+        table[point.k].push_back(std::move(point));
+    }
+    return table;
+}
+
+const std::vector<ParetoPoint> &complete_pareto_level(
+    std::map<int, std::vector<ParetoPoint>> &table,
+    const std::map<int, bool> &incomplete_levels, int k) {
+    if (incomplete_levels.contains(k))
+        throw std::runtime_error("Pareto level " + std::to_string(k) +
+                                 " contains non-max or non-proven rows");
+    auto found = table.find(k);
+    if (found == table.end())
+        throw std::runtime_error("no proven Pareto maxima for level " + std::to_string(k));
+    auto &points = found->second;
+    std::sort(points.begin(), points.end(), [](const ParetoPoint &left, const ParetoPoint &right) {
+        return left.m < right.m;
+    });
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        const int expected_m = static_cast<int>(i) + 1;
+        if (points[i].m != expected_m)
+            throw std::runtime_error("proven Pareto level " + std::to_string(k) +
+                                     " is not contiguous through the normalized endpoint");
+        if (points[i].n < points[i].m)
+            throw std::runtime_error("unnormalized Pareto row at level " + std::to_string(k) +
+                                     ", height " + std::to_string(points[i].m));
+        if (points[i].n > power_int(2, k) ||
+            static_cast<std::int64_t>(points[i].n) * points[i].m > power_int(3, k))
+            throw std::runtime_error("Pareto row exceeds a theorem capacity at level " +
+                                     std::to_string(k) + ", height " +
+                                     std::to_string(points[i].m));
+        if (i > 0 && points[i].n > points[i - 1].n)
+            throw std::runtime_error("Pareto widths increase with height at level " +
+                                     std::to_string(k));
+    }
+    const ParetoPoint &last = points.back();
+    // The CSV stores the unordered Pareto antichain only through its normalized
+    // near-diagonal endpoint.  This schema check rejects an obvious truncated level;
+    // the max status and source on each row remain the evidence for the frontier.
+    if (last.n > last.m + 1)
+        throw std::runtime_error("proven Pareto level " + std::to_string(k) +
+                                 " stops before the normalized endpoint");
+    return points;
+}
+
+State assembly_branch(const State &fixed, int d, int beta) {
+    State branch = fixed;
+    branch.push_back({d, beta});
+    normalize(branch);
+    return branch;
+}
+
+int assembly_r0_upper(const State &fixed, int beta, int residual_k) {
+    const int legal_upper = static_cast<int>(power_int(2, residual_k));
+    if (!r0(assembly_branch(fixed, 0, beta), residual_k)) return -1;
+    if (r0(assembly_branch(fixed, legal_upper, beta), residual_k)) return legal_upper;
+    int low = 0;
+    int high = legal_upper;
+    while (low + 1 < high) {
+        const int middle = low + (high - low) / 2;
+        if (r0(assembly_branch(fixed, middle, beta), residual_k))
+            low = middle;
+        else
+            high = middle;
+    }
+    return low;
+}
+
+void print_pareto_point(const char *role, const ParetoPoint &point) {
+    std::cout << "assembly_pareto role=" << role << " k=" << point.k << " state=" << point.n
+              << ':' << point.m << " status=" << point.status << " source=" << point.source
+              << '\n';
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -453,6 +644,259 @@ int main(int argc, char **argv) {
             return 1;
         } catch (const std::exception &error) {
             std::cerr << "ABORT: " << error.what() << " (not a negative verdict)\n";
+            return 3;
+        }
+    }
+    if (argc >= 2 && (std::string(argv[1]) == "assembly-enumerate" ||
+                      std::string(argv[1]) == "assembly-rank")) {
+        const bool rank_only = std::string(argv[1]) == "assembly-rank";
+        if (argc != 5) {
+            std::cerr << "usage: " << argv[0]
+                      << " " << argv[1] << " parent_k total_m pareto_csv\n";
+            return 2;
+        }
+        const int parent_k = std::atoi(argv[2]);
+        const int total_m = std::atoi(argv[3]);
+        const int residual_k = parent_k - 2;
+        if (parent_k < 3 || parent_k > 12 || total_m <= 0 ||
+            (!rank_only && total_m >= 16)) {
+            std::cerr << "usage: " << argv[0]
+                      << " " << argv[1] << " parent_k total_m pareto_csv\n"
+                      << "require 3<=parent_k<=12 and total_m>0; exact enumeration also"
+                         " requires total_m<16 because of the exact-state key\n";
+            return 2;
+        }
+
+        try {
+            std::map<int, bool> incomplete_levels;
+            auto table = load_proven_pareto(argv[4], incomplete_levels);
+            const auto &a_points =
+                complete_pareto_level(table, incomplete_levels, parent_k - 1);
+            const auto &bc_points =
+                complete_pareto_level(table, incomplete_levels, parent_k - 2);
+            make_bases(residual_k);
+            const ParetoPoint *known_parent = nullptr;
+            if (auto found = table.find(parent_k); found != table.end()) {
+                for (const ParetoPoint &point : found->second)
+                    if (point.m == total_m) known_parent = &point;
+            }
+
+            std::cout << (rank_only ? "assembly_ranking" : "assembly_enumeration")
+                      << " parent_k=" << parent_k
+                      << " residual_k=" << residual_k << " total_m=" << total_m
+                      << " pareto_csv=" << argv[4]
+                      << " pareto_inputs=PROVEN_MAX_COMPLETE"
+                         " working_m_le_2a=ENFORCED_UNPROVEN\n";
+            for (const ParetoPoint &point : a_points) print_pareto_point("A", point);
+            for (const ParetoPoint &point : bc_points) print_pareto_point("BC", point);
+
+            const std::uint64_t cartesian = static_cast<std::uint64_t>(a_points.size()) *
+                                            bc_points.size() * bc_points.size();
+            std::uint64_t beta_failures = 0;
+            std::uint64_t height_failures = 0;
+            std::uint64_t c_width_failures = 0;
+            std::uint64_t working_height_failures = 0;
+            std::uint64_t admissible = 0;
+            std::uint64_t r0_infeasible = 0;
+            std::vector<AssemblyTriple> triples;
+
+            for (const ParetoPoint &a : a_points) {
+                for (const ParetoPoint &b : bc_points) {
+                    for (const ParetoPoint &c : bc_points) {
+                        const bool beta_ok = b.m <= a.m;
+                        const bool height_ok = a.m + c.m <= total_m;
+                        const bool c_width_ok = c.n <= a.n;
+                        const bool working_height_ok =
+                            static_cast<std::int64_t>(total_m) <= 2LL * a.n;
+                        beta_failures += !beta_ok;
+                        height_failures += !height_ok;
+                        c_width_failures += !c_width_ok;
+                        working_height_failures += !working_height_ok;
+                        if (!beta_ok || !height_ok || !c_width_ok || !working_height_ok) continue;
+                        ++admissible;
+
+                        State fixed{{b.n, a.m - b.m},
+                                    {c.n, total_m - a.m - c.m},
+                                    {a.n - c.n, c.m}};
+                        normalize(fixed);
+                        const int d_upper = assembly_r0_upper(fixed, b.m, residual_k);
+                        if (d_upper < 0) {
+                            ++r0_infeasible;
+                            std::cout << "assembly_triple_static decision=R0_INFEASIBLE"
+                                      << " A=" << a.n << ':' << a.m << " B=" << b.n << ':'
+                                      << b.m << " C=" << c.n << ':' << c.m << " fixed=";
+                            print_state(fixed);
+                            std::cout << '\n';
+                            continue;
+                        }
+                        triples.push_back(
+                            {a, b, c, std::move(fixed), d_upper, a.n + b.n + d_upper});
+                    }
+                }
+            }
+
+            std::sort(triples.begin(), triples.end(), [](const AssemblyTriple &left,
+                                                         const AssemblyTriple &right) {
+                if (left.width_upper != right.width_upper)
+                    return left.width_upper > right.width_upper;
+                if (left.d_upper != right.d_upper) return left.d_upper > right.d_upper;
+                return std::tie(left.a.m, left.b.m, left.c.m, left.a.n, left.b.n, left.c.n) <
+                       std::tie(right.a.m, right.b.m, right.c.m, right.a.n, right.b.n,
+                                right.c.n);
+            });
+
+            std::cout << "assembly_inventory cartesian=" << cartesian
+                      << " admissible=" << admissible
+                      << " geometry_rejected=" << cartesian - admissible
+                      << " beta_failures=" << beta_failures
+                      << " height_failures=" << height_failures
+                      << " c_width_failures=" << c_width_failures
+                      << " working_m_le_2a_failures=" << working_height_failures
+                      << " r0_infeasible=" << r0_infeasible
+                      << " r0_ranked=" << triples.size() << '\n'
+                      << std::flush;
+            for (std::size_t rank = 0; rank < triples.size(); ++rank) {
+                const AssemblyTriple &triple = triples[rank];
+                std::cout << "assembly_rank rank=" << rank + 1
+                          << " width_upper=" << triple.width_upper
+                          << " d_upper=" << triple.d_upper << " A=" << triple.a.n << ':'
+                          << triple.a.m << " B=" << triple.b.n << ':' << triple.b.m << " C="
+                          << triple.c.n << ':' << triple.c.m << " fixed=";
+                print_state(triple.fixed);
+                std::cout << '\n';
+            }
+            std::cout << "assembly_ranking_result ranked=" << triples.size()
+                      << " complete=YES bound=R0_NECESSARY";
+            if (known_parent != nullptr)
+                std::cout << " known_parent_max=" << known_parent->n
+                          << " known_parent_status=" << known_parent->status
+                          << " known_parent_source=" << known_parent->source;
+            std::cout << '\n' << std::flush;
+            if (rank_only) return 0;
+
+            int best_width = -1;
+            std::vector<AssemblyWinner> winners;
+            std::uint64_t exact_triples = 0;
+            std::uint64_t exact_probes = 0;
+            std::uint64_t upper_pruned = 0;
+            std::uint64_t competitive_prefix_rejected = 0;
+            bool all_dmax_exact = true;
+
+            for (std::size_t rank = 0; rank < triples.size(); ++rank) {
+                const AssemblyTriple &triple = triples[rank];
+                if (best_width >= 0 && triple.width_upper < best_width) {
+                    ++upper_pruned;
+                    all_dmax_exact = false;
+                    std::cout << "assembly_triple rank=" << rank + 1
+                              << " decision=UPPER_PRUNED width_upper=" << triple.width_upper
+                              << " incumbent=" << best_width << " d_upper=" << triple.d_upper
+                              << " A=" << triple.a.n << ':' << triple.a.m << " B=" << triple.b.n
+                              << ':' << triple.b.m << " C=" << triple.c.n << ':' << triple.c.m
+                              << '\n';
+                    continue;
+                }
+
+                ++exact_triples;
+                const int base_width = triple.a.n + triple.b.n;
+                const int minimum_competitive_d =
+                    best_width < 0 ? 0 : std::max(0, best_width - base_width);
+                std::cout << "assembly_triple rank=" << rank + 1
+                          << " decision=EXACT_SEARCH width_upper=" << triple.width_upper
+                          << " d_range=" << triple.d_upper << ':' << minimum_competitive_d
+                          << " A=" << triple.a.n << ':' << triple.a.m << " B=" << triple.b.n
+                          << ':' << triple.b.m << " C=" << triple.c.n << ':' << triple.c.m
+                          << " fixed=";
+                print_state(triple.fixed);
+                std::cout << '\n' << std::flush;
+
+                bool found = false;
+                for (int d = triple.d_upper; d >= minimum_competitive_d; --d) {
+                    State branch = assembly_branch(triple.fixed, d, triple.b.m);
+                    const Counters before = counters;
+                    const auto started = std::chrono::steady_clock::now();
+                    const bool answer = construct(branch, residual_k, residual_k);
+                    const double seconds = std::chrono::duration<double>(
+                                               std::chrono::steady_clock::now() - started)
+                                               .count();
+                    ++exact_probes;
+                    std::cout << "assembly_probe rank=" << rank + 1 << " d=" << d << ' '
+                              << (answer ? "YES" : "NO") << " candidate_width="
+                              << base_width + d << " branch=";
+                    print_state(branch);
+                    std::cout << " wall=" << seconds << "s calls="
+                              << counters.calls - before.calls << " assignments="
+                              << counters.assignments - before.assignments
+                              << " memo=" << memo.size() << '\n'
+                              << std::flush;
+                    if (!answer) continue;
+
+                    found = true;
+                    const int candidate_width = base_width + d;
+                    std::cout << "assembly_triple_result rank=" << rank + 1 << " d_max=" << d
+                              << " candidate_width=" << candidate_width
+                              << " d_max_exact=YES r0_excludes_larger=YES\n";
+                    if (candidate_width > best_width) {
+                        best_width = candidate_width;
+                        winners.clear();
+                    }
+                    if (candidate_width == best_width)
+                        winners.push_back({triple, d, std::move(branch)});
+                    break;
+                }
+                if (found) continue;
+
+                if (minimum_competitive_d == 0) {
+                    std::cout << "assembly_triple_result rank=" << rank + 1
+                              << " feasible=NONE d_max_exact=YES\n";
+                } else {
+                    ++competitive_prefix_rejected;
+                    all_dmax_exact = false;
+                    std::cout << "assembly_triple_result rank=" << rank + 1
+                              << " decision=NONCOMPETITIVE_BELOW_D d_below="
+                              << minimum_competitive_d
+                              << " incumbent=" << best_width << " d_max_exact=NO\n";
+                }
+            }
+
+            if (known_parent != nullptr && best_width > known_parent->n)
+                throw std::logic_error("assembly construction exceeds the proven parent maximum");
+            std::cout << "assembly_enumeration_result best_width=";
+            if (best_width < 0)
+                std::cout << "NONE";
+            else
+                std::cout << best_width;
+            std::cout << " winners=" << winners.size()
+                      << " optimization_complete=YES best_exact=YES"
+                      << " all_triple_dmax_exact=" << (all_dmax_exact ? "YES" : "NO")
+                      << " admissible=" << admissible << " r0_infeasible=" << r0_infeasible
+                      << " exact_triples=" << exact_triples << " exact_probes=" << exact_probes
+                      << " upper_pruned=" << upper_pruned
+                      << " competitive_prefix_rejected=" << competitive_prefix_rejected;
+            if (known_parent != nullptr) {
+                const char *relation = best_width < 0 || best_width < known_parent->n
+                                           ? "BELOW"
+                                           : (best_width == known_parent->n ? "EQUAL" : "ABOVE");
+                std::cout << " known_parent_max=" << known_parent->n
+                          << " known_parent_relation=" << relation
+                          << " known_parent_status=" << known_parent->status
+                          << " known_parent_source=" << known_parent->source;
+            }
+            std::cout << '\n';
+
+            for (std::size_t i = 0; i < winners.size(); ++i) {
+                const AssemblyWinner &winner = winners[i];
+                std::cout << "assembly_winner index=" << i + 1 << " candidate_width="
+                          << best_width << " d=" << winner.d << " A=" << winner.triple.a.n << ':'
+                          << winner.triple.a.m << " B=" << winner.triple.b.n << ':'
+                          << winner.triple.b.m << " C=" << winner.triple.c.n << ':'
+                          << winner.triple.c.m << " branch=";
+                print_state(winner.branch);
+                std::cout << '\n';
+                print_tree(winner.branch, residual_k, residual_k);
+            }
+            return best_width < 0 ? 1 : 0;
+        } catch (const std::exception &error) {
+            std::cerr << "ABORT: " << error.what() << " (not an enumeration result)\n";
             return 3;
         }
     }
@@ -756,6 +1200,10 @@ int main(int argc, char **argv) {
         std::cerr << "usage: " << argv[0] << " k depth n1 m1 [n2 m2 ...]\n"
                   << "       " << argv[0] << " forced k depth n m a b\n"
                   << "       " << argv[0] << " frontier k m start_n minimum_n\n"
+                  << "       " << argv[0]
+                  << " assembly-rank parent_k total_m pareto_csv\n"
+                  << "       " << argv[0]
+                  << " assembly-enumerate parent_k total_m pareto_csv\n"
                   << "       " << argv[0]
                   << " assembly parent_k depth total_m a alpha b beta c gamma"
                      " start_d minimum_d\n"

@@ -5578,3 +5578,39 @@ the branch `Sb(58:1,50:1,46:3,35:5)@6`.  One exact attempt hit a 60-CPU-second c
 verdict; bounded singletonization depths 3, 4, and 5 each hit a separate 20-CPU-second cap without a
 summary.  All processes were gone afterward.  This is 120 CPU seconds of inconclusive work, not a
 construction or rejection.  No Pareto table entry changes in this work.
+
+## 2026-08-14 — complete Pareto-triple enumeration, exact through parent level 7
+
+`search_singletonization assembly-enumerate` now automates the outer A/B/C choice in the corrected
+diagram.  It reads `data/pareto_sb.csv`, accepts only complete normalized levels made entirely of
+source-carrying proven maxima, and refuses the current level-9 mixture of theorem, legacy and bound
+rows.  It enumerates ordered triples under `beta<=alpha`, `alpha+gamma<=m`, `c<=a`, and the user's
+still-unproved `m<=2a` working condition.  A binary search of full-star majorization supplies a sound
+D upper bound.  Exact scans then continue only while a triple can tie the incumbent; every omitted
+larger D fails the necessary bound and every omitted smaller D loses arithmetically.  Therefore the
+final optimum is exact over this explicitly conditional family even though losing triples need not
+have individually exact D maxima.
+
+The new regression is the durable source for the following finite `m=10` facts.  At parent levels
+5, 6 and 7 it respectively examines 68, 133 and 165 admissible triples; 3, 21 and 37 survive the
+full-star screen.  The exact family optima are the proven Pareto widths 12, 33 and 82, attained by
+2, 4 and 1 triples.  All seven printed branch trees pass `tools/check_witness.py`.  The unique
+level-7 winner is the previously found `(46:6),(22:5),(27:3),d=14`; the enumeration proves that its
+choice is best within the working family rather than merely exhibiting it.  Source:
+`tools/singletonization_regression.sh`, with the input maxima sourced by `data/pareto_sb.csv`.
+
+`assembly-rank` separates the completed static product from exact optimization.  For parent level
+8 and `m=10`, the regression locks 165 admissible triples, 37 full-star survivors, top necessary
+candidate width 195, and the proven parent maximum 189.  The especially simple width-189 target
+`Sb(50:4,39:6)@6` is exactly negative in the regression, so neither low part count nor R_0 is a
+construction criterion.  Exact optimization of the level-8 family is still open.
+
+Exploratory local target checks were deliberately not promoted to durable evidence.  Ranking entries
+3, 8, 9, 11, 14, 17, 18, 19 and 21 at width 189 returned exact negatives in the current recurrence;
+together with the retained two-part control, their measured solve time was 5.459808 seconds.  Entries
+2, 5, 6 and 7 each hit an independent 30-CPU-second cap without a verdict; entry 1 is the natural
+candidate whose earlier 60-second cap is recorded immediately above.  The raw exploratory outputs
+were under `/tmp/assembly-k8-rank*.out` and were not retained, so these observations are scheduling
+notes, not evidence claims.  Two one-CPU-second development probes were also killed after entering
+the first exact query; that led to the clean `assembly-rank` mode rather than another inferred
+negative.  Process inventory was empty afterward.  No CSV fact changes.

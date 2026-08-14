@@ -91,6 +91,97 @@ grep -F 'assembly_result d=11 parent_width=81 global_maximum=YES exact=YES' \
     "$tmp/assembly-k7-nonoptimal.out" >/dev/null
 tools/check_witness.py "$tmp/assembly-k7-nonoptimal.out" >/dev/null
 
+# Enumerate the complete ordered A/B/C triple family from source-carrying proven Pareto rows.
+# R_0 is only a necessary bound; every triple capable of tying the incumbent is still decided by
+# the exact residual recurrence.  The final summaries therefore certify the family optimum even
+# though losing triples below the incumbent need not have their individual d maxima computed.
+"$tmp/search_singletonization" assembly-enumerate 5 10 data/pareto_sb.csv \
+    >"$tmp/assembly-enumerate-k5.out"
+grep -F 'assembly_inventory cartesian=96 admissible=68 geometry_rejected=28 ' \
+    "$tmp/assembly-enumerate-k5.out" >/dev/null
+grep -F 'assembly_ranking_result ranked=3 complete=YES bound=R0_NECESSARY' \
+    "$tmp/assembly-enumerate-k5.out" >/dev/null
+grep -F 'assembly_enumeration_result best_width=12 winners=2 optimization_complete=YES best_exact=YES ' \
+    "$tmp/assembly-enumerate-k5.out" >/dev/null
+grep -F 'assembly_winner index=1 candidate_width=12 d=1 A=7:6 B=4:4 C=5:3 ' \
+    "$tmp/assembly-enumerate-k5.out" >/dev/null
+grep -F 'assembly_winner index=2 candidate_width=12 d=1 A=7:6 B=4:4 C=4:4 ' \
+    "$tmp/assembly-enumerate-k5.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-enumerate-k5.out" >/dev/null
+
+"$tmp/search_singletonization" assembly-enumerate 6 10 data/pareto_sb.csv \
+    >"$tmp/assembly-enumerate-k6.out"
+grep -F 'assembly_inventory cartesian=396 admissible=133 geometry_rejected=263 ' \
+    "$tmp/assembly-enumerate-k6.out" >/dev/null
+grep -F 'assembly_ranking_result ranked=21 complete=YES bound=R0_NECESSARY' \
+    "$tmp/assembly-enumerate-k6.out" >/dev/null
+grep -F 'assembly_enumeration_result best_width=33 winners=4 optimization_complete=YES best_exact=YES ' \
+    "$tmp/assembly-enumerate-k6.out" >/dev/null
+grep -F 'assembly_winner index=4 candidate_width=33 d=4 A=19:6 B=10:4 C=12:3 ' \
+    "$tmp/assembly-enumerate-k6.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-enumerate-k6.out" >/dev/null
+
+"$tmp/search_singletonization" assembly-enumerate 7 10 data/pareto_sb.csv \
+    >"$tmp/assembly-enumerate-k7.out"
+grep -F 'assembly_inventory cartesian=2299 admissible=165 geometry_rejected=2134 ' \
+    "$tmp/assembly-enumerate-k7.out" >/dev/null
+grep -F 'assembly_ranking_result ranked=37 complete=YES bound=R0_NECESSARY' \
+    "$tmp/assembly-enumerate-k7.out" >/dev/null
+grep -F 'assembly_enumeration_result best_width=82 winners=1 optimization_complete=YES best_exact=YES ' \
+    "$tmp/assembly-enumerate-k7.out" >/dev/null
+grep -F 'assembly_winner index=1 candidate_width=82 d=14 A=46:6 B=22:5 C=27:3 ' \
+    "$tmp/assembly-enumerate-k7.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-enumerate-k7.out" >/dev/null
+
+# At the next level exact slices can be expensive, so ranking is a separate completed product.
+# This emits all sound R_0 bounds and exits before entering the first exact query.
+"$tmp/search_singletonization" assembly-rank 8 10 data/pareto_sb.csv \
+    >"$tmp/assembly-rank-k8.out"
+grep -F 'assembly_inventory cartesian=11552 admissible=165 geometry_rejected=11387 ' \
+    "$tmp/assembly-rank-k8.out" >/dev/null
+grep -F 'assembly_rank rank=1 width_upper=195 d_upper=41 A=104:6 B=50:5 C=58:3 ' \
+    "$tmp/assembly-rank-k8.out" >/dev/null
+grep -F 'assembly_rank rank=37 width_upper=170 d_upper=47 A=87:9 B=36:9 C=64:1 ' \
+    "$tmp/assembly-rank-k8.out" >/dev/null
+grep -F 'assembly_ranking_result ranked=37 complete=YES bound=R0_NECESSARY known_parent_max=189 ' \
+    "$tmp/assembly-rank-k8.out" >/dev/null
+if grep -F 'assembly_probe' "$tmp/assembly-rank-k8.out" >/dev/null; then
+    echo "rank-only assembly mode entered exact search" >&2
+    exit 1
+fi
+
+# One particularly simple width-189 target from that ranking reduces to a two-part branch and is
+# exactly negative.  This locks that R_0 ranking remains only a necessary bound, even in the diagram.
+set +e
+"$tmp/search_singletonization" assembly 8 6 10 104 6 46 6 54 4 39 39 \
+    >"$tmp/assembly-k8-two-part.out"
+result=$?
+set -e
+if [[ "$result" != 1 ]]; then
+    echo "k=8 two-part assembly control exited $result, expected exact negative status 1" >&2
+    exit 1
+fi
+grep -F 'assembly d=39 NO parent_width=189 parent_k=8 residual_k=6 depth=6 total_m=10 A=104:6 B=46:6 C=54:4 branch=50:4,39:6 ' \
+    "$tmp/assembly-k8-two-part.out" >/dev/null
+
+# The k=9 input level currently has one theorem row and legacy bounds, not a complete proven
+# frontier.  Refuse it rather than silently upgrading lower bounds into Pareto states.
+set +e
+"$tmp/search_singletonization" assembly-enumerate 10 10 data/pareto_sb.csv \
+    >"$tmp/assembly-enumerate-incomplete.out" 2>"$tmp/assembly-enumerate-incomplete.err"
+result=$?
+set -e
+if [[ "$result" != 3 ]]; then
+    echo "incomplete Pareto input exited $result, expected abort status 3" >&2
+    exit 1
+fi
+grep -F 'ABORT: Pareto level 9 contains non-max or non-proven rows' \
+    "$tmp/assembly-enumerate-incomplete.err" >/dev/null
+if grep -F 'assembly_enumeration_result' "$tmp/assembly-enumerate-incomplete.out" >/dev/null; then
+    echo "incomplete Pareto input emitted an enumeration result" >&2
+    exit 1
+fi
+
 # Two singleton rows at k=2 have the complete deficit antichain {(0,1),(1,0)}.  This checks
 # coordinate ordering, sharp thresholds, completeness detection and multiple emitted trees.
 "$tmp/search_singletonization" mixed-frontier 2 2 1 1 1 1 >"$tmp/mixed-small.out"
