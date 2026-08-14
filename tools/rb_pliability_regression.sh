@@ -50,4 +50,14 @@ grep -F 'parts=8 mass=229 cap=81 slack=14' <<<"$hard_state" >/dev/null
 grep -F 'potential_call_suffixes=5 exact_head=7 exact_tail=1' <<<"$hard_state" >/dev/null
 grep -F 'theorem_head=8 theorem_tail=0 coarse_head=8 coarse_tail=0' <<<"$hard_state" >/dev/null
 
+# Retaining the full absolute slack strengthens the old q/D corollary.  Here sigma=5: the former
+# slack>=2 form certifies only the final (2:1), while 2*(D-q)<=sigma-4 certifies two suffix parts.
+full_slack=$(
+    "$tmp/rb_root_probe" 3 4 3 2 2 2 2 2 1 \
+        2>/dev/null | grep '^RB_PLIABILITY '
+)
+grep -F 'slack=5' <<<"$full_slack" >/dev/null
+grep -F 'coarse_head=3 coarse_tail=1' <<<"$full_slack" >/dev/null
+grep -F 'slack_excess_head=2 slack_excess_tail=2' <<<"$full_slack" >/dev/null
+
 echo "rb pliability regression passed"

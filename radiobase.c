@@ -1212,11 +1212,29 @@ long long cant_solve_count=0;
 #ifndef RB_TRIGGER
 #define RB_TRIGGER 10000000LL      /* arm the prune once a state has cost this many candidates */
 #endif
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+#ifndef RADIO_RB_PLIABILITY_DIAGNOSTIC
+#define RADIO_RB_PLIABILITY_DIAGNOSTIC
+#endif
+#endif
 static int rb_on = 0, rb_cap = 0, rb_words = 0, rb_P = 0;
 static unsigned long long *rb_bits[17];
 static short *rb_mx[17];
 static int rb_mrem[17];
 static long long rb_tested = 0, rb_pruned = 0;
+#ifdef RADIO_RB_PLIABLE_CUTOFF
+/* Lab-only comparison: pay an exact post-build scan, then omit lookups that it proves vacuous.
+   The default solver deliberately leaves this off; the measured lookup savings did not reduce
+   CPU time on the hard positive control. */
+static unsigned char rb_pliable[17];
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+static long long rb_pliable_skipped = 0;
+#endif
+#endif
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+static unsigned long long rb_suffix_tested[17], rb_suffix_pruned[17];
+static int rb_profile_parts[17];
+#endif
 
 static void rb_free(void) {
     int i;
@@ -1225,6 +1243,11 @@ static void rb_free(void) {
 static void rb_build(splits **sa, int *tmpp, int P, int cap) {
     int i, c, r0, w, W = cap + 1;
     rb_cap = cap; rb_P = P; rb_words = (W + 63) / 64;
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+    memset(rb_suffix_tested, 0, sizeof(rb_suffix_tested));
+    memset(rb_suffix_pruned, 0, sizeof(rb_suffix_pruned));
+    memcpy(rb_profile_parts, tmpp, (size_t)P * sizeof(*tmpp));
+#endif
     rb_mrem[P] = 0;
     for (i = P - 1; i >= 0; i--) rb_mrem[i] = rb_mrem[i+1] + sb_pairs[tmpp[i]];
     for (i = 0; i <= P; i++) {
@@ -1263,21 +1286,60 @@ static void rb_build(splits **sa, int *tmpp, int P, int cap) {
     }
 }
 static void rb_release(void) {
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+    int i;
+    for (i = 1; i < rb_P; i++) {
+        int q = rb_P - i;
+        int mass = rb_mrem[i];
+        int excess = mass - 2 * q;
+        fprintf(stderr,
+                "RB_PROFILE_SUFFIX index=%d parts=%d mass=%d excess=%d calls=%llu pruned=%llu\n",
+                i, q, mass, excess,
+                rb_suffix_tested[i], rb_suffix_pruned[i]);
+    }
+    fprintf(stderr, "RB_PROFILE_END tested=%lld pruned=%lld", rb_tested, rb_pruned);
+#if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
+    fprintf(stderr, " pliable_skipped=%lld", rb_pliable_skipped);
+#endif
+    fputc('\n', stderr);
+#endif
+#if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
+    fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%), %lld pliable-skipped\n",
+            rb_tested, rb_pruned, rb_tested ? 100.0*rb_pruned/rb_tested : 0.0,
+            rb_pliable_skipped);
+#else
     fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%)\n",
             rb_tested, rb_pruned, rb_tested ? 100.0*rb_pruned/rb_tested : 0.0);
+#endif
     rb_free(); rb_on = 0; rb_tested = rb_pruned = 0;
+#if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
+    rb_pliable_skipped = 0;
+#endif
 }
 static inline int rb_dead(int nexti, int p0, int p1, int p2) {
     int W = rb_cap + 1;
     int a = rb_cap - p0, cc = rb_cap - p2;
     long long need = (long long)p1 + rb_mrem[nexti] - rb_cap;
     rb_tested++;
-    if (a < 0 || cc < 0) { rb_pruned++; return 1; }
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+    rb_suffix_tested[nexti]++;
+#endif
+    if (a < 0 || cc < 0) {
+        rb_pruned++;
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+        rb_suffix_pruned[nexti]++;
+#endif
+        return 1;
+    }
     if (rb_mx[nexti][(size_t)a*W + cc] >= need) return 0;
-    rb_pruned++; return 1;
+    rb_pruned++;
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+    rb_suffix_pruned[nexti]++;
+#endif
+    return 1;
 }
 
-#ifdef RADIO_RB_PLIABILITY_DIAGNOSTIC
+#if defined(RADIO_RB_PLIABILITY_DIAGNOSTIC) || defined(RADIO_RB_PLIABLE_CUTOFF)
 /* A suffix is sigma-pliable when it can fit every residual capacity triple h with
 
        0 <= hj <= cap,       h0 + h1 + h2 = suffix_mass + sigma.
@@ -1304,7 +1366,9 @@ static int rb_suffix_pliable(int suffix, int slack) {
     }
     return TRUE;
 }
+#endif
 
+#ifdef RADIO_RB_PLIABILITY_DIAGNOSTIC
 static int rb_has_mass_vector(const splits *table, int want0, int want1, int want2) {
     int c;
     for (c = 0; c < table->size; c++) {
@@ -1349,6 +1413,7 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
     unsigned char hereditary[17] = {0};
     unsigned char theorem[17] = {0};
     unsigned char coarse[17] = {0};
+    unsigned char slack_excess[17] = {0};
     unsigned char corners[17] = {0};
     unsigned char all_corners[17] = {0};
     unsigned char all_nonempty[17] = {0};
@@ -1357,6 +1422,7 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
     int exact_head = rb_P;
     int theorem_head = rb_P;
     int coarse_head = rb_P;
+    int slack_excess_head = rb_P;
     int potential_call_suffixes = 0;
     int i;
 
@@ -1367,6 +1433,7 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
     hereditary[rb_P] = exact[rb_P];
     theorem[rb_P] = TRUE;
     coarse[rb_P] = TRUE;
+    slack_excess[rb_P] = TRUE;
     all_corners[rb_P] = TRUE;
     all_nonempty[rb_P] = TRUE;
 
@@ -1378,6 +1445,7 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
         int q = rb_P - i;
         int excess = rb_mrem[i] - 2 * q;
         int coarse_bound = FALSE;
+        int slack_excess_bound = FALSE;
 
         corners[i] = rb_has_pure_corners(tables[i], mass);
         all_corners[i] = corners[i] && all_corners[i + 1];
@@ -1395,8 +1463,21 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
             if (q == 1) coarse_bound = TRUE;
             else if (slack == 1 && q >= excess + 2) coarse_bound = TRUE;
             else if (slack >= 2 && q >= excess + 1) coarse_bound = TRUE;
+
+            /* Preserve the full absolute slack instead of collapsing it to slack>=2.  Writing
+               each mass as 2+d_j, with nondecreasing d_j from the (2:1) base outwards, the same
+               extension proof works whenever
+
+                   2 * (D-q) <= slack-4,
+
+               where D=sum(d_j)=suffix_mass-2q.  This specializes to q>=D+2 at slack one and
+               q>=D+1 at slack two or three, then admits progressively more excess as slack grows. */
+            if (q == 1 || (slack >= 1
+                           && 2LL * (excess - q) <= (long long)slack - 4))
+                slack_excess_bound = TRUE;
         }
         coarse[i] = coarse_bound;
+        slack_excess[i] = slack_excess_bound;
 
         if (theorem[i] && !hereditary[i]) {
             fprintf(stderr, "RB_PLIABILITY internal-error theorem-not-exact suffix=%d\n", i);
@@ -1404,6 +1485,10 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
         }
         if (coarse[i] && !theorem[i]) {
             fprintf(stderr, "RB_PLIABILITY internal-error coarse-not-direct suffix=%d\n", i);
+            exit(4);
+        }
+        if (slack_excess[i] && !theorem[i]) {
+            fprintf(stderr, "RB_PLIABILITY internal-error slack-excess-not-direct suffix=%d\n", i);
             exit(4);
         }
     }
@@ -1417,6 +1502,9 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
     for (i = 0; i <= rb_P; i++) {
         if (coarse[i]) { coarse_head = i; break; }
     }
+    for (i = 0; i <= rb_P; i++) {
+        if (slack_excess[i]) { slack_excess_head = i; break; }
+    }
     for (i = 1; i < rb_P; i++) {
         if (!exact[i]) potential_call_suffixes++;
     }
@@ -1424,10 +1512,12 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
     fprintf(out,
             "RB_PLIABILITY parts=%d mass=%d cap=%d slack=%d root_pliable=%d "
             "potential_call_suffixes=%d exact_head=%d exact_tail=%d "
-            "theorem_head=%d theorem_tail=%d coarse_head=%d coarse_tail=%d\n",
+            "theorem_head=%d theorem_tail=%d coarse_head=%d coarse_tail=%d "
+            "slack_excess_head=%d slack_excess_tail=%d\n",
             rb_P, rb_mrem[0], rb_cap, slack, exact[0], potential_call_suffixes,
             exact_head, rb_P - exact_head, theorem_head, rb_P - theorem_head,
-            coarse_head, rb_P - coarse_head);
+            coarse_head, rb_P - coarse_head,
+            slack_excess_head, rb_P - slack_excess_head);
 
     if (verbose) {
         for (i = 0; i < rb_P; i++) {
@@ -1435,11 +1525,25 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
             int margin = rb_mrem[i + 1] + slack + 2 - 2 * mass;
             fprintf(out,
                     "RB_PLIABILITY_SUFFIX index=%d parts=%d mass=%d exact=%d hereditary=%d "
-                    "theorem=%d coarse=%d corners=%d extension_margin=%d\n",
+                    "theorem=%d coarse=%d slack_excess=%d corners=%d extension_margin=%d\n",
                     i, rb_P - i, rb_mrem[i], exact[i], hereditary[i], theorem[i], coarse[i],
-                    corners[i], margin);
+                    slack_excess[i], corners[i], margin);
         }
     }
+}
+#endif
+
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+static void rb_profile_begin(splits **tables, const int *parts, int k) {
+    int i;
+    fprintf(stderr, "RB_PROFILE_BEGIN k=%d cap=%d parts=%d mass=%d slack=%d state=Sb(",
+            k, rb_cap, rb_P, rb_mrem[0], 3 * rb_cap - rb_mrem[0]);
+    for (i = 0; i < rb_P; i++) {
+        if (i) fputc(',', stderr);
+        fputs(sbb_to_str[rb_profile_parts[i]], stderr);
+    }
+    fprintf(stderr, ")\n");
+    rb_report_pliability(tables, parts, stderr, TRUE);
 }
 #endif
 
@@ -1819,6 +1923,16 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                         }
                         rb_on = rb_here = 1;
                         rb_build(splitsarr, tmp, size, power3[k_1]);
+#ifdef RADIO_RB_PLIABLE_CUTOFF
+                        {
+                            int slack = 3 * rb_cap - rb_mrem[0];
+                            for (ri = 0; ri <= rb_P; ri++)
+                                rb_pliable[ri] = rb_suffix_pliable(ri, slack);
+                        }
+#endif
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+                        rb_profile_begin(splitsarr, tmp, k);
+#endif
                     }
                     int p0 = sb0p[i] = sb_pairs[sb0[i] = s[0]] + (i>0?sb0p[i-1]:0);
                     int p1 = sb1p[i] = sb_pairs[sb1[i*2] = s[1]] + sb_pairs[sb1[i*2+1] = s[2]] + (i>0?sb1p[i-1]:0);
@@ -1835,10 +1949,19 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                     
                     debug_printf(" i=%d p0=%d p1=%d p2=%d\n", i, p0,p1,p2);
 #endif
-                    if (within_cap && rb_here && i + 1 < size) {
+                    if (within_cap && rb_here && i + 1 < size
+#ifdef RADIO_RB_PLIABLE_CUTOFF
+                        && !rb_pliable[i + 1]
+#endif
+                        ) {
                         rb_rejected = rb_dead(i + 1, p0, p1, p2);
                         if (rb_rejected) rb_tainted_contraction = 1;
                     }
+#if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
+                    else if (within_cap && rb_here && i + 1 < size && rb_pliable[i + 1]) {
+                        rb_pliable_skipped++;
+                    }
+#endif
                     if (within_cap && !rb_rejected
                         && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY))
                         && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY))

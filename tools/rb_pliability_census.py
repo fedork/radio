@@ -79,7 +79,9 @@ def print_summary(rows: list[dict[str, int]], parent_theorem_dead: int) -> None:
           f"{sum(row['potential_call_suffixes'] == 0 for row in rows)}")
     print(f"theorem_proves_no_callable_prune={sum(row['theorem_head'] <= 1 for row in rows)}")
     print(f"coarse_proves_no_callable_prune={sum(row['coarse_head'] <= 1 for row in rows)}")
-    for field in ("exact_head", "theorem_head", "coarse_head"):
+    print(f"slack_excess_proves_no_callable_prune="
+          f"{sum(row['slack_excess_head'] <= 1 for row in rows)}")
+    for field in ("exact_head", "theorem_head", "coarse_head", "slack_excess_head"):
         counts = dict(sorted(Counter(row[field] for row in rows).items()))
         print(field, counts)
 
