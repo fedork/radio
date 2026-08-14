@@ -227,6 +227,18 @@ particular stored subtree:
 Do not infer a constant `-3` correction from one value.  Reproduction, correctness argument and
 costs are in the latest journal entry and `docs/tools.md`.
 
+**Conditional excess-q construction track (2026-08-14).** Under the explicitly unproved working
+assumption that every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf regime,
+the free D-width problem is now reduced exactly to two pure deficit thresholds and a two-coordinate
+mixed-child antichain.  The finite tool computes complete exact antichains and compresses them into
+guarded slope-one pieces; the resulting D optimization has a closed form per piece.  The next step is
+not another blind frontier scan: annotate the sketch with the recursive A/B/C boundaries, derive the
+three labelled child contributions `E_2,E_1,E_0` for every synchronized cut, and only then enumerate
+candidate total heights.  In parallel, fit guarded-piece endpoints and sums across residual level and
+seek an induction proving eventual formulas.  The exact checks through residual level 11 are finite
+evidence only, and this track currently changes no Pareto datum; definitions and controls are in
+[conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
+
 ## Ordering
 
 P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed

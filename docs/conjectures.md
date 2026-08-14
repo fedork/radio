@@ -456,6 +456,24 @@ This identifies the irreducible object: it is the **two-dimensional mixed-child 
 `M`, not a single majorization capacity.  A scalar formula for D can exist only after that antichain
 has acquired a stable describable form.
 
+Every finite antichain can be split into maximal guarded slope-one pieces
+
+    L <= p <= R,       q=C-p.
+
+For one such piece, put
+
+    I = [min(U_2,C-U_0), max(U_2,C-U_0)].
+
+The piece contributes
+
+    max(C,U_2+U_0) + distance([L,R], I)
+
+to `delta_D`.  This is exact: without the guard, the convex objective is constant on `I`; moving to
+the nearest allowed integer endpoint raises it by exactly the interval distance.  Taking the minimum
+over pieces and over the fixed A/B/C cuts gives D without enumerating the individual antichain points.
+If `L,R,C` eventually have polynomial descriptions in the residual level, this is already a scalable
+max/min expression.
+
 In the diagram's levels, write
 
     width(A) = 2^(k-1)-delta_A,
@@ -482,11 +500,37 @@ subgraph monotonicity the fixed state `(11:2,9:2,3:2)@4` has exact D-maximum 10.
 majorization still permits 11, but exact synchronization rejects it.  The positive tree is checked by
 `tools/check_witness.py`; `tools/singletonization_regression.sh` locks the pair and abort semantics.
 
-This validates the slice formulation, not the excessive-`q` hypothesis or the proposed global
-Pareto decomposition.  The next diagram-specific step is to encode exactly which labelled pieces of
-A/B/C enter each `E_i(sigma)`.  The next scale-free step is to represent the antichains by eventual
-dyadic-polynomial width germs and test whether those labelled antichains stabilize under atom
-refinement.
+The new `mixed-frontier` mode computes `M` itself.  For the same fixed parts `(9:2,3:2)@4`, its
+complete exact frontier for two variable height-two parts is
+
+    {(2,10), (3,8), (4,6), (6,4), (8,3), (10,2)}.
+
+In particular `(4,6)` is feasible while the equally costly balanced pair `(5,5)` is not.  This is the
+two-coordinate synchronization notch that a scalar total deficit would erase.  As an illustrative
+combination, imposing the synthetic pure thresholds `U_2=U_0=5` makes the piece optimizer return
+`delta_D=11`: synchronization costs one unit beyond the unattainable scalar value 10.  Those pure
+thresholds have not yet been derived from the sketch's unmarked A/B/C boundaries.
+
+Two unforced families show what “stabilization” should mean computationally.  The regression performs
+complete exact scans and verifies every positive tree:
+
+- for residual levels `3<=s<=11`, variable heights `(1,2)` give one piece
+  `0<=u<=s`, `v=s+1-u`;
+- for `4<=s<=11`, variable heights `(2,2)` give the integer minimal boundary of
+  `u,v>=1` and `u+v>=2s+indicator(min(u,v)<=2)`, compressed into three pieces; and
+- at level `s=6`, heights `(1,4)` already require three guarded pieces:
+  `u=0..2, v=17-u`; `u=4..7, v=18-u`; and `u=9, v=19-u`.
+
+These are finite exact facts sourced by `tools/singletonization_regression.sh`, not proofs of the
+displayed formulae outside their checked ranges.  They also show that the antichain need not stabilize
+as a list: the `(2,2)` frontier has `2s-1` points.  What can stabilize is a finite guarded-piece
+description whose endpoints and sums depend on `s`.
+
+This validates the slice formulation and a representation for its hard subproblem, not the
+excessive-`q` hypothesis or the proposed global Pareto decomposition.  The next diagram-specific step
+is to encode exactly which labelled pieces of A/B/C enter each `E_i(sigma)`.  The next scale-free step
+is to fit and then prove eventual dyadic-polynomial formulae for the guarded piece endpoints and sums,
+while testing whether those labelled descriptions survive atom refinement.
 
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 

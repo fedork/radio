@@ -5493,4 +5493,76 @@ missing diagram-specific datum is the labelled map from the chosen A/B/C states 
 child contributions.  After encoding that map, the finite command can enumerate candidate heights
 immediately.  The scale-free continuation is to store eventual dyadic-polynomial width germs and
 their two-dimensional minimal antichains, then test the postulated stabilization under atom
-refinement instead of guessing a formula for D.
+refinement instead of guessing a formula for D.  The following entry begins that continuation by
+replacing point lists with guarded affine pieces.
+
+## 2026-08-14 — the mixed antichain becomes a guarded-piece D optimizer
+
+The sketch itself can now be transcribed without guessing the unmarked component boundaries.  Reading
+each color as one global branch, the nonempty segments are
+
+    row 1: green[a a b c]  yellow[c a]  orange[a]  red[b]
+    row 2: green continues  orange[c]    red[a]     cyan[a b]
+    row 3: green continues  red[c]       blue[a]    cyan continues
+    row 4: yellow[a a]      orange[b]    red[c]
+
+On that reading, red is uniquely the four-segment branch, with atom sequence `(b,a,c,c)` from top to
+bottom, and the proposed free D is naturally its top-right segment.  The sketch does not mark the
+recursive boundaries of component states B and C, so this color/lineage reading remains an inference
+and is not hard-coded.
+
+`search_singletonization mixed-frontier` now computes the missing two-coordinate object directly.
+For fixed residual parts it considers
+
+    (2^k-u:left_m), (2^k-v:right_m),
+
+uses subgraph monotonicity to binary-search the least feasible `v` for each increasing `u`, retains
+one exact memo, and emits a point only when that threshold strictly drops.  Its `complete` flag is
+proved from the search box: the vertical side must either contain the `u=0` threshold or exhaust the
+legal range, and the horizontal side must either reach `v=0` or exhaust its legal range.  A truncated
+frontier remains useful for candidates but cannot certify D.
+The legal range includes the endpoint `u=2^k` or `v=2^k`, where that zero-width part is omitted;
+stopping at the conventional `n>=m` orientation boundary would not justify an unconditional
+`complete=YES` claim.
+
+The synchronized four-bundle control makes the need for two coordinates concrete.  With fixed
+`(9:2,3:2)@4`, the complete exact frontier for two variable height-two parts is
+
+    (2,10), (3,8), (4,6), (6,4), (8,3), (10,2).
+
+The pair `(4,6)` works but `(5,5)` does not, despite equal total deficit.  This is exactly the notch
+hidden by the earlier scalar slice.  All six positive trees are regenerated and independently
+checked by `tools/singletonization_regression.sh`.
+
+Point lists are still the wrong excessive-`q` representation.  The tool now groups maximal runs as
+
+    L <= p <= R,  q=C-p.
+
+For such a piece, combining pure thresholds `U_2,U_0` has the closed form
+
+    max(C,U_2+U_0)
+      + distance([L,R], [min(U_2,C-U_0), max(U_2,C-U_0)]).
+
+`tools/optimize_mixed_frontier.py` implements this formula, validates that the pieces reproduce every
+printed point, and refuses an incomplete or bounded-depth frontier.  On the synchronized control,
+the illustrative synthetic choice `U_2=U_0=5` returns `delta_D=11` and parent D-width 21; the
+unattainable balanced shortcut would have incorrectly returned deficit 10.  The sketch's A/B/C cuts
+have not yet supplied those pure thresholds, so 21 is a regression value rather than a proposed
+Pareto width.
+
+The first finite series support the guarded-piece representation while stopping short of an eventual
+claim.  Complete exact scans with every positive tree checked give one affine piece for variable
+heights `(1,2)` at residual levels 3 through 11.  Heights `(2,2)` give three pieces at levels 4
+through 11; the number of minimal points is `2k-1`, so the list grows even though the piece rule stays
+fixed throughout the checked range.  A level-6 `(1,4)` control already has three separated pieces,
+showing that one half-plane is not general.  These finite families are locked in
+`tools/singletonization_regression.sh`; none is promoted to an all-`k` theorem.
+
+The exploratory `(1,4)` continuation at residual level 10 was deliberately bounded:
+
+    (ulimit -t 30; search_singletonization mixed-frontier 10 10 1 4 1023 1020)
+
+It was terminated by the 30-CPU-second cap with shell status 152 before printing a frontier summary,
+so it produced no verdict; process inventory afterward was empty.  This is precisely why the apparent
+piece pattern through the lower exploratory levels is not extrapolated.  No Pareto table entry changes
+in this work.

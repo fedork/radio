@@ -381,6 +381,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a one-part frontier or a fixed-residual variable-width slice with memo reuse |
+| `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock the exact variable-width synchronization boundary and memo-exhaustion abort semantics |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
@@ -576,6 +577,9 @@ tools/run_with_provenance.py /tmp/search_singletonization 9 9 488 3 488 3
 tools/run_with_provenance.py /tmp/search_singletonization forced 10 10 973 6 477 2
 tools/run_with_provenance.py /tmp/search_singletonization frontier 10 6 974 973
 tools/run_with_provenance.py /tmp/search_singletonization slice 4 4 2 5 6 11 2 9 2 3 2
+tools/run_with_provenance.py /tmp/search_singletonization \
+    mixed-frontier 4 4 2 2 16 16 9 2 3 2 > /tmp/mixed-frontier.out
+tools/optimize_mixed_frontier.py 5 5 /tmp/mixed-frontier.out
 ```
 
 The first form checks one state with a bounded number of synchronized levels.  `forced` verifies a
@@ -598,6 +602,31 @@ its negative endpoint and subgraph monotonicity show that the fixed parts `(11:2
 admit variable width 10 but not 11.  Run
 `tools/singletonization_regression.sh` to check this boundary, re-verify its positive tree, and confirm
 that memo exhaustion exits as an abort rather than emitting a negative verdict.
+
+`mixed-frontier` constructs
+
+    fixed parts + (2^k-u : left_m) + (2^k-v : right_m),
+
+scans `u` upward, and binary-searches the least feasible `v` using the same retained exact memo.
+Thresholds are nonincreasing by subgraph monotonicity; every strict drop is a Pareto-minimal point.
+The command prints all points and their checkable trees, then compresses consecutive points of slope
+minus one into `mixed_piece u=L:R sum=C`, meaning `v=C-u` for every integer `u` in that interval.
+The full legal deficit box is `0<=u,v<=2^k`; at the upper endpoint the corresponding zero-width
+part is omitted.
+
+`complete=YES` means the bounding box cannot hide another minimal point: either the `u=0` threshold
+was found or the legal vertical box was exhausted, and either `v=0` was reached or the legal
+horizontal box was exhausted.  `exact=YES` additionally means `depth=k`; otherwise the frontier is
+exact only for the bounded singletonization predicate.  A `complete=NO` frontier contains valid
+candidates but is not a global frontier, while an `exact=NO` frontier can omit solvable points
+outside that restricted predicate.
+
+Given exact pure-child thresholds `U_2,U_0`, `optimize_mixed_frontier.py` minimizes
+`max(p,U_2)+max(q,U_0)` over the printed pieces and reports both the deficit and
+`parent_D_width=2^(k+1)-deficit`.  It refuses either `complete=NO` or `exact=NO` input.  For a piece
+`p in [L,R], q=C-p`, the unconstrained optimum is `max(C,U_2+U_0)`; restricting `p` to `[L,R]`
+adds the distance from that interval to the interval joining `U_2` and `C-U_0`.  Thus a stable finite
+piece description gives a constant-size D optimizer even when the antichain itself grows with `k`.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

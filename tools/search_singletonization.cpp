@@ -524,12 +524,162 @@ int main(int argc, char **argv) {
             return 3;
         }
     }
+    if (argc >= 2 && std::string(argv[1]) == "mixed-frontier") {
+        if (argc < 8 || ((argc - 8) % 2) != 0) {
+            std::cerr << "usage: " << argv[0]
+                      << " mixed-frontier k depth left_m right_m maximum_u maximum_v"
+                         " [fixed_n1 fixed_m1 ...]\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int depth = std::atoi(argv[3]);
+        const int left_m = std::atoi(argv[4]);
+        const int right_m = std::atoi(argv[5]);
+        const int maximum_u = std::atoi(argv[6]);
+        const int maximum_v = std::atoi(argv[7]);
+        const std::int64_t full_width = k >= 0 && k < 31 ? power_int(2, k) : 0;
+        State fixed;
+        bool fixed_dimensions_valid = true;
+        for (int i = 8; i < argc; i += 2) {
+            const Part part{std::atoi(argv[i]), std::atoi(argv[i + 1])};
+            fixed_dimensions_valid = fixed_dimensions_valid && part.n > 0 && part.m > 0;
+            fixed.push_back(part);
+        }
+        if (fixed.size() > MAX_PARTS - 2) {
+            std::cerr << "mixed-frontier leaves room for at most " << MAX_PARTS - 2
+                      << " fixed parts plus the two variable parts\n";
+            return 2;
+        }
+        normalize(fixed);
+        if (k < 0 || k >= 31 || depth < 0 || depth > k || left_m <= 0 || right_m <= 0 ||
+            maximum_u < 0 || maximum_v < 0 || maximum_u > full_width ||
+            maximum_v > full_width || !fixed_dimensions_valid) {
+            std::cerr << "usage: " << argv[0]
+                      << " mixed-frontier k depth left_m right_m maximum_u maximum_v"
+                         " [fixed_n1 fixed_m1 ...]\n"
+                      << "require 0 <= depth <= k < 31, positive heights and fixed parts,"
+                         " and 0 <= u,v <= 2^k\n";
+            return 2;
+        }
+        const int legal_maximum_u = static_cast<int>(full_width);
+        const int legal_maximum_v = static_cast<int>(full_width);
+        make_bases(k);
+        try {
+            std::vector<std::pair<int, int>> frontier;
+            int previous_threshold = -1;
+            bool vertical_complete = maximum_v == legal_maximum_v;
+            bool reached_zero = false;
+
+            for (int u = 0; u <= maximum_u; ++u) {
+                const Counters before = counters;
+                const auto started = std::chrono::steady_clock::now();
+                auto make_state = [&](int v) {
+                    State state = fixed;
+                    state.push_back({static_cast<int>(full_width - u), left_m});
+                    state.push_back({static_cast<int>(full_width - v), right_m});
+                    normalize(state);
+                    return state;
+                };
+                auto evaluate = [&](int v) { return construct(make_state(v), k, depth); };
+
+                int high = previous_threshold >= 0 ? previous_threshold : maximum_v;
+                if (!evaluate(high)) {
+                    if (previous_threshold >= 0)
+                        throw std::logic_error("mixed frontier violated subgraph monotonicity");
+                    const double seconds = std::chrono::duration<double>(
+                                               std::chrono::steady_clock::now() - started)
+                                               .count();
+                    std::cout << "mixed_threshold u=" << u << " minimum_v=NONE"
+                              << " wall=" << seconds << "s calls=" << counters.calls - before.calls
+                              << " assignments=" << counters.assignments - before.assignments
+                              << " memo=" << memo.size() << '\n'
+                              << std::flush;
+                    continue;
+                }
+                if (u == 0) vertical_complete = true;
+
+                int low = 0;
+                while (low < high) {
+                    const int middle = low + (high - low) / 2;
+                    if (evaluate(middle))
+                        high = middle;
+                    else
+                        low = middle + 1;
+                }
+                const int threshold = low;
+                if (!evaluate(threshold) || (threshold > 0 && evaluate(threshold - 1)))
+                    throw std::logic_error("mixed frontier threshold is not sharp");
+
+                const bool new_point = previous_threshold < 0 || threshold < previous_threshold;
+                const double seconds = std::chrono::duration<double>(
+                                           std::chrono::steady_clock::now() - started)
+                                           .count();
+                std::cout << "mixed_threshold u=" << u << " minimum_v=" << threshold << ' '
+                          << (new_point ? "POINT" : "DOMINATED") << " wall=" << seconds
+                          << "s calls=" << counters.calls - before.calls
+                          << " assignments=" << counters.assignments - before.assignments
+                          << " memo=" << memo.size() << '\n'
+                          << std::flush;
+                if (new_point) frontier.emplace_back(u, threshold);
+                previous_threshold = threshold;
+                if (threshold == 0) {
+                    reached_zero = true;
+                    break;
+                }
+            }
+
+            const bool horizontal_complete = reached_zero || maximum_u == legal_maximum_u;
+            const bool complete = vertical_complete && horizontal_complete;
+            std::cout << "mixed_frontier points=" << frontier.size()
+                      << " complete=" << (complete ? "YES" : "NO")
+                      << " exact=" << (depth == k ? "YES" : "NO") << " u_box=0:" << maximum_u
+                      << " v_box=0:" << maximum_v << " k=" << k << " depth=" << depth << '\n';
+            if (!frontier.empty()) {
+                int piece_start = frontier.front().first;
+                int piece_end = piece_start;
+                int piece_sum = frontier.front().first + frontier.front().second;
+                auto print_piece = [&] {
+                    std::cout << "mixed_piece u=" << piece_start << ':' << piece_end
+                              << " sum=" << piece_sum << " formula=v=" << piece_sum << "-u\n";
+                };
+                for (std::size_t i = 1; i < frontier.size(); ++i) {
+                    const int u = frontier[i].first;
+                    const int sum = u + frontier[i].second;
+                    if (u == piece_end + 1 && sum == piece_sum) {
+                        piece_end = u;
+                    } else {
+                        print_piece();
+                        piece_start = piece_end = u;
+                        piece_sum = sum;
+                    }
+                }
+                print_piece();
+            }
+            for (auto [u, v] : frontier) {
+                State state = fixed;
+                state.push_back({static_cast<int>(full_width - u), left_m});
+                state.push_back({static_cast<int>(full_width - v), right_m});
+                normalize(state);
+                std::cout << "mixed_point u=" << u << " v=" << v << " state=";
+                print_state(state);
+                std::cout << '\n';
+                print_tree(state, k, depth);
+            }
+            return frontier.empty() ? 1 : 0;
+        } catch (const std::exception &error) {
+            std::cerr << "ABORT: " << error.what() << " (not a negative verdict)\n";
+            return 3;
+        }
+    }
     if (argc < 5 || ((argc - 3) % 2) != 0) {
         std::cerr << "usage: " << argv[0] << " k depth n1 m1 [n2 m2 ...]\n"
                   << "       " << argv[0] << " forced k depth n m a b\n"
                   << "       " << argv[0] << " frontier k m start_n minimum_n\n"
                   << "       " << argv[0]
                   << " slice k depth variable_m start_delta maximum_delta"
+                     " [fixed_n1 fixed_m1 ...]\n"
+                  << "       " << argv[0]
+                  << " mixed-frontier k depth left_m right_m maximum_u maximum_v"
                      " [fixed_n1 fixed_m1 ...]\n";
         return 2;
     }
