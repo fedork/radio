@@ -380,7 +380,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_suffix_profile_regression.sh` | lock actual per-suffix call/prune accounting and the opt-in exact cutoff |
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
-| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
+| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a one-part frontier or a fixed-residual variable-width slice with memo reuse |
+| `tools/singletonization_regression.sh` | lock the exact variable-width synchronization boundary and memo-exhaustion abort semantics |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -574,6 +575,7 @@ CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
 tools/run_with_provenance.py /tmp/search_singletonization 9 9 488 3 488 3
 tools/run_with_provenance.py /tmp/search_singletonization forced 10 10 973 6 477 2
 tools/run_with_provenance.py /tmp/search_singletonization frontier 10 6 974 973
+tools/run_with_provenance.py /tmp/search_singletonization slice 4 4 2 5 6 11 2 9 2 3 2
 ```
 
 The first form checks one state with a bounded number of synchronized levels.  `forced` verifies a
@@ -582,6 +584,20 @@ between adjacent `n`, stops at the first positive, and prints its tree.  Cap fro
 `tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never a negative verdict.
 The retained `k=10,m=6` replay and independently checked tree are
 `evidence/sb_m6_k10_frontier.txt` and `witnesses/majorized_973_6_at10.tree`.
+
+`slice` adds one variable part `(2^k-delta : variable_m)` to the listed fixed parts, scans `delta`
+from `start_delta` through `maximum_delta`, retains the exact memo, and stops at the first positive.
+Because shrinking one component gives a subgraph, feasibility is monotone in `delta`; the first
+positive therefore maximizes the variable width over the scanned interval.  Starting at zero makes
+that maximum unconditional if the interval reaches a positive.  A nonzero start needs an independent
+proof that the omitted smaller deficits fail (for example a full-star bound).  With `depth=k`, every
+printed negative and the resulting maximum are exact; at smaller depth they refer only to `C_depth`.
+The example is derived from the synchronized counterexample in
+[singleton-majorization.md](theorems/singleton-majorization.md#why-there-is-no-single-width-two-base-sequence):
+its negative endpoint and subgraph monotonicity show that the fixed parts `(11:2,9:2,3:2)@4`
+admit variable width 10 but not 11.  Run
+`tools/singletonization_regression.sh` to check this boundary, re-verify its positive tree, and confirm
+that memo exhaustion exits as an abort rather than emitting a negative verdict.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

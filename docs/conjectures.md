@@ -396,6 +396,98 @@ scaling the witness's next split produces the exactly unsolvable residual
 `Sb(247:1,247:1,240:2,231:2)@8`; that continuation is refuted even though the parent state remains
 open.
 
+## Excess-q Pareto assembly as a variable-D slice (working hypothesis, 2026-08-14)
+
+The proposed construction chooses a Pareto state A one level down, Pareto states B and C two levels
+down, fixes the total height and all resulting branch geometry, and leaves only the width of a fourth
+state D free.  For the diagram's three width-contributing branches the candidate is
+`width(A)+width(B)+width(D)`; C constrains synchronization but is not added to that objective.
+Here A/B/C/D name diagram components, not the dyadic atom types denoted by the same letters elsewhere.
+The admissible total heights are those in the proposed interval
+`max(height(A),height(C)) <= m <= 2*width(A)`; after fixing `m`, the diagram fixes every remaining
+dimension except D's width.
+
+The working assumption is deliberately stronger than anything proved here:
+
+> For every fixed total height and labelled A/B/C/D lineage pattern, some sufficiently large `q`
+> reaches a stable atomic-leaf construction regime.
+
+No threshold or proof of existence is claimed.  Lineages remain labelled while taking this limit;
+ordinary normalization of equal-looking rectangles must not erase which diagram branch they came
+from.
+
+### Deficit form of the exact D problem
+
+At a residual level `s`, write the variable part as
+
+    D = (2^s-delta : h).
+
+Every viable wide-side cut has the form
+
+    a = 2^(s-1)-u,       (2^s-delta)-a = 2^(s-1)-v,       u+v=delta.
+
+If the selected narrow-side height is `b`, D contributes
+
+    outcome 2: (2^(s-1)-u : b)
+    outcome 0: (2^(s-1)-v : h-b)
+    outcome 1: (2^(s-1)-u : h-b), (2^(s-1)-v : b).
+
+Thus maximizing D is exactly minimizing `delta`.  Fix synchronized cuts `sigma` of A/B/C and a
+height cut `b` of D.  Let `E_2(sigma)`, `E_1(sigma)`, and `E_0(sigma)` be the fixed contributions to
+the three children.  For any chosen constructibility predicate (`C_d` for bounded singletonization
+search, or `C_s` for exact solvability), define:
+
+- `U_2` as the least `u` making the outcome-2 child constructible;
+- `U_0` as the least `v` making the outcome-0 child constructible; and
+- `M` as the Pareto-minimal pairs `(p,q)` making the mixed child constructible.
+
+Constructibility is upward closed in deficits by subgraph monotonicity.  Consequently the exact
+answer for these fixed cuts is
+
+    delta*(sigma,b) = min_{(p,q) in M} [max(p,U_2) + max(q,U_0)].
+
+The proof is immediate in both directions.  Every feasible `(u,v)` must exceed both pure thresholds
+and dominate some minimal mixed pair.  Conversely, for any `(p,q)` in `M`, choosing
+`u=max(p,U_2)` and `v=max(q,U_0)` satisfies all three children.  Minimize this expression over
+`sigma` and `b`, inside the legal box `0<=u,v<=2^(s-1)`; an empty feasible set has value infinity.
+Zero-height terms at `b=0` or `b=h` are simply omitted.
+
+This identifies the irreducible object: it is the **two-dimensional mixed-child deficit antichain**
+`M`, not a single majorization capacity.  A scalar formula for D can exist only after that antichain
+has acquired a stable describable form.
+
+In the diagram's levels, write
+
+    width(A) = 2^(k-1)-delta_A,
+    width(B) = 2^(k-2)-delta_B,
+    width(D) = 2^(k-2)-delta_D.
+
+Then each parent candidate is
+
+    2^k - (delta_A + delta_B + delta_D).
+
+So candidate comparison is also deficit minimization.  Enumerate the permitted A/B/C choices and
+height allocations, compute `delta_D` from the slice, then retain the smallest total deficit for
+each total height before Pareto filtering.
+
+### Finite exact check and present boundary
+
+`tools/search_singletonization.cpp slice` now executes the finite version directly: it adds
+`(2^s-delta:h)` to arbitrary fixed residual parts, scans deficits in increasing order with one exact
+memo, and stops at the first constructible state.  The regression uses the adjacent pair from
+[the Singleton Majorization note](theorems/singleton-majorization.md#why-there-is-no-single-width-two-base-sequence)
+after applying subgraph monotonicity.
+The note supplies the variable-width-11 negative and a variable-width-10 positive superstate; by
+subgraph monotonicity the fixed state `(11:2,9:2,3:2)@4` has exact D-maximum 10.  Full-star
+majorization still permits 11, but exact synchronization rejects it.  The positive tree is checked by
+`tools/check_witness.py`; `tools/singletonization_regression.sh` locks the pair and abort semantics.
+
+This validates the slice formulation, not the excessive-`q` hypothesis or the proposed global
+Pareto decomposition.  The next diagram-specific step is to encode exactly which labelled pieces of
+A/B/C enter each `E_i(sigma)`.  The next scale-free step is to represent the antichains by eventual
+dyadic-polynomial width germs and test whether those labelled antichains stabilize under atom
+refinement.
+
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 
 Across the frontier enumerations above — six states, three values of k, for both m=5 and m=6 —

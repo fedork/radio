@@ -19,7 +19,10 @@
 namespace {
 
 constexpr int MAX_PARTS = 12;
-constexpr std::size_t MAX_MEMO = 8'000'000;
+#ifndef SINGLETONIZATION_MAX_MEMO
+#define SINGLETONIZATION_MAX_MEMO 8000000
+#endif
+constexpr std::size_t MAX_MEMO = SINGLETONIZATION_MAX_MEMO;
 constexpr std::array<int, 3> SEARCH_OUTCOMES{2, 1, 0};
 
 struct Part {
@@ -453,10 +456,81 @@ int main(int argc, char **argv) {
             return 3;
         }
     }
+    if (argc >= 2 && std::string(argv[1]) == "slice") {
+        if (argc < 7 || ((argc - 7) % 2) != 0) {
+            std::cerr << "usage: " << argv[0]
+                      << " slice k depth variable_m start_delta maximum_delta"
+                         " [fixed_n1 fixed_m1 ...]\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int depth = std::atoi(argv[3]);
+        const int variable_m = std::atoi(argv[4]);
+        const int start_delta = std::atoi(argv[5]);
+        const int maximum_delta = std::atoi(argv[6]);
+        const std::int64_t full_width = k >= 0 && k < 31 ? power_int(2, k) : 0;
+        State fixed;
+        bool fixed_dimensions_valid = true;
+        for (int i = 7; i < argc; i += 2) {
+            const Part part{std::atoi(argv[i]), std::atoi(argv[i + 1])};
+            fixed_dimensions_valid = fixed_dimensions_valid && part.n > 0 && part.m > 0;
+            fixed.push_back(part);
+        }
+        if (fixed.size() >= MAX_PARTS) {
+            std::cerr << "slice leaves room for at most " << MAX_PARTS - 1
+                      << " fixed parts plus the variable part\n";
+            return 2;
+        }
+        normalize(fixed);
+        if (k < 0 || k >= 31 || depth < 0 || depth > k || variable_m <= 0 ||
+            start_delta < 0 || maximum_delta < start_delta || maximum_delta >= full_width ||
+            full_width - maximum_delta < variable_m || !fixed_dimensions_valid) {
+            std::cerr << "usage: " << argv[0]
+                      << " slice k depth variable_m start_delta maximum_delta"
+                         " [fixed_n1 fixed_m1 ...]\n"
+                      << "require 0 <= depth <= k < 31, 0 <= start_delta <= maximum_delta,"
+                         " 0 < variable_m <= 2^k-maximum_delta, and positive fixed parts\n";
+            return 2;
+        }
+        make_bases(k);
+        try {
+            for (int delta = start_delta; delta <= maximum_delta; ++delta) {
+                const int variable_width = static_cast<int>(full_width - delta);
+                State state = fixed;
+                state.push_back({variable_width, variable_m});
+                normalize(state);
+                const Counters before = counters;
+                const auto started = std::chrono::steady_clock::now();
+                const bool answer = construct(state, k, depth);
+                const double seconds = std::chrono::duration<double>(
+                                           std::chrono::steady_clock::now() - started)
+                                           .count();
+                std::cout << "slice delta=" << delta << " variable_width=" << variable_width
+                          << ' ' << (answer ? "YES" : "NO") << " k=" << k
+                          << " depth=" << depth << " state=";
+                print_state(state);
+                std::cout << " wall=" << seconds << "s calls=" << counters.calls - before.calls
+                          << " assignments=" << counters.assignments - before.assignments
+                          << " memo=" << memo.size() << '\n'
+                          << std::flush;
+                if (answer) {
+                    print_tree(state, k, depth);
+                    return 0;
+                }
+            }
+            return 1;
+        } catch (const std::exception &error) {
+            std::cerr << "ABORT: " << error.what() << " (not a negative verdict)\n";
+            return 3;
+        }
+    }
     if (argc < 5 || ((argc - 3) % 2) != 0) {
         std::cerr << "usage: " << argv[0] << " k depth n1 m1 [n2 m2 ...]\n"
                   << "       " << argv[0] << " forced k depth n m a b\n"
-                  << "       " << argv[0] << " frontier k m start_n minimum_n\n";
+                  << "       " << argv[0] << " frontier k m start_n minimum_n\n"
+                  << "       " << argv[0]
+                  << " slice k depth variable_m start_delta maximum_delta"
+                     " [fixed_n1 fixed_m1 ...]\n";
         return 2;
     }
     const int k = std::atoi(argv[1]);

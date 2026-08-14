@@ -27,6 +27,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
+| **Do not maximize a free D-width with full-star majorization alone.** | It is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap. Use the recursive deficit slice and retain its two-dimensional mixed-child antichain; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 
 ## Goals
 
@@ -153,6 +154,14 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   lower mass — by Singleton Majorization, not by solver). What remains is one lemma: *the winning
   split minimising `p−q` survives the coin move*, 187/187 at k ≤ 5 plus 28 at k = 6.
   [conjectures.md](conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
+- **New construction track (2026-08-14, explicitly conditional):** assume without proof that every
+  labelled A/B/C/D component geometry (not the atom-letter notation) reaches an atomic-leaf regime
+  for sufficiently large `q`.  In deficit
+  coordinates, maximizing the remaining D-width is an exact monotone slice problem.  For fixed cuts
+  of A/B/C it reduces to two pure-child deficit thresholds plus a two-dimensional Pareto antichain
+  for the mixed child.  `tools/search_singletonization.cpp slice` now computes finite instances and
+  its regression reproduces the exact width-two synchronization boundary above.  This changes no
+  Pareto datum: the diagram-specific labelled child map and stabilization itself remain open.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.

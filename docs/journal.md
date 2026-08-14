@@ -5449,3 +5449,48 @@ Decision: leave the ordinary measured-cost trigger and call path unchanged.  Ret
 timings are in
 [`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 The primary checkout, other chat branches and live local/remote watchers were not modified.
+
+## 2026-08-14 — excessive-q Pareto assembly reduces D to a two-dimensional deficit frontier
+
+The new construction proposal starts from a Pareto state A at `k-1`, states B and C at `k-2`, a
+fixed total height, and a fourth state D whose height and diagram position are fixed but whose width
+is free.  The parent objective is `width(A)+width(B)+width(D)`.  We are adopting the following only
+as a working assumption: every fixed total height and labelled lineage geometry has some sufficiently
+large `q` in which the relevant atomic-leaf construction stabilizes.  There is no proof or claimed
+threshold yet, and A/B/C/D remain labelled through refinement.  These are diagram-component names,
+not the established A/B/C/D notation for dyadic atom types.
+
+Deficit coordinates isolate the free variable.  At residual level `s`, write
+`D=(2^s-delta:h)`.  A viable cut is `a=2^(s-1)-u` with complementary deficit
+`v=delta-u`.  Its pure children depend separately on `u` and `v`, while its mixed child contains both.
+For fixed cuts of A/B/C and a fixed height cut of D, let `U_2,U_0` be the minimum deficits accepted
+by the two pure children, and let `M` be the Pareto-minimal feasible `(u,v)` pairs of the mixed child.
+Subgraph monotonicity then gives the exact formula
+
+    delta_D = min_{(p,q) in M} (max(p,U_2) + max(q,U_0)).
+
+Minimizing over the fixed-part cuts and D's height cut solves the slice.  This is the main conceptual
+answer: the hard object is generally a two-dimensional mixed-child antichain, not a scalar capacity.
+Since A lies at `k-1` and B,D at `k-2`, the diagram's candidate width is
+`2^k-(delta_A+delta_B+delta_D)`, so choosing the widest candidate is again just choosing the smallest
+total deficit.  The derivation and its exact quantifiers are now in
+[conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
+
+`tools/search_singletonization.cpp` now has a generic `slice` mode.  It adds
+`(2^k-delta:variable_m)` to arbitrary fixed residual parts, scans deficits upward with one retained
+exact memo, and prints the first positive tree.  Starting at deficit zero makes that first positive
+the unconditional maximum if the scan reaches one; a nonzero start requires an independently proved
+lower-deficit exclusion.  The synchronization counterexample recorded in
+[the Singleton Majorization note](theorems/singleton-majorization.md#why-there-is-no-single-width-two-base-sequence)
+gives a sharp regression: with fixed `(11:2,9:2,3:2)@4`, variable width 11 fails, while width 10 is
+a subgraph of the note's solvable state and succeeds.
+The new output tree passes `tools/check_witness.py`.  A separately compiled one-entry memo build exits
+3 with an explicit abort and emits no verdict, locking the rule that exhaustion is not a negative.
+`tools/singletonization_regression.sh` reproduces both checks.
+
+This validates the finite optimizer but does not yet instantiate the illustrated construction.  The
+missing diagram-specific datum is the labelled map from the chosen A/B/C states into the three fixed
+child contributions.  After encoding that map, the finite command can enumerate candidate heights
+immediately.  The scale-free continuation is to store eventual dyadic-polynomial width germs and
+their two-dimensional minimal antichains, then test the postulated stabilization under atom
+refinement instead of guessing a formula for D.
