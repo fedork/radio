@@ -5263,3 +5263,55 @@ embedded provenance.  The final probe build id is
 the then-uncommitted probe exactly.  Failed diagnostic logs were small and deliberately not
 archived; their complete states, bounds and measured costs are recorded above so the experiments
 are not repeated accidentally.
+
+## 2026-08-13 — k=7 choice corpus completed; k=8 remainder moved to guarded AWS
+
+`tools/pareto_prefix_census.c` now exhaustively preserves the two labelled cuts below every
+one-part Pareto root, removes degenerate lineages only under Unit-Group Elimination, traverses each
+effective dimension to its complete componentwise-maximal solvable antichain, and enumerates every
+endpoint cut.  A full structural analyzer reconstructs all children and multiplicities from the
+TSV records and rejects incomplete output.  Interrupted runs can be resumed only from a
+`FIRST`/`LINEAGE` block closed by its matching `SECOND_SUMMARY`; imported winners are canonicalized,
+deduplicated and exactly re-verified.  The scoped 16-second initial probe applies only to fresh
+four-part exact queries in the exhaustive second-cut layer.  Ordinary recursive children keep the
+production finite-probe scheduler.
+
+The k=7 corpus completed and analyzed cleanly: 32 roots, 450 winning first cuts, 2,956 labelled
+second-cut lineages, 563 canonical targets, 819 upgrade nodes, 610 fixed-dimension Pareto endpoints,
+7,396 raw endpoint winners and 3,227 automorphism classes.  `representation_blocked=0`.  A replay
+from all 448 closed second-state blocks reproduced the same labelled geometry and downstream
+totals, including under the 16-second scoped probe, so the probe schedule changes cost rather than
+the census semantics at k=7.
+
+The local k=8 continuation was killed when the IDE restarted, not by its guards or solver.  It had
+run for 17,829 seconds (4 h 57 m) and peaked at 7.043 GB physical footprint against a 20 GB cap.
+The stopped log contains 621 of 815 summary-closed blocks: 17 of the 70 blocks genuinely absent
+from the two older checkpoints were completed, and the eighteenth was interrupted.  That tail had
+spent about 959 solver seconds across 200 completed k=6 calls; it is not treated as a complete
+block and will be replayed.  The raw log has complete provenance for build
+`d09122a95b45951de86762503bdbed7baca88688ffc239e3d134e2d8b5d98c0b` at `54486d6`.
+
+At 2026-08-14T01:40:45Z the remainder launched detached on the existing
+`i-0005d74f985c52ae1` r7iz.4xlarge as `/root/pareto-census-k8-20260814T0132Z/pareto_k8_aws`.
+The 123 MB compressed input bundle has SHA-256
+`dd6fbc6c2f613a21ef5d67309926affa0bc4d540ebf17b909d09f0f3f32cd671`; the exact source archive
+from `54486d6ec68a1d268363c358e7de644f57581fb6` has SHA-256
+`bc69bd8cfc0c06bcc208dc9ef1d659258235787b9ea0f64731a70a11de357ff1`.  Both and every unpacked
+input were checked before build.  The AWS binary's build ID is
+`d9a89e3002d69f7879a214fbc78452c257a1c05ac9c51a4ecee55c62432af3cf`, its SHA-256 is
+`f7f58456dc7998f16a3a7dce4be0c1b82f956fc7d5d76045fd002c3b7e86ecbb`, and the live raw output
+passed `tools/check_provenance.py` immediately after detachment.  The frozen binary and sidecar are
+retained beside the source and input bundles in the same S3 prefix.
+
+The census has a 20 GiB individual RSS cap and a ten-year accident backstop, so a normal verdict,
+not a wall deadline, should end it.  A new 108 GiB joint guard counts all four solver names and
+terminates this newest census wrapper first; the older three-run guard remains as the fallback for
+run9.  The sole idle guard was replaced with a four-name guard only after the broader guard and all
+four solvers were verified alive.  At the survival check the host had 93.9 GiB available, no swap,
+one of each solver, one idle guard and two joint guards.  The supervisor will validate, analyze,
+compress and upload the final result to
+`s3://radio-sa193-393287594714/pareto-census-k8/20260814T0132Z/`.  Launch and independent survival
+SSM commands were `4a6606f5-6875-4dc6-9763-51c328160cdc` and
+`f5a47495-c697-4eba-bba1-02eafa3ceb1c`; frozen-binary preservation was
+`df8cd807-7a93-4211-87a0-eb5632d759d8`.  `tools/pareto_census_status.sh` performs one bounded status
+query and then exits; no local polling process is needed.

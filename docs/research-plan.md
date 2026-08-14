@@ -183,11 +183,13 @@ components.  See [the theorem note](theorems/recursive-pareto-lift.md) and the f
 
 This is not ready for `radiobase.c`.  A literal second recursive step exhausted the complete lower
 split's lift box, and a greedy componentwise Pareto upgrade followed by its first solving split also
-failed.  The next experiment should target larger k, where degeneration is reduced, and retain the
-choice set rather than one fitted witness: enumerate a small antichain of parent-conditioned Pareto
-upgrades and several inequivalent solving splits for each.  Only after that corpus exists should the
-minimal production form be tried: a transient lineage-aware hint, one or two templates, a bounded
-pass, and unchanged fallback.  Split hints must influence order only; they are not cache facts.
+failed.  The k=7 exhaustive choice corpus is complete; the k=8 remainder is running on the shared
+AWS host from 621 of 815 summary-closed prefix blocks.  Let that finish before adding another fitted
+heuristic, then analyze the retained antichain of fixed-dimension Pareto upgrades and inequivalent
+solving splits for a lineage-preserving choice property.  Only after that corpus is understood
+should the minimal production form be tried: a transient lineage-aware hint, one or two templates,
+a bounded pass, and unchanged fallback.  Split hints must influence order only; they are not cache
+facts.  Use `tools/pareto_census_status.sh` for a one-shot progress query.
 
 **Separate theoretical m=6 thread (updated 2026-08-10).** The first large-`k` classification is
 complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified

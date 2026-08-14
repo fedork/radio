@@ -314,6 +314,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
+| `tools/pareto_census_aws_remote.sh` | verify, build and detach a resumable census bundle on the shared AWS host with individual, combined and idle guards |
+| `tools/pareto_census_status.sh` | make one bounded SSM query for the current remote k=8 census; it does not watch or poll after returning |
 
 Example table builds (the stated `MAX_N` includes all parts in a table entry):
 
@@ -438,6 +440,16 @@ closed summary is the completeness claim, so retain the checkpoint's source snap
 provenance and use this only when its prefix enumerator is known to match.  A k=7 replay of all 448
 closed blocks reproduced the complete labelled geometry and all 563 targets, 819 upgrade nodes and
 610 endpoints.
+
+The current detached k=8 continuation is on the shared AWS host.  Its launch helper records and
+uploads the exact source/input hashes, build sidecar, run arguments and memory policy, and its
+supervisor validates and analyzes a successful final output before uploading it.  Monitoring is a
+one-shot command, so it is safe to invoke from an ordinary terminal without leaving another local
+watch process behind:
+
+```
+tools/pareto_census_status.sh
+```
 
 The output's `CENSUS` records are stable TSV.  The analyzer refuses a log without `CENSUS END`,
 reconstructs both descendant levels and every final child from the logged cuts, checks masses,

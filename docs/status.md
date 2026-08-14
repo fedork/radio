@@ -1,8 +1,8 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-12** (proof-safe cold AWS `run9` is running beside the
-retained `run3`/`run8` performance baselines).
+don't know it. Last refreshed **2026-08-13** (proof-safe cold AWS `run9` and the resumed k=8
+Pareto-prefix census are running beside the retained `run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -513,6 +513,20 @@ over an antichain of Pareto upgrades and inequivalent solving splits, preferably
 larger k where degeneration is weaker.  The implementation remains the standalone
 `tools/pareto_lift_probe.c`; no production search order or cache semantics changed.  Fully
 provenanced positive-path logs are archived as `pareto-lift-2026-08-12`.
+
+The exhaustive choice-corpus driver is now built and its k=7 run is complete: 32 roots, 450 winning
+first cuts, 2,956 labelled second-cut lineages, 563 canonical targets, 819 upgrade nodes, 610
+fixed-dimension Pareto endpoints, 7,396 raw endpoint winners and 3,227 exact automorphism classes.
+No seed was blocked by the representation limit.  The larger k=8 run was interrupted by an IDE
+restart after 4 h 57 m at 7.043 GB peak physical footprint.  Its durable input contains 621 of 815
+summary-closed first-cut blocks, including 17 of the 70 blocks absent from the older checkpoints;
+the unfinished next block is deliberately ignored and replayed.
+
+That remainder is now detached on the shared AWS host as `pareto_k8_aws`, built from `54486d6` with
+build ID `d9a89e3002d69f7879a214fbc78452c257a1c05ac9c51a4ecee55c62432af3cf`.  It has a 20 GiB
+individual RSS cap and is the victim of a four-solver 108 GiB combined guard; the host idle guard
+also tracks it.  Its supervisor analyzes and uploads the final corpus automatically.  Query it once,
+without starting a local watch loop, with `tools/pareto_census_status.sh`.
 
 One safe `R_0` deployment landed on 2026-08-10: split-table construction omits a local cut when one
 of that part's child substates already fails counting or full-star majorization at `k-1`. Subgraph
