@@ -3,7 +3,9 @@
    This does not recursively solve any child.  It builds the same theorem-filtered per-part split
    tables and joint suffix reachability DP used by rb_dead, then asks rb_dead(0,0,0,0): is there any
    legal first test whose three children all fit beneath 3^(k-1)?  DEAD is an exact refutation;
-   ALIVE only means that this necessary condition passes.
+   ALIVE only means that this necessary condition passes.  It then reports the exact hereditary
+   suffix at which rb_dead becomes universally vacuous, plus two cheap sufficient certificates;
+   set RB_PLIABILITY_VERBOSE=1 for every suffix row.
 
      tools/build_radio.py -O3 -DMAX_K=7 -DMAX_N=<sum of all sides> \
          tools/rb_root_probe.c -o rb_root_probe
@@ -12,6 +14,9 @@
 
 #ifndef RADIOBASE_PATH
 #define RADIOBASE_PATH "../radiobase.c"
+#endif
+#ifndef RADIO_RB_PLIABILITY_DIAGNOSTIC
+#define RADIO_RB_PLIABILITY_DIAGNOSTIC
 #endif
 #include RADIOBASE_PATH
 
@@ -125,6 +130,7 @@ int main(int argc, char **argv) {
 
     printf(" result=%s table_build_ms=%.3f rb_build_ms=%.3f\n",
            dead ? "DEAD" : "ALIVE", table_ms, build_ms);
+    rb_report_pliability(tables, state, stdout, getenv("RB_PLIABILITY_VERBOSE") != NULL);
     rb_release();
     return 0;
 }

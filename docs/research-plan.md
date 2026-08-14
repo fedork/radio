@@ -38,6 +38,12 @@ stopping point for a fixed binary, query and cache history; it does not make a w
 equivalent or change what constitutes a proof. The root `rb_dead(0,0,0,0)` relaxation was tested
 separately and was too weak to enable eagerly, so the existing measured-cost trigger remains. See
 [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
+The follow-up hereditary-pliability test now gives an exact suffix cutoff after the DP is built and
+a cheap sufficient cutoff from absolute slack, tail excess and retained pure corners.  The cheap
+bound is sound but captures only 29 of 65 complete no-call cases in the 243 parent-theorem survivors
+of the small census; it does not justify an a-priori length trigger.  Keep it diagnostic until a
+per-depth cost measurement shows that suppressing certified-vacuous lookups pays for the scan. See
+[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 `m=6` closed form and `BBCD` profile are now refuted by the exact `n(10,6)=973` frontier.  The

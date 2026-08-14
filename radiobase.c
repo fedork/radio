@@ -1277,6 +1277,172 @@ static inline int rb_dead(int nexti, int p0, int p1, int p2) {
     rb_pruned++; return 1;
 }
 
+#ifdef RADIO_RB_PLIABILITY_DIAGNOSTIC
+/* A suffix is sigma-pliable when it can fit every residual capacity triple h with
+
+       0 <= hj <= cap,       h0 + h1 + h2 = suffix_mass + sigma.
+
+   This is stronger than merely passing rb_dead at one reachable prefix.  If suffix i and every
+   later suffix are pliable, rb_dead cannot reject after the search has assigned i parts.  The
+   existing prefix-max table decides the definition exactly: among contributions with r0 <= h0 and
+   r2 <= h2, some choice also has r1 <= h1 iff max(r0+r2) >= suffix_mass-h1. */
+static int rb_suffix_pliable(int suffix, int slack) {
+    int side = rb_cap + 1;
+    int target = rb_mrem[suffix] + slack;
+    int h0;
+
+    for (h0 = 0; h0 <= rb_cap; h0++) {
+        int h2_lo = max(0, target - h0 - rb_cap);
+        int h2_hi = min(rb_cap, target - h0);
+        int h2;
+        for (h2 = h2_lo; h2 <= h2_hi; h2++) {
+            int h1 = target - h0 - h2;
+            int best = rb_mx[suffix][(size_t)h0 * side + h2];
+            int need = rb_mrem[suffix] - h1;
+            if (best < 0 || best < need) return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static int rb_has_mass_vector(const splits *table, int want0, int want1, int want2) {
+    int c;
+    for (c = 0; c < table->size; c++) {
+        const int *sp = table->splitsl[c];
+        int k0 = sb_pairs[sp[0]];
+        int k1 = sb_pairs[sp[1]] + sb_pairs[sp[2]];
+        int k2 = sb_pairs[sp[3]];
+        if (k0 == want0 && k1 == want1 && k2 == want2) return TRUE;
+    }
+    return FALSE;
+}
+
+static int rb_has_pure_corners(const splits *table, int mass) {
+    return rb_has_mass_vector(table, mass, 0, 0)
+        && rb_has_mass_vector(table, 0, mass, 0)
+        && rb_has_mass_vector(table, 0, 0, mass);
+}
+
+/* The special base of the extension theorem.  A retained (2:1) table has these five mass vectors;
+   at slack >= 1 they make one copy, and hence a tail of copies, universally pliable. */
+static int rb_has_two_one_base(const splits *table, int mass, int slack) {
+    return mass == 2 && slack >= 1
+        && rb_has_mass_vector(table, 2, 0, 0)
+        && rb_has_mass_vector(table, 0, 2, 0)
+        && rb_has_mass_vector(table, 0, 0, 2)
+        && rb_has_mass_vector(table, 1, 1, 0)
+        && rb_has_mass_vector(table, 0, 1, 1);
+}
+
+/* Report only; this never changes rb_dead, split ordering, or the adaptive arming policy.
+
+   `theorem` is the direct extension certificate.  If a tail of mass T is pliable and the next part
+   of mass w retains all three pure corners, adding that part preserves pliability whenever
+
+       2*w <= T + slack + 2.
+
+   `coarse` is the simpler nonunit-length corollary.  For q parts of total mass W, let D=W-2q.
+   Starting from a (2:1) base, q>=D+2 at slack 1 or q>=D+1 at slack >=2 certifies the whole hereditary
+   tail (subject to the same retained-corner check). */
+static void rb_report_pliability(splits **tables, const int *parts, FILE *out, int verbose) {
+    unsigned char exact[17] = {0};
+    unsigned char hereditary[17] = {0};
+    unsigned char theorem[17] = {0};
+    unsigned char coarse[17] = {0};
+    unsigned char corners[17] = {0};
+    unsigned char all_corners[17] = {0};
+    unsigned char all_nonempty[17] = {0};
+    int slack = 3 * rb_cap - rb_mrem[0];
+    int sorted_by_mass = TRUE;
+    int exact_head = rb_P;
+    int theorem_head = rb_P;
+    int coarse_head = rb_P;
+    int potential_call_suffixes = 0;
+    int i;
+
+    for (i = 0; i < rb_P - 1; i++) {
+        if (sb_pairs[parts[i]] < sb_pairs[parts[i + 1]]) sorted_by_mass = FALSE;
+    }
+    for (i = 0; i <= rb_P; i++) exact[i] = rb_suffix_pliable(i, slack);
+    hereditary[rb_P] = exact[rb_P];
+    theorem[rb_P] = TRUE;
+    coarse[rb_P] = TRUE;
+    all_corners[rb_P] = TRUE;
+    all_nonempty[rb_P] = TRUE;
+
+    for (i = rb_P - 1; i >= 0; i--) {
+        int mass = sb_pairs[parts[i]];
+        int tail_mass = rb_mrem[i + 1];
+        int extension_ok;
+        int special_base;
+        int q = rb_P - i;
+        int excess = rb_mrem[i] - 2 * q;
+        int coarse_bound = FALSE;
+
+        corners[i] = rb_has_pure_corners(tables[i], mass);
+        all_corners[i] = corners[i] && all_corners[i + 1];
+        all_nonempty[i] = tables[i]->size > 0 && all_nonempty[i + 1];
+        hereditary[i] = exact[i] && hereditary[i + 1];
+        extension_ok = theorem[i + 1] && corners[i]
+            && 2LL * mass <= (long long)tail_mass + slack + 2;
+        special_base = i == rb_P - 1 && rb_has_two_one_base(tables[i], mass, slack);
+        /* If slack >= 2*cap, every residual capacity is at least the entire suffix mass: the
+           other two capacities can consume at most 2*cap.  Then any retained routing fits. */
+        theorem[i] = (slack >= 2 * rb_cap && all_nonempty[i]) || extension_ok || special_base;
+
+        if (sorted_by_mass && all_corners[i]
+            && rb_has_two_one_base(tables[rb_P - 1], sb_pairs[parts[rb_P - 1]], slack)) {
+            if (q == 1) coarse_bound = TRUE;
+            else if (slack == 1 && q >= excess + 2) coarse_bound = TRUE;
+            else if (slack >= 2 && q >= excess + 1) coarse_bound = TRUE;
+        }
+        coarse[i] = coarse_bound;
+
+        if (theorem[i] && !hereditary[i]) {
+            fprintf(stderr, "RB_PLIABILITY internal-error theorem-not-exact suffix=%d\n", i);
+            exit(4);
+        }
+        if (coarse[i] && !theorem[i]) {
+            fprintf(stderr, "RB_PLIABILITY internal-error coarse-not-direct suffix=%d\n", i);
+            exit(4);
+        }
+    }
+
+    for (i = 0; i <= rb_P; i++) {
+        if (hereditary[i]) { exact_head = i; break; }
+    }
+    for (i = 0; i <= rb_P; i++) {
+        if (theorem[i]) { theorem_head = i; break; }
+    }
+    for (i = 0; i <= rb_P; i++) {
+        if (coarse[i]) { coarse_head = i; break; }
+    }
+    for (i = 1; i < rb_P; i++) {
+        if (!exact[i]) potential_call_suffixes++;
+    }
+
+    fprintf(out,
+            "RB_PLIABILITY parts=%d mass=%d cap=%d slack=%d root_pliable=%d "
+            "potential_call_suffixes=%d exact_head=%d exact_tail=%d "
+            "theorem_head=%d theorem_tail=%d coarse_head=%d coarse_tail=%d\n",
+            rb_P, rb_mrem[0], rb_cap, slack, exact[0], potential_call_suffixes,
+            exact_head, rb_P - exact_head, theorem_head, rb_P - theorem_head,
+            coarse_head, rb_P - coarse_head);
+
+    if (verbose) {
+        for (i = 0; i < rb_P; i++) {
+            int mass = sb_pairs[parts[i]];
+            int margin = rb_mrem[i + 1] + slack + 2 - 2 * mass;
+            fprintf(out,
+                    "RB_PLIABILITY_SUFFIX index=%d parts=%d mass=%d exact=%d hereditary=%d "
+                    "theorem=%d coarse=%d corners=%d extension_margin=%d\n",
+                    i, rb_P - i, rb_mrem[i], exact[i], hereditary[i], theorem[i], coarse[i],
+                    corners[i], margin);
+        }
+    }
+}
+#endif
+
 int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
 #ifdef DEBUG1
     if(k>7) {

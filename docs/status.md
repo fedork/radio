@@ -1,9 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-13** (deterministic-budget and root-reachability experiments;
-proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
-`run3`/`run8` performance baselines).
+don't know it. Last refreshed **2026-08-13** (deterministic-budget, root-reachability and hereditary
+pliability experiments; proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are
+running beside the retained `run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -279,6 +279,17 @@ independent 283-state k=3 census it added 5 refutations after parent star-majori
 hook saved only 0.091% recursive work on the hard k=5 positive and slightly slowed fixed-work probes
 of the saturated fourteen-part state. `tools/rb_root_probe.c` retains the diagnostic; ordinary search
 keeps the measured-cost trigger.
+
+That probe now also computes the exact hereditary pliable tail from the already-built `rb_mx`
+tables.  If `exact_head=i`, `rb_dead` cannot reject at suffix `i` or later.  A sound cheaper theorem
+uses absolute slack, a `(2:1)` base, retained pure corners and the extension inequality
+`2w<=T+slack+2`; a length-only corollary uses the tail excess above mass two.  In the complete small
+census, 65 of 243 parent-theorem survivors had no useful production call site, but the direct cheap
+theorem proved only 29 (the coarser length bound only 10).  Slack is the correct proof parameter but
+does not determine the cutoff by itself.  The hard eight-part positive has only a one-part pliable
+tail, while the saturated fourteen-part state at zero slack has none.  No production policy changed;
+the exact scan and reproducible census remain diagnostics. See
+[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).
 
 Raw validation and rejected-experiment logs are archived as `bounded-probe-2026-08-11` and
 `bounded-probe-rejected-2026-08-11`.  Full control flow, build IDs and the two-stage correction are

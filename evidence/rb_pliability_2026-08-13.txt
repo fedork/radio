@@ -1,0 +1,168 @@
+# Hereditary suffix pliability for joint reachability
+
+Status: diagnostic theorem and measurements, 2026-08-13.  No production pruning, split ordering or
+`RB_TRIGGER` policy was changed.  `tools/rb_root_probe.c` owns the opt-in analysis; ordinary solver
+drivers compile the existing `radiobase.c` path without calling it.
+
+## Exact question
+
+Work with the reduced state after Unit Group Elimination, so its `P` parts are all nonunit.  At level
+`k`, let one child hold at most `C=3^(k-1)` pair candidates, let the reduced state mass be `M`, and
+write the **absolute slack** as
+
+```
+sigma = 3*C - M.
+```
+
+For suffix `i`, let `W_i` be its mass.  After some prefix has been assigned, its residual capacities
+`h=(h0,h1,h2)` satisfy
+
+```
+0 <= hj <= C,             h0+h1+h2 = W_i+sigma.
+```
+
+Call the suffix `sigma`-pliable if *every* such capacity triple admits some retained suffix routing
+`r` with `rj<=hj`.  This is deliberately universal over capacity triples; a nonpliable suffix says
+only that `rb_dead` has something it could reject, not that the obstructing triple is reachable from
+an actual search prefix.
+
+The existing `rb_mx` table decides this definition without another reachability construction.  Since
+`r1=W_i-r0-r2`, suffix `i` is pliable exactly when, for every admissible `h0,h2` (and hence `h1`),
+
+```
+rb_mx[i][h0,h2] >= W_i-h1.
+```
+
+The diagnostic scans all suffixes and then scans backward.  `exact_head=i` means that suffix `i` and
+every suffix after it are pliable, so the first `i` parts are the rigid head and the remaining
+`P-i` parts are a hereditary pliable tail.  Production calls `rb_dead` only with suffix indices
+`1..P-1`; `potential_call_suffixes=0` therefore proves that its per-prefix lookup is vacuous for the
+whole state.  It does not decide the recursive solvability of any child.
+
+## Cheap sufficient certificates
+
+The report compares the exact cutoff with two one-sided certificates.  They inspect only masses and
+whether the ordinary theorem-filtered split tables retained the required routings.
+
+1. If `sigma>=2*C`, then every residual capacity is at least the entire suffix mass: the other two
+   capacities total at most `2*C`.  Any retained routing fits, so every suffix is pliable.
+2. A retained `(2:1)` part has mass routings `(2,0,0)`, `(0,2,0)`, `(0,0,2)`, `(1,1,0)` and
+   `(0,1,1)`.  At `sigma>=1` this is a pliable one-part base.
+3. If a tail of mass `T` is pliable and a preceding part of mass `w` retains all three pure corner
+   routings, the extended tail is pliable whenever
+
+   ```
+   2*w <= T+sigma+2.
+   ```
+
+   Indeed, that inequality forces at least one residual capacity to be at least `w`; route the new
+   part wholly there and apply tail pliability to the reduced capacities.
+4. For an ascending tail of `q` nonunit masses, let `D=W-2q` be its excess above `q` copies of
+   `(2:1)`.  With the same retained-corner premise, the simpler corollary is `q>=D+2` at `sigma=1`,
+   or `q>=D+1` at `sigma>=2`.  The direct extension test is stronger; the report labels this coarse
+   corollary separately.
+
+For the corollary, write `w_i=2+d_i` with nondecreasing nonnegative integer `d_i` and `d_1=0`.
+At extension step `i`, the direct condition becomes
+
+```
+2*d_i <= 2*i + (d_1+...+d_(i-1)) + sigma - 4.                 (1)
+```
+
+Put `b=2` for `sigma=1` and `b=1` for `sigma>=2`; the respective length hypotheses say
+`D<=q-b`.  If `d_i>0`, monotonicity gives
+
+```
+(q-i+1)*d_i <= D <= q-b,
+```
+
+and hence `(q-i+1)(d_i-1)<=i-1-b`, so `d_i<=i-b`.  For `b=2`, this makes the left side of (1) at
+most `2i-4`, below its `2i-3` right side even before the earlier excess is added.  For `b=1`, it is
+at most `2i-2`, which is the right side at `sigma=2` before earlier excess.  The `d_i=0` steps are
+immediate.  Thus every extension succeeds, and the one-part `(2:1)` base closes the induction.
+
+The corner premise matters.  A pure routing leaves the original part in one child, and the split
+table removes it when that child fails the information or full-star-majorization filter at `k-1`.
+The diagnostic inspects the retained table rather than assuming corners from raw combinatorics.
+
+## Reproduction
+
+The focused boundary cases are executable regression tests:
+
+```
+tools/rb_pliability_regression.sh
+```
+
+The complete small census builds the provenance-bearing probe and reproduces every aggregate below:
+
+```
+tools/rb_pliability_census.py
+```
+
+For one state, `tools/rb_root_probe.c` now prints the summary automatically.  Set
+`RB_PLIABILITY_VERBOSE=1` to print one row per suffix, for example:
+
+```
+tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=157 tools/rb_root_probe.c -o /tmp/rb_probe
+RB_PLIABILITY_VERBOSE=1 /tmp/rb_probe 5 15 3 14 3 17 2 8 4 11 2 10 2 19 1 15 1
+```
+
+## Measurements
+
+The two sharp synthetic controls behave as predicted.
+
+- Thirteen `(2:1)` parts at `k=3` have `M=26`, `C=9`, `sigma=1`.  Every one of the thirteen
+  nonempty suffixes is exactly pliable; both certificates give `head=0, tail=13`.
+- `(3:1)` plus twelve `(2:1)` parts has `M=27`, hence `sigma=0`.  The root itself packs exactly
+  `9/9/9`, but the last `(2:1)` suffix is not pliable.  The hereditary tail is empty and nine of the
+  twelve suffix indices queried by production `rb_dead` are potentially useful.  Thus root-ALIVE
+  and hereditary pliability are genuinely different tests.
+
+The complete prior k=3 census has 283 four-part states.  Parent full-star majorization rejects 40;
+the probe analyzes the remaining 243 and its existing root test rejects 5.  Among those 243:
+
+```
+exact_head distribution:       0:64, 1:1, 2:58, 3:40, 4:80
+direct-theorem head:            1:29, 2:34, 3:45, 4:135
+coarse q/D head:                1:10, 2:25, 3:51, 4:157
+no callable suffix can prune:   exact 65, direct theorem 29, coarse theorem 10
+```
+
+The exact no-call count rises with absolute slack but is not determined by it:
+
+```
+sigma          0       1       2       3       4       5
+analyzed      23      45      45      49      39      42
+exact no-call  0       3      11      13      15      23
+theorem        0       1       2       5       9      12
+```
+
+The diagnostic asserts `coarse => direct theorem => exact hereditary` at every suffix; all 243
+analyzed states pass.  The direct theorem nevertheless recognizes only 29 of the 65 states on which
+all production call sites are vacuous.  It is sound but too conservative to infer a generally
+optimal arming depth from length and mass alone.
+
+The 16 retained exhaustive multipart states in `data/exhaustive_multipart.csv` give a less synthetic
+control.  Four have no potentially useful production suffix, ten have no nonempty hereditary
+pliable tail, and two have partial tails.  The direct theorem proves the complete no-call result for
+two of the four.  In particular:
+
+- the historical hard eight-part positive has `C=81`, `M=229`, `sigma=14`; exactly its final
+  one-part suffix is hereditary pliable, while five callable suffixes remain potentially useful;
+- the information-tight fourteen-part deadline state has `C=81`, `M=243`, `sigma=0`; its hereditary
+  tail is empty and eight callable suffixes are potentially useful;
+- the exact negative `Sb(111:3,115:2,121:1)@7` has `C=729`, `M=684`, `sigma=1503>=2C`; every suffix
+  is pliable, so joint reachability cannot refute it after any prefix.  This matches the earlier
+  observation that its root is ALIVE despite the full solver refutation.
+
+## Decision
+
+Keep the production cost-based trigger.  Absolute slack is the right invariant in the proofs and is
+more informative than a saturation fraction, but neither slack nor nonunit length alone determines
+pliability.  The cheap theorem proves some complete no-op cases, yet misses more than half of them in
+the complete small census and misses important partial cutoffs in real states.
+
+The exact `exact_head` is useful as a diagnostic and could safely suppress `rb_dead` calls at or
+after the certified tail once the DP has already been built.  That is a narrower future performance
+experiment, not an a-priori reason to build the DP eagerly: it pays the existing DP first and needs
+per-depth call counts to show that the avoided O(1) lookups matter.

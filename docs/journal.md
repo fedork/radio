@@ -5315,6 +5315,7 @@ SSM commands were `4a6606f5-6875-4dc6-9763-51c328160cdc` and
 `f5a47495-c697-4eba-bba1-02eafa3ceb1c`; frozen-binary preservation was
 `df8cd807-7a93-4211-87a0-eb5632d759d8`.  `tools/pareto_census_status.sh` performs one bounded status
 query and then exits; no local polling process is needed.
+
 ## 2026-08-13 — deterministic accepted-prefix budgets; eager root reachability rejected
 
 The deadline state machine was sound after `45c34fd`, but its process-CPU clock still let hardware,
@@ -5367,3 +5368,48 @@ the existing contraction guard. Default work, CPU fallback and ASan+UBSan builds
 same 1,038-answer normalized split-regression SHA-256. All work was performed in the isolated
 `work-budget-rb-root` worktree; the primary checkout's unrelated IDE/benchmark changes and every
 other chat's branches and processes were left untouched.
+
+## 2026-08-13 — exact hereditary suffix pliability; length bound is sound but incomplete
+
+The follow-up question was whether a long nonunit tail can make `rb_dead` predictably useless before
+search.  The useful invariant is absolute pair slack, not a fraction.  With child cap
+`C=3^(k-1)`, reduced nonunit mass `M` and `sigma=3C-M`, a suffix of mass `W` is universally pliable
+when it can fit every capacity triple `h` in `[0,C]^3` with sum `W+sigma`.  The existing `rb_mx`
+table decides this exactly: for every `h0,h2`, its prefix maximum must reach `W-h1`.  Scanning
+backward then gives the first suffix after which every later suffix is pliable.  This is stronger
+than root ALIVE and deliberately weaker than a solvability claim.
+
+Two cheap sufficient theorems were added to the standalone probe.  Slack at least `2C` makes every
+suffix trivial.  Otherwise a retained `(2:1)` table is a pliable base at slack one; a preceding mass
+`w` with all pure corners extends a pliable tail of mass `T` when `2w<=T+sigma+2`.  Writing
+`D=W-2q` for a `q`-part tail yields the coarser conditions `q>=D+2` at slack one and `q>=D+1` at
+slack at least two.  The retained-corner qualification is essential because the child-level
+theorem filter can remove a raw pure routing.
+
+The boundary controls separate root packing from hereditary pliability.  Thirteen `(2:1)` parts at
+`k=3` have slack one and every suffix is pliable.  Replacing one by `(3:1)` makes total mass 27 and
+slack zero: the complete state still packs `9/9/9`, but the final `(2:1)` suffix is not universal, so
+the hereditary tail is empty.  `tools/rb_pliability_regression.sh` locks both cases plus the large-
+slack theorem and the historical hard positive.
+
+`tools/rb_pliability_census.py` reproduced the complete 283-state k=3 census.  Parent
+star-majorization removed 40 and 243 reached the DP.  Exactly 65 had no suffix index at which the
+production lookup could reject; the direct theorem proved 29 and the q/D corollary 10.  Exact
+no-call cases rose from 0/23 at slack zero to 23/42 at slack five, but every intermediate slack had
+both outcomes.  On the 16 retained exhaustive multipart states, four were exact no-call, ten had no
+nonempty hereditary tail and two were partial.  The hard eight-part positive (`C=81`, mass 229,
+slack 14) has only its final one-part suffix pliable; the saturated fourteen-part state (mass 243,
+slack zero) has none.  The known negative `Sb(111:3,115:2,121:1)@7` has slack 1503, at least `2C`,
+so all suffixes are pliable and reachability cannot supply its refutation.
+
+Decision: keep the measured-cost production trigger and do not infer an optimal level from length
+or slack alone.  The exact cutoff could later suppress O(1) `rb_dead` calls after the DP is already
+built, but first instrument call counts by suffix; the scan itself and the avoided lookups need a
+measured tradeoff.  Definitions, full distributions and reproduction commands are in
+[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).  All changes
+remain in the isolated worktree and do not touch the running solver branches.
+
+Final verification passed the new sharp-boundary regression and complete census, the pre-existing
+rb-contraction regression, all table and witness checks, and `tools/check_docs.py`.  An
+ASan+UBSan probe build ran both the thirteen-part slack-one case and the hard eight-part state with
+no runtime diagnostic.

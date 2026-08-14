@@ -339,6 +339,15 @@ and eager construction did not improve either a hard positive or the saturated d
 ordinary search still arms the DP only after measured cost. Exact counts and timings are in
 [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
 
+The probe also reports hereditary suffix pliability. `exact_head=i` means the first `i` nonunit parts
+are the only possible rigid head: suffix `i` and every later suffix fit every residual capacity
+triple, so `rb_dead` is provably vacuous there. `theorem_head` is the cheaper retained-corner
+certificate and `coarse_head` is its length/excess corollary. Set `RB_PLIABILITY_VERBOSE=1` for one
+line per suffix. `tools/rb_pliability_regression.sh` locks the slack-zero/slack-one boundaries, and
+`tools/rb_pliability_census.py` reproduces the complete 283-state comparison. Definitions, proofs
+and measurements are in
+[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).
+
 ## Split-heuristic research tools
 
 The 2026-08-09 long-state experiments use exact solvability of small child subsets. These are lab
@@ -356,6 +365,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/fast_replay.c` | replay logged long k=5 states from one forked warm-cache image, clearing all per-target cache/self-training effects |
 | `tools/budget_probe.c` | compare deterministic accepted-prefix allowances with the measured CPU fallback on one finite query |
 | `tools/rb_root_probe.c` | evaluate the complete first-test mass relaxation `rb_dead(0,0,0,0)` without enabling it in ordinary search |
+| `tools/rb_pliability_regression.sh` | check exact and theorem-certified hereditary suffix cutoffs at sharp slack boundaries |
+| `tools/rb_pliability_census.py` | reproduce the complete small-state exact/theorem pliability comparison |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
