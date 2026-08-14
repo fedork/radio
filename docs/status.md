@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-14** (exact mixed-deficit frontier prototype; proof-safe cold
+don't know it. Last refreshed **2026-08-14** (corrected four-segment Pareto assembly; proof-safe cold
 AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained `run3`/`run8`
 performance baselines).
 
@@ -27,6 +27,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
+| **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum, and the optimizer deliberately refuses both. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 
 ## Goals
@@ -156,14 +157,15 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   [conjectures.md](conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
 - **New construction track (2026-08-14, explicitly conditional):** assume without proof that every
   labelled A/B/C/D component geometry (not the atom-letter notation) reaches an atomic-leaf regime
-  for sufficiently large `q`.  In deficit
-  coordinates, maximizing the remaining D-width is an exact monotone slice problem.  For fixed cuts
-  of A/B/C it reduces to two pure-child deficit thresholds plus a two-dimensional Pareto antichain
-  for the mixed child.  `search_singletonization mixed-frontier` now computes that antichain, emits
-  guarded slope-one pieces, and `tools/optimize_mixed_frontier.py` combines them exactly with the pure
-  thresholds.  Finite exact regressions expose the synchronization notch above and stable piece
-  descriptions through residual level 11, but prove no eventual formula.  This changes no Pareto
-  datum: the diagram-specific labelled child map and stabilization itself remain open.
+  for sufficiently large `q`.  For `A=(a:alpha)@k-1` and
+  `B=(b:beta),C=(c:gamma)@k-2`, the corrected picture makes the hard branch exactly
+  `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, with parent candidate `a+b+d`.
+  `search_singletonization assembly` maximizes `d` directly.  Exact regressions recover the proven
+  `m=10` widths 12, 33 and 82 at parent levels 5, 6 and 7; at level 7, retaining the lower
+  `(alpha,beta,gamma)=(6,4,3)` pattern gives only 81, while choosing B-height 5 gives 82.  The generic
+  mixed-frontier/guarded-piece optimizer remains the recursive way to seek a scale-free D formula,
+  but its synthetic controls are not evidence for the diagram itself.  No eventual formula or new
+  Pareto datum is claimed.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.
@@ -173,8 +175,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 `tools/extract_evidence.py` (`certify` / `audit`), `tools/artifacts.sh`
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
-fixed-small-m exact recurrence `tools/search_singletonization.cpp` together with its guarded-piece
-combiner `tools/optimize_mixed_frontier.py`.
+fixed-small-m exact recurrence and corrected assembly mode in `tools/search_singletonization.cpp`,
+together with its guarded-piece combiner `tools/optimize_mixed_frontier.py`.
 
 Artifact store `fedork/radio-data` (private): 12 tags, 33 assets plus a manifest per tag,
 about 394 MB stored, `check-index` green.

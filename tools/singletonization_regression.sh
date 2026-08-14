@@ -46,6 +46,51 @@ grep -F 'slice delta=6 variable_width=10 YES k=4 depth=4 state=11:2,10:2,9:2,3:2
     "$tmp/slice.out" >/dev/null
 tools/check_witness.py "$tmp/slice.out" >/dev/null
 
+# The corrected q=5 assembly diagram has four-segment branch
+#   (d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma) @ parent_k-2.
+# Three proven m=10 frontier rows are recovered by maximizing d for the displayed Pareto triples.
+"$tmp/search_singletonization" assembly 5 3 10 7 6 4 4 5 3 2 1 \
+    >"$tmp/assembly-k5.out"
+grep -F 'assembly d=2 NO parent_width=13 parent_k=5 residual_k=3 depth=3 total_m=10 A=7:6 B=4:4 C=5:3' \
+    "$tmp/assembly-k5.out" >/dev/null
+grep -F 'assembly d=1 YES parent_width=12 parent_k=5 residual_k=3 depth=3 total_m=10 A=7:6 B=4:4 C=5:3' \
+    "$tmp/assembly-k5.out" >/dev/null
+grep -F 'assembly_result d=1 parent_width=12 global_maximum=YES exact=YES' \
+    "$tmp/assembly-k5.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-k5.out" >/dev/null
+
+"$tmp/search_singletonization" assembly 6 4 10 19 6 10 4 12 3 5 4 \
+    >"$tmp/assembly-k6.out"
+grep -F 'assembly d=5 NO parent_width=34 parent_k=6 residual_k=4 depth=4 total_m=10 A=19:6 B=10:4 C=12:3' \
+    "$tmp/assembly-k6.out" >/dev/null
+grep -F 'assembly d=4 YES parent_width=33 parent_k=6 residual_k=4 depth=4 total_m=10 A=19:6 B=10:4 C=12:3' \
+    "$tmp/assembly-k6.out" >/dev/null
+grep -F 'assembly_result d=4 parent_width=33 global_maximum=YES exact=YES' \
+    "$tmp/assembly-k6.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-k6.out" >/dev/null
+
+"$tmp/search_singletonization" assembly 7 5 10 46 6 22 5 27 3 15 14 \
+    >"$tmp/assembly-k7.out"
+grep -F 'assembly d=15 NO parent_width=83 parent_k=7 residual_k=5 depth=5 total_m=10 A=46:6 B=22:5 C=27:3' \
+    "$tmp/assembly-k7.out" >/dev/null
+grep -F 'assembly d=14 YES parent_width=82 parent_k=7 residual_k=5 depth=5 total_m=10 A=46:6 B=22:5 C=27:3' \
+    "$tmp/assembly-k7.out" >/dev/null
+grep -F 'assembly_result d=14 parent_width=82 global_maximum=YES exact=YES' \
+    "$tmp/assembly-k7.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-k7.out" >/dev/null
+
+# Repeating the lower-level (6,4,3) height pattern is not optimal at parent k=7: its D boundary
+# is 12 NO / 11 YES, one parent-width unit below the alternative B-height-five triple above.
+"$tmp/search_singletonization" assembly 7 5 10 46 6 24 4 27 3 12 11 \
+    >"$tmp/assembly-k7-nonoptimal.out"
+grep -F 'assembly d=12 NO parent_width=82 parent_k=7 residual_k=5 depth=5 total_m=10 A=46:6 B=24:4 C=27:3' \
+    "$tmp/assembly-k7-nonoptimal.out" >/dev/null
+grep -F 'assembly d=11 YES parent_width=81 parent_k=7 residual_k=5 depth=5 total_m=10 A=46:6 B=24:4 C=27:3' \
+    "$tmp/assembly-k7-nonoptimal.out" >/dev/null
+grep -F 'assembly_result d=11 parent_width=81 global_maximum=YES exact=YES' \
+    "$tmp/assembly-k7-nonoptimal.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-k7-nonoptimal.out" >/dev/null
+
 # Two singleton rows at k=2 have the complete deficit antichain {(0,1),(1,0)}.  This checks
 # coordinate ordering, sharp thresholds, completeness detection and multiple emitted trees.
 "$tmp/search_singletonization" mixed-frontier 2 2 1 1 1 1 >"$tmp/mixed-small.out"

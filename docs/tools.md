@@ -380,9 +380,9 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_suffix_profile_regression.sh` | lock actual per-suffix call/prune accounting and the opt-in exact cutoff |
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
-| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a one-part frontier or a fixed-residual variable-width slice with memo reuse |
+| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a one-part frontier, the corrected four-segment assembly, or a fixed-residual variable-width slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
-| `tools/singletonization_regression.sh` | lock the exact variable-width synchronization boundary and memo-exhaustion abort semantics |
+| `tools/singletonization_regression.sh` | lock the corrected four-segment assembly, exact variable-width synchronization boundaries, and memo-exhaustion abort semantics |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -576,6 +576,8 @@ CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
 tools/run_with_provenance.py /tmp/search_singletonization 9 9 488 3 488 3
 tools/run_with_provenance.py /tmp/search_singletonization forced 10 10 973 6 477 2
 tools/run_with_provenance.py /tmp/search_singletonization frontier 10 6 974 973
+tools/run_with_provenance.py /tmp/search_singletonization \
+    assembly 7 5 10 46 6 22 5 27 3 15 14
 tools/run_with_provenance.py /tmp/search_singletonization slice 4 4 2 5 6 11 2 9 2 3 2
 tools/run_with_provenance.py /tmp/search_singletonization \
     mixed-frontier 4 4 2 2 16 16 9 2 3 2 > /tmp/mixed-frontier.out
@@ -588,6 +590,23 @@ between adjacent `n`, stops at the first positive, and prints its tree.  Cap fro
 `tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never a negative verdict.
 The retained `k=10,m=6` replay and independently checked tree are
 `evidence/sb_m6_k10_frontier.txt` and `witnesses/majorized_973_6_at10.tree`.
+
+`assembly` is the corrected diagram directly.  Write
+
+    A=(a:alpha) @ parent_k-1,
+    B=(b:beta), C=(c:gamma) @ parent_k-2.
+
+For total parent height `m`, its magenta four-segment branch is
+
+    Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma) @ parent_k-2,
+
+with zero-width or zero-height parts omitted, and the parent candidate has width `a+b+d`.
+The command scans `d` downward from `start_d` to `minimum_d` with one memo.  Geometry requires
+`beta<=alpha`, `alpha+gamma<=m`, and `c<=a`.  An exact negative followed by a positive proves the
+reported D maximum globally by subgraph monotonicity, even when `start_d<2^(parent_k-2)`;
+otherwise `global_maximum=NO` is explicit.  The regression reproduces the proven `m=10` parent
+widths 12, 33, and 82 at parent levels 5, 6, and 7 respectively, and independently checks every
+positive branch tree.  These are finite construction controls, not an eventual-`q` theorem.
 
 `slice` adds one variable part `(2^k-delta : variable_m)` to the listed fixed parts, scans `delta`
 from `start_delta` through `maximum_delta`, retains the exact memo, and stops at the first positive.

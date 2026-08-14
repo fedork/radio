@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-13.
+entries. Last revised 2026-08-14.
 
 ## High-level goals
 
@@ -229,14 +229,17 @@ costs are in the latest journal entry and `docs/tools.md`.
 
 **Conditional excess-q construction track (2026-08-14).** Under the explicitly unproved working
 assumption that every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf regime,
-the free D-width problem is now reduced exactly to two pure deficit thresholds and a two-coordinate
-mixed-child antichain.  The finite tool computes complete exact antichains and compresses them into
-guarded slope-one pieces; the resulting D optimization has a closed form per piece.  The next step is
-not another blind frontier scan: annotate the sketch with the recursive A/B/C boundaries, derive the
-three labelled child contributions `E_2,E_1,E_0` for every synchronized cut, and only then enumerate
-candidate total heights.  In parallel, fit guarded-piece endpoints and sums across residual level and
-seek an induction proving eventual formulas.  The exact checks through residual level 11 are finite
-evidence only, and this track currently changes no Pareto datum; definitions and controls are in
+the corrected diagram gives a concrete branch rather than a missing map.  For
+`A=(a:alpha)@k-1` and `B=(b:beta),C=(c:gamma)@k-2`, maximize `d` in
+`Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, then score the candidate `a+b+d`.
+The direct finite mode recovers the proven `m=10` widths at parent levels 5 through 7 and shows why
+all Pareto triples must be retained: the repeated `(6,4,3)` height choice falls one short at level 7,
+while B-height 5 reaches the frontier.  Next, automate enumeration of admissible A/B/C triples,
+rank them with sound D upper bounds, and evaluate exact slices until every still-competitive triple
+is decided or explicitly inconclusive.  In parallel, use guarded mixed-frontier pieces to seek an
+eventual formula for `d*` and an induction under atom refinement.  The exact generic piece checks
+through residual level 11 remain finite evidence only, and this track changes no Pareto datum;
+definitions and controls are in
 [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 
 ## Ordering

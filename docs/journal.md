@@ -5452,20 +5452,23 @@ The primary checkout, other chat branches and live local/remote watchers were no
 
 ## 2026-08-14 — excessive-q Pareto assembly reduces D to a two-dimensional deficit frontier
 
-The new construction proposal starts from a Pareto state A at `k-1`, states B and C at `k-2`, a
-fixed total height, and a fourth state D whose height and diagram position are fixed but whose width
-is free.  The parent objective is `width(A)+width(B)+width(D)`.  We are adopting the following only
-as a working assumption: every fixed total height and labelled lineage geometry has some sufficiently
-large `q` in which the relevant atomic-leaf construction stabilizes.  There is no proof or claimed
-threshold yet, and A/B/C/D remain labelled through refinement.  These are diagram-component names,
-not the established A/B/C/D notation for dyadic atom types.
+The corrected construction proposal starts from `A=(a:alpha)@k-1`,
+`B=(b:beta)@k-2`, `C=(c:gamma)@k-2`, and total height `m`.  Its magenta four-segment branch is
+
+    Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma) @ k-2,
+
+and only `d=width(D)` is free; the parent objective is `a+b+d`.  The geometry requires
+`beta<=alpha`, `alpha+gamma<=m`, and `c<=a`.  We are adopting the following only as a working
+assumption: every fixed total height and labelled lineage geometry has some sufficiently large `q`
+in which the relevant atomic-leaf construction stabilizes.  There is no proof or claimed threshold
+yet.  These A/B/C/D names are diagram components, not the established dyadic atom notation.
 
 Deficit coordinates isolate the free variable.  At residual level `s`, write
-`D=(2^s-delta:h)`.  A viable cut is `a=2^(s-1)-u` with complementary deficit
+`D=(2^s-delta:h)`.  A viable cut is `y=2^(s-1)-u` with complementary deficit
 `v=delta-u`.  Its pure children depend separately on `u` and `v`, while its mixed child contains both.
-For fixed cuts of A/B/C and a fixed height cut of D, let `U_2,U_0` be the minimum deficits accepted
-by the two pure children, and let `M` be the Pareto-minimal feasible `(u,v)` pairs of the mixed child.
-Subgraph monotonicity then gives the exact formula
+For fixed cuts of the other three staircase parts and a fixed height cut of D, let `U_2,U_0` be the
+minimum deficits accepted by the two pure children, and let `M` be the Pareto-minimal feasible
+`(u,v)` pairs of the mixed child.  Subgraph monotonicity then gives the exact formula
 
     delta_D = min_{(p,q) in M} (max(p,U_2) + max(q,U_0)).
 
@@ -5488,31 +5491,36 @@ The new output tree passes `tools/check_witness.py`.  A separately compiled one-
 3 with an explicit abort and emits no verdict, locking the rule that exhaustion is not a negative.
 `tools/singletonization_regression.sh` reproduces both checks.
 
-This validates the finite optimizer but does not yet instantiate the illustrated construction.  The
-missing diagram-specific datum is the labelled map from the chosen A/B/C states into the three fixed
-child contributions.  After encoding that map, the finite command can enumerate candidate heights
-immediately.  The scale-free continuation is to store eventual dyadic-polynomial width germs and
-their two-dimensional minimal antichains, then test the postulated stabilization under atom
-refinement instead of guessing a formula for D.  The following entry begins that continuation by
-replacing point lists with guarded affine pieces.
+The correct diagram supplied later in the session instantiates the previously abstract fixed state:
+its three non-D parts are exactly `(b:alpha-beta)`, `(c:m-alpha-gamma)`, and `(a-c:gamma)`.
+Thus there is no missing A/B/C child map.  The scale-free continuation is to store eventual
+dyadic-polynomial width germs and their two-dimensional minimal antichains, then test the postulated
+stabilization under atom refinement instead of guessing a formula for D.  The following entry records
+the corrected finite controls and replaces point lists with guarded affine pieces.
 
-## 2026-08-14 — the mixed antichain becomes a guarded-piece D optimizer
+## 2026-08-14 — corrected diagram instantiates D; its cut frontier has guarded pieces
 
-The sketch itself can now be transcribed without guessing the unmarked component boundaries.  Reading
-each color as one global branch, the nonempty segments are
+The user reported that the initial attachment was the wrong picture.  Its color transcription and
+the resulting claim that A/B/C boundaries were missing are retracted.  In the corrected picture,
+A is upper-left, B upper-middle, C lies under the right end of A, and D is the upper-right part of one
+magenta staircase.  With `A=(a:alpha)`, `B=(b:beta)`, and `C=(c:gamma)`, its four segments are
 
-    row 1: green[a a b c]  yellow[c a]  orange[a]  red[b]
-    row 2: green continues  orange[c]    red[a]     cyan[a b]
-    row 3: green continues  red[c]       blue[a]    cyan continues
-    row 4: yellow[a a]      orange[b]    red[c]
+    (d:beta), (b:alpha-beta), (c:m-alpha-gamma), (a-c:gamma).
 
-On that reading, red is uniquely the four-segment branch, with atom sequence `(b,a,c,c)` from top to
-bottom, and the proposed free D is naturally its top-right segment.  The sketch does not mark the
-recursive boundaries of component states B and C, so this color/lineage reading remains an inference
-and is not hard-coded.
+The new `search_singletonization assembly` mode constructs exactly this state, scans `d` downward
+with one memo, and reports the parent candidate `a+b+d`.  Three exact `m=10` controls recover proven
+Pareto rows.  At parent level 5, `A=(7:6)`, `B=(4:4)`, `C=(5:3)` give adjacent D results 2 NO / 1 YES
+and parent width 12.  At level 6, `(19:6),(10:4),(12:3)` give 5 NO / 4 YES and width 33.  At level 7,
+the repeated pattern `(46:6),(24:4),(27:3)` gives 12 NO / 11 YES and only candidate 81; enumerating
+other Pareto triples finds `A=(46:6)`, `B=(22:5)`, `C=(27:3)`, whose branch
+`Sb(27:1,22:1,19:3,14:5)@5` is solvable while replacing 14 by 15 is not, giving width 82.  Every
+positive tree is independently verified, and `tools/singletonization_regression.sh` reproduces the
+four adjacent boundaries.  These values agree with `data/pareto_sb.csv` but do not prove eventual
+stabilization.
 
-`search_singletonization mixed-frontier` now computes the missing two-coordinate object directly.
-For fixed residual parts it considers
+`search_singletonization mixed-frontier` computes the second-order two-coordinate object needed to
+solve a chosen D slice recursively.  It is generic infrastructure, not a reconstruction of the
+corrected picture.  For fixed residual parts it considers
 
     (2^k-u:left_m), (2^k-v:right_m),
 
@@ -5546,9 +5554,8 @@ For such a piece, combining pure thresholds `U_2,U_0` has the closed form
 `tools/optimize_mixed_frontier.py` implements this formula, validates that the pieces reproduce every
 printed point, and refuses an incomplete or bounded-depth frontier.  On the synchronized control,
 the illustrative synthetic choice `U_2=U_0=5` returns `delta_D=11` and parent D-width 21; the
-unattainable balanced shortcut would have incorrectly returned deficit 10.  The sketch's A/B/C cuts
-have not yet supplied those pure thresholds, so 21 is a regression value rather than a proposed
-Pareto width.
+unattainable balanced shortcut would have incorrectly returned deficit 10.  This is a regression
+value rather than a proposed Pareto width.
 
 The first finite series support the guarded-piece representation while stopping short of an eventual
 claim.  Complete exact scans with every positive tree checked give one affine piece for variable
@@ -5564,5 +5571,10 @@ The exploratory `(1,4)` continuation at residual level 10 was deliberately bound
 
 It was terminated by the 30-CPU-second cap with shell status 152 before printing a frontier summary,
 so it produced no verdict; process inventory afterward was empty.  This is precisely why the apparent
-piece pattern through the lower exploratory levels is not extrapolated.  No Pareto table entry changes
-in this work.
+piece pattern through the lower exploratory levels is not extrapolated.
+
+The natural parent-level-8 continuation with `A=(104:6)`, `B=(50:5)`, `C=(58:3)`, and `d=35` gives
+the branch `Sb(58:1,50:1,46:3,35:5)@6`.  One exact attempt hit a 60-CPU-second cap before emitting a
+verdict; bounded singletonization depths 3, 4, and 5 each hit a separate 20-CPU-second cap without a
+summary.  All processes were gone afterward.  This is 120 CPU seconds of inconclusive work, not a
+construction or rejection.  No Pareto table entry changes in this work.

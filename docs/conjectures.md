@@ -398,44 +398,68 @@ open.
 
 ## Excess-q Pareto assembly as a variable-D slice (working hypothesis, 2026-08-14)
 
-The proposed construction chooses a Pareto state A one level down, Pareto states B and C two levels
-down, fixes the total height and all resulting branch geometry, and leaves only the width of a fourth
-state D free.  For the diagram's three width-contributing branches the candidate is
-`width(A)+width(B)+width(D)`; C constrains synchronization but is not added to that objective.
+The corrected diagram supplied later on 2026-08-14 makes the geometry explicit and supersedes the
+initial attachment.  Write the chosen one-part Pareto states as
+
+    A=(a:alpha) @ k-1,
+    B=(b:beta), C=(c:gamma) @ k-2.
+
+A is the upper-left rectangle, B the upper-middle rectangle, C lies below the right end of A, and D
+is the upper-right segment of the magenta four-segment staircase.  For total parent height `m`, that
+staircase is exactly
+
+    S_D(d) = Sb(d:beta,
+                b:alpha-beta,
+                c:m-alpha-gamma,
+                a-c:gamma) @ k-2.                 (1)
+
+Zero-width or zero-height parts are omitted.  The drawn non-overlap conditions are
+`beta<=alpha`, `alpha+gamma<=m`, and `c<=a`; the proposed additional admissibility condition
+`m<=2a` is retained as a working hypothesis rather than derived from the picture.  Once A/B/C and
+`m` are chosen, `d=width(D)` is the only free dimension, and the parent candidate is
+
+    N = a+b+d.                                    (2)
+
 Here A/B/C/D name diagram components, not the dyadic atom types denoted by the same letters elsewhere.
-The admissible total heights are those in the proposed interval
-`max(height(A),height(C)) <= m <= 2*width(A)`; after fixing `m`, the diagram fixes every remaining
-dimension except D's width.
 
 The working assumption is deliberately stronger than anything proved here:
 
-> For every fixed total height and labelled A/B/C/D lineage pattern, some sufficiently large `q`
-> reaches a stable atomic-leaf construction regime.
+> For every fixed total height and labelled placement (1), some sufficiently large `q` reaches a
+> stable atomic-leaf construction regime.
 
 No threshold or proof of existence is claimed.  Lineages remain labelled while taking this limit;
 ordinary normalization of equal-looking rectangles must not erase which diagram branch they came
 from.
 
-### Deficit form of the exact D problem
+### The exact D problem, then its deficit form
 
-At a residual level `s`, write the variable part as
+Put `s=k-2`.  The hard part of the proposed assembly is now the concrete one-dimensional frontier
 
-    D = (2^s-delta : h).
+    d*(A,B,C,m) = max { d : S_D(d) is solvable in s }.       (3)
+
+It is enough to consider `0<=d<=2^s`: the variable part contains `Sb(d:1)` as a substate, whose exact
+maximum in `s` tests is `2^s`.  Subgraph monotonicity makes feasibility downward closed in `d`, so an
+exact adjacent negative/positive pair certifies (3).  Formula (2), followed by maximization over the
+permitted Pareto triples and height allocations, is precisely the proposed candidate generator.
+
+To seek a scale-free expression rather than scan every `d`, write
+
+    D = (2^s-delta : beta).
 
 Every viable wide-side cut has the form
 
-    a = 2^(s-1)-u,       (2^s-delta)-a = 2^(s-1)-v,       u+v=delta.
+    y = 2^(s-1)-u,       (2^s-delta)-y = 2^(s-1)-v,       u+v=delta.
 
-If the selected narrow-side height is `b`, D contributes
+If the selected narrow-side height is `x`, D contributes
 
-    outcome 2: (2^(s-1)-u : b)
-    outcome 0: (2^(s-1)-v : h-b)
-    outcome 1: (2^(s-1)-u : h-b), (2^(s-1)-v : b).
+    outcome 2: (2^(s-1)-u : x)
+    outcome 0: (2^(s-1)-v : beta-x)
+    outcome 1: (2^(s-1)-u : beta-x), (2^(s-1)-v : x).
 
-Thus maximizing D is exactly minimizing `delta`.  Fix synchronized cuts `sigma` of A/B/C and a
-height cut `b` of D.  Let `E_2(sigma)`, `E_1(sigma)`, and `E_0(sigma)` be the fixed contributions to
-the three children.  For any chosen constructibility predicate (`C_d` for bounded singletonization
-search, or `C_s` for exact solvability), define:
+Thus maximizing D is exactly minimizing `delta`.  Fix synchronized cuts `sigma` of the other three
+parts in (1), and a height cut `x` of D.  Let `E_2(sigma)`, `E_1(sigma)`, and `E_0(sigma)` be those
+fixed parts' contributions to the three children.  For any chosen constructibility predicate (`C_r`
+for bounded singletonization search, or `C_s` for exact solvability), define:
 
 - `U_2` as the least `u` making the outcome-2 child constructible;
 - `U_0` as the least `v` making the outcome-0 child constructible; and
@@ -449,8 +473,8 @@ answer for these fixed cuts is
 The proof is immediate in both directions.  Every feasible `(u,v)` must exceed both pure thresholds
 and dominate some minimal mixed pair.  Conversely, for any `(p,q)` in `M`, choosing
 `u=max(p,U_2)` and `v=max(q,U_0)` satisfies all three children.  Minimize this expression over
-`sigma` and `b`, inside the legal box `0<=u,v<=2^(s-1)`; an empty feasible set has value infinity.
-Zero-height terms at `b=0` or `b=h` are simply omitted.
+`sigma` and `x`, inside the legal box `0<=u,v<=2^(s-1)`; an empty feasible set has value infinity.
+Zero-height terms at `x=0` or `x=beta` are simply omitted.
 
 This identifies the irreducible object: it is the **two-dimensional mixed-child deficit antichain**
 `M`, not a single majorization capacity.  A scalar formula for D can exist only after that antichain
@@ -470,9 +494,9 @@ The piece contributes
 
 to `delta_D`.  This is exact: without the guard, the convex objective is constant on `I`; moving to
 the nearest allowed integer endpoint raises it by exactly the interval distance.  Taking the minimum
-over pieces and over the fixed A/B/C cuts gives D without enumerating the individual antichain points.
-If `L,R,C` eventually have polynomial descriptions in the residual level, this is already a scalable
-max/min expression.
+over pieces, fixed-part cuts and D height cuts gives D without enumerating the individual antichain
+points.  If `L,R,C` eventually have polynomial descriptions in the residual level, this is already a
+scalable max/min expression.
 
 In the diagram's levels, write
 
@@ -484,15 +508,28 @@ Then each parent candidate is
 
     2^k - (delta_A + delta_B + delta_D).
 
-So candidate comparison is also deficit minimization.  Enumerate the permitted A/B/C choices and
-height allocations, compute `delta_D` from the slice, then retain the smallest total deficit for
-each total height before Pareto filtering.
+So candidate comparison is also deficit minimization.  Enumerate the permitted A/B/C choices,
+compute the three fixed parts in (1), maximize D, then retain the smallest total deficit for each
+total height before Pareto filtering.
 
 ### Finite exact check and present boundary
 
-`tools/search_singletonization.cpp slice` now executes the finite version directly: it adds
-`(2^s-delta:h)` to arbitrary fixed residual parts, scans deficits in increasing order with one exact
-memo, and stops at the first constructible state.  The regression uses the adjacent pair from
+`tools/search_singletonization.cpp assembly` now executes (1) directly and scans `d` downward with
+one retained exact memo.  Three `m=10` controls use Pareto values from `data/pareto_sb.csv`; every
+positive branch tree is independently checked and every adjacent negative is exact:
+
+- at parent level 5, `A=(7:6)`, `B=(4:4)`, `C=(5:3)` give `d*=1` and candidate 12;
+- at parent level 6, `A=(19:6)`, `B=(10:4)`, `C=(12:3)` give `d*=4` and candidate 33; and
+- at parent level 7, a frontier-reaching triple is `A=(46:6)`, `B=(22:5)`, `C=(27:3)`, giving
+  `S_D(14)=Sb(27:1,22:1,19:3,14:5)@5`, `d*=14`, and candidate 82.
+
+These reproduce the proven Pareto rows 12, 33, and 82.  They validate the corrected geometry and
+the finite D maximization, not the eventual-`q` assumption or completeness of the triple generator
+at untested levels.
+
+The generic `slice` mode is the same finite D problem after the fixed three parts have been formed:
+it adds `(2^s-delta:h)` to arbitrary fixed residual parts and scans deficits upward.  Its independent
+synchronization regression uses the adjacent pair from
 [the Singleton Majorization note](theorems/singleton-majorization.md#why-there-is-no-single-width-two-base-sequence)
 after applying subgraph monotonicity.
 The note supplies the variable-width-11 negative and a variable-width-10 positive superstate; by
@@ -500,7 +537,8 @@ subgraph monotonicity the fixed state `(11:2,9:2,3:2)@4` has exact D-maximum 10.
 majorization still permits 11, but exact synchronization rejects it.  The positive tree is checked by
 `tools/check_witness.py`; `tools/singletonization_regression.sh` locks the pair and abort semantics.
 
-The new `mixed-frontier` mode computes `M` itself.  For the same fixed parts `(9:2,3:2)@4`, its
+The `mixed-frontier` mode computes the second-order object `M` needed to solve a chosen slice
+recursively.  For the same generic fixed parts `(9:2,3:2)@4`, its
 complete exact frontier for two variable height-two parts is
 
     {(2,10), (3,8), (4,6), (6,4), (8,3), (10,2)}.
@@ -509,7 +547,7 @@ In particular `(4,6)` is feasible while the equally costly balanced pair `(5,5)`
 two-coordinate synchronization notch that a scalar total deficit would erase.  As an illustrative
 combination, imposing the synthetic pure thresholds `U_2=U_0=5` makes the piece optimizer return
 `delta_D=11`: synchronization costs one unit beyond the unattainable scalar value 10.  Those pure
-thresholds have not yet been derived from the sketch's unmarked A/B/C boundaries.
+thresholds are a generic regression choice, not a value derived from assembly (1).
 
 Two unforced families show what “stabilization” should mean computationally.  The regression performs
 complete exact scans and verifies every positive tree:
@@ -526,11 +564,11 @@ displayed formulae outside their checked ranges.  They also show that the antich
 as a list: the `(2,2)` frontier has `2s-1` points.  What can stabilize is a finite guarded-piece
 description whose endpoints and sums depend on `s`.
 
-This validates the slice formulation and a representation for its hard subproblem, not the
-excessive-`q` hypothesis or the proposed global Pareto decomposition.  The next diagram-specific step
-is to encode exactly which labelled pieces of A/B/C enter each `E_i(sigma)`.  The next scale-free step
-is to fit and then prove eventual dyadic-polynomial formulae for the guarded piece endpoints and sums,
-while testing whether those labelled descriptions survive atom refinement.
+The corrected diagram removes the supposed missing A/B/C map: the three fixed parts are already
+given by (1).  The next finite step is to enumerate all admissible Pareto triples for a chosen `m`,
+rank them by sound D upper bounds, and evaluate enough exact slices to identify the widest candidate.
+The scale-free step is to fit and then prove eventual dyadic-polynomial formulae for `d*`—or for its
+guarded mixed-frontier pieces—while testing whether those descriptions survive atom refinement.
 
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 

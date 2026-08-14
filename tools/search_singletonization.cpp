@@ -456,6 +456,87 @@ int main(int argc, char **argv) {
             return 3;
         }
     }
+    if (argc >= 2 && std::string(argv[1]) == "assembly") {
+        if (argc != 13) {
+            std::cerr << "usage: " << argv[0]
+                      << " assembly parent_k depth total_m a alpha b beta c gamma"
+                         " start_d minimum_d\n";
+            return 2;
+        }
+        const int parent_k = std::atoi(argv[2]);
+        const int depth = std::atoi(argv[3]);
+        const int total_m = std::atoi(argv[4]);
+        const int a = std::atoi(argv[5]);
+        const int alpha = std::atoi(argv[6]);
+        const int b = std::atoi(argv[7]);
+        const int beta = std::atoi(argv[8]);
+        const int c = std::atoi(argv[9]);
+        const int gamma = std::atoi(argv[10]);
+        const int start_d = std::atoi(argv[11]);
+        const int minimum_d = std::atoi(argv[12]);
+        const int residual_k = parent_k - 2;
+        const std::int64_t full_width =
+            residual_k >= 0 && residual_k < 31 ? power_int(2, residual_k) : 0;
+        if (parent_k < 2 || parent_k >= 33 || depth < 0 || depth > residual_k ||
+            total_m <= 0 || a <= 0 || alpha <= 0 || b <= 0 || beta <= 0 || c <= 0 ||
+            gamma <= 0 || beta > alpha || alpha + gamma > total_m || c > a ||
+            minimum_d < 0 || start_d < minimum_d || start_d > full_width) {
+            std::cerr << "usage: " << argv[0]
+                      << " assembly parent_k depth total_m a alpha b beta c gamma"
+                         " start_d minimum_d\n"
+                      << "for A=(a:alpha), B=(b:beta), C=(c:gamma), require parent_k>=2,"
+                         " 0<=depth<=parent_k-2, beta<=alpha, alpha+gamma<=total_m,"
+                         " c<=a, and 0<=minimum_d<=start_d<=2^(parent_k-2)\n";
+            return 2;
+        }
+
+        State fixed{{b, alpha - beta}, {c, total_m - alpha - gamma}, {a - c, gamma}};
+        normalize(fixed);
+        make_bases(residual_k);
+        bool saw_exact_negative = false;
+        try {
+            for (int d = start_d; d >= minimum_d; --d) {
+                State state = fixed;
+                state.push_back({d, beta});
+                normalize(state);
+                const Counters before = counters;
+                const auto started = std::chrono::steady_clock::now();
+                const bool answer = construct(state, residual_k, depth);
+                const double seconds = std::chrono::duration<double>(
+                                           std::chrono::steady_clock::now() - started)
+                                           .count();
+                std::cout << "assembly d=" << d << ' ' << (answer ? "YES" : "NO")
+                          << " parent_width=" << a + b + d << " parent_k=" << parent_k
+                          << " residual_k=" << residual_k << " depth=" << depth
+                          << " total_m=" << total_m << " A=" << a << ':' << alpha
+                          << " B=" << b << ':' << beta << " C=" << c << ':' << gamma
+                          << " branch=";
+                print_state(state);
+                std::cout << " wall=" << seconds << "s calls=" << counters.calls - before.calls
+                          << " assignments=" << counters.assignments - before.assignments
+                          << " memo=" << memo.size() << '\n'
+                          << std::flush;
+                if (answer) {
+                    const bool global_maximum =
+                        depth == residual_k && (d == full_width || saw_exact_negative);
+                    std::cout << "assembly_result d=" << d << " parent_width=" << a + b + d
+                              << " global_maximum=" << (global_maximum ? "YES" : "NO")
+                              << " exact=" << (depth == residual_k ? "YES" : "NO") << '\n';
+                    print_tree(state, residual_k, depth);
+                    return 0;
+                }
+                if (depth == residual_k) saw_exact_negative = true;
+            }
+            const bool complete = depth == residual_k && minimum_d == 0;
+            std::cout << "assembly_result feasible=NONE complete="
+                      << (complete ? "YES" : "NO")
+                      << " exact=" << (depth == residual_k ? "YES" : "NO") << '\n';
+            return 1;
+        } catch (const std::exception &error) {
+            std::cerr << "ABORT: " << error.what() << " (not a negative verdict)\n";
+            return 3;
+        }
+    }
     if (argc >= 2 && std::string(argv[1]) == "slice") {
         if (argc < 7 || ((argc - 7) % 2) != 0) {
             std::cerr << "usage: " << argv[0]
@@ -675,6 +756,9 @@ int main(int argc, char **argv) {
         std::cerr << "usage: " << argv[0] << " k depth n1 m1 [n2 m2 ...]\n"
                   << "       " << argv[0] << " forced k depth n m a b\n"
                   << "       " << argv[0] << " frontier k m start_n minimum_n\n"
+                  << "       " << argv[0]
+                  << " assembly parent_k depth total_m a alpha b beta c gamma"
+                     " start_d minimum_d\n"
                   << "       " << argv[0]
                   << " slice k depth variable_m start_delta maximum_delta"
                      " [fixed_n1 fixed_m1 ...]\n"
