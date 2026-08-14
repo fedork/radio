@@ -5413,3 +5413,39 @@ Final verification passed the new sharp-boundary regression and complete census,
 rb-contraction regression, all table and witness checks, and `tools/check_docs.py`.  An
 ASan+UBSan probe build ran both the thirteen-part slack-one case and the hard eight-part state with
 no runtime diagnostic.
+
+## 2026-08-14 — actual suffix pruning confirms slack as a prior, not a new RB policy
+
+The requested combined test now records each actual `rb_dead` call and rejection by suffix, together
+with absolute slack, remaining part count and excess `D=W-2q`.  The complete cold k=3 census forces
+RB after its first accepted prefix so it measures the proactive counterfactual rather than the
+production trigger.  Its 242 profiles contain 1,590 calls and 259 rejections.  Rejection rates by
+slack are 49.47%, 18.93%, 3.25%, 5.36%, 0% and 0% for slack zero through five.  At suffix level,
+`slack-D>=2` had zero rejections in 230 calls, but `slack-D=1` already fails empirically:
+`Sb(4:3,4:1,2:2,2:2)@3` rejects one of three reached prefixes at its final suffix.  These quantities
+are strong priors and useful explanations, not shape-free certificates.
+
+Keeping the full slack also strengthens the proved q/D corollary.  Under the same sorted `(2:1)`
+base and retained-corner premises, `2(D-q)<=slack-4` implies every direct extension inequality.  It
+specializes to the old bounds at slack one through three, then uses additional slack instead of
+discarding it.  Diagnostic assertions checked it against both the direct theorem and exact DP at
+every suffix.  It improves 11 partial cutoffs in the small census, from head distribution
+`{1:10,2:25,3:51,4:157}` to `{1:10,2:36,3:40,4:157}`, but still proves exactly the same 10 complete
+no-call states.  Thus the theorem is genuinely stronger without supplying the desired trigger.
+
+The real controls resolve the proposed post-build cutoff.  On the hard eight-part positive,
+42,430,348 reachability calls produced 2,940,923 rejections; its exactly pliable final suffix alone
+received 33,049,379 calls and rejected none.  The opt-in exact scan skipped 33,049,382 calls in all
+(77.89%), retained every rejection and preserved the identical 132,279,387 deterministic work
+units.  Five paired CPU runs nevertheless changed direction; four differed by at most 1.07% and one
+unreplicated run favoured the cutoff by 7.94%.  There is no stable timing benefit because the avoided
+lookup is already tiny beside the surrounding prefix work.  Conversely, the zero-slack fourteen-
+part control produced 1,141,496 useful rejections in 6,921,698 calls during a 40,000,001-work probe,
+mostly in its last three suffixes.
+
+Decision: leave the ordinary measured-cost trigger and call path unchanged.  Retain
+`RADIO_RB_PROFILE_DIAGNOSTIC`, the forced cold census and the sound-but-rejected
+`RADIO_RB_PLIABLE_CUTOFF` as research modes.  Full proof, distributions, build IDs, commands and
+timings are in
+[`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
+The primary checkout, other chat branches and live local/remote watchers were not modified.

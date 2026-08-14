@@ -1,0 +1,171 @@
+# Absolute slack, tail excess and actual suffix-reachability pruning
+
+Status: proved diagnostic refinement and measured performance experiment, 2026-08-14.  The ordinary
+solver's `RB_TRIGGER` and call path are unchanged.  The profiler and exact cutoff described below
+are compile-time research modes; the cutoff was measured and rejected for production.
+
+All final measurements use commit `1b7bd6eb5a9903a58bc677ee02bfb6783100b2f3`.  The two raw control
+outputs used for the summaries passed `tools/check_provenance.py`; their build IDs are given below.
+They were not archived because both runs are short and reproduced by the commands here.  The small
+census is fully reproduced by `tools/rb_suffix_profile_census.py`.
+
+## Keeping the full absolute slack in the q/D theorem
+
+For a sorted tail of `q` nonunit parts, write the masses from the final `(2:1)` base outwards as
+
+```
+w_i = 2+d_i,       0=d_1 <= d_2 <= ... <= d_q,
+D = d_1+...+d_q = W-2q.
+```
+
+Assume the base's five required mass routings and all three retained pure corners for every added
+part, exactly as in the prior extension theorem.  The extension at step `i` is valid when
+
+```
+2*d_i <= 2*i + (d_1+...+d_(i-1)) + sigma - 4.             (1)
+```
+
+The earlier corollary collapsed every `sigma>=2` to one case.  For `q>1`, retaining the full
+absolute slack gives the stronger sufficient condition
+
+```
+2*(D-q) <= sigma-4.                                       (2)
+```
+
+Proof: put `b=ceil((4-sigma)/2)`, so (2) is `D<=q-b`.  If `d_i>0`, monotonicity gives
+
+```
+(q-i+1)*d_i <= D <= q-b,
+(q-i+1)*(d_i-1) <= i-1-b,
+```
+
+and hence `d_i<=i-b`.  Therefore `2*d_i<=2*i-2*b<=2*i+sigma-4`, which implies (1) even before
+the earlier excess is added.  The `d_i=0` steps are immediate and the retained `(2:1)` base closes
+the induction.  At `sigma=1`, (2) is the old `q>=D+2`; at sigma two or three it is `q>=D+1`; at
+sigma four or five it becomes `q>=D`; larger slack continues to weaken the necessary length.
+
+The diagnostic checks `slack-excess certificate => direct extension certificate => exact DP
+pliability` at every suffix.  All 243 states reached by the prior complete k=3 pliability census
+pass.  The stronger formula improves the certified partial cutoff in 11 states: its head
+distribution is `{1:10,2:36,3:40,4:157}`, versus `{1:10,2:25,3:51,4:157}` for the old q/D bound.
+It still proves only the same 10 complete no-call states, so this is a real theorem improvement but
+not a better whole-state trigger.  A sharp regression example is
+`Sb(4:3,2:2,2:2,2:1)@3`, where `sigma=5`: the old tail has length one and the full-slack tail has
+length two, while the direct theorem has length three and the exact tail has length four.
+
+## Actual calls: forced complete k=3 census
+
+`RADIO_RB_PROFILE_DIAGNOSTIC` records calls and rejections separately at every suffix.  The census
+build sets `RB_TRIGGER=1`, so it measures the counterfactual proactive policy from the first
+accepted prefix; every query runs in a new cold process.  This is a workload measurement, not a
+claim that production currently pays these costs.
+
+The complete 283-state corpus produced 242 profiles; 41 queries returned before a reachability
+profile was armed.  Across 726 callable suffix rows there were 1,590 actual `rb_dead` calls and 259
+rejections (16.29%); 48 profiled states rejected at least one reached prefix.
+
+```
+sigma   profiles  states with prune   calls   pruned   rate
+0             23                 22     285      141   49.47%
+1             44                 18     507       96   18.93%
+2             45                  4     246        8    3.25%
+3             49                  4     261       14    5.36%
+4             39                  0     142        0    0.00%
+5             42                  0     149        0    0.00%
+```
+
+Thus absolute slack is a strong prior in this corpus.  Combining it with suffix excess is sharper:
+for `F=sigma-D`, all 230 calls with `F>=2` were nonrejecting, while `F=1` had one rejection in 160
+calls.  That one is important: `Sb(4:3,4:1,2:2,2:2)@3`, suffix index three, has `F=1` and rejects
+one of three reached prefixes.  A simple empirical threshold is therefore not a theorem.  At the
+whole-state level, `min_suffix(F)>=0` selected 20 profiles and all 72 of their calls were
+nonrejecting, but this is only small-corpus evidence and covers few of the no-prune states.
+
+The exact universal test certified 496 reached calls, the direct theorem 255, the old coarse bound
+166, and the full-slack q/D bound 182; every certified call had zero rejections, as required.
+
+Reproduce the census and both sharp checks with:
+
+```
+tools/rb_suffix_profile_census.py
+tools/rb_suffix_profile_regression.sh
+tools/rb_pliability_regression.sh
+```
+
+The final reused k=3 profiler build ID was
+`b7dcaa0c451a14a403c5ff752d895160c98f9dcb105696f672e527f7e8a5017f`.
+
+## Real expensive controls
+
+The historical hard positive
+
+```
+Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)@5
+```
+
+has `sigma=14` but global excess `D=229-2*8=213`: its large absolute slack does not make its coarse
+parts flexible.  With the ordinary ten-million trigger it made 42,430,348 reachability calls and
+2,940,923 rejections.  The suffix distribution was:
+
+```
+index  q   W    D       calls    pruned
+1      7  184  170           3         0
+2      6  142  130          78         0
+3      5  108   98       2,870        34
+4      4   76   68      73,242    10,140
+5      3   54   48   1,035,359   253,502
+6      2   34   30   8,269,417 2,677,247
+7      1   15   13  33,049,379         0
+```
+
+The exact DP says suffixes one and seven are universally pliable.  The final suffix alone accounts
+for 77.89% of all lookups, so this is the strongest available test for an exact post-build cutoff.
+The profiled raw output passed provenance with build ID
+`247ed5cc0dabfa737a47eb539fff5941596b1dfbcba7a7580545a40a18e29e5a`.
+
+The information-tight fourteen-part state
+
+```
+Sb(9:4,8:4,8:1,5:5,15:1,5:3,6:3,7:2,5:3,11:1,8:2,11:1,14:1,13:1)@5
+```
+
+has `sigma=0` and no pliable hereditary tail.  A cold 40,000,001-work probe made 6,921,698 calls and
+1,141,496 rejections (16.5%).  Its final three suffixes supplied 2,996, 113,489 and 1,025,011
+rejections respectively.  The `MAYBE` result is only a bounded performance observation.  The raw
+output passed provenance with build ID
+`20a7cdc6ba70beda528564d20362e0ca4f030108686982eabb9106db274e25b5`.
+
+These controls explain why slack alone looked contradictory: `sigma=14` is still small beside the
+hard state's excess, while the zero-slack state is rigid all the way down.
+
+## Exact cutoff benchmark and decision
+
+The opt-in `RADIO_RB_PLIABLE_CUTOFF` scans the completed DP once and omits calls for every exactly
+pliable suffix.  On the hard positive it skipped 33,049,382 of 42,430,348 lookups, retained all
+2,940,923 rejections, and preserved the identical 132,279,387 deterministic work units and verdict.
+
+Five cold paired measurements used `tools/budget_probe.c` with a ten-second nominal allowance.  The
+times below are process CPU seconds inside `canSolveB`, baseline / cutoff:
+
+```
+6.781962 / 6.817467
+6.558353 / 6.492412
+7.129397 / 6.563160
+6.276297 / 6.343689
+6.241084 / 6.226921
+```
+
+Four paired changes lie between a 1.01% improvement and a 1.07% regression; one unreplicated pair
+favours the cutoff by 7.94%.  The raw medians differ by about one percent, but direction changes
+across pairs and the earlier development run was likewise tied.  Even after eliminating
+78% of lookups, there is no stable speed signal: an `rb_dead` lookup is only a few integer operations
+and one table read inside a much larger prefix loop.  The scan and extra branch are not justified.
+
+Baseline and cutoff build IDs were
+`746259413cb92e085b6b6c310e53fb6857ed663062e9dfdd51571383e15dee24` and
+`6779af0441a4031627d2ceb6fe01bc9d4160b3ed02c0a537d15b8fc999db4ec6`.
+
+Decision: retain the full-slack theorem, per-suffix profiler and cutoff switch as research tools,
+but leave the ordinary solver unchanged.  Absolute slack and `sigma-D` are useful explanatory and
+prior variables.  They do not select a safe pliability cutoff without retained routing shape, and
+they do not improve the already cost-based arming decision on the measured real controls.

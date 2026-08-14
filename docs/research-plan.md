@@ -41,9 +41,13 @@ separately and was too weak to enable eagerly, so the existing measured-cost tri
 The follow-up hereditary-pliability test now gives an exact suffix cutoff after the DP is built and
 a cheap sufficient cutoff from absolute slack, tail excess and retained pure corners.  The cheap
 bound is sound but captures only 29 of 65 complete no-call cases in the 243 parent-theorem survivors
-of the small census; it does not justify an a-priori length trigger.  Keep it diagnostic until a
-per-depth cost measurement shows that suppressing certified-vacuous lookups pays for the scan. See
-[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).
+of the small census; it does not justify an a-priori length trigger.  The per-depth measurement is
+complete: full absolute slack strengthens the q/D theorem for 11 partial tails, and actual rejection
+rates fall sharply with both slack and `slack-D`, but an exact cutoff that removed 77.89% of lookups
+on the hard positive produced no stable CPU speedup.  Keep the measured-cost trigger and the cutoff
+diagnostic-only. See
+[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt) and
+[`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 `m=6` closed form and `BBCD` profile are now refuted by the exact `n(10,6)=973` frontier.  The

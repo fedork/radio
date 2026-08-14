@@ -342,11 +342,21 @@ ordinary search still arms the DP only after measured cost. Exact counts and tim
 The probe also reports hereditary suffix pliability. `exact_head=i` means the first `i` nonunit parts
 are the only possible rigid head: suffix `i` and every later suffix fit every residual capacity
 triple, so `rb_dead` is provably vacuous there. `theorem_head` is the cheaper retained-corner
-certificate and `coarse_head` is its length/excess corollary. Set `RB_PLIABILITY_VERBOSE=1` for one
-line per suffix. `tools/rb_pliability_regression.sh` locks the slack-zero/slack-one boundaries, and
-`tools/rb_pliability_census.py` reproduces the complete 283-state comparison. Definitions, proofs
-and measurements are in
+certificate and `coarse_head` is its original length/excess corollary. `slack_excess_head` retains
+the full absolute slack in the stronger bound `2(D-q)<=slack-4`. Set `RB_PLIABILITY_VERBOSE=1` for
+one line per suffix. `tools/rb_pliability_regression.sh` locks the sharp boundaries, and
+`tools/rb_pliability_census.py` reproduces the complete 283-state comparison. Definitions and the
+first census are in
 [`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).
+
+Compile with `RADIO_RB_PROFILE_DIAGNOSTIC` to print actual calls and rejections at every suffix; it
+also enables the exact/theorem report so each observed row carries its structural features.
+`tools/rb_suffix_profile_census.py` builds a forced-arming (`RB_TRIGGER=1`) binary and runs every
+small state cold. `RADIO_RB_PLIABLE_CUTOFF` is an opt-in lab comparison that scans the completed DP
+and skips exactly certified lookups. It is sound but deliberately not a default: even after skipping
+77.89% of lookups on the hard positive, paired CPU timings were noise-level. Proof, profiles and
+commands are in
+[`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 
 ## Split-heuristic research tools
 
@@ -367,6 +377,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_root_probe.c` | evaluate the complete first-test mass relaxation `rb_dead(0,0,0,0)` without enabling it in ordinary search |
 | `tools/rb_pliability_regression.sh` | check exact and theorem-certified hereditary suffix cutoffs at sharp slack boundaries |
 | `tools/rb_pliability_census.py` | reproduce the complete small-state exact/theorem pliability comparison |
+| `tools/rb_suffix_profile_regression.sh` | lock actual per-suffix call/prune accounting and the opt-in exact cutoff |
+| `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; scan a fixed-m frontier with memo reuse |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |

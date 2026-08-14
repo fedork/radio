@@ -1,9 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-13** (deterministic-budget, root-reachability and hereditary
-pliability experiments; proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are
-running beside the retained `run3`/`run8` performance baselines).
+don't know it. Last refreshed **2026-08-14** (actual per-suffix reachability profiles; proof-safe
+cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
+`run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -290,6 +290,18 @@ does not determine the cutoff by itself.  The hard eight-part positive has only 
 tail, while the saturated fourteen-part state at zero slack has none.  No production policy changed;
 the exact scan and reproducible census remain diagnostics. See
 [`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt).
+
+The proposed per-depth follow-up is now measured.  Keeping the full absolute slack strengthens the
+q/D corollary to `2(D-q)<=slack-4`; it improves 11 partial cutoffs in the small census but no
+additional complete no-call state.  A forced cold census made 1,590 actual calls and 259 rejections:
+the rejection rate fell from 49.47% at slack zero to none in 291 calls at slack four or five, while
+`slack-D>=2` had no rejection in 230 calls.  These are useful priors, not theorems; `slack-D=1`
+already has a reached counterexample.  On the real hard positive, the exact tail cutoff removed
+33.05 M of 42.43 M lookups while retaining all 2.94 M rejections and identical deterministic work,
+yet five paired timings showed no stable CPU benefit.  The saturated state instead made 1.14 M
+useful rejections in a 40 M-work probe.  Therefore the measured-cost trigger remains and no cutoff
+is enabled; the profiler and rejected exact switch are reproducible research modes. See
+[`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 
 Raw validation and rejected-experiment logs are archived as `bounded-probe-2026-08-11` and
 `bounded-probe-rejected-2026-08-11`.  Full control flow, build IDs and the two-stage correction are

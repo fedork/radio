@@ -21,6 +21,8 @@ certify a frontier cell:
 |---|---|
 | `deadline_stall_2026-08-10.txt` | why finite descendants must share an absolute allowance and long-state probes must deepen monotonically; CPU-clock incarnation used by the frozen Sa(193) runs |
 | `work_budget_rb_root_2026-08-13.txt` | calibration and regression of deterministic accepted-prefix budgets; exact meaning, measured power, and rejected eager use of `rb_dead(0,0,0,0)` |
+| `rb_pliability_2026-08-13.txt` | exact hereditary suffix pliability and the first absolute-slack/tail-length certificates |
+| `rb_slack_profile_2026-08-14.txt` | full-slack q/D refinement, actual suffix call/prune census, real controls and rejected exact cutoff |
 
 ## Regenerating and auditing
 
