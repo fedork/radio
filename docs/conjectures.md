@@ -599,6 +599,126 @@ retaining an exact proof obligation for each skipped query.  The scale-free step
 prove eventual dyadic-polynomial formulae for `d*`—or for its guarded mixed-frontier pieces—while
 testing whether those descriptions survive atom refinement.
 
+### Ground-up atom induction: the outer states are black boxes
+
+The construction does **not** need the internal solution trees of A, B, or C.  They occur in
+separate adaptive branches, so their witnesses can be attached independently after the two outer
+tests have selected a branch.  The four-segment state (1) depends only on the six outer scalars
+`a,alpha,b,beta,c,gamma`.  In particular, `a-c` is an arithmetic width difference, not a remainder
+of A's witness tree.  Keeping the A/B/C/D labels while forming (1) is bookkeeping for the diagram;
+it is not an atom-by-atom alignment condition.
+
+This makes induction on total height possible.  For fixed `m`, every admissible choice has
+`alpha,beta,gamma<m`; the already constructed one-part widths at those heights supply `a,b,c`, and
+only the synchronized D branch is new.  Use `A_r,B_r,C_r,D_r` below for the first four atom values
+of `G_r` (not the diagram components), with refinement
+
+    A_{r+1}=2 A_r,
+    B_{r+1}=A_r+B_r,
+    C_{r+1}=B_r+C_r,
+    D_{r+1}=C_r+D_r.                              (4)
+
+The first nontrivial height steps then work directly in atoms, conditional only on the proposed
+outer assembly.
+
+**Height 4.**  Put `s=k-2`, `r=s-1`, and choose
+`(alpha,beta,gamma)=(2,2,1)`.  The known height-1 and height-2 constructions give
+
+    a=B_{s+1},  b=B_s,  c=A_s,  d=2 C_r.
+
+The hard branch is
+
+    Sb(2 C_r:2, A_s:1, B_s:1) @ s.
+
+One test splits the two copies of `C_r` evenly and uses the decompositions
+`A_s=A_r+A_r`, `B_s=A_r+B_r`.  Its two pure children are the singleton state
+`(A_r,C_r)` and its mixed child is `(A_r,B_r,C_r,C_r)`, a prefix of `G_r`.  Hence the branch is
+solvable, while (4) gives
+
+    a+b+d = 4 A_r+2 B_r+2 C_r = R(AACC).
+
+Thus the ground-up assembly produces the `AACC@G[k-2]` lower-bound construction (for `r>=2`; the
+smaller established cases remain finite base cases).  This is an achievability statement, not a new
+maximality proof.
+
+**Height 5.**  Put `s=k-2`, `r=s-2`, and choose
+`(alpha,beta,gamma)=(3,2,2)`.  The height-2 and height-3 constructions give
+
+    a=A_s+C_s,  b=c=B_s,
+    a-c=A_{s-1}+C_{s-1},
+    d=B_{s-1}+D_{s-1}.
+
+At level `r` the hard branch therefore has the three width profiles
+
+    (ABCD:2), (AAAB:1), (AABC:2).                 (5)
+
+There is a uniform two-test construction for (5).  On the first test take respectively
+`(AB:2)`, `(AB:0)`, and `(AC:1)`.  One pure child is the first two atoms of `G_{r+1}`.  The other
+pure child is `(AB:2,AC:1)` and is resolved by taking `(B:1,A:1)`.  The mixed child is
+
+    (AB:1, AB:1, AC:1, CD:2).
+
+Resolve it by taking `B:0` from the first `AB`, `A:0` from the second, `A:1` from `AC`, and
+`h:1` from `CD`, where `h=floor((C_r+D_r)/2)` and
+`h'=C_r+D_r-h`.  Its singleton children are majorized by `G_r`: the only non-immediate case is
+`(A_r,B_r,C_r,h,h')`, for which `h'<=C_r` and `h+h'=C_r+D_r`, so its first five prefix sums are
+bounded by `(A_r,B_r,C_r,C_r,D_r)`.  This proves (5) for `r>=3`.  Finally,
+
+    a+b+d = 3 B_s+D_s,
+
+so the construction has profile `BBBD@G[k-2]`, equivalently the recorded height-5 formula, for
+all `k>=7`.  Again, this proves the lower bound only; equality remains conjectural beyond the
+finite proven frontier.
+
+**Height 6 is exactly the first synchronization obstruction.**  The repeated finite winner uses
+`(alpha,beta,gamma)=(4,3,2)`.  With `r=k-4`, the refuted `BBCD` continuation would require the hard
+branch
+
+    Sb(ABBD:3, AABC:1, ABCC:2) @ r+2.             (6)
+
+It works through the finite `k<=9` data but fails at `k=10`: at `G_6`, its D word `ABBD` has width
+232 and would give the impossible parent width 976.  The exact height-6 frontier instead uses
+`d=229`, giving the verified hard state `Sb(229:3,241:2,248:1)@8` and parent width 973.  After one
+more refinement, at `G_5`, the failed D word is `AAAABBCD` (width 232), whereas one eight-atom
+accounting of the exact width 229 is `ABBBBBCD`: three `A` atoms have been replaced by three `B`
+atoms.  This is a precise finite synchronization loss of three, not evidence for a constant
+correction at later levels.
+
+At the same `G_5` normalization, the outer A and C widths have profiles
+`A^10 B^4 C^2` and `A^7 B`; hence `a-c=A^3 B^3 C^2` is nonnegative.  This supports—but does not
+prove—the working expectation that C fits inside A after sufficient refinement.  The resulting
+parent accounting `A^16 B^11 C^4 D` is likewise only an outer width decomposition; it is not claimed
+to be a symmetric profile derived from the stored witness tree.
+
+### Minimal state for a height-first D optimizer
+
+No routed catalog for A/B/C is needed.  A scale-free implementation needs only two kinds of entry:
+
+    P[m,q] = outer width germ (and one proof pointer) for the constructed one-part state;
+    H[q; (w_1:h_1),...,(w_j:h_j)] = exact constructibility of a labelled mixed state.
+
+Here a width germ may be stored either as an atom-count vector after refinement to a common `G_t`,
+or equivalently as its binomial-deficit polynomial.  For each new `m`, refine the already known
+`P[alpha,q-1]`, `P[beta,q-2]`, and `P[gamma,q-2]` to the common base, form the three fixed widths
+`b,c,a-c`, and ask `H` for the largest D germ.  The parent comparison is then the scalar deficit
+comparison `delta_A+delta_B+delta_D`; the A/B/C proof pointers are used only after a winner has been
+chosen.
+
+If the cell interpretation requires whole atoms, `c` fitting in `a` means only that the scalar
+difference `a-c` has a nonnegative atom decomposition at the selected refinement.  It does not mean
+that C must select cells from a previously fixed decomposition of A.  Likewise, if the maximal
+integer D has no decomposition with exactly `2^(q-2)` atoms, increase `q` and refine; the 229 example
+first acquires the displayed eight-atom D accounting one level below the failed four-atom attempt.
+
+The computational stabilization test is therefore
+
+    P[m,q+1] = R(P[m,q])
+
+together with refinement-compatible guarded pieces for the D mixed-child frontier.  Equality of
+numeric widths or atom counts alone is only discovery evidence.  A scalable proof still requires a
+symbolic split template (as above for heights 4 and 5), or an induction showing that the guarded
+frontier description itself refines.
+
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 
 Across the frontier enumerations above — six states, three values of k, for both m=5 and m=6 —

@@ -167,8 +167,14 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   (`tools/singletonization_regression.sh`).  `assembly-rank` completes the level-8 static stage—165
   admissible triples, 37 surviving bounds—but exact optimization remains open; in particular its
   simple target `Sb(50:4,39:6)@6` is negative.  The generic mixed-frontier/guarded-piece optimizer
-  remains the recursive route to a scale-free D formula.  No eventual formula or new Pareto datum
-  is claimed.
+  remains the recursive route to a scale-free D formula.  A height-first atom calculation now
+  clarifies that A/B/C are black boxes: only their outer width-height pairs enter the hard branch;
+  no witness-tree or atom-placement alignment is required.  It gives uniform conditional
+  constructions for the `AACC` height-4 profile and, for `k>=7`, the `BBBD` height-5 profile.  At
+  height 6 it lands on the known obstruction exactly: the old D word `ABBD@G_6` has width 232,
+  whereas the exact `k=10` slice has `d=229`, expressible after refinement as `ABBBBBCD@G_5`.
+  This finite three-unit synchronization loss is not extrapolated.  No eventual formula or new
+  Pareto datum is claimed.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.

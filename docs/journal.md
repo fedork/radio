@@ -5614,3 +5614,36 @@ were under `/tmp/assembly-k8-rank*.out` and were not retained, so these observat
 notes, not evidence claims.  Two one-CPU-second development probes were also killed after entering
 the first exact query; that led to the clean `assembly-rank` mode rather than another inferred
 negative.  Process inventory was empty afterward.  No CSV fact changes.
+
+## 2026-08-14 — ground-up atom assembly needs only outer A/B/C dimensions
+
+The proposed height-first version starts at `m=1` and constructs consecutive heights.  A correction
+to the first formulation is important: the internal witnesses of diagram components A/B/C do not
+interact.  They sit in separate adaptive branches and can be attached independently, so the hard
+state needs only `a,alpha,b,beta,c,gamma`.  In particular, `a-c` is scalar subtraction, not an
+aligned subword of A.  Only the new four-segment D branch has synchronized cuts.
+
+Writing `A_r,B_r,C_r,D_r` for atom values of `G_r`, the corrected recurrence gives explicit uniform
+hard-branch constructions through height 5.  For `m=4`, heights `(alpha,beta,gamma)=(2,2,1)` reduce
+the branch to `Sb(2C_r:2,A_{r+1}:1,B_{r+1}:1)@r+1`; one split leaves `(A_r,C_r)` in both pure
+outcomes and `(A_r,B_r,C_r,C_r)` in the mixed outcome.  The parent profile is `AACC`.  For `m=5`,
+heights `(3,2,2)` reduce the branch, two levels above `G_r`, to atom widths
+`(ABCD:2),(AAAB:1),(AABC:2)`.  A two-test symbolic split, recorded in
+`docs/conjectures.md`, proves the `BBBD` lower-bound construction for `r>=3` (`k>=7`).  Neither
+argument proves Pareto maximality.
+
+At `m=6`, the same calculation isolates the known break.  Heights `(4,3,2)` make the old `BBCD`
+continuation require D profile `ABBD@G_6`, width 232, in the `k=10` hard branch.  Exact frontier
+evidence rules that out and proves `d=229`.  Refining once gives failed word `AAAABBCD@G_5`; replacing
+three A atoms by B atoms gives the exact-width accounting `ABBBBBCD@G_5=229`.  The accompanying
+outer profiles are A=`A^10B^4C^2`, B=`A^5B^2C`, C=`A^7B`, so `a-c=A^3B^3C^2` is already a
+nonnegative eight-atom word at this normalization.  The parent accounting is `A^16B^11C^4D=973`.
+These are arithmetic atom decompositions, not a claim that the stored witness has a symmetric
+per-coin profile, and the three-unit loss is not extrapolated to later levels.  Sources for the
+finite 973/974 boundary remain `witnesses/majorized_973_6_at10.tree` and
+`evidence/sb_m6_k10_frontier.txt`.
+
+An attempted bounded-singletonization follow-up launched depths 3 through 8 concurrently before
+their cost was known.  All six were interrupted after about 36 seconds each (about 216 CPU seconds
+total) without a summary or verdict; process inventory was empty afterward.  Do not repeat those
+depths in parallel.  This abort contributes no mathematical evidence.
