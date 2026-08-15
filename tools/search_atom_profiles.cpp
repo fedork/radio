@@ -1,11 +1,13 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -93,6 +95,8 @@ struct DCPart {
     std::uint8_t d{};
     std::uint8_t cd{};
     std::uint8_t height{};
+
+    friend bool operator==(const DCPart &, const DCPart &) = default;
 };
 
 using DCState = std::vector<DCPart>;
@@ -117,6 +121,12 @@ struct DCKeyHash {
         for (int i = 0; i < key.size; ++i) mix(key.parts[i]);
         return value;
     }
+};
+
+struct DCSplit {
+    std::uint8_t selected_d{};
+    std::uint8_t selected_cd{};
+    std::uint8_t selected_height{};
 };
 
 struct LocalChildren {
@@ -155,6 +165,7 @@ std::array<ProfileId, MAX_HEIGHT> reference_profiles{};
 std::unordered_map<Key, bool, KeyHash> memo;
 std::unordered_map<Key, std::vector<Split>, KeyHash> witnesses;
 std::unordered_map<DCKey, bool, DCKeyHash> dc_memo;
+std::unordered_map<DCKey, std::vector<DCSplit>, DCKeyHash> dc_witnesses;
 Counters counters;
 
 Deficit make_deficit(const Counts &count) {
@@ -569,11 +580,13 @@ bool construct_dc(const DCState &input, int depth) {
     }
 
     struct Candidate {
+        int original{};
         DCPart part{};
         std::vector<DCOption> options;
     };
     std::vector<Candidate> candidates;
-    for (DCPart part : state) {
+    for (std::size_t part_index = 0; part_index < state.size(); ++part_index) {
+        const DCPart part = state[part_index];
         std::vector<DCOption> viable;
         for (DCOption option : dc_local_options(part)) {
             bool possible = true;
@@ -589,7 +602,8 @@ bool construct_dc(const DCState &input, int depth) {
             dc_memo.emplace(key, false);
             return false;
         }
-        candidates.push_back({part, std::move(viable)});
+        candidates.push_back(
+            {static_cast<int>(part_index), part, std::move(viable)});
     }
     std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
                                                               const Candidate &right) {
@@ -597,6 +611,7 @@ bool construct_dc(const DCState &input, int depth) {
     });
 
     std::array<DCState, 3> partial;
+    std::vector<DCSplit> selected_original(candidates.size());
     auto dfs = [&](auto &&self, int index) -> bool {
         if (index == static_cast<int>(candidates.size())) return true;
         for (const DCOption &option : candidates[index].options) {
@@ -612,6 +627,8 @@ bool construct_dc(const DCState &input, int depth) {
             if (!possible) continue;
             const auto saved = partial;
             partial = std::move(next);
+            selected_original[candidates[index].original] =
+                {option.selected_d, option.selected_cd, option.selected_height};
             if (self(self, index + 1)) return true;
             partial = saved;
         }
@@ -620,6 +637,7 @@ bool construct_dc(const DCState &input, int depth) {
 
     const bool answer = dfs(dfs, 0);
     dc_memo.emplace(key, answer);
+    if (answer) dc_witnesses.emplace(key, std::move(selected_original));
     return answer;
 }
 
@@ -689,7 +707,8 @@ bool construct(const State &input, int depth) {
         remember(key, false);
         return false;
     }
-    if (!construct_dc(project_dc(state), depth)) {
+    const DCState projected = project_dc(state);
+    if (!construct_dc(projected, depth)) {
         ++counters.dc_rejects;
         remember(key, false);
         return false;
@@ -779,6 +798,183 @@ void print_state(const State &state) {
         std::cout << profile_text(state[i].profile) << ':' << static_cast<int>(state[i].height);
     }
     if (state.empty()) std::cout << '-';
+}
+
+void print_dc_state(const DCState &state) {
+    for (std::size_t i = 0; i < state.size(); ++i) {
+        if (i) std::cout << ',';
+        std::cout << '(' << static_cast<int>(state[i].d) << ','
+                  << static_cast<int>(state[i].cd) << "):"
+                  << static_cast<int>(state[i].height);
+    }
+    if (state.empty()) std::cout << '-';
+}
+
+std::array<DCState, 3> dc_children_of(const DCState &state,
+                                      const std::vector<DCSplit> &split) {
+    std::array<DCState, 3> children;
+    for (std::size_t i = 0; i < state.size(); ++i) {
+        const DCPart part = state[i];
+        const DCSplit cut = split[i];
+        const int complement_d = part.d - cut.selected_d;
+        const int complement_cd = part.d + part.cd - cut.selected_cd;
+        std::array<DCState, 3> local{
+            DCState{{cut.selected_d, cut.selected_cd, cut.selected_height}},
+            DCState{{cut.selected_d, cut.selected_cd,
+                     static_cast<std::uint8_t>(part.height - cut.selected_height)},
+                    {static_cast<std::uint8_t>(complement_d),
+                     static_cast<std::uint8_t>(complement_cd), cut.selected_height}},
+            DCState{{static_cast<std::uint8_t>(complement_d),
+                     static_cast<std::uint8_t>(complement_cd),
+                     static_cast<std::uint8_t>(part.height - cut.selected_height)}}};
+        for (int outcome = 0; outcome < 3; ++outcome) {
+            normalize_dc(local[outcome]);
+            children[outcome] = add_dc_states(children[outcome], local[outcome]);
+        }
+    }
+    return children;
+}
+
+void print_dc_tree(const DCState &input, int depth, int parent = -1, int outcome = -1,
+                   int level = 0, int *next_id_pointer = nullptr) {
+    int local_next_id = 0;
+    int &next_id = next_id_pointer ? *next_id_pointer : local_next_id;
+    DCState state = input;
+    normalize_dc(state);
+    const int id = next_id++;
+    const DCKey key = make_dc_key(state, depth);
+    const auto found = dc_witnesses.find(key);
+    std::cout << "dc_tree_node id=" << id << " parent=" << parent
+              << " outcome=" << outcome << " level=" << level << " state=";
+    print_dc_state(state);
+    if (found == dc_witnesses.end()) {
+        std::cout << " leaf=YES\n";
+        return;
+    }
+    std::cout << " split=";
+    for (std::size_t i = 0; i < found->second.size(); ++i) {
+        if (i) std::cout << ',';
+        const DCSplit split = found->second[i];
+        std::cout << '(' << static_cast<int>(split.selected_d) << ','
+                  << static_cast<int>(split.selected_cd) << "):"
+                  << static_cast<int>(split.selected_height);
+    }
+    std::cout << '\n';
+    const std::array<DCState, 3> children = dc_children_of(state, found->second);
+    for (int child_outcome = 0; child_outcome < 3; ++child_outcome)
+        print_dc_tree(children[child_outcome], depth - 1, id, child_outcome, level + 1,
+                      &next_id);
+    if (!next_id_pointer)
+        std::cout << "dc_tree_certificate version=1 root=0 nodes=" << next_id
+                  << " profile_atoms=" << PROFILE_ATOMS << '\n';
+}
+
+DCState dc_state_from_key(const DCKey &key) {
+    DCState state;
+    for (int i = 0; i < key.size; ++i) {
+        const int encoded_profile = key.parts[i] / (MAX_HEIGHT + 1);
+        const int height = key.parts[i] % (MAX_HEIGHT + 1);
+        const int d = encoded_profile / (PROFILE_ATOMS + 1);
+        const int cd = encoded_profile % (PROFILE_ATOMS + 1);
+        state.push_back({static_cast<std::uint8_t>(d), static_cast<std::uint8_t>(cd),
+                         static_cast<std::uint8_t>(height)});
+    }
+    normalize_dc(state);
+    return state;
+}
+
+bool dc_is_substate(const DCState &small, const DCState &large) {
+    if (small.size() > large.size()) return false;
+    std::vector<bool> used(large.size(), false);
+    for (DCPart wanted : small) {
+        bool found = false;
+        for (std::size_t i = 0; i < large.size(); ++i) {
+            if (!used[i] && large[i] == wanted) {
+                used[i] = true;
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+
+void reset_search();
+
+// Synthesize a candidate coinductive kernel from two repeated bounded-search layers.  Equality of
+// the layers is only a discovery device, not the all-depth proof: the independent Python checker
+// exhausts every cut from the emitted minimal cores and verifies upward-substate closure directly.
+void print_dc_kernel_certificate(const DCState &root) {
+    constexpr int SEARCH_DEPTH = 20;
+    reset_search();
+    if (construct_dc(root, SEARCH_DEPTH))
+        throw std::logic_error("kernel target unexpectedly became constructible");
+
+    std::unordered_map<DCKey, bool, DCKeyHash> layer3;
+    std::unordered_map<DCKey, bool, DCKeyHash> layer4;
+    for (const auto &[stored_key, answer] : dc_memo) {
+        if (answer || (stored_key.depth != 3 && stored_key.depth != 4)) continue;
+        DCKey key = stored_key;
+        key.depth = 0;
+        (stored_key.depth == 3 ? layer3 : layer4).emplace(key, false);
+    }
+    if (layer3.size() != layer4.size())
+        throw std::logic_error("candidate DC kernel layers differ in size");
+    for (const auto &[key, answer] : layer3) {
+        (void)answer;
+        if (!layer4.contains(key))
+            throw std::logic_error("candidate DC kernel layers differ in membership");
+    }
+    DCKey root_key = make_dc_key(root, 0);
+    if (!layer4.contains(root_key))
+        throw std::logic_error("DC kernel does not contain its requested root");
+
+    std::vector<DCState> states;
+    states.reserve(layer4.size());
+    for (const auto &[key, answer] : layer4) {
+        (void)answer;
+        DCState state = dc_state_from_key(key);
+        if (dc_lineage_possible(state) && dc_full_star(state))
+            states.push_back(std::move(state));
+    }
+    std::vector<DCState> minimal_states;
+    for (std::size_t i = 0; i < states.size(); ++i) {
+        bool redundant = false;
+        for (std::size_t j = 0; j < states.size(); ++j) {
+            if (i != j && dc_is_substate(states[j], states[i])) {
+                redundant = true;
+                break;
+            }
+        }
+        if (!redundant) minimal_states.push_back(states[i]);
+    }
+    states = std::move(minimal_states);
+    std::sort(states.begin(), states.end(), [](const DCState &left, const DCState &right) {
+        if (left.size() != right.size()) return left.size() < right.size();
+        for (std::size_t i = 0; i < left.size(); ++i) {
+            const auto left_tuple =
+                std::tuple(left[i].d, left[i].cd, left[i].height);
+            const auto right_tuple =
+                std::tuple(right[i].d, right[i].cd, right[i].height);
+            if (left_tuple != right_tuple) return left_tuple < right_tuple;
+        }
+        return false;
+    });
+
+    std::cout << "dc_kernel_certificate version=1 model=power_of_two_atom_aligned"
+              << " profile_atoms=" << PROFILE_ATOMS << " search_depth=" << SEARCH_DEPTH
+              << " fixed_layers=3,4 core_states=" << states.size()
+              << " candidate_rank_first=290 candidate_rank_last=304 next_rank=305"
+              << " implicit_axioms=d_lineage,full_star minimized=multiset"
+              << " closure=upward_substate root=";
+    print_dc_state(root);
+    std::cout << " verdict=ALL_DEPTH_NO\n";
+    for (const DCState &state : states) {
+        std::cout << "dc_kernel_state state=";
+        print_dc_state(state);
+        std::cout << '\n';
+    }
 }
 
 std::array<State, 3> children_of(const State &state, const std::vector<Split> &split) {
@@ -920,6 +1116,7 @@ void reset_search() {
     memo.clear();
     witnesses.clear();
     dc_memo.clear();
+    dc_witnesses.clear();
     counters = {};
 }
 
@@ -955,6 +1152,18 @@ int parse_nonnegative(const char *text, const char *name, int maximum = 1000000)
     if (end == text || *end != '\0' || value < 0 || value > maximum)
         throw std::invalid_argument(std::string("invalid ") + name);
     return static_cast<int>(value);
+}
+
+DCPart parse_dc_part(const char *text) {
+    int d = -1;
+    int cd = -1;
+    int height = -1;
+    char trailing = '\0';
+    if (std::sscanf(text, "%d,%d,%d%c", &d, &cd, &height, &trailing) != 3 || d < 0 ||
+        d > cd || cd > PROFILE_ATOMS || height < 1 || height > MAX_HEIGHT)
+        throw std::invalid_argument("invalid DC part (expected d,cd,height)");
+    return {static_cast<std::uint8_t>(d), static_cast<std::uint8_t>(cd),
+            static_cast<std::uint8_t>(height)};
 }
 
 std::vector<ProfileId> ordered_profiles() {
@@ -1008,6 +1217,14 @@ int main(int argc, char **argv) {
         initialize_profiles();
         if (argc == 2 && std::string(argv[1]) == "height6-lineage-certificate") {
             print_height6_lineage_certificate();
+            return 0;
+        }
+        if (argc == 2 && std::string(argv[1]) == "height6-dc-kernel-certificate") {
+            const std::vector<ProfileId> ordered = ordered_profiles();
+            if (ordered.size() < 290)
+                throw std::invalid_argument(
+                    "height6 DC kernel certificate requires the 16-atom build");
+            print_dc_kernel_certificate(project_dc(height6_state(ordered[289])));
             return 0;
         }
         if (argc == 3 && (std::string(argv[1]) == "height4-control" ||
@@ -1102,10 +1319,59 @@ int main(int argc, char **argv) {
             return 1;
         }
 
+        if (argc == 4 && std::string(argv[1]) == "height6-dc") {
+            const int depth = parse_nonnegative(argv[2], "depth", 255);
+            const std::vector<ProfileId> ordered = ordered_profiles();
+            const int rank = parse_nonnegative(argv[3], "rank");
+            if (rank < 1 || rank > static_cast<int>(ordered.size()))
+                throw std::invalid_argument("rank lies outside configured profile list");
+
+            const State state = height6_state(ordered[rank - 1]);
+            const DCState projected = project_dc(state);
+            reset_search();
+            const auto started = std::chrono::steady_clock::now();
+            const bool answer = construct_dc(projected, depth);
+            const double seconds = std::chrono::duration<double>(
+                                       std::chrono::steady_clock::now() - started)
+                                       .count();
+            std::cout << "height6_dc rank=" << rank
+                      << " D=" << profile_text(ordered[rank - 1])
+                      << " depth=" << depth << " answer=" << (answer ? "YES" : "NO")
+                      << " state=";
+            print_dc_state(projected);
+            std::cout << " wall=" << seconds << "s dc_memo=" << dc_memo.size() << '\n';
+            if (answer) print_dc_tree(projected, depth);
+            return answer ? 0 : 1;
+        }
+
+        if (argc >= 4 && std::string(argv[1]) == "dc-state") {
+            const int depth = parse_nonnegative(argv[2], "depth", 255);
+            DCState state;
+            for (int i = 3; i < argc; ++i) state.push_back(parse_dc_part(argv[i]));
+            normalize_dc(state);
+            if (dc_total_height(state) > MAX_HEIGHT)
+                throw std::invalid_argument("DC state exceeds height bound");
+            reset_search();
+            const auto started = std::chrono::steady_clock::now();
+            const bool answer = construct_dc(state, depth);
+            const double seconds = std::chrono::duration<double>(
+                                       std::chrono::steady_clock::now() - started)
+                                       .count();
+            std::cout << "dc_state depth=" << depth << " answer="
+                      << (answer ? "YES" : "NO") << " state=";
+            print_dc_state(state);
+            std::cout << " wall=" << seconds << "s dc_memo=" << dc_memo.size() << '\n';
+            if (answer) print_dc_tree(state, depth);
+            return answer ? 0 : 1;
+        }
+
         std::cerr << "usage: " << argv[0]
                   << " height4-control|height5-control|height6|height6-literal-residual"
                      "|height6-literal-core maximum_depth\n"
                   << "       " << argv[0] << " height6-max depth [first_rank [last_rank]]\n"
+                  << "       " << argv[0] << " height6-dc depth rank\n"
+                  << "       " << argv[0] << " dc-state depth d,cd,height [...]\n"
+                  << "       " << argv[0] << " height6-dc-kernel-certificate\n"
                   << "       " << argv[0] << " height6-lineage-certificate\n";
         return 2;
     } catch (const std::exception &error) {

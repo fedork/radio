@@ -383,10 +383,11 @@ tools, not yet part of `radiobase.c`:
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, exact variable-width synchronization, and memo-exhaustion abort semantics |
-| `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8 or 16 atoms, with an all-depth D-lineage obstruction and a sound `(D,C+D)` abstraction |
+| `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8 or 16 atoms, with all-depth D-lineage and finite `(D,C+D)` coinductive obstructions |
 | `tools/check_atom_profile_certificate.py` | independently exhaust the local algebra behind a D-lineage closed losing-set certificate |
 | `tools/check_atom_profile_tree.py` | independently re-derive every split, leaf inequality and threshold in a symbolic positive tree |
-| `tools/atom_profile_regression.sh` | verify the height-4/5 controls, exact eight-atom height-6 optimum, and the first 16-atom exclusions |
+| `tools/check_dc_kernel_certificate.py` | independently exhaust every cut from the 16-atom projected losing kernel and replay its boundary tree |
+| `tools/atom_profile_regression.sh` | verify the height-4/5 controls, exact eight-atom height-6 optimum, and all-depth 16-atom exclusions through rank 304 |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -689,8 +690,9 @@ Two symbolic necessary tests precede exact recursion.  The all-depth D-lineage t
 height-`h` state when the unweighted sum of its D counts is below `max(0,h-4)`; this is a closed
 losing-set proof, not a depth cutoff.  The `(D,C+D)` projection retains the first two deficit
 coefficients and over-approximates aligned play, so its `NO` is a sound exclusion at the requested
-depth.  Other negative results remain exhaustive only inside the configured aligned model and at
-that depth.
+depth.  For the 16-atom rank-290 projection, the program can also synthesize a finite coinductive
+kernel: its independently checked upward closure replaces the depth qualifier entirely.  Other
+negative results remain exhaustive only inside the configured aligned model and at that depth.
 
 Build and run it as follows:
 
@@ -700,6 +702,11 @@ CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
 tools/run_with_provenance.py /tmp/search_atom_profiles height6 2
 tools/run_with_provenance.py /tmp/search_atom_profiles height6-lineage-certificate
 tools/run_with_provenance.py /tmp/search_atom_profiles height6-max 3 1 82
+
+CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+    -DATOM_PROFILE_ATOMS=16 tools/search_atom_profiles.cpp -o /tmp/search_atom_profiles16
+tools/run_with_provenance.py /tmp/search_atom_profiles16 height6-dc-kernel-certificate
+tools/run_with_provenance.py /tmp/search_atom_profiles16 height6-dc 3 305
 tools/atom_profile_regression.sh
 ```
 
@@ -710,7 +717,10 @@ widest to narrowest and retains both exact and abstract memos across the inclusi
 At eight atoms, ranks 1--81 have all-depth D-lineage certificates and rank 82 `A^6D^2` has an
 independently checked depth-3 tree, so the first 82 scan proves the exact all-depth optimum of that
 slice.  At 16 atoms, ranks 1--289 are lineage-excluded and rank 290 is abstractly negative through
-depth 5; ranks 290--318 remain open before the refined rank-319 winner.
+all depths by the 242-core projected kernel.  Since ranks 290--304 share that projection, all are
+excluded.  Rank 305 has a checked depth-3 projected tree but no full A--D lift yet; ranks 305--318
+remain open before the refined rank-319 winner.  The retained kernel and projected tree are
+`evidence/atom_profile_height6_dc16.cert`.
 
 This does not maximize arbitrary excessive `q`: 165 is the number of A--D words of length eight,
 not the whole longer-profile universe.  Range slicing still prevents one hard germ from hiding

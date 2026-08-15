@@ -88,25 +88,56 @@ whose width is
 valid from the symbolic hard-branch threshold `k>=18`.  Equation (5) is an aligned-family lower
 construction, not a global Pareto maximum over other height triples or normalization sizes.
 
-## Why larger normalization is still open
+## Sixteen-atom two-coordinate kernel
 
 The 165 profiles above are all A--D profiles of length eight, not all excessive-q profiles.  At
 length 16 there are 969 A--D profiles.  The same lineage theorem excludes ranks 1 through 289; the
-refined `ABBBBBCD` class is rank 191, and the first survivor is rank 290, `A^14D^2`.
+refined `ABBBBBCD` class is rank 191, and the first profile not decided by D count alone is rank 290,
+`A^14D^2`.
 
-The two-coordinate abstraction `(p_D,p_C+p_D)` is a sound over-approximation: it retains the first
-two eventual deficit coefficients and allows every projected aligned cut, while dropping the final
-coefficient at terminal comparison.  Therefore an abstract `NO` is an exact bounded-depth
-exclusion.  It rejects the 16-atom rank-290 state through depth 5 in the retained regression.  A
-60-second exact scan reached the next `(D,C+D)` band at rank 305 without a verdict, and the known
-eight-atom positive refines to the constructible profile `A^12C^2D^2` at rank 319.  Whether a new
-16-atom germ in ranks 290--318 wins at greater depth is open.
+The two-coordinate projection
+
+    pi(p) = (p_D,p_C+p_D)
+
+is a sound over-approximation: it retains the first two eventual deficit coefficients, permits
+every projected aligned cut, and deliberately drops the final coefficient at terminal comparison.
+Writing a projected part as `(u,v:h)`, refinement sends its total profile to `(u,u+v)`.  Thus the
+projected local cut algebra is closed and finite.
+
+Ranks 290 through 304 all have `p_D=2,p_C=0`; their differing A/B counts disappear under `pi`.
+Together with the two fixed branches, every one has the same projected root
+
+    S_290 = ((0,1):1), ((0,2):2), ((2,2):3).                      (6)
+
+A single scalar lineage count does not close (6): a cut can trade a projected C gain in the mixed
+child against a prefix failure in a pure child.  The exact invariant is instead a finite
+coinductive kernel.  Let `I` contain every projected state that already fails D lineage or
+two-coordinate full-star majorization, and let `K` be the 242 minimal states retained in
+`evidence/atom_profile_height6_dc16.cert`.  The independently checked property is
+
+    for every S in K and every legal synchronized cut of S,
+    some outcome contains a state in K or I as a substate.          (7)
+
+The upward closure is important: adjoining more branches cannot make an unsolvable restricted
+substate solvable.  Hence (7) makes the upward closure of `K union I` a closed losing set.  Since
+`S_290` is in `K`, it is impossible at every synchronized depth.  The projected model is an
+over-approximation, so this excludes the full A--D profiles at ranks 290--304 as well.  The kernel
+was discovered as a repeated pair of bounded-search layers, but the proof no longer depends on
+that depth: the checker exhausts the transition closure directly.
+
+Rank 305, `A^13CD^2`, adds exactly one C atom and changes only the last root part to `((2,3):3)`.
+It lies outside the losing kernel.  A separately retained 25-node projected tree solves it at
+depth three, so the `(D,C+D)` abstraction is sharp at this boundary.  This positive is only an
+abstraction witness: it does not assign the dropped B/C/D deficit coefficient and therefore is
+not yet a full profile construction.  The exact ranks 305--318 remain open; the known eight-atom
+positive refines to the constructible `A^12C^2D^2` at rank 319.
 
 So the symbolic result is sharp but scoped:
 
 - the one-D proposal is refuted at *all* depths and under every pure refinement;
 - the eight-atom A--D optimum is proved exactly;
-- maximizing over genuinely new profiles introduced by larger `q` remains the next problem.
+- the new 16-atom ranks 290--304 are also all-depth negative;
+- the remaining larger-`q` maximization now begins at the exact rank-305 lifting problem.
 
 ## Mechanical verification
 
@@ -117,3 +148,9 @@ transitions (174,069 cases at eight atoms and 5,540,319 at sixteen), and
 majorization inequality, and threshold in the positive trees.  Neither checker shares code with
 the C++ search.  The combined durable eight-atom proof object is
 `evidence/atom_profile_height6_ad8.cert`.
+
+For the new two-coordinate result, `tools/check_dc_kernel_certificate.py` independently replays
+the projected algebra.  It checks all 242 minimal cores, 641,741 partial global cut assignments,
+their upward-substate closure, and all 25 nodes of the rank-305 projected tree.  The durable object
+is `evidence/atom_profile_height6_dc16.cert`.  The checker does not trust the producer's search
+depth or memo answers.

@@ -8,6 +8,7 @@ trap 'rm -rf "$work_dir"' EXIT
 cd "$repo_dir"
 tools/check_atom_profile_certificate.py evidence/atom_profile_height6_ad8.cert
 tools/check_atom_profile_tree.py evidence/atom_profile_height6_ad8.cert
+tools/check_dc_kernel_certificate.py evidence/atom_profile_height6_dc16.cert
 
 CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_atom_profiles.cpp -o "$work_dir/search_atom_profiles"
@@ -109,6 +110,13 @@ tools/check_atom_profile_certificate.py "$work_dir/lineage16.cert"
 rg -q 'profile_atoms=16 .*candidate_rank_last=289 .*target_rank=191 .*next_rank=290' \
     "$work_dir/lineage16.cert"
 
+run_profile_16 height6-dc-kernel-certificate > "$work_dir/dc-kernel16.cert"
+tools/check_dc_kernel_certificate.py "$work_dir/dc-kernel16.cert"
+diff \
+    <(rg '^(dc_kernel_certificate|dc_kernel_state)' \
+        evidence/atom_profile_height6_dc16.cert) \
+    <(rg '^(dc_kernel_certificate|dc_kernel_state)' "$work_dir/dc-kernel16.cert")
+
 if run_profile_16 height6-max 5 290 290 > "$work_dir/height6-rank290-depth5.out"; then
     echo 'sixteen-atom height6 rank 290 unexpectedly solved within depth 5' >&2
     exit 1
@@ -121,5 +129,17 @@ else
 fi
 rg -q 'rank=290 D=AAAAAAAAAAAAAADD .*answer=NO depth=5 .*dc_rejects=1' \
     "$work_dir/height6-rank290-depth5.out"
+
+run_profile_16 height6-dc 3 305 > "$work_dir/dc-rank305-depth3.out"
+rg -Fq 'height6_dc rank=305 D=AAAAAAAAAAAAACDD depth=3 answer=YES state=(0,1):1,(0,2):2,(2,3):3' \
+    "$work_dir/dc-rank305-depth3.out"
+{
+    rg '^(dc_kernel_certificate|dc_kernel_state)' evidence/atom_profile_height6_dc16.cert
+    rg '^dc_tree' "$work_dir/dc-rank305-depth3.out"
+} > "$work_dir/dc-combined16.cert"
+tools/check_dc_kernel_certificate.py "$work_dir/dc-combined16.cert"
+diff \
+    <(rg '^dc_tree' evidence/atom_profile_height6_dc16.cert) \
+    <(rg '^dc_tree' "$work_dir/dc-rank305-depth3.out")
 
 echo 'atom profile regression passed'

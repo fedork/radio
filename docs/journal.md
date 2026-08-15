@@ -5746,16 +5746,62 @@ UndefinedBehaviorSanitizer build reproduced the rank-82 positive in 16.609 solve
 The phrase “the 165 possible D germs” in the preceding entry was too broad.  They are all A--D words
 of length eight, not all profiles introduced by arbitrary excessive `q`.  The program now also
 builds at 16 atoms.  Its independent certificate checks 5,540,319 local transitions and excludes
-ranks 1--289 at all depths; the refined 229 class is rank 191 and the first survivor is rank 290,
-`A^14D^2`.  The `(D,C+D)` abstraction rejects rank 290 through depth 5 in the retained regression.
+ranks 1--289 at all depths; the refined 229 class is rank 191 and the first state not excluded by
+that lineage test is rank 290, `A^14D^2`.  The `(D,C+D)` abstraction rejects rank 290 through depth 5
+in the retained regression.
 An exploratory abstraction-only run remained negative through depth 16 and was stopped after about
 81 single-threaded seconds; this is not an all-depth verdict.
 
-The genuinely new 16-atom band remains open.  A 60-second exact depth-3 range run discharged ranks
+At that point the genuinely new 16-atom band remained open.  A 60-second exact depth-3 range run discharged ranks
 290--304 via the abstraction, then stalled on rank 305 with 0.05 GB peak RSS.  A separate 60-second
 depth-3 run for rank 319, `A^12C^2D^2`, also timed out at 0.10 GB even though its construction follows
 abstractly by refining the verified eight-atom tree; the timeout measures search order, not
-constructibility.  These runs were capped and left no solver process.  The next symbolic target is
+constructibility.  These runs were capped and left no solver process.  This set up the next symbolic target:
 an all-depth `(D,C+D)` invariant for the rank-290 band, followed by the rank-305 band where that
 two-coordinate relaxation first permits depth-3 play.  Full proof and scope are in
 `docs/theorems/atom-lineage.md`.
+
+## 2026-08-14 — a finite `(D,C+D)` kernel excludes 16-atom ranks 290--304 at all depths
+
+The apparent bounded-depth pattern at rank 290 is a genuine coinductive obstruction.  Project an
+A--D profile to `(p_D,p_C+p_D)`.  The fixed height-1 and height-2 branches project to `(0,1):1` and
+`(0,2):2`; every rank-290--304 germ has two D atoms and no C atom, so all fifteen profiles have the
+same root
+
+    (0,1):1, (0,2):2, (2,2):3.
+
+Exploration first pushed that root from the retained depth 5 to depth 32 (2.99447 solver seconds,
+169,293 memo entries) and depth 255 (28.1646 seconds, 1,576,423 entries), still negative.  Those
+runs were only diagnostics.  The useful observation was that a depth-20 run had identical false
+state sets at internal layers 3 and 4: 3,563 states at each layer.  Removing the immediate D-lineage
+and projected full-star obstructions left 391 cyclic states; taking the minimal antichain under
+multiset-substate inclusion left 242.
+
+That antichain is now a depth-free proof object.  Let `K` be its upward closure together with the
+two immediate obstruction classes.  For every minimal core and every legal assignment of projected
+cuts to all its parts, at least one outcome contains another core or immediate obstruction as a
+substate.  Hence `K` is closed under an adversarial outcome, and the root is all-depth negative.
+Because the projection permits every exact cut and drops a terminal coefficient, its negative
+verdict excludes the full A--D profiles too.  This closes ranks 290--304, not merely rank 290.
+
+The independent `check_dc_kernel_certificate.py` does not trust the repeated search layers.  It
+reimplements refinement, cut legality, all three children, terminal projected majorization, and
+upward-substate closure.  It verifies all 242 cores through 925 cached local options and 641,741
+partial global assignments.  The retained certificate is
+`evidence/atom_profile_height6_dc16.cert`, regenerated and compared byte-for-byte by
+`tools/atom_profile_regression.sh`.  A combined AddressSanitizer/UndefinedBehaviorSanitizer build
+also regenerated the kernel and rank-305 tree with no diagnostic (leak detection is unsupported by
+the platform runtime and was disabled).
+
+The boundary changes exactly at rank 305, `A^13CD^2`: its last projected part is `(2,3):3`.  The
+abstraction found a depth-3 tree in 0.0397185 seconds; its 25 nodes are retained in the same proof
+object and independently replayed.  This is not a full construction, because the projection omits
+the `B+C+D` deficit coefficient.  A temporary search constrained to the first projected witness
+found no lift in 0.145508 seconds after 1,319,632 calls, but that filter did not enumerate other
+projected witnesses and its negative was deliberately not retained.  The complete exact rank-305
+depth-3 search again hit a 60-second cap (about 0.04 GB observed RSS) without a verdict.  No process
+was left running.
+
+The next symbolic problem is therefore narrower: lift a rank-305 projected tree through the third
+coefficient, enumerating alternative projected skeletons if the first one fails, then walk
+ranks 306--318 toward the known refined rank-319 construction.  No Pareto CSV datum changes.

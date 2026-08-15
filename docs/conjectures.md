@@ -751,16 +751,17 @@ outer branches gives the conditional parent profile `A^21B^6C^3D^2@G_(k-5)` and 
 
 This closes the fixed eight-atom A--D slice, not arbitrary excessive `q`.  The 165 profiles are all
 A--D words of length eight, not all possible longer words.  At 16 atoms the same certificate excludes
-ranks 1--289 (including the refined 229 class at rank 191); the first survivor is rank 290,
-`A^14D^2`.  The sound `(p_D,p_C+p_D)` abstraction rejects it through depth 5, while the known
-eight-atom winner refines to rank 319, `A^12C^2D^2`.  Ranks 290--318 remain the first genuinely
-larger-`q` symbolic band.  Full proof and scope are in
+ranks 1--289 (including the refined 229 class at rank 191).  A finite 242-core coinductive kernel
+in the sound `(p_D,p_C+p_D)` abstraction then excludes ranks 290--304 at every depth.  Rank 305,
+`A^13CD^2`, has a checked depth-3 tree in that projection but no full third-coordinate lift yet,
+while the known eight-atom winner refines to rank 319, `A^12C^2D^2`.  Thus ranks 305--318 are the
+first genuinely larger-`q` exact band still open.  Full proof and scope are in
 [the atom-lineage note](theorems/atom-lineage.md).
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
-`tools/atom_profile_regression.sh` invokes independent checkers for the closed losing certificate
-and positive tree.  This is the concrete version of the abstract `H` state below and still uses only
-the outer profiles of A/B/C.
+`tools/atom_profile_regression.sh` invokes independent checkers for the D-lineage certificate, the
+two-coordinate kernel, and both positive trees.  This is the concrete version of the abstract `H`
+state below and still uses only the outer profiles of A/B/C.
 
 ### Minimal state for a height-first D optimizer
 

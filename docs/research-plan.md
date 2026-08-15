@@ -249,12 +249,15 @@ refuted at `k=11`; do not retry it.  The stronger symbolic result now rules out 
 refinement class: following mixed outcomes preserves height and cannot branch a D lineage, so all
 eight-atom ranks 1--81 are all-depth negative.  Rank 82, `A^6D^2`, has a checked three-level tree
 and is the exact A--D eight-atom optimum, yielding the conditional construction
-`2^k-k^2+6k-16` from `k>=18`.  The next task is no longer deeper search for 229.  It is the genuinely
-new 16-atom band: the same certificate excludes ranks 1--289, while ranks 290--318 precede the
-refined rank-319 winner.  Start by seeking an all-depth `(D,C+D)` closed invariant for rank 290 and
-then resolve the rank-305 band where that abstraction first admits depth-3 play.  This carries no
-inner A/B/C witness data, changes no Pareto datum, and remains conditional on the outer assembly;
-definitions, proof and controls are in
+`2^k-k^2+6k-16` from `k>=18`.  The next task is no longer deeper search for 229.  At 16 atoms the
+D-lineage certificate excludes ranks 1--289, and the new 242-core `(D,C+D)` coinductive kernel
+excludes ranks 290--304 at every depth.  Rank 305 is therefore the first live exact target: its
+projection has a checked 25-node depth-3 tree, but the dropped third deficit coordinate has not been
+lifted.  Treat that projected tree as a finite skeleton and solve its A/B allocation constraints;
+if the first skeleton has no lift, enumerate alternative projected trees before returning to an
+unstructured exact search.  Then walk ranks 306--318 until meeting the refined rank-319 control.
+This carries no inner A/B/C witness data, changes no Pareto datum, and remains conditional on the
+outer assembly; definitions, proof and controls are in
 [the atom-lineage note](theorems/atom-lineage.md) and
 [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 
