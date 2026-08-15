@@ -113,7 +113,7 @@ def split_part(part: Part, selected: Profile, selected_height: int) -> tuple[Sta
         )
     complement = tuple(available - take for take, available in zip(selected, total))
     if sum(complement) != PROFILE_ATOMS:
-        raise ValueError("complement does not contain eight atoms")
+        raise ValueError("complement has the wrong normalization size")
     complement = complement  # type: ignore[assignment]
     both = normalize([(selected, selected_height)])
     mixed = normalize(
@@ -227,7 +227,7 @@ def main() -> int:
     if summary.get("version") != "1":
         raise ValueError("unsupported tree certificate version")
     PROFILE_ATOMS = int(summary["profile_atoms"])
-    if PROFILE_ATOMS < 8 or PROFILE_ATOMS > 16 or PROFILE_ATOMS & (PROFILE_ATOMS - 1):
+    if PROFILE_ATOMS < 8 or PROFILE_ATOMS > 32 or PROFILE_ATOMS & (PROFILE_ATOMS - 1):
         raise ValueError(f"unsupported profile atom count {PROFILE_ATOMS}")
     levels = PROFILE_ATOMS.bit_length() - 1
     if int(summary["normalization_levels"]) != levels:

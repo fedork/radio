@@ -53,7 +53,10 @@ diagnostic-only. See
 `m=6` closed form and `BBCD` profile are refuted by the exact `n(10,6)=973` frontier.  A checked
 sixteen-atom aligned tree now gives the different conditional continuation
 `2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  The next
-excessive-`q` question is whether the 32-atom slice improves on this refinement class.
+excessive-`q` question has narrowed sharply: a 32-atom all-depth kernel leaves only rank 1180
+between the excluded prefix and the constructible pure refinement at rank 1181.  More generally,
+the outer algebra reduces each `N=2^s` slice to minimizing the D germ's `C` count and then its `B`
+count; no arbitrary word search remains.
 
 ## Proximate goals
 
@@ -258,9 +261,18 @@ excludes ranks 290--304 at every depth.  The first projected rank-305 tree has n
 product search over alternative projected splits finds a checked 19-node exact tree for
 `A^13CD^2`.  Thus rank 305 is the exact sixteen-atom optimum and yields the conditional parent
 profile `A^49B^9C^4D^2@G[k-6]`, equivalently `A^7B^7D^2@G[k-4]`, with width
-`2^k-k^2+7k-21` from `k>=12`.  The next finite optimizer is the 32-atom slice: first test whether the
-same projected skeleton lifts the wider germ `A^29CD^2`, then enumerate alternatives and synthesize
-an all-depth losing kernel for every preceding projection band.  This carries no inner A/B/C
+`2^k-k^2+7k-21` from `k>=12`.  At 32 atoms, lineage and a new independently checked 504-core
+`(D,C+D)` kernel exclude ranks 1--1179 at every depth.  Rank 1181, `A^26BC^3D^2`, is constructible
+by refining the rank-305 tree, so the only unresolved profile in this slice is the wider rank 1180,
+`A^27C^3D^2`.  Capped exact depth-three searches in both the compiled engine and the independent
+product implementation remain inconclusive; the largest completed caps were 900 seconds each.  The next
+symbolic task is therefore singular: either find an exact rank-1180 tree, or close a losing kernel
+that retains the omitted `B+C+D` coordinate.  Only after that one-rank decision should the finite
+optimizer move to 64 atoms and test stabilization.  The general candidate
+`A^(N-b-c-2)B^bC^cD^2`, `N=2^s`, has parent width
+`2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2`; use this formula to compare slices, and keep the
+postulated `s=5,b=0,c=3` value `2^k-k^2+7k-20` explicitly separate from the checked `b=1`
+construction.  This carries no inner A/B/C
 witness data, changes no Pareto datum, and remains conditional on the outer assembly; definitions,
 proof and controls are in
 [the atom-lineage note](theorems/atom-lineage.md) and
@@ -284,12 +296,15 @@ It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the re
 passed in 471.6 CPU seconds in run8 and 479.2 in proof-safe run9. Use run8 as the
 matched baseline for run9's natural `Sa(193)` progress, visible-attempt cost and memory, but use only
 run9 for a new negative claim. Do not add split history before that comparison matures.
-The theory track now has two compatible large-k targets: determine whether the 32-atom aligned
-slice improves the new `m=6` continuation (while the separate exact `k=11` case remains open), and
-test whether recursive Pareto lifting stabilises once low-k degeneration disappears.  In both cases
-retain alternative Pareto upgrades and split classes, then recover small k backwards.  The
-rank-305 result is the warning in miniature: its first projected tree does not lift, while another
-one does.  Do not use one witness-tree shape as evidence that either track has a unique continuation.
+The theory track now has two compatible large-k targets: decide the sole open 32-atom profile at
+rank 1180 (while the separate exact `k=11` case remains open), and test whether recursive Pareto
+lifting stabilises once low-k degeneration disappears.  In both cases retain alternative Pareto
+upgrades and split classes, then recover small k backwards.  The rank-305 result is the warning in
+miniature: its first projected tree does not lift, while another one does.  Do not use one
+witness-tree shape—or the timeout on rank 1180—as evidence that either track has a unique
+continuation.  Once rank 1180 is decided, the 64-atom projected search should minimize `c` before
+any exact `b` search; that ordering follows from the symbolic width formula and prevents another
+undirected profile scan.
 
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`

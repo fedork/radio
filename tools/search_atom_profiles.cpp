@@ -15,7 +15,7 @@
 // Symbolic search for the excessive-q, power-of-two-atom height-6 construction.
 //
 // A profile (a,b,c,d) denotes a*A_r+b*B_r+c*C_r+d*D_r, with
-// a+b+c+d=PROFILE_ATOMS (8 by default, optionally 16 at compile time).
+// a+b+c+d=PROFILE_ATOMS (8 by default, optionally 16 or 32 at compile time).
 // Refinement from G_r to G_(r-1) is
 //
 //   A -> AA,  B -> AB,  C -> BC,  D -> CD.
@@ -42,8 +42,8 @@ constexpr int PROFILE_ATOMS = ATOM_PROFILE_ATOMS;
 constexpr int TYPES = 4;
 constexpr int MAX_HEIGHT = 6;
 constexpr int MAX_PARTS = MAX_HEIGHT;
-static_assert(PROFILE_ATOMS >= 8 && PROFILE_ATOMS <= 16,
-              "supported normalizations contain 8 or 16 atoms");
+static_assert(PROFILE_ATOMS >= 8 && PROFILE_ATOMS <= 32,
+              "supported normalizations contain 8, 16 or 32 atoms");
 static_assert((PROFILE_ATOMS & (PROFILE_ATOMS - 1)) == 0,
               "profile atom count must be a power of two");
 #ifndef ATOM_PROFILE_MAX_MEMO
@@ -148,6 +148,7 @@ struct Counters {
     std::uint64_t calls{};
     std::uint64_t memo_hits{};
     std::uint64_t lineage_rejects{};
+    std::uint64_t supply_rejects{};
     std::uint64_t dc_rejects{};
     std::uint64_t raw_options{};
     std::uint64_t assignments{};
@@ -173,7 +174,7 @@ Deficit make_deficit(const Counts &count) {
 }
 
 // Negative means left is eventually wider.  Equal deficits imply equal profiles because both
-// profiles contain exactly eight atoms.
+// profiles contain exactly PROFILE_ATOMS atoms.
 constexpr int normalization_levels() {
     int atoms = PROFILE_ATOMS;
     int levels = 0;
@@ -427,6 +428,53 @@ int required_d_lineages(const State &state) {
 
 bool d_lineage_possible(const State &state) {
     return d_lineages(state) >= required_d_lineages(state);
+}
+
+// Follow the mixed outcome for every remaining test.  If a state has unweighted deficit
+// supply (D,V,W), where V=C+D and W=B+C+D, one refinement can supply at most
+//
+//     (D, V+D, W+V).
+//
+// Selected and complementary profiles attain that sum only when neither zero-height piece is
+// discarded.  After t levels the componentwise upper bound is therefore
+//
+//     (D, V+tD, W+tV+C(t,2)D).
+//
+// A singleton leaf of height h must dominate the complete prefix of the first h reference
+// profiles.  If even this optimistic supply is lexicographically smaller, nature can keep taking
+// the mixed outcome and the state cannot finish within t levels.  Heights do not multiply supply:
+// each state part denotes one profile lineage, exactly as in the all-depth D-lineage lemma.
+Deficit mixed_supply_upper(const State &state, int depth) {
+    Deficit supply{};
+    for (Part part : state)
+        for (int coefficient = 0; coefficient < 3; ++coefficient)
+            supply[coefficient] += profiles[part.profile].deficit[coefficient];
+
+    const int initial_d = supply[0];
+    const int initial_v = supply[1];
+    supply[1] += depth * initial_d;
+    supply[2] += depth * initial_v + depth * (depth - 1) / 2 * initial_d;
+    return supply;
+}
+
+Deficit singleton_prefix_requirement(const State &state) {
+    Deficit required{};
+    const std::size_t height = total_height(state);
+    if (height > MAX_HEIGHT) throw std::logic_error("state exceeds terminal height bound");
+    for (std::size_t index = 0; index < height; ++index)
+        for (int coefficient = 0; coefficient < 3; ++coefficient)
+            required[coefficient] += profiles[reference_profiles[index]].deficit[coefficient];
+    return required;
+}
+
+bool mixed_supply_possible(const State &state, int depth) {
+    const Deficit supply = mixed_supply_upper(state, depth);
+    const Deficit required = singleton_prefix_requirement(state);
+    for (int coefficient = 0; coefficient < 3; ++coefficient) {
+        if (supply[coefficient] != required[coefficient])
+            return supply[coefficient] > required[coefficient];
+    }
+    return true;
 }
 
 // Sound two-coefficient over-approximation.  A projected profile keeps only
@@ -704,6 +752,11 @@ bool construct(const State &input, int depth) {
     }
     if (!d_lineage_possible(state)) {
         ++counters.lineage_rejects;
+        remember(key, false);
+        return false;
+    }
+    if (!mixed_supply_possible(state, depth)) {
+        ++counters.supply_rejects;
         remember(key, false);
         return false;
     }
@@ -1129,6 +1182,7 @@ void print_result(const State &state, int depth, bool answer, double seconds) {
               << " wall=" << seconds << "s calls=" << counters.calls
               << " memo_hits=" << counters.memo_hits << " memo=" << memo.size()
               << " lineage_rejects=" << counters.lineage_rejects
+              << " supply_rejects=" << counters.supply_rejects
               << " dc_rejects=" << counters.dc_rejects << " dc_memo=" << dc_memo.size()
               << " raw_options=" << counters.raw_options
               << " assignments=" << counters.assignments
@@ -1138,6 +1192,14 @@ void print_result(const State &state, int depth, bool answer, double seconds) {
                   << " d_lineages=" << d_lineages(state)
                   << " required=" << required_d_lineages(state)
                   << " preserving_outcome=mixed\n";
+    if (!mixed_supply_possible(state, depth)) {
+        const Deficit supply = mixed_supply_upper(state, depth);
+        const Deficit required = singleton_prefix_requirement(state);
+        std::cout << "atom_profile_depth_obstruction=mixed_supply depth=" << depth
+                  << " supply_upper=" << supply[0] << ',' << supply[1] << ',' << supply[2]
+                  << " required=" << required[0] << ',' << required[1] << ',' << required[2]
+                  << " preserving_outcome=mixed verdict=NO_WITHIN_DEPTH\n";
+    }
     if (answer) {
         const int threshold = print_tree(state, depth);
         std::cout << "atom_profile_proof root_base_threshold=" << threshold
@@ -1152,6 +1214,34 @@ int parse_nonnegative(const char *text, const char *name, int maximum = 1000000)
     if (end == text || *end != '\0' || value < 0 || value > maximum)
         throw std::invalid_argument(std::string("invalid ") + name);
     return static_cast<int>(value);
+}
+
+Part parse_profile_part(const char *text) {
+    const std::string encoded(text);
+    const std::size_t separator = encoded.rfind(':');
+    if (separator == std::string::npos || separator == 0 || separator + 1 == encoded.size())
+        throw std::invalid_argument("invalid profile part (expected canonical WORD:height)");
+    const std::string word = encoded.substr(0, separator);
+    if (word.size() != static_cast<std::size_t>(PROFILE_ATOMS))
+        throw std::invalid_argument("profile word has the wrong normalization size");
+
+    static constexpr std::array<char, TYPES> LETTERS{'A', 'B', 'C', 'D'};
+    Counts count{};
+    int previous = 0;
+    for (char letter : word) {
+        const auto found = std::find(LETTERS.begin(), LETTERS.end(), letter);
+        if (found == LETTERS.end())
+            throw std::invalid_argument("profile word contains an unknown atom letter");
+        const int index = static_cast<int>(found - LETTERS.begin());
+        if (index < previous)
+            throw std::invalid_argument("profile word is not in canonical A/B/C/D order");
+        previous = index;
+        ++count[index];
+    }
+    const int height = parse_nonnegative(encoded.c_str() + separator + 1, "profile height",
+                                         MAX_HEIGHT);
+    if (height == 0) throw std::invalid_argument("profile height must be positive");
+    return {lookup_profile(count), static_cast<std::uint8_t>(height)};
 }
 
 DCPart parse_dc_part(const char *text) {
@@ -1365,12 +1455,30 @@ int main(int argc, char **argv) {
             return answer ? 0 : 1;
         }
 
+        if (argc >= 4 && std::string(argv[1]) == "profile-state") {
+            const int depth = parse_nonnegative(argv[2], "depth", 255);
+            State state;
+            for (int i = 3; i < argc; ++i) state.push_back(parse_profile_part(argv[i]));
+            normalize(state);
+            if (total_height(state) > MAX_HEIGHT)
+                throw std::invalid_argument("profile state exceeds height bound");
+            reset_search();
+            const auto started = std::chrono::steady_clock::now();
+            const bool answer = construct(state, depth);
+            const double seconds = std::chrono::duration<double>(
+                                       std::chrono::steady_clock::now() - started)
+                                       .count();
+            print_result(state, depth, answer, seconds);
+            return answer ? 0 : 1;
+        }
+
         std::cerr << "usage: " << argv[0]
                   << " height4-control|height5-control|height6|height6-literal-residual"
                      "|height6-literal-core maximum_depth\n"
                   << "       " << argv[0] << " height6-max depth [first_rank [last_rank]]\n"
                   << "       " << argv[0] << " height6-dc depth rank\n"
                   << "       " << argv[0] << " dc-state depth d,cd,height [...]\n"
+                  << "       " << argv[0] << " profile-state depth WORD:height [...]\n"
                   << "       " << argv[0] << " height6-dc-kernel-certificate\n"
                   << "       " << argv[0] << " height6-lineage-certificate\n";
         return 2;

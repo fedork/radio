@@ -383,11 +383,13 @@ tools, not yet part of `radiobase.c`:
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, exact variable-width synchronization, and memo-exhaustion abort semantics |
-| `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8 or 16 atoms, with all-depth D-lineage and finite `(D,C+D)` coinductive obstructions |
+| `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8, 16 or 32 atoms, with all-depth D-lineage, finite-depth mixed-supply pruning, and finite `(D,C+D)` coinductive obstructions |
 | `tools/check_atom_profile_certificate.py` | independently exhaust the local algebra behind a D-lineage closed losing-set certificate |
 | `tools/check_atom_profile_tree.py` | independently re-derive every split, leaf inequality and threshold in a symbolic positive tree |
-| `tools/check_dc_kernel_certificate.py` | independently exhaust every cut from the 16-atom projected losing kernel and replay its boundary tree |
-| `tools/atom_profile_regression.sh` | verify the height-4/5 controls, exact eight-atom height-6 optimum, and all-depth 16-atom exclusions through rank 304 |
+| `tools/check_atom_parent_formula.py` | independently derive the general `(s,b,c)` parent profile and compare its closed width formula with direct atom evaluation |
+| `tools/check_dc_kernel_certificate.py` | independently exhaust every cut from the 16- and 32-atom projected losing kernels, validate their complete rank bands, and replay an optional boundary tree |
+| `tools/check_dc_tree_lift.py` | lift a retained projected tree exactly, stream all projected skeletons with the hidden coordinate, or synthesize a projected losing kernel at any power-of-two normalization |
+| `tools/atom_profile_regression.sh` | verify the height-4/5 controls, exact eight-/sixteen-atom height-6 optima, and the all-depth 32-atom exclusion through rank 1179 |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -681,18 +683,22 @@ piece description gives a constant-size D optimizer even when the antichain itse
 `search_atom_profiles.cpp` is narrower than `search_singletonization.cpp`: it searches only
 non-wasteful strategies whose every current width is a sum of `N` `G_r` atoms and whose cuts take
 `N` of the `2N` atoms produced by refinement.  The default is `N=8`; compile with
-`-DATOM_PROFILE_ATOMS=16` for the next normalization.  A profile `(a,b,c,d)` means
+`-DATOM_PROFILE_ATOMS=16` or `32` for the larger supported normalizations.  A profile `(a,b,c,d)` means
 `a A_r+b B_r+c C_r+d D_r`.  Its eventual deficit coefficients are
 `(d,c+d,b+c+d)` in the basis `(binom(r,2),r,1)`, so the program compares profiles symbolically and
 prints a concrete lower threshold for every positive tree.
 
-Two symbolic necessary tests precede exact recursion.  The all-depth D-lineage theorem rejects a
+Three symbolic necessary tests precede exact recursion.  The all-depth D-lineage theorem rejects a
 height-`h` state when the unweighted sum of its D counts is below `max(0,h-4)`; this is a closed
-losing-set proof, not a depth cutoff.  The `(D,C+D)` projection retains the first two deficit
+losing-set proof, not a depth cutoff.  The finite-depth mixed-supply bound iterates the full
+triangular deficit transform along the adversarial mixed path and rejects a state when even its
+optimistic supply cannot reach the terminal prefix.  The `(D,C+D)` projection retains the first two deficit
 coefficients and over-approximates aligned play, so its `NO` is a sound exclusion at the requested
 depth.  For the 16-atom rank-290 projection, the program can also synthesize a finite coinductive
-kernel: its independently checked upward closure replaces the depth qualifier entirely.  Other
-negative results remain exhaustive only inside the configured aligned model and at that depth.
+kernel: its independently checked upward closure replaces the depth qualifier entirely.
+`check_dc_tree_lift.py` applies the same projected algebra at larger power-of-two normalizations;
+its retained 32-atom kernel closes three adjacent projection bands.  Other negative results remain
+exhaustive only inside the configured aligned model and at that depth.
 
 Build and run it as follows:
 
@@ -712,6 +718,11 @@ tools/check_atom_profile_tree.py evidence/atom_profile_height6_rank305.cert
 # Optional two-minute rediscovery of the retained exact tree:
 tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \
     --rank 305 --all-skeletons --depth 3 --expect YES --emit-tree
+tools/check_dc_kernel_certificate.py evidence/atom_profile_height6_dc32.cert
+# Optional ~2.5-minute rediscovery of the retained 32-atom kernel:
+tools/check_dc_tree_lift.py --atoms 32 --rank 1121 --projected-only --depth 32 \
+    --expect NO --emit-dc-kernel 3,4
+tools/check_atom_parent_formula.py
 tools/atom_profile_regression.sh
 ```
 
@@ -730,12 +741,29 @@ and first projected tree are `evidence/atom_profile_height6_dc16.cert`; the exac
 `evidence/atom_profile_height6_rank305.cert`.
 
 This does not maximize arbitrary excessive `q`: 165 is the number of A--D words of length eight,
-and 969 the number at sixteen, not the whole longer-profile universe.  The next slice is 32 atoms;
-the C++ producer must be generalized beyond its current 16-atom bound before scanning it.  Range
-slicing still prevents one hard germ from hiding completed work on later germs.  The default
-two-million exact memo-entry ceiling aborts explicitly rather than printing `NO`; external time and
-memory caps remain appropriate for deeper runs.  The proof and scope are in
+and 969 the number at sixteen, not the whole longer-profile universe.  At 32 atoms, D lineage and
+the 504-core certificate in `evidence/atom_profile_height6_dc32.cert` exclude ranks 1--1179 at all
+depths.  Pure refinement constructs rank 1181, leaving only rank 1180 open in that slice.  The
+Python product search accepts `--atoms 32` without a tree certificate for this work; its capped
+rank-1180 exact search was inconclusive, so no negative is recorded.  Range slicing still prevents
+one hard germ from hiding completed work on later germs.  The C++ tool's default two-million exact
+memo-entry ceiling aborts explicitly rather than printing `NO`; external time and memory caps
+remain appropriate for deeper runs.  The proof and scope are in
 [the atom-lineage note](theorems/atom-lineage.md).
+
+For a custom exact state, `profile-state depth WORD:height [...]` runs the same recursion and emits
+a machine-checkable tree on success.  `check_dc_tree_lift.py --projected-only` skips exact lifts and
+is the appropriate mode for discovering a larger-normalization two-coordinate kernel.  The
+mixed-supply control used by the regression is
+
+```
+/tmp/search_atom_profiles32 profile-state 3 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB:1 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAABBCC:3
+```
+
+It is rejected immediately with supply upper bound `(0,2,11)` below the height-4 requirement
+`(0,2,13)`.  This is a depth-three obstruction only.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

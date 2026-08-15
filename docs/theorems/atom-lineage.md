@@ -56,6 +56,33 @@ Equivalently, these states form a closed losing set: for every legal test, natur
 mixed child and remain in the set.  This is the finite coinductive certificate that the earlier
 bounded-depth search was missing.
 
+## Finite-depth mixed-supply lemma
+
+The same argument retains all three deficit coordinates.  Define the unweighted supply
+
+    Sigma(S) = sum over parts (p_D, p_C+p_D, p_B+p_C+p_D) = (D,V,W).
+
+Again, do not multiply a part by its height.  Refinement acts by the triangular map
+
+    T(D,V,W) = (D,V+D,W+V).
+
+Selected and complementary profiles partition `T(p)`.  A zero-height mixed piece can delete
+supply but cannot add it, so every mixed child satisfies `Sigma(S_1) <= T(Sigma(S))`
+componentwise.  After following `t` mixed outcomes,
+
+    Sigma(S_t) <= (D, V+tD, W+tV+binom(t,2)D).                    (2a)
+
+Let `Q_h` be the sum of the deficit triples of the first `h` singleton reference profiles.  A
+singleton leaf of height `h` must have total deficit lexicographically at least `Q_h`.  Therefore:
+
+> **Mixed-supply bound.** If the right side of (2a) is lexicographically smaller than `Q_h`, a
+> height-`h` state cannot finish within `t` more synchronized tests.
+
+This is a finite-depth obstruction.  Its leading-coordinate failure is independent of `t` and is
+exactly the D-lineage theorem; lower-coordinate failures can disappear when more depth is allowed.
+The compiled search uses this bound before recursion, and the independent lineage checker verifies
+the local triangular inequality on every enumerated cut at the 8- and 16-atom controls.
+
 ## Height-6 consequence
 
 For the `(alpha,beta,gamma)=(4,3,2)` hard branch, the two fixed profiles have no D atoms:
@@ -181,12 +208,84 @@ So the symbolic result is sharp but scoped:
 - the one-D proposal is refuted at *all* depths and under every pure refinement;
 - the eight- and sixteen-atom A--D optima are proved exactly;
 - the new 16-atom ranks 290--304 are also all-depth negative;
-- the remaining arbitrary-excess-`q` maximization now begins at the 32-atom slice, where a profile
-  wider than the refinement of rank 305 may still exist.
+- the 32-atom slice is reduced to one unresolved profile, but larger normalization sizes remain
+  open.
+
+## Thirty-two-atom boundary kernel
+
+At length 32 there are 6,545 A--D profiles.  D lineage excludes ranks 1--1089.  The next three
+complete projection bands all have two D atoms:
+
+    ranks 1090--1120: p_C=0, root ((0,1):1),((0,2):2),((2,2):3),
+    ranks 1121--1150: p_C=1, root ((0,1):1),((0,2):2),((2,3):3),
+    ranks 1151--1179: p_C=2, root ((0,1):1),((0,2):2),((2,4):3).  (11)
+
+A projected depth-32 search exposed identical false layers at depths three and four.  Minimizing
+their viable states under multiset inclusion gives the 504-core kernel retained in
+`evidence/atom_profile_height6_dc32.cert`.  The independently checked closure property is again
+(7), now for all 504 cores.  Its upward closure contains every root in (11), so the projection
+excludes ranks 1090--1179 at every depth.  Together with D lineage, every rank through 1179 is
+therefore impossible in the exact aligned model.
+
+The next profile is rank 1180, `A^27C^3D^2`, whose projected last part is `((2,5):3)` and is not
+covered by this kernel.  Rank 1181, `A^26BC^3D^2`, is the pure refinement
+`R(A^13CD^2)` and hence inherits the exact rank-305 construction.  Consequently the exact
+32-atom optimum has been narrowed to a one-rank alternative: rank 1180 if that state is
+constructible, otherwise rank 1181.  A capped exact depth-three product search for rank 1180 made
+no determination; larger capped runs in both exact implementations did not change that.  None is a
+negative result.
+
+## Scalar form of the remaining D optimization
+
+The outer A/B/C branches can now be eliminated symbolically.  Put `N=2^s`, with `s>=3`.  D
+lineage requires at least two D atoms, while any larger D count loses in the leading eventual
+coefficient, so write the only potentially optimal D germ as
+
+    D_(s;b,c) = A^(N-b-c-2) B^b C^c D^2.
+
+At the same normalization the three already constructed outer profiles are
+
+    A^(N-1)B,
+    A^(N-2s+1) B^(2s-3) C^2,
+    A^(N-s) B^(s-1) C.
+
+Thus attaching `D_(s;b,c)` gives the parent profile
+
+    A^(4N-3s-b-c-2) B^(3s+b-3) C^(c+3) D^2 @ G_(k-s-2),        (12)
+
+and purely algebraic evaluation gives the width germ
+
+    2^k - k^2 + (2s-c)k - s^2 - 3s + c(s+1) - b + 2.           (13)
+
+No witness internals occur in (12)--(13).  For a fixed normalization and `k>s+1`, eventual width
+order says to minimize `c` first and then `b`; constructibility of that two-parameter D state is
+the only remaining synchronized obligation.
+
+For the height-6 root, its unweighted supply and the six-item terminal requirement are
+
+    Sigma(S) = (2, c+5, 3s+b+c+1),
+    Q_6      = (2, 2s+4, s^2+3s+5).                              (14)
+
+At depth three, (2a) and (14) force `c>=2s-7`.  If equality holds, the last coordinate further
+requires `b>=s^2-8s+11`.  These are necessary depth-three bounds, not all-depth bounds.  At
+`s=5`, the first one forces `c>=3`, agreeing with the stronger all-depth kernel; the second places
+no restriction on `b`.  The exact 32-atom question is consequently the single step `b=1 -> 0`:
+
+    b=1: A^26BC^3D^2, constructible by refinement, parent width
+         2^k-k^2+7k-21;
+    b=0: A^27C^3D^2, unresolved, formal parent
+         A^108B^12C^6D^2 @ G_(k-7), width 2^k-k^2+7k-20.         (15)
+
+The working sufficiently-large-`q` postulate licenses this eventual comparison, but does not imply
+the second line of (15) is constructible.  It is the unique wider candidate left at `s=5`.  At
+larger `s`, neither `c=2s-7` nor `b=0` may be assumed without another all-depth
+exclusion/positive argument.  Equation (13), rather than a guessed word, is the scalable objective
+for those slices.
 
 ## Mechanical verification
 
-`tools/atom_profile_regression.sh` builds both the 8- and 16-atom variants.  It invokes
+`tools/atom_profile_regression.sh` builds both the 8- and 16-atom variants and also checks the
+retained 32-atom projected certificate.  It invokes
 `tools/check_atom_profile_certificate.py`, which independently enumerates all local refinement/cut
 transitions (174,069 cases at eight atoms and 5,540,319 at sixteen), and
 `tools/check_atom_profile_tree.py`, which independently re-derives every state, split, terminal
@@ -194,11 +293,14 @@ majorization inequality, and threshold in the positive trees.  Neither checker s
 the C++ search.  The combined durable eight-atom proof object is
 `evidence/atom_profile_height6_ad8.cert`.
 
-For the new two-coordinate result, `tools/check_dc_kernel_certificate.py` independently replays
-the projected algebra.  It checks all 242 minimal cores, 641,741 partial global cut assignments,
-their upward-substate closure, and all 25 nodes of the first rank-305 projected tree.  The durable
-object is `evidence/atom_profile_height6_dc16.cert`.  The checker does not trust the producer's
-search depth or memo answers.
+For the two-coordinate results, `tools/check_dc_kernel_certificate.py` independently replays the
+projected algebra.  On the 16-atom certificate it checks all 242 minimal cores, 641,741 partial
+global cut assignments, their upward-substate closure, and all 25 nodes of the first rank-305
+projected tree.  On the 32-atom certificate it checks 504 cores and 1,776,407 assignments, verifies
+that all three complete rank bands in (11) are represented, and verifies that every one of their
+roots contains a listed core.  The durable objects are `evidence/atom_profile_height6_dc16.cert`
+and `evidence/atom_profile_height6_dc32.cert`.  The checker does not trust the producer's search
+depth or memo answers.
 
 `tools/check_dc_tree_lift.py` then reimplements the omitted-coordinate intervals and proves that
 this first skeleton has no exact lift.  Its all-skeleton mode produced the alternative exact tree
@@ -206,3 +308,10 @@ in `evidence/atom_profile_height6_rank305.cert`; `tools/check_atom_profile_tree.
 re-derives every one of its profiles, splits, children, leaf inequalities, and threshold.  The
 ordinary regression verifies both the fixed-skeleton negative and the retained positive tree;
 rerunning the two-minute all-skeleton discovery is optional because the tree itself is the proof.
+
+The same regression builds the 32-atom exact engine, checks a 32-atom singleton tree, and locks a
+sharp mixed-supply rejection.  `tools/check_atom_profile_certificate.py` independently checks the
+local triangular supply inequality while replaying 5,540,319 transitions at 16 atoms.
+`tools/check_atom_parent_formula.py` separately reconstructs (12) from the three outer profiles and
+compares (13) with direct atom evaluation in 5,136 cases, including all three boundary
+specializations in (15).

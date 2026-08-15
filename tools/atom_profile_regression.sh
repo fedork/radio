@@ -6,9 +6,11 @@ work_dir=$(mktemp -d "${TMPDIR:-/tmp}/radio-atom-profile.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT
 
 cd "$repo_dir"
+tools/check_atom_parent_formula.py
 tools/check_atom_profile_certificate.py evidence/atom_profile_height6_ad8.cert
 tools/check_atom_profile_tree.py evidence/atom_profile_height6_ad8.cert
 tools/check_dc_kernel_certificate.py evidence/atom_profile_height6_dc16.cert
+tools/check_dc_kernel_certificate.py evidence/atom_profile_height6_dc32.cert
 tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \
     --rank 305 --expect NO
 tools/check_atom_profile_tree.py evidence/atom_profile_height6_rank305.cert
@@ -144,5 +146,35 @@ tools/check_dc_kernel_certificate.py "$work_dir/dc-combined16.cert"
 diff \
     <(rg '^dc_tree' evidence/atom_profile_height6_dc16.cert) \
     <(rg '^dc_tree' "$work_dir/dc-rank305-depth3.out")
+
+CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+    -DATOM_PROFILE_ATOMS=32 tools/search_atom_profiles.cpp \
+    -o "$work_dir/search_atom_profiles_32"
+
+run_profile_32() {
+    tools/run_with_provenance.py "$work_dir/search_atom_profiles_32" "$@"
+}
+
+run_profile_32 profile-state 0 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA:1 \
+    > "$work_dir/singleton32.out"
+tools/check_atom_profile_tree.py "$work_dir/singleton32.out"
+
+if run_profile_32 profile-state 3 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB:1 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAABBCC:3 \
+    > "$work_dir/mixed-supply32.out"; then
+    echo '32-atom mixed-supply control unexpectedly solved within depth 3' >&2
+    exit 1
+else
+    status=$?
+    if [[ $status -ne 1 ]]; then
+        echo "32-atom mixed-supply control aborted with status $status" >&2
+        exit "$status"
+    fi
+fi
+rg -q 'answer=NO .*profile_atoms=32 .*supply_rejects=1' \
+    "$work_dir/mixed-supply32.out"
+rg -q 'atom_profile_depth_obstruction=mixed_supply depth=3 supply_upper=0,2,11 required=0,2,13' \
+    "$work_dir/mixed-supply32.out"
 
 echo 'atom profile regression passed'

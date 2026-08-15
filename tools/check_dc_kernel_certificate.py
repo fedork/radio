@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Independently verify a coinductive (D,C+D) losing-kernel certificate.
 
-The producer is tools/search_atom_profiles.cpp.  This checker deliberately reimplements the
-projected refinement/cut algebra and does not trust the producer's bounded-depth memo table.
+The producers are tools/search_atom_profiles.cpp and tools/check_dc_tree_lift.py.  This checker
+deliberately reimplements the projected refinement/cut algebra and does not trust either
+producer's bounded-depth memo table.
 
 A listed core denotes its upward closure under adjoining state parts.  For every non-axiomatic
 core S, the checker exhausts every synchronized test and verifies that some outcome contains a
@@ -96,32 +97,55 @@ def ordered_profiles(atoms: int) -> list[tuple[int, int, int, int]]:
     return profiles
 
 
-def check_rank_boundary(header: dict[str, str], root: State) -> State:
+def check_rank_boundary(header: dict[str, str], root: State) -> tuple[State, set[State]]:
     atoms = int(header["profile_atoms"])
-    if atoms != 16:
-        raise ValueError("this kernel schema currently certifies the sixteen-atom boundary")
+    if atoms < 8 or atoms & (atoms - 1):
+        raise ValueError("profile_atoms must be a power of two at least eight")
     first = int(header["candidate_rank_first"])
     last = int(header["candidate_rank_last"])
     next_rank = int(header["next_rank"])
     profiles = ordered_profiles(atoms)
     if not (1 <= first <= last < next_rank <= len(profiles)):
         raise ValueError("invalid candidate rank interval")
-    candidate_band = profiles[first - 1 : last]
-    actual_band = [
-        rank for rank, (_, _, c, d) in enumerate(profiles, 1) if (c, d) == (0, 2)
-    ]
-    if actual_band != list(range(first, last + 1)) or next_rank != last + 1:
-        raise ValueError("header does not identify the complete two-D/no-C rank band")
-    if len(candidate_band) != last - first + 1 or any(
-        (c, d) != (0, 2) for _, _, c, d in candidate_band
-    ):
-        raise ValueError("candidate rank interval is not exactly the two-D/no-C band")
-    if profiles[first - 1] != (14, 0, 0, 2) or profiles[next_rank - 1] != (13, 0, 1, 2):
-        raise ValueError("unexpected sixteen-atom rank boundary profiles")
-    expected_root = normalize([(0, 1, 1), (0, 2, 2), (2, 2, 3)])
-    if root != expected_root:
-        raise ValueError("kernel root does not represent the candidate rank band")
-    return normalize([(0, 1, 1), (0, 2, 2), (2, 3, 3)])
+    if next_rank != last + 1:
+        raise ValueError("next_rank is not immediately after the excluded interval")
+
+    interval = set(range(first, last + 1))
+    projections = {(c, d) for _, _, c, d in profiles[first - 1 : last]}
+    covered_ranks: set[int] = set()
+    expected_roots: set[State] = set()
+    for candidate_c, candidate_d in projections:
+        projection_band = {
+            rank
+            for rank, (_, _, c, d) in enumerate(profiles, 1)
+            if (c, d) == (candidate_c, candidate_d)
+        }
+        if not projection_band <= interval:
+            raise ValueError("excluded interval cuts through a C/D projection band")
+        covered_ranks.update(projection_band)
+        expected_roots.add(
+            normalize(
+                [
+                    (0, 1, 1),
+                    (0, 2, 2),
+                    (candidate_d, candidate_c + candidate_d, 3),
+                ]
+            )
+        )
+    if covered_ranks != interval:
+        raise ValueError("excluded interval is not a union of complete projection bands")
+
+    if "roots" in header:
+        listed_roots = {parse_state(item) for item in header["roots"].split(";")}
+        if listed_roots != expected_roots:
+            raise ValueError("roots do not represent exactly the excluded projection bands")
+    elif expected_roots != {root}:
+        raise ValueError("multi-band certificates must list every covered root")
+    if root not in expected_roots:
+        raise ValueError("requested kernel root lies outside the excluded rank interval")
+    _, _, next_c, next_d = profiles[next_rank - 1]
+    next_root = normalize([(0, 1, 1), (0, 2, 2), (next_d, next_c + next_d, 3)])
+    return next_root, expected_roots
 
 
 class KernelChecker:
@@ -459,11 +483,15 @@ def main() -> int:
         if len(cores) != expected_count:
             raise ValueError(f"header says {expected_count} cores, found {len(cores)}")
         root = parse_state(header["root"])
-        if root not in cores:
-            raise ValueError("certificate root is not a listed core")
-        expected_tree_root = check_rank_boundary(header, root)
+        expected_tree_root, covered_roots = check_rank_boundary(header, root)
 
         checker = KernelChecker(atoms, cores)
+        for covered_root in covered_roots:
+            if not checker.contains_core(covered_root):
+                raise ValueError(
+                    "excluded projection root is not covered by a listed core: "
+                    f"{state_text(covered_root)}"
+                )
         checker.check()
         if tree_header is not None:
             checker.check_tree(tree_header, tree_nodes)

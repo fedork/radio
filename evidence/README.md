@@ -5,14 +5,24 @@ that actually certifies the published tables is about 30 KB — two log lines pe
 cell. Those lines live here, in git, so the provenance outlives the logs.
 
 A `witnesses/*.tree` file proves a state *is* solvable and can be re-checked from first
-principles. The files here are different: they are verbatim excerpts of solver output,
+principles. Most files here are different: they are verbatim excerpts of solver output,
 recording **negative** results and exhaustive searches, which cannot be re-derived cheaply.
-They are evidence, not proof — they rest on the solver being correct.
+They are evidence, not proof — they rest on the solver being correct. The `atom_profile_*.cert`
+files are the exception: they are finite symbolic proof objects replayed by independent checkers.
 
 | file | certifies |
 |---|---|
 | `pareto_certification_k1_8.txt` | every `proven-exhaustive` cell of the Sb frontier for K=1..8, and the Sa sequence for k=1..9. 276 obligations, 276 located. |
 | `sa193_unsolvable_in_10.txt` | `Sa(193)` is not solvable in 10, hence `Sa(10) = 192` is maximal |
+
+Symbolic aligned-profile proof objects:
+
+| file | certifies |
+|---|---|
+| `atom_profile_height6_ad8.cert` | the D-lineage exclusion through eight-atom rank 81 and the exact rank-82 construction |
+| `atom_profile_height6_dc16.cert` | the two-coordinate exclusion through sixteen-atom rank 304 and the first projected rank-305 tree |
+| `atom_profile_height6_rank305.cert` | an exact alternative rank-305 tree, establishing the sixteen-atom optimum |
+| `atom_profile_height6_dc32.cert` | the 504-core two-coordinate exclusion of 32-atom ranks 1090--1179; together with D lineage this excludes every rank through 1179 |
 
 Engineering investigations are retained separately because they explain solver policy rather than
 certify a frontier cell:

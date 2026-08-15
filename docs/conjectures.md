@@ -765,8 +765,24 @@ with width
 The compact `A^7B^7D^2@G[k-4]` spelling is the old spreadsheet's `p6'` row: it reproduces 473 at
 `k=9`, the exact 973 at `k=10`, and predicts 1983 at the still-open `k=11`.  The construction needs
 the twice-refined 64-atom realization; the compact spelling alone does not lower its proved atomic
-depth.  Arbitrary excessive `q` remains open—the next finite slice is 32 atoms.  Full proof and
-scope are in [the atom-lineage note](theorems/atom-lineage.md).
+depth.  At 32 atoms, D lineage and a checked 504-core `(D,C+D)` kernel exclude ranks 1--1179 at
+every depth.  Rank 1181, `A^26BC^3D^2`, is the pure refinement of the rank-305 construction, leaving
+only the wider rank 1180, `A^27C^3D^2`, unresolved in that slice.  Thus arbitrary excessive `q`
+remains open, but the next symbolic decision is a single profile rather than a band.  Full proof
+and scope are in [the atom-lineage note](theorems/atom-lineage.md).
+
+There is now a scale-free objective for that decision.  At normalization `N=2^s`, write the D germ
+as `A^(N-b-c-2)B^bC^cD^2`.  Attaching the three known outer branches gives width
+
+    2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2.
+
+Thus eventual maximization at fixed `s` is lexicographic: minimize `c`, then `b`.  For `s=5`, the
+all-depth projected kernel fixes `c=3`; the checked construction has `b=1`, while `b=0` is the
+unique wider candidate still open.  Its formal parent is `A^108B^12C^6D^2@G[k-7]` and its width is
+`2^k-k^2+7k-20`.  The user's sufficiently-large-`q` postulate licenses the eventual comparison; it
+does not supply this missing construction.  This row is deliberately not added to
+`data/conjectures.csv`: no starting `k` or construction is known, and the next normalization could
+change the optimum again.
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
 `tools/check_dc_tree_lift.py` supplies the exact-coordinate product search.

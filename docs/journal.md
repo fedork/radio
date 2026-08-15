@@ -5869,3 +5869,116 @@ This closes the eight- and sixteen-atom finite optimizers, not arbitrary excessi
 slice is 32 atoms: recheck the no-C projected kernel and test whether `A^29CD^2` (which is wider than
 the pure refinement of the rank-305 germ) admits an exact lift.  All local discovery processes
 exited normally; none remains running.
+
+## 2026-08-15 — the 32-atom slice contracts to one unresolved rank
+
+The projected search now accepts an arbitrary power-of-two normalization, so the next slice could
+be attacked without extending the full C++ profile enumerator.  There are 6,545 length-32 A--D
+profiles in eventual-deficit order.  D lineage excludes ranks 1--1089.  The next complete bands are
+
+    ranks 1090--1120: (p_C,p_D)=(0,2),
+    ranks 1121--1150: (p_C,p_D)=(1,2),
+    ranks 1151--1179: (p_C,p_D)=(2,2).
+
+The first probe used rank 1121, `A^29CD^2`.  Projection-only negative searches at depths 3 through
+10 took respectively 0.99, 3.67, 7.52, 12.11, 17.18, 21.42, 26.28 and 30.68 wall seconds.  Depth
+20 took 82.18 seconds; depth 32 took 149.34 seconds, visited 401,549 projected memo states, and used
+about 144 MB maximum RSS.  These bounded negatives were not promoted.  Their useful output was
+structural: in the depth-32 computation the 5,646 false states at depth three were exactly the
+5,646 false states at depth four.
+
+After removing immediate D-lineage/full-star failures and minimizing under multiset inclusion, the
+repeated layer gives 504 viable cores.  The independent checker exhausts every legal synchronized
+cut from them: 1,673 cached local option sets and 1,776,407 partial global assignments.  Every core
+is cyclically closed—each cut has an outcome containing another core or an immediate obstruction.
+The same upward closure contains all three projected roots `(2,2):3`, `(2,3):3`, and `(2,4):3`
+beside the two fixed branches.  The checker recomputes the profile ordering and verifies that these
+are exactly the three complete bands above; it does not trust hand-written rank endpoints.  The
+durable proof object is `evidence/atom_profile_height6_dc32.cert`, checked on an ordinary replay in
+5.08 wall / 5.02 user seconds with 19,709,952 bytes maximum RSS.
+
+Consequently every 32-atom rank through 1179 is impossible at all synchronized depths in the exact
+aligned model: ranks 1--1089 by D lineage and 1090--1179 because the sound projection is already in
+the closed losing set.  Rank 1180 is `A^27C^3D^2`, with projected last part `(2,5):3`, and is the
+first profile outside this kernel.  Rank 1181 is `A^26BC^3D^2=R(A^13CD^2)`, so pure refinement of
+the retained rank-305 exact tree constructs it.  The 32-atom optimum is therefore one of these two
+adjacent ranks.
+
+An exact all-skeleton depth-three search for rank 1180 reached the 300-CPU-second cap after 300.51
+wall / 298.83 user seconds and about 33.4 MB maximum RSS, exiting 152 without a verdict.  This is an
+inconclusive search, not an exclusion.  The next symbolic task is to find an exact rank-1180 tree or
+retain the omitted `B+C+D` coefficient in a closed losing kernel.  Only then is it useful to move
+to 64 atoms.  No Pareto CSV datum changed, and all processes launched for this work had exited by
+the final inventory.
+
+## 2026-08-15 — mixed supply turns the remaining word search into two scalars
+
+The exact C++ profile engine now supports 32 atoms and accepts an arbitrary serialized
+`profile-state`.  Merely raising the old normalization assertion did not solve rank 1180: the first
+depth-three run reached its explicit 4,000,000-state ceiling after 578 seconds at 0.24 GB peak RSS.
+That is an abort, not a bounded negative.
+
+The useful result came from following the mixed outcome symbolically in all three deficit
+coordinates.  For an unweighted state supply
+
+    Sigma(S)=(D,V,W)=sum_parts(p_D,p_C+p_D,p_B+p_C+p_D),
+
+one refinement has upper transform `T(D,V,W)=(D,V+D,W+V)`.  Selected and complementary profiles
+partition that supply; deleting a zero-height piece can only lower it.  After `t` mixed outcomes,
+
+    Sigma(S_t) <= (D,V+tD,W+tV+binom(t,2)D).
+
+If this optimistic triple is lexicographically below the complete height-`h` singleton prefix, the
+state cannot finish within `t` more tests.  This is finite-depth except in its leading D coordinate.
+The independent Python certificate checker now verifies the local triangular inequality while it
+replays every 8- and 16-atom cut; the 16-atom run covers 5,540,319 local transitions.  A sharp
+32-atom regression state has supply upper `(0,2,11)` at depth three versus requirement `(0,2,13)`
+and is rejected before recursion.
+
+One attempted bridge explains both the promise and the remaining obstruction.  From the rank-1180
+root
+
+    A^27B^4C:1, A^23B^7C^2:2, A^27C^3D^2:3,
+
+the split
+
+    A^31B:1, A^23B^7C^2:0, A^28B^2C^2:3
+
+has mixed child exactly equal to the known rank-1181 root.  Its other children are the trivial
+`A^30B^2:2` state and the auxiliary `A^31B:1,A^28B^2C^2:3`.  The latter fails the mixed-supply
+bound at depth three and exact recursion remains negative at every tested depth through 32.  The
+depth-4, 5, 6, 10, 20 and 32 runs took respectively 0.003746, 0.009940, 0.021501, 0.097865,
+0.694269 and 1.6507 solver seconds; depth 32 used 25,233,988 calls and 173,151 memo states.  These
+are bounded negatives for one auxiliary state, not an all-depth kernel and not a rank-1180
+negative.  The bridge is a measured dead end unless that auxiliary state changes.
+
+With the supply filter enabled, the 4,000,000-state rank-1180 run reached the same explicit memo
+abort in 156 seconds at 0.30 GB peak RSS.  A 16,000,000-state build then reached its 900-second wall
+cap instead, using 0.73 GB peak RSS and producing no verdict.  The independently implemented Python
+all-skeleton product search, with the same lemma coded separately, also reached its 900-second cap
+at 0.18 GB peak RSS without a verdict.  Neither timeout emitted a negative line.  No further
+undirected rank-1180 search was started.
+
+The outer algebra nevertheless removes the arbitrary-word part of the excessive-`q` problem.  Let
+`N=2^s` and parameterize the D germ as
+
+    A^(N-b-c-2) B^b C^c D^2.
+
+Adding the three known outer profiles gives
+
+    A^(4N-3s-b-c-2) B^(3s+b-3) C^(c+3) D^2 @ G_(k-s-2)
+
+and width
+
+    2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2.
+
+Thus a fixed normalization first minimizes `c`, then `b`.  At `s=5` the all-depth projected kernel
+has already fixed `c=3`; the sole question is `b=1` (checked refinement) versus `b=0` (rank 1180).
+The latter gives the formal parent `A^108B^12C^6D^2@G_(k-7)` and width
+`2^k-k^2+7k-20`, one above the checked `-21` family.  The user's working sufficiently-large-`q`
+postulate licenses comparing these eventual expressions, but does not prove the `b=0` state.  It
+is not recorded in `data/conjectures.csv` because neither a construction nor a valid starting `k`
+is known.
+`tools/check_atom_parent_formula.py` independently reconstructs the parent counts and checks 5,136
+direct atom evaluations, including both 32-atom alternatives.  No Pareto CSV datum changed, and the
+final local process inventory was empty.

@@ -1,9 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-15** (an exact alternative lift closes the sixteen-atom
-height-6 slice at rank 305 and yields the conditional `m=6` profile `A^7B^7D^2`; arbitrary
-excessive `q` now begins at 32 atoms;
+don't know it. Last refreshed **2026-08-15** (a 504-core certificate excludes 32-atom height-6
+ranks through 1179; rank 1181 is constructible by refinement, leaving only rank 1180 unresolved
+in that slice;
 proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
 `run3`/`run8` performance baselines).
 
@@ -31,7 +31,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
-| **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify one projected skeleton with the exact problem.** | One D lineage cannot serve a height-6 mixed path, and the 16-atom `(D,C+D)` kernel excludes ranks 290--304. The first projected rank-305 tree also has no exact lift, but a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof, and failure of one skeleton is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
+| **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify one projected skeleton with the exact problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton or a capped product search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 
 ## Goals
 
@@ -195,8 +195,18 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   `A^49B^9C^4D^2@G_(k-6)`, equivalently `A^7B^7D^2@G_(k-4)`, and width
   `2^k-k^2+7k-21` for `k>=12`.  This reproduces 473 at `k=9` and the exact 973 at `k=10`, but
   predicts the still-open 1983 at `k=11`; the symbolic threshold does not settle that finite case.
-  Arbitrary excessive `q` remains open at the 32-atom slice.  All losing and positive certificates
-  are independently checked by `tools/atom_profile_regression.sh`; see
+  At 32 atoms, lineage excludes ranks 1--1089 and a separately checked 504-core projected kernel
+  excludes ranks 1090--1179 at every depth.  Rank 1181, `A^26BC^3D^2`, is constructible by pure
+  refinement of rank 305; only the wider rank 1180, `A^27C^3D^2`, remains unresolved in this
+  normalization.  Repeated capped exact depth-three probes still have no verdict.  The new
+  mixed-supply lemma gives the sound finite-depth bound
+  `(D,V,W)->(D,V+tD,W+tV+binom(t,2)D)`, and the outer algebra reduces a general `N=2^s` D germ
+  `A^(N-b-c-2)B^bC^cD^2` to the width
+  `2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2`.  Hence each slice minimizes `c`, then `b`; at 32 atoms
+  the open `b=0,c=3` postulate would give `2^k-k^2+7k-20`, while only `b=1` and the `-21`
+  construction are checked.  Arbitrary excessive `q` therefore remains open, but the 32-atom slice
+  is a one-rank problem rather than a profile scan.  All losing and positive
+  certificates are independently checked by `tools/atom_profile_regression.sh`; see
   [the atom-lineage note](theorems/atom-lineage.md).  No Pareto datum changes.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —

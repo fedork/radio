@@ -173,32 +173,43 @@ def main() -> int:
     if root_d_max >= required:
         raise ValueError("certificate does not exhibit a strict D-lineage deficit")
 
-    # Exhaust the local algebra used by the coinductive closure.  Refinement preserves D;
-    # selected and complementary profiles partition it; and every possible mixed child keeps
-    # no more D-bearing lineages than its parent.  Additivity then proves the same for states.
+    # Exhaust the local algebra used by the coinductive closure.  In deficit coordinates
+    # (D,V,W)=(D,C+D,B+C+D), refinement is (D,V+D,W+V).  Selected and complementary profiles
+    # partition that supply, while zero-height pieces can only remove coordinates from the mixed
+    # child.  Additivity and iteration give the finite-depth mixed-supply bound; its leading
+    # coordinate is the all-depth D-lineage obstruction.
     local_cases = 0
     for parent in profiles(atom_count):
         if refine(parent)[3] != parent[3]:
             raise ValueError(f"D count is not preserved by refinement for {profile_text(parent)}")
+        parent_d, parent_v, parent_w = deficit(parent)
+        refined_supply = (parent_d, parent_v + parent_d, parent_w + parent_v)
+        if deficit(refine(parent)) != refined_supply:
+            raise ValueError("refinement does not follow the triangular deficit recurrence")
         for selected, complement in selected_profiles(parent, atom_count):
             if selected[3] + complement[3] != parent[3]:
                 raise ValueError("selected/complementary D counts do not partition the parent")
             for height in range(1, 7):
                 for selected_height in range(height + 1):
-                    mixed_d = 0
+                    mixed_supply = [0, 0, 0]
                     if height - selected_height > 0:
-                        mixed_d += selected[3]
+                        for index, value in enumerate(deficit(selected)):
+                            mixed_supply[index] += value
                     if selected_height > 0:
-                        mixed_d += complement[3]
-                    if mixed_d > parent[3]:
-                        raise ValueError("mixed outcome increases the number of D lineages")
+                        for index, value in enumerate(deficit(complement)):
+                            mixed_supply[index] += value
+                    if any(
+                        actual > available
+                        for actual, available in zip(mixed_supply, refined_supply)
+                    ):
+                        raise ValueError("mixed outcome exceeds refined deficit supply")
                     local_cases += 1
 
     print(
         "atom lineage certificate verified: "
         f"ranks 1..{last_rank} all-depth excluded; "
         f"target rank {ordered.index(target) + 1}; next rank {last_rank + 1} "
-        f"{profile_text(ordered[last_rank])}; {local_cases} local transitions checked"
+        f"{profile_text(ordered[last_rank])}; {local_cases} local mixed-supply transitions checked"
     )
     return 0
 

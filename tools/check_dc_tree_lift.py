@@ -163,6 +163,10 @@ def state_text(state: State) -> str:
     return ",".join(f"{profile_text(profile)}:{height}" for profile, height in state) or "-"
 
 
+def dc_state_text(state: DCState) -> str:
+    return ",".join(f"({d},{cd}):{height}" for d, cd, height in state) or "-"
+
+
 @dataclass(frozen=True)
 class Node:
     node_id: int
@@ -245,6 +249,7 @@ class LiftChecker:
         self.pairings = 0
         self.cut_assignments = 0
         self.prefix_rejects = 0
+        self.supply_rejects = 0
         self.leaf_checks = 0
         self.witness: dict[tuple[int, State], tuple[tuple[Profile, int], ...]] = {}
 
@@ -266,6 +271,27 @@ class LiftChecker:
             if not eventually_nonnegative(difference):
                 return False
         return True
+
+    @functools.lru_cache(maxsize=None)
+    def mixed_supply_possible(self, state: State, depth: int) -> bool:
+        supply = [0, 0, 0]
+        for profile, _ in state:
+            coordinates = deficit(profile)
+            for coefficient in range(3):
+                supply[coefficient] += coordinates[coefficient]
+        initial_d, initial_v = supply[0], supply[1]
+        supply[1] += depth * initial_d
+        supply[2] += depth * initial_v + math.comb(depth, 2) * initial_d
+
+        required = [0, 0, 0]
+        height = sum(part_height for _, part_height in state)
+        for profile in self.reference[:height]:
+            coordinates = deficit(profile)
+            for coefficient in range(3):
+                required[coefficient] += coordinates[coefficient]
+        return eventually_nonnegative(
+            tuple(supply[index] - required[index] for index in range(3))
+        )
 
     @functools.lru_cache(maxsize=None)
     def exact_cuts(self, part: Part, projected_split: DCSplit) -> tuple[Profile, ...]:
@@ -439,6 +465,7 @@ class DCSolver:
         self.calls = 0
         self.split_assignments = 0
         self.winning_splits_emitted = 0
+        self.answers: dict[int, dict[DCState, bool]] = {}
 
     @functools.lru_cache(maxsize=None)
     def full_star(self, state: DCState) -> bool:
@@ -550,12 +577,134 @@ class DCSolver:
     def solve(self, state: DCState, depth: int) -> bool:
         self.calls += 1
         if not self.lineage_possible(state) or not self.full_star(state):
-            return False
-        if not state or all(height == 1 for _, _, height in state):
-            return True
-        if depth == 0:
-            return False
-        return next(self.winning_splits(state, depth), None) is not None
+            answer = False
+        elif not state or all(height == 1 for _, _, height in state):
+            answer = True
+        elif depth == 0:
+            answer = False
+        else:
+            answer = next(self.winning_splits(state, depth), None) is not None
+        self.answers.setdefault(depth, {})[state] = answer
+        return answer
+
+    def print_layer_summary(self) -> None:
+        false_layers: dict[int, set[DCState]] = {
+            depth: {state for state, answer in answers.items() if not answer}
+            for depth, answers in self.answers.items()
+        }
+        for depth in sorted(self.answers):
+            answers = self.answers[depth]
+            false_count = len(false_layers[depth])
+            print(
+                f"dc_layer depth={depth} states={len(answers)} false={false_count} "
+                f"true={len(answers) - false_count}"
+            )
+        for depth in sorted(false_layers):
+            if depth + 1 not in false_layers:
+                continue
+            left = false_layers[depth]
+            right = false_layers[depth + 1]
+            print(
+                f"dc_layer_pair depths={depth},{depth + 1} "
+                f"common_false={len(left & right)} left_only={len(left - right)} "
+                f"right_only={len(right - left)} equal={'YES' if left == right else 'NO'}"
+            )
+
+    @staticmethod
+    def is_substate(small: DCState, large: DCState) -> bool:
+        remaining = list(large)
+        for part in small:
+            try:
+                remaining.remove(part)
+            except ValueError:
+                return False
+        return True
+
+    def print_kernel_certificate(
+        self,
+        root: DCState,
+        search_depth: int,
+        fixed_layers: tuple[int, int],
+        candidate_rank: int,
+    ) -> None:
+        left_depth, right_depth = fixed_layers
+        if (
+            left_depth == right_depth
+            or left_depth not in self.answers
+            or right_depth not in self.answers
+        ):
+            raise ValueError("requested fixed layers were not reached")
+        left = {
+            state
+            for state, answer in self.answers[left_depth].items()
+            if not answer
+        }
+        right = {
+            state
+            for state, answer in self.answers[right_depth].items()
+            if not answer
+        }
+        if left != right:
+            raise ValueError(
+                f"DC false layers {left_depth} and {right_depth} are not equal"
+            )
+
+        viable = {
+            state
+            for state in left
+            if self.lineage_possible(state) and self.full_star(state)
+        }
+        minimal: list[DCState] = []
+        for state in viable:
+            has_smaller = False
+            for size in range(1, len(state)):
+                for indices in itertools.combinations(range(len(state)), size):
+                    substate = normalize_dc([state[index] for index in indices])
+                    if substate in viable:
+                        has_smaller = True
+                        break
+                if has_smaller:
+                    break
+            if not has_smaller:
+                minimal.append(state)
+        minimal.sort(key=lambda state: (len(state), state))
+        if not any(self.is_substate(core, root) for core in minimal):
+            raise ValueError("candidate kernel does not cover its requested root")
+
+        profiles = ordered_profiles(self.atoms)
+        if not 1 <= candidate_rank <= len(profiles):
+            raise ValueError("candidate rank lies outside the profile list")
+
+        def profile_root(profile: Profile) -> DCState:
+            _, _, c, d = profile
+            return normalize_dc([(0, 1, 1), (0, 2, 2), (d, c + d, 3)])
+
+        def covered(profile: Profile) -> bool:
+            candidate_root = profile_root(profile)
+            return any(self.is_substate(core, candidate_root) for core in minimal)
+
+        first = candidate_rank
+        while first > 1 and covered(profiles[first - 2]):
+            first -= 1
+        last = candidate_rank
+        while last < len(profiles) and covered(profiles[last]):
+            last += 1
+        if last == len(profiles):
+            raise ValueError("covered rank interval has no next boundary")
+        covered_roots = sorted({profile_root(profile) for profile in profiles[first - 1 : last]})
+
+        print(
+            "dc_kernel_certificate version=1 model=power_of_two_atom_aligned "
+            f"profile_atoms={self.atoms} search_depth={search_depth} "
+            f"fixed_layers={left_depth},{right_depth} core_states={len(minimal)} "
+            f"candidate_rank_first={first} candidate_rank_last={last} "
+            f"next_rank={last + 1} implicit_axioms=d_lineage,full_star "
+            f"minimized=multiset closure=upward_substate root={dc_state_text(root)} "
+            f"roots={';'.join(dc_state_text(item) for item in covered_roots)} "
+            "verdict=ALL_DEPTH_NO"
+        )
+        for state in minimal:
+            print(f"dc_kernel_state state={dc_state_text(state)}")
 
 
 class GuidedLiftChecker(LiftChecker):
@@ -638,6 +787,9 @@ class GuidedLiftChecker(LiftChecker):
     @functools.lru_cache(maxsize=None)
     def solve_guided(self, state: State, depth: int) -> bool:
         self.state_calls += 1
+        if not self.mixed_supply_possible(state, depth):
+            self.supply_rejects += 1
+            return False
         if not self.full_star(state):
             return False
         projected_state = project(state)
@@ -694,8 +846,17 @@ class GuidedLiftChecker(LiftChecker):
                             self.add_states(partial[outcome], local[outcome])
                             for outcome in range(3)
                         )
-                        if any(not self.full_star(child) for child in next_children):
+                        if any(
+                            not self.full_star(child)
+                            or not self.mixed_supply_possible(child, depth - 1)
+                            for child in next_children
+                        ):
                             self.prefix_rejects += 1
+                            self.supply_rejects += sum(
+                                self.full_star(child)
+                                and not self.mixed_supply_possible(child, depth - 1)
+                                for child in next_children
+                            )
                             continue
                         selected_by_index[original] = (selected, selected_height)
                         if assign(index + 1, next_children):
@@ -723,19 +884,57 @@ def root_state(atoms: int, rank: int) -> State:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("certificate", type=Path)
+    parser.add_argument(
+        "certificate",
+        type=Path,
+        nargs="?",
+        help="projected tree certificate (optional in search modes with --atoms)",
+    )
     parser.add_argument("--rank", type=int, default=305)
+    parser.add_argument(
+        "--atoms",
+        type=int,
+        help="override the certificate normalization in a search mode",
+    )
     parser.add_argument("--all-skeletons", action="store_true")
+    parser.add_argument(
+        "--projected-only",
+        action="store_true",
+        help="solve only the (D,C+D) relaxation; do not enumerate exact lifts",
+    )
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--emit-tree", action="store_true")
+    parser.add_argument(
+        "--emit-dc-kernel",
+        metavar="LEFT,RIGHT",
+        help="emit a candidate coinductive kernel from two equal false layers",
+    )
+    parser.add_argument("--dc-layer-summary", action="store_true")
     parser.add_argument("--expect", choices=("YES", "NO"))
     args = parser.parse_args()
     try:
-        atoms, nodes = read_tree(args.certificate)
+        if args.certificate is None:
+            if not (args.all_skeletons or args.projected_only) or args.atoms is None:
+                raise ValueError(
+                    "certificate is required unless a search mode and --atoms are set"
+                )
+            certificate_atoms, nodes = args.atoms, {}
+        else:
+            certificate_atoms, nodes = read_tree(args.certificate)
+        if args.atoms is not None and not (args.all_skeletons or args.projected_only):
+            raise ValueError("--atoms requires --all-skeletons or --projected-only")
+        if args.projected_only and args.all_skeletons:
+            raise ValueError("choose either --projected-only or --all-skeletons")
+        atoms = args.atoms if args.atoms is not None else certificate_atoms
+        if atoms < 8 or atoms & (atoms - 1):
+            raise ValueError("atoms must be a power of two at least eight")
         state = root_state(atoms, args.rank)
         if args.depth < 0:
             raise ValueError("depth must be nonnegative")
-        if args.all_skeletons:
+        if args.projected_only:
+            checker = GuidedLiftChecker(atoms)
+            answer = checker.dc.solve(project(state), args.depth)
+        elif args.all_skeletons:
             checker = GuidedLiftChecker(atoms)
             answer = checker.solve_guided(state, args.depth)
         else:
@@ -747,28 +946,59 @@ def main() -> int:
             raise ValueError(f"expected exact lift {args.expect}, got {verdict}")
         candidate = ordered_profiles(atoms)[args.rank - 1]
         candidate_text = "".join(letter * count for letter, count in zip("ABCD", candidate))
-        scope = "all_skeletons" if args.all_skeletons else "fixed_skeleton"
-        print(
-            f"projected tree exact lift: rank={args.rank} candidate={candidate_text} "
-            f"answer={verdict} scope={scope} depth={args.depth} nodes={len(nodes)} "
-            f"states={checker.state_calls} "
-            f"cut_assignments={checker.cut_assignments} "
-            f"prefix_rejects={checker.prefix_rejects} leaf_checks={checker.leaf_checks}"
-            + (
-                f" projected_splits={checker.projected_splits} "
-                f"dc_states={checker.dc.solve.cache_info().currsize}"
-                if isinstance(checker, GuidedLiftChecker)
-                else f" memo={checker.solve.cache_info().currsize} pairings={checker.pairings}"
+        if args.projected_only:
+            assert isinstance(checker, GuidedLiftChecker)
+            print(
+                f"projected profile search: rank={args.rank} candidate={candidate_text} "
+                f"answer={verdict} depth={args.depth} "
+                f"dc_states={checker.dc.solve.cache_info().currsize} "
+                f"dc_calls={checker.dc.calls} "
+                f"dc_split_assignments={checker.dc.split_assignments}"
             )
-        )
+        else:
+            scope = "all_skeletons" if args.all_skeletons else "fixed_skeleton"
+            print(
+                f"projected tree exact lift: rank={args.rank} candidate={candidate_text} "
+                f"answer={verdict} scope={scope} depth={args.depth} nodes={len(nodes)} "
+                f"states={checker.state_calls} "
+                f"cut_assignments={checker.cut_assignments} "
+                f"prefix_rejects={checker.prefix_rejects} leaf_checks={checker.leaf_checks}"
+                f" supply_rejects={checker.supply_rejects}"
+                + (
+                    f" projected_splits={checker.projected_splits} "
+                    f"dc_states={checker.dc.solve.cache_info().currsize}"
+                    if isinstance(checker, GuidedLiftChecker)
+                    else f" memo={checker.solve.cache_info().currsize} pairings={checker.pairings}"
+                )
+            )
         if args.emit_tree:
-            if not answer or not isinstance(checker, GuidedLiftChecker):
+            if (
+                not answer
+                or not isinstance(checker, GuidedLiftChecker)
+                or args.projected_only
+            ):
                 raise ValueError("--emit-tree requires a positive --all-skeletons search")
             print(
                 f"height6_candidate rank={args.rank} D={candidate_text} "
                 f"answer=YES depth={args.depth}"
             )
             checker.emit_tree(state, args.depth)
+        if args.dc_layer_summary:
+            if not isinstance(checker, GuidedLiftChecker):
+                raise ValueError("--dc-layer-summary requires a projected search mode")
+            checker.dc.print_layer_summary()
+        if args.emit_dc_kernel:
+            if answer or not isinstance(checker, GuidedLiftChecker):
+                raise ValueError(
+                    "--emit-dc-kernel requires a negative projected search"
+                )
+            layer_text = args.emit_dc_kernel.split(",")
+            if len(layer_text) != 2 or any(not item.isdigit() for item in layer_text):
+                raise ValueError("--emit-dc-kernel expects LEFT,RIGHT")
+            fixed_layers = int(layer_text[0]), int(layer_text[1])
+            checker.dc.print_kernel_certificate(
+                project(state), args.depth, fixed_layers, args.rank
+            )
         return 0
     except (KeyError, OSError, StopIteration, ValueError) as error:
         print(f"projected tree lift error: {error}", file=sys.stderr)
