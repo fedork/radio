@@ -18,6 +18,25 @@ tools/check_dc_tree_lift.py --atoms 32 --rank 1180 --all-skeletons \
     --depth 3 --expect NO > "$work_dir/rank1180-depth3-independent.out"
 rg -q 'rank=1180 .*answer=NO scope=all_skeletons depth=3 .*supply_loss_rejects=[1-9][0-9]*' \
     "$work_dir/rank1180-depth3-independent.out"
+tools/check_dc_tree_lift.py --atoms 32 --rank 1180 --depth 4 --pure-frontier \
+    --close-positive-v-loss > "$work_dir/rank1180-depth4-frontier-independent.out"
+rg -q 'pure_frontier rank=1180 depth=4 local_options=24,86,150 products=7266 .*survivors=6712 unique_mixed=1826' \
+    "$work_dir/rank1180-depth4-frontier-independent.out"
+rg -q 'pure_frontier_loss loss=0,0,1 candidates=108 unique_mixed=32' \
+    "$work_dir/rank1180-depth4-frontier-independent.out"
+rg -q 'pure_frontier_loss loss=0,0,14 candidates=136 unique_mixed=36' \
+    "$work_dir/rank1180-depth4-frontier-independent.out"
+rg -q 'pure_frontier_loss loss=0,2,10 candidates=4 unique_mixed=2' \
+    "$work_dir/rank1180-depth4-frontier-independent.out"
+test "$(rg -c '^pure_frontier_loss ' \
+    "$work_dir/rank1180-depth4-frontier-independent.out")" -eq 17
+if rg -q '^pure_frontier_loss loss=0,1,' \
+    "$work_dir/rank1180-depth4-frontier-independent.out"; then
+    echo 'rank-1180 frontier unexpectedly retained a V-loss-one class' >&2
+    exit 1
+fi
+rg -q 'pure_frontier_closed_summary selected_states=8 yes=0 no=8' \
+    "$work_dir/rank1180-depth4-frontier-independent.out"
 
 CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_atom_profiles.cpp -o "$work_dir/search_atom_profiles"
@@ -204,6 +223,47 @@ if rg -q 'atom_profile_depth_obstruction=' "$work_dir/rank1180-depth3.out"; then
     echo 'rank-1180 depth-3 result was only a root obstruction, not exhaustive' >&2
     exit 1
 fi
+
+# At depth four, exact solution of both pure children leaves a finite mixed-child frontier.  The
+# independent Python implementation above reproduces these counts and exhausts the eight states
+# that spend the available V slack.
+run_profile_32 profile-state-pure-frontier-dc-kernel 4 \
+    evidence/atom_profile_height6_dc32.cert \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3 \
+    > "$work_dir/rank1180-depth4-frontier.out" 2>&1
+rg -q 'cover_root_pure_frontier candidates=6712 unique_mixed_children=1826 loss_classes=17' \
+    "$work_dir/rank1180-depth4-frontier.out"
+rg -q 'cover_root_loss loss=0,2,12 candidates=6 unique_mixed_children=3' \
+    "$work_dir/rank1180-depth4-frontier.out"
+
+: > "$work_dir/rank1180-depth4-vtight.out"
+while IFS='|' read -r first second third; do
+    if run_profile_32 profile-state-flat-dc-kernel 3 \
+        evidence/atom_profile_height6_dc32.cert "$first" "$second" "$third" \
+        >> "$work_dir/rank1180-depth4-vtight.out" 2>/dev/null; then
+        echo 'rank-1180 V-tight mixed child unexpectedly solved within depth 3' >&2
+        exit 1
+    else
+        status=$?
+        if [[ $status -ne 1 ]]; then
+            echo "rank-1180 V-tight mixed-child search aborted with status $status" >&2
+            exit "$status"
+        fi
+    fi
+done <<'EOF'
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAABC:1|AAAAAAAAAAAAAAAAAAAAAABBBBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:1|AAAAAAAAAAAAAAAAAAAAAABBBBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAABCCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAABC:1|AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:1|AAAAAAAAAAAAAAAAAAAAAABBBBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:1|AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAABCCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAABC:1|AAAAAAAAAAAAAAAAAAAAAAAABBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:1|AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC:1|AAAAAAAAAAAAAAAAAAAAAAAABBBBBBCC:2|AAAAAAAAAAAAAAAAAAAAAAAAAABCCCDD:3
+EOF
+test "$(rg -c '^atom_profile depth=3 answer=NO' \
+    "$work_dir/rank1180-depth4-vtight.out")" -eq 8
 
 # A two-part child that traps prefix recursion has a one-test exact construction.  Keep this as a
 # positive control for the complete-product path used by the depth-three boundary search.

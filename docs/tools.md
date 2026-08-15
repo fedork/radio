@@ -688,13 +688,17 @@ non-wasteful strategies whose every current width is a sum of `N` `G_r` atoms an
 `(d,c+d,b+c+d)` in the basis `(binom(r,2),r,1)`, so the program compares profiles symbolically and
 prints a concrete lower threshold for every positive tree.
 
-Three symbolic necessary tests precede exact recursion.  The all-depth D-lineage theorem rejects a
+Several symbolic necessary tests precede exact recursion.  The all-depth D-lineage theorem rejects a
 height-`h` state when the unweighted sum of its D counts is below `max(0,h-4)`; this is a closed
 losing-set proof, not a depth cutoff.  The finite-depth mixed-supply bound iterates the full
 triangular deficit transform along the adversarial mixed path and rejects a state when even its
 optimistic supply cannot reach the terminal prefix.  Its propagated-loss refinement applies the
 same transform to supply discarded by the first mixed transition, giving a sound lexicographic
-budget while a global cut is assembled.  The `(D,C+D)` projection retains the first two deficit
+budget while a global cut is assembled.  A height-aware envelope additionally caps each ancestral
+part's terminal coordinate supply by its height times the atom count and requires enough levels to
+split it into singleton lineages.  An exact mixed-only recursion tests the adversarial transcript
+that returns outcome 1 at every node; its `NO` is a sound obstruction, while its `YES` merely
+permits the full three-outcome recursion.  The `(D,C+D)` projection retains the first two deficit
 coefficients and over-approximates aligned play, so its `NO` is a sound exclusion at the requested
 depth.  For the 16-atom rank-290 projection, the program can also synthesize a finite coinductive
 kernel: its independently checked upward closure replaces the depth qualifier entirely.
@@ -793,7 +797,26 @@ tools/check_dc_tree_lift.py --atoms 32 --rank 1180 \
 ```
 
 The corresponding depth-four first transition must satisfy
-`ell_D=0, ell_V<=2`, with `ell_W<=12` when `ell_V=2`.
+the stronger frontier `ell_D=ell_V=0`, `1<=ell_W<=14`.  It can be reproduced without attempting
+all mixed children:
+
+```
+/tmp/search_atom_profiles32 profile-state-pure-frontier-dc-kernel 4 \
+    evidence/atom_profile_height6_dc32.cert \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+tools/check_dc_tree_lift.py --atoms 32 --rank 1180 --depth 4 \
+    --pure-frontier --close-positive-v-loss
+```
+
+Both implementations start from 7,266 symbolically filtered oriented tests.  Exact solution of the
+two pure children leaves 6,712 tests and 1,826 distinct mixed children; exact rejection of the
+eight positive-`V`-loss children leaves 6,696 tests and 1,818 children in the fourteen W-loss
+classes.  `profile-state-cover[-dc-kernel]` continues from the same materialized root hypergraph,
+choosing the unresolved child shared by the most active tests.  `profile-state-pure-frontier`
+stops deliberately after the pure outcomes and prints `mixed_outcome=UNRESOLVED`; its successful
+process exit is a frontier report, not a positive construction.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

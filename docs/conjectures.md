@@ -768,9 +768,10 @@ the twice-refined 64-atom realization; the compact spelling alone does not lower
 depth.  At 32 atoms, D lineage and a checked 504-core `(D,C+D)` kernel exclude ranks 1--1179 at
 every depth.  Rank 1181, `A^26BC^3D^2`, is the pure refinement of the rank-305 construction, leaving
 only the wider rank 1180, `A^27C^3D^2`, unresolved in that slice.  Exact propagated-loss search now
-excludes that profile through depth three, but depth four and eventual constructibility remain
-open.  Thus arbitrary excessive `q` remains open, but the next symbolic decision is a single
-profile rather than a band.  Full proof and scope are in
+excludes that profile through depth three.  At depth four, solving the two pure outcomes exactly
+leaves 1,818 distinct mixed children, but neither depth four nor eventual constructibility is
+decided.  Thus arbitrary excessive `q` remains open, but the next symbolic decision is a single
+profile with a finite hard-child frontier rather than a band.  Full proof and scope are in
 [the atom-lineage note](theorems/atom-lineage.md).
 
 There is now a scale-free objective for that decision.  At normalization `N=2^s`, write the D germ
@@ -786,10 +787,11 @@ does not supply this missing construction.  This row is deliberately not added t
 `data/conjectures.csv`: no starting `k` or construction is known, and the next normalization could
 change the optimum again.
 
-At depth four, any first mixed transition for this candidate must preserve both D lineages, lose at
-most two units of `C+D`, and, when both units are lost, lose at most twelve units of `B+C+D`.
-These are constraints on the outer dimensions alone; they do not inspect the solved internals of
-the A/B/C branches.
+At depth four, exact solution of both pure children shows that any surviving first mixed transition
+must preserve all D and `C+D` supply and lose between one and fourteen units of `B+C+D`.  This leaves
+6,696 oriented first tests and 1,818 distinct hard children in fourteen loss classes.  These are
+constraints on the outer dimensions alone; they do not inspect the solved internals of the A/B/C
+branches.
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
 `tools/check_dc_tree_lift.py` supplies the exact-coordinate product search.

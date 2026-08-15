@@ -106,6 +106,22 @@ coordinates forces the corresponding propagated losses to vanish.  The C++ recur
 this lexicographic test both to each local cut and after every added state part; it is a necessary
 condition only and does not turn a bounded negative into an all-depth result.
 
+There is also a height-sensitive version of (2a).  Preserve the ancestry of each state part
+`p:h` while following `j` mixed outcomes.  To finish as `h` singleton lineages requires
+`h<=2^j`, because one test can at most double the number of descendants.  Moreover, each terminal
+singleton profile contains `N` atoms, so none of its three deficit coordinates exceeds `N`.
+Consequently the total supply descending from that part is bounded componentwise by
+
+    (p_D,
+     min(hN, p_C+p_D+j p_D),
+     min(hN, p_B+p_C+p_D+j(p_C+p_D)+binom(j,2)p_D)).             (2c)
+
+Sum (2c) over the original parts and compare it lexicographically with `Q_h`.  A state that can
+finish within `t` tests must pass this comparison for at least one `j` in `0..t`.  This remains an
+optimistic necessary bound: it ignores whether the capped supplies can actually be partitioned
+among the `h` leaves.  The independent Python implementation recomputes it rather than consuming
+the C++ result.
+
 ## Height-6 consequence
 
 For the `(alpha,beta,gamma)=(4,3,2)` hard branch, the two fixed profiles have no D atoms:
@@ -264,7 +280,20 @@ verdict.  The separately implemented Python all-skeleton search independently re
 `NO` by enumerating every winning two-coordinate skeleton and every exact hidden-coordinate lift.
 Thus no rank-1180 aligned tree has depth at most three.  This is not an all-depth exclusion.  Exact
 depth-four runs using both complete-product and outer-prefix order reached their explicit ten-minute
-CPU caps without a verdict, so rank 1180 and the 32-atom optimum remain open.
+CPU caps without a verdict.
+
+A finite root-frontier calculation now replaces those undirected depth-four attempts.  Sound
+symbolic and projected filters leave 7,266 oriented first tests.  Solving both pure-outcome
+children exactly leaves 6,712 tests and 1,826 distinct mixed children.  The only positive-`V`-loss
+classes are `(ell_D,ell_V,ell_W)=(0,2,10),(0,2,11),(0,2,12)`, comprising 16 tests and eight distinct
+mixed children.  Exact depth-three recursion proves all eight children negative, independently in
+the C++ and Python implementations.  Therefore every possible depth-four tree must satisfy
+
+    ell_D=ell_V=0,       1<=ell_W<=14.                            (11a)
+
+The remaining exact frontier has 6,696 oriented first tests and 1,818 distinct mixed children in
+fourteen scalar W-loss classes.  This is a bounded reduction, not a depth-four verdict: rank 1180,
+the 32-atom optimum, and eventual constructibility all remain open.
 
 ## Scalar form of the remaining D optimization
 
@@ -321,10 +350,12 @@ At this boundary the two finite-depth supply budgets are especially concrete:
     T^3 Sigma      = (2,14,49),     T^4 Sigma = (2,16,63).        (16)
 
 For a first-transition loss `ell`, depth three therefore requires
-`ell_D=ell_V=0, ell_W<=4`.  Depth four requires `ell_D=0, ell_V<=2`; if the full two units of
-V slack are spent, (2b) further gives `ell_W+3ell_V<=18`, hence `ell_W<=12`.  These constraints
-depend only on the outer profiles and the candidate D germ, not on the inner witness trees.  They
-are the finite symbolic interface for maximizing the D branch at the next depth.
+`ell_D=ell_V=0, ell_W<=4`.  The raw depth-four supply budget permits `ell_D=0, ell_V<=2`; if the
+full two units of V slack are spent, (2b) further gives `ell_W+3ell_V<=18`, hence `ell_W<=12`.
+Exact solution of the two pure children then removes every `ell_V>0` case and the `ell_W=0` case,
+leaving precisely the necessary frontier (11a).  These calculations use only the outer profiles
+and the candidate D germ, not the inner witness trees of A/B/C.  The 1,818 mixed children are the
+finite symbolic interface for the next D-branch calculation.
 
 ## Mechanical verification
 
@@ -356,7 +387,10 @@ rerunning the two-minute all-skeleton discovery is optional because the tree its
 The same regression builds the 32-atom exact engine, checks a 32-atom singleton tree, locks a sharp
 mixed-supply rejection, and exhausts rank 1180 through depth three.  A small positive two-part tree
 guards the complete-product search path used there; `tools/check_dc_tree_lift.py --all-skeletons`
-independently repeats the bounded rank-1180 negative.  `tools/check_atom_profile_certificate.py`
+independently repeats the bounded rank-1180 negative.  At depth four, both implementations enumerate
+the same 7,266 filtered first tests, 6,712 pure-feasible tests and 1,826 mixed children.  They also
+independently exhaust the same eight positive-`V`-loss children, all negative, which certifies the
+reduced frontier (11a).  `tools/check_atom_profile_certificate.py`
 independently checks the local triangular supply inequality while replaying 5,540,319 transitions
 at 16 atoms and checks 5,814 ordered-triple/depth propagation cases against literal triangular
 iteration.

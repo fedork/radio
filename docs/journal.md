@@ -6061,3 +6061,56 @@ The next useful search should enumerate A/B/C prefix pairs under the propagated-
 retain the surviving D constraints, or construct a closed three-coordinate losing kernel.  Another
 unstructured depth-four run is unlikely to add information.  No Pareto CSV datum changed, and all
 processes launched for this work had exited by the final inventory.
+
+## 2026-08-15 — exact pure branches reduce depth four to a W-only mixed frontier
+
+The proposed outer-dimensional decomposition works as intended: the root search needs only the
+profiles and heights of the already constructed A/B/C branches.  Their internal witness trees never
+enter the first-test enumeration.  A new pure-frontier mode materializes every root test that passes
+the sound symbolic and `(D,C+D)` filters, solves outcomes 0 and 2 exactly, and deliberately leaves
+outcome 1—the synchronized four-segment branch—unresolved.
+
+A height-aware supply bound was added first.  After `j` mixed levels, a height-`h` ancestral part
+must satisfy `h<=2^j`, and each of its three optimistic terminal supplies is capped by `hN` because
+it can end in only `h` profiles of `N` atoms.  The implementation compares every possible stopping
+level `j<=t` with the singleton requirement.  This is a necessary over-approximation, independently
+implemented in C++ and Python.  An exact relaxation that follows only the all-mixed transcript was
+also added.  Rank 1180 passes that relaxation at depth four, so aggregate mixed evolution alone
+does not close the state; the interaction with the two pure outcomes is essential.
+
+For the rank-1180 root, the three local symbolic option lists have sizes `24 x 86 x 150`.  The 150
+is not a correction to the previous 148 exact-per-part count: the frontier materializer intentionally
+retains two additional locally plausible options and applies exact recursion only after assembling
+the global child.  Prefix loss, height, majorization and projected checks leave 7,266 oriented
+complete first tests.  Exact solution of both pure children leaves 6,712 tests with 1,826 distinct
+mixed children.  Their loss classes are
+
+    (ell_D,ell_V,ell_W)=(0,0,w), 1<=w<=14,
+    (0,2,10), (0,2,11), (0,2,12).
+
+There is no surviving `ell_V=1` class.  The three positive-`V` classes contain respectively
+4, 6 and 6 oriented tests and only 2, 3 and 3 distinct mixed children.  Both implementations then
+solve all eight distinct children exactly at depth three and return `NO` for every one.  Hence any
+depth-four construction must satisfy
+
+    ell_D=ell_V=0, 1<=ell_W<=14.
+
+The remaining frontier is 6,696 oriented tests and 1,818 distinct mixed children in fourteen
+one-dimensional W-loss classes.  Counts `(tests/distinct children)` for `w=1,...,14` are
+`108/32, 226/64, 346/97, 468/131, 594/166, 726/202, 744/202, 752/202, 762/202,
+644/170, 524/138, 398/105, 268/71, 136/36`.  This is not a depth-four negative: none of those
+1,818 hard children has yet been collectively decided.
+
+The independent Python frontier and eight-child closure took 18.91 wall / 18.40 user seconds with
+about 104 MB maximum physical footprint and reproduced every aggregate count above.  The C++ path
+and eight direct exact child calls agree and are locked into `tools/atom_profile_regression.sh`.
+A combined Python attempt to close the edge classes `w=1` and `w=14` was explicitly capped and
+ended `TIMEOUT` after 62 wall seconds at 0.10 GB peak RSS; it produced no verdict.  An earlier
+per-part exact-envelope prototype was manually stopped after at least 48 CPU seconds without a
+result and was replaced by the cheap sound height-cap formula.
+
+The next symbolic target is therefore the 1,818-state mixed antichain, not the solved A/B/C
+internals and not another undirected root run.  A three-coordinate closed kernel or a recurrence
+indexed by the fourteen W-loss values would turn this finite reduction into either a depth-four
+exclusion or a construction.  Eventual rank-1180 constructibility, the formal `-20` width family,
+and arbitrary excessive `q` all remain open.  No Pareto CSV datum changed.

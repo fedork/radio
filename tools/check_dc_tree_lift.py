@@ -783,6 +783,182 @@ class GuidedLiftChecker(LiftChecker):
             threshold = max(threshold, eventual_threshold(difference))
         return threshold
 
+    @functools.lru_cache(maxsize=None)
+    def height_aware_mixed_possible(self, state: State, depth: int) -> bool:
+        """Independent terminal-capacity version of the mixed-supply bound."""
+        required = [0, 0, 0]
+        height = sum(part_height for _, part_height in state)
+        for profile in self.reference[:height]:
+            coordinates = deficit(profile)
+            for coefficient in range(3):
+                required[coefficient] += coordinates[coefficient]
+
+        for steps in range(depth + 1):
+            maximum = [0, 0, 0]
+            possible = True
+            for profile, part_height in state:
+                if part_height > 1 << steps:
+                    possible = False
+                    break
+                d, v, w = deficit(profile)
+                capacity = part_height * self.atoms
+                local = (
+                    d,
+                    min(capacity, v + steps * d),
+                    min(capacity, w + steps * v + math.comb(steps, 2) * d),
+                )
+                for coefficient in range(3):
+                    maximum[coefficient] += local[coefficient]
+            if possible and eventually_nonnegative(
+                tuple(maximum[index] - required[index] for index in range(3))
+            ):
+                return True
+        return False
+
+    @functools.lru_cache(maxsize=None)
+    def necessary_state(self, state: State, depth: int) -> bool:
+        projected = project(state)
+        return (
+            self.dc.lineage_possible(projected)
+            and self.mixed_supply_possible(state, depth)
+            and self.height_aware_mixed_possible(state, depth)
+            and self.full_star(state)
+            and self.dc.solve(projected, depth)
+        )
+
+    def pure_frontier(self, root: State, depth: int) -> dict[str, object]:
+        """Enumerate root cuts, solve both pure children, and leave mixed unresolved."""
+        if depth <= 0 or not self.necessary_state(root, depth):
+            raise ValueError("pure-frontier root fails its necessary conditions")
+        profiles = ordered_profiles(self.atoms)
+        candidates: list[
+            tuple[
+                int,
+                Part,
+                tuple[tuple[Profile, int, tuple[State, State, State]], ...],
+            ]
+        ] = []
+        for original, part in enumerate(root):
+            total = refine(part[0])
+            options: list[tuple[Profile, int, tuple[State, State, State]]] = []
+            for selected in profiles:
+                if any(take > available for take, available in zip(selected, total)):
+                    continue
+                for selected_height in range(part[1] + 1):
+                    local = self.split_part(part, selected, selected_height)
+                    local_loss = self.local_mixed_supply_loss(part, local)
+                    if not self.mixed_supply_loss_possible(root, depth, local_loss):
+                        continue
+                    if all(
+                        self.necessary_state(child, depth - 1) for child in local
+                    ):
+                        options.append((selected, selected_height, local))
+            if not options:
+                raise ValueError("pure-frontier part has no necessary local option")
+            candidates.append((original, part, tuple(options)))
+        candidates.sort(key=lambda item: (len(item[2]), deficit(item[1][0]), -item[1][1]))
+
+        combinations: list[
+            tuple[tuple[State, State, State], tuple[tuple[Profile, int], ...]]
+        ] = []
+        selected_sorted: list[tuple[Profile, int] | None] = [None] * len(candidates)
+        selected_original: list[tuple[Profile, int] | None] = [None] * len(root)
+        cheap_rejects = 0
+
+        def enumerate_cuts(
+            index: int,
+            partial: tuple[State, State, State],
+            mixed_loss: tuple[int, int, int],
+        ) -> None:
+            nonlocal cheap_rejects
+            if index == len(candidates):
+                combinations.append(
+                    (
+                        partial,
+                        tuple(
+                            selected
+                            for selected in selected_original
+                            if selected is not None
+                        ),
+                    )
+                )
+                return
+            original, part, options = candidates[index]
+            for selected, selected_height, local in options:
+                choice = (selected, selected_height)
+                if index > 0 and candidates[index - 1][1] == part:
+                    previous = selected_sorted[index - 1]
+                    assert previous is not None
+                    if choice < previous:
+                        continue
+                local_loss = self.local_mixed_supply_loss(part, local)
+                next_loss = tuple(
+                    mixed_loss[coefficient] + local_loss[coefficient]
+                    for coefficient in range(3)
+                )
+                if not self.mixed_supply_loss_possible(root, depth, next_loss):
+                    continue
+                next_children = tuple(
+                    self.add_states(partial[outcome], local[outcome])
+                    for outcome in range(3)
+                )
+                if any(
+                    not self.necessary_state(child, depth - 1)
+                    for child in next_children
+                ):
+                    cheap_rejects += 1
+                    continue
+                selected_sorted[index] = choice
+                selected_original[original] = choice
+                enumerate_cuts(index + 1, next_children, next_loss)  # type: ignore[arg-type]
+                selected_sorted[index] = None
+                selected_original[original] = None
+
+        enumerate_cuts(0, ((), (), ()), (0, 0, 0))
+
+        pure_answers: dict[State, bool] = {}
+        survivors: list[tuple[State, State, State]] = []
+        for children, _split in combinations:
+            possible = True
+            for outcome in (0, 2):
+                child = children[outcome]
+                if child not in pure_answers:
+                    pure_answers[child] = self.solve_guided(child, depth - 1)
+                if not pure_answers[child]:
+                    possible = False
+                    break
+            if possible:
+                survivors.append(children)
+
+        refined_root = [0, 0, 0]
+        for profile, _height in root:
+            coordinates = deficit(refine(profile))
+            for coefficient in range(3):
+                refined_root[coefficient] += coordinates[coefficient]
+        loss_groups: dict[tuple[int, int, int], list[State]] = {}
+        for children in survivors:
+            child_supply = self.unweighted_supply(children[1])
+            loss = tuple(
+                refined_root[index] - child_supply[index] for index in range(3)
+            )
+            loss_groups.setdefault(loss, []).append(children[1])
+        return {
+            "local_options": tuple(len(item[2]) for item in candidates),
+            "products": len(combinations),
+            "cheap_rejects": cheap_rejects,
+            "pure_states": len(pure_answers),
+            "survivors": len(survivors),
+            "unique_mixed": len({children[1] for children in survivors}),
+            "loss_groups": {
+                loss: (len(states), len(set(states)))
+                for loss, states in sorted(loss_groups.items())
+            },
+            "loss_states": {
+                loss: tuple(sorted(set(states)))
+                for loss, states in sorted(loss_groups.items())
+            },
+        }
+
     def emit_tree(self, root: State, depth: int) -> None:
         next_id = 0
         root_threshold = 3
@@ -963,6 +1139,19 @@ def main() -> int:
         help="override the certificate normalization in a search mode",
     )
     parser.add_argument("--all-skeletons", action="store_true")
+    parser.add_argument("--pure-frontier", action="store_true")
+    parser.add_argument(
+        "--close-positive-v-loss",
+        action="store_true",
+        help="with --pure-frontier, exact-solve every surviving mixed state with V loss",
+    )
+    parser.add_argument(
+        "--close-w-loss",
+        type=int,
+        action="append",
+        default=[],
+        help="with --pure-frontier, exact-solve mixed states in this zero-V W-loss class",
+    )
     parser.add_argument(
         "--projected-only",
         action="store_true",
@@ -980,23 +1169,78 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.certificate is None:
-            if not (args.all_skeletons or args.projected_only) or args.atoms is None:
+            if (
+                not (args.all_skeletons or args.projected_only or args.pure_frontier)
+                or args.atoms is None
+            ):
                 raise ValueError(
                     "certificate is required unless a search mode and --atoms are set"
                 )
             certificate_atoms, nodes = args.atoms, {}
         else:
             certificate_atoms, nodes = read_tree(args.certificate)
-        if args.atoms is not None and not (args.all_skeletons or args.projected_only):
-            raise ValueError("--atoms requires --all-skeletons or --projected-only")
-        if args.projected_only and args.all_skeletons:
-            raise ValueError("choose either --projected-only or --all-skeletons")
+        if args.atoms is not None and not (
+            args.all_skeletons or args.projected_only or args.pure_frontier
+        ):
+            raise ValueError(
+                "--atoms requires --all-skeletons, --projected-only, or --pure-frontier"
+            )
+        if sum((args.projected_only, args.all_skeletons, args.pure_frontier)) > 1:
+            raise ValueError("choose one search mode")
+        if (args.close_positive_v_loss or args.close_w_loss) and not args.pure_frontier:
+            raise ValueError("mixed-loss closure options require --pure-frontier")
         atoms = args.atoms if args.atoms is not None else certificate_atoms
         if atoms < 8 or atoms & (atoms - 1):
             raise ValueError("atoms must be a power of two at least eight")
         state = root_state(atoms, args.rank)
         if args.depth < 0:
             raise ValueError("depth must be nonnegative")
+        if args.pure_frontier:
+            checker = GuidedLiftChecker(atoms)
+            summary = checker.pure_frontier(state, args.depth)
+            print(
+                f"pure_frontier rank={args.rank} depth={args.depth} "
+                f"local_options={','.join(map(str, summary['local_options']))} "
+                f"products={summary['products']} cheap_rejects={summary['cheap_rejects']} "
+                f"pure_states={summary['pure_states']} survivors={summary['survivors']} "
+                f"unique_mixed={summary['unique_mixed']}"
+            )
+            for loss, (count, unique) in summary["loss_groups"].items():
+                print(
+                    f"pure_frontier_loss loss={loss[0]},{loss[1]},{loss[2]} "
+                    f"candidates={count} unique_mixed={unique}"
+                )
+                if loss[1] > 0:
+                    for mixed_state in summary["loss_states"][loss]:
+                        print(
+                            f"pure_frontier_mixed_state loss={loss[0]},{loss[1]},{loss[2]} "
+                            f"state={state_text(mixed_state)}"
+                        )
+            if args.close_positive_v_loss or args.close_w_loss:
+                selected_states = sorted(
+                    {
+                        mixed_state
+                        for loss, states in summary["loss_states"].items()
+                        if (args.close_positive_v_loss and loss[1] > 0)
+                        or (loss[1] == 0 and loss[2] in args.close_w_loss)
+                        for mixed_state in states
+                    }
+                )
+                answers = {
+                    mixed_state: checker.solve_guided(mixed_state, args.depth - 1)
+                    for mixed_state in selected_states
+                }
+                for mixed_state, answer in answers.items():
+                    print(
+                        f"pure_frontier_tight_mixed answer={'YES' if answer else 'NO'} "
+                        f"depth={args.depth - 1} state={state_text(mixed_state)}"
+                    )
+                yes_count = sum(answers.values())
+                print(
+                    f"pure_frontier_closed_summary selected_states={len(answers)} "
+                    f"yes={yes_count} no={len(answers) - yes_count}"
+                )
+            return 0
         if args.projected_only:
             checker = GuidedLiftChecker(atoms)
             answer = checker.dc.solve(project(state), args.depth)

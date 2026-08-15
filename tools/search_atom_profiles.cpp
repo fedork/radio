@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -152,6 +154,10 @@ struct Counters {
     std::uint64_t lineage_rejects{};
     std::uint64_t supply_rejects{};
     std::uint64_t supply_loss_rejects{};
+    std::uint64_t mixed_envelope_rejects{};
+    std::uint64_t mixed_path_rejects{};
+    std::uint64_t mixed_path_calls{};
+    std::uint64_t mixed_path_assignments{};
     std::uint64_t dc_rejects{};
     std::uint64_t raw_options{};
     std::uint64_t assignments{};
@@ -173,6 +179,14 @@ std::unordered_map<DCKey, std::vector<DCSplit>, DCKeyHash> dc_witnesses;
 std::unordered_set<DCKey, DCKeyHash> dc_kernel_exact_cores;
 bool dc_kernel_upward_substate = false;
 Counters counters;
+
+struct MixedEnvelope {
+    bool possible{};
+    Deficit maximum{};
+};
+
+std::unordered_map<Key, bool, KeyHash> mixed_path_memo;
+std::unordered_map<Key, std::vector<Split>, KeyHash> mixed_path_witnesses;
 
 Deficit make_deficit(const Counts &count) {
     return {count[3], count[2] + count[3], count[1] + count[2] + count[3]};
@@ -495,6 +509,42 @@ bool mixed_supply_possible(const State &state, int depth) {
     return true;
 }
 
+// A height-h part can end in only h singleton profiles, each containing PROFILE_ATOMS atoms.
+// Cap each optimistic mixed-supply coordinate by that terminal capacity.  The bound deliberately
+// ignores how those atoms must be partitioned among the h profiles, so it is cheap and safely
+// optimistic.  Reaching h singleton lineages also needs h<=2^steps.
+MixedEnvelope mixed_capacity_envelope(Part part, int steps) {
+    if (steps < 0 || part.height > (std::uint64_t{1} << std::min(steps, 63))) return {};
+    const Deficit initial = profiles[part.profile].deficit;
+    const int capacity = part.height * PROFILE_ATOMS;
+    return {true,
+            {initial[0], std::min(capacity, initial[1] + steps * initial[0]),
+             std::min(capacity, initial[2] + steps * initial[1] +
+                                    steps * (steps - 1) / 2 * initial[0])}};
+}
+
+bool height_aware_mixed_possible(const State &state, int depth) {
+    const Deficit required = singleton_prefix_requirement(state);
+    for (int steps = 0; steps <= depth; ++steps) {
+        MixedEnvelope combined{true, {}};
+        for (Part part : state) {
+            const MixedEnvelope local = mixed_capacity_envelope(part, steps);
+            if (!local.possible) {
+                combined.possible = false;
+                break;
+            }
+            for (int coefficient = 0; coefficient < 3; ++coefficient)
+                combined.maximum[coefficient] += local.maximum[coefficient];
+        }
+        if (!combined.possible) continue;
+        Deficit difference{};
+        for (int coefficient = 0; coefficient < 3; ++coefficient)
+            difference[coefficient] = combined.maximum[coefficient] - required[coefficient];
+        if (eventually_nonnegative(difference)) return true;
+    }
+    return false;
+}
+
 int mixed_supply_preserved_coordinates(const State &state, int depth) {
     const Deficit upper = mixed_supply_upper(state, depth);
     const Deficit required = singleton_prefix_requirement(state);
@@ -774,6 +824,15 @@ LocalChildren split_part(Part part, ProfileId selected, int selected_height) {
 
 bool construct(const State &input, int depth, bool allow_complete_product = true);
 bool construct_flat_root(const State &input, int depth, bool report_progress = true);
+bool construct_cover_root(const State &input, int depth, bool stop_after_pure = false,
+                          bool *stopped_at_pure = nullptr);
+bool mixed_path_possible(const State &input, int depth);
+
+bool necessary_child_possible(const State &state, int depth) {
+    return d_lineage_possible(state) && mixed_supply_possible(state, depth) &&
+           height_aware_mixed_possible(state, depth) && full_star_eventual(state) &&
+           construct_dc(project_dc(state), depth);
+}
 
 std::array<int, 3> height_score(const LocalChildren &children) {
     std::array<int, 3> score{};
@@ -818,6 +877,140 @@ std::vector<Option> viable_part_options(Part part, const State &whole_state, int
     return out;
 }
 
+// Flat/product searches do not need to prove each one-part child exactly before assembling the
+// rest of the test.  Doing so repeats the same large product search for many related parent
+// states.  Retain every local option whose three children pass the sound symbolic/projected
+// bounds; exact recursion is still applied to each complete global child.
+std::vector<Option> necessary_part_options(Part part, const State &whole_state, int depth) {
+    std::vector<Option> out;
+    for (ProfileId selected : cuts[part.profile]) {
+        for (int selected_height = 0; selected_height <= part.height; ++selected_height) {
+            ++counters.raw_options;
+            LocalChildren children = split_part(part, selected, selected_height);
+            Option candidate{selected, static_cast<std::uint8_t>(selected_height),
+                             std::move(children)};
+            if (!mixed_supply_loss_possible(
+                    whole_state, depth, local_mixed_supply_loss(part, candidate))) {
+                ++counters.supply_loss_rejects;
+                continue;
+            }
+            bool possible = true;
+            for (const State &child : candidate.children.state) {
+                if (!necessary_child_possible(child, depth - 1)) {
+                    possible = false;
+                    break;
+                }
+            }
+            if (possible) out.push_back(std::move(candidate));
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const Option &left, const Option &right) {
+        const auto left_score = height_score(left.children);
+        const auto right_score = height_score(right.children);
+        if (left_score != right_score) return left_score < right_score;
+        const int comparison = compare_profiles(left.selected_profile, right.selected_profile);
+        if (comparison != 0) return comparison < 0;
+        return left.selected_height < right.selected_height;
+    });
+    return out;
+}
+
+// Exact reachability for the single adversarial transcript that answers "mixed" at every test.
+// This drops both pure-outcome obligations, so YES is only permission for the full search.  A NO,
+// however, is a sound bounded-depth obstruction: every genuine strategy must also handle this
+// transcript.  The recursion still assembles one globally consistent cut at every level; the
+// symbolic and projected tests applied to partial cuts are only sound necessary filters.
+bool mixed_path_possible(const State &input, int depth) {
+    ++counters.mixed_path_calls;
+    State state = input;
+    normalize(state);
+    const Key key = make_key(state, depth);
+    if (const auto found = mixed_path_memo.find(key); found != mixed_path_memo.end())
+        return found->second;
+    if (!necessary_child_possible(state, depth)) {
+        mixed_path_memo.emplace(key, false);
+        return false;
+    }
+    if (state.empty() || singleton(state)) {
+        mixed_path_memo.emplace(key, true);
+        return true;
+    }
+    if (depth == 0) {
+        mixed_path_memo.emplace(key, false);
+        return false;
+    }
+
+    struct Candidate {
+        int original{};
+        Part part{};
+        std::vector<Option> options;
+    };
+    std::vector<Candidate> candidates;
+    for (std::size_t part_index = 0; part_index < state.size(); ++part_index) {
+        const Part part = state[part_index];
+        std::vector<Option> options;
+        for (ProfileId selected : cuts[part.profile]) {
+            for (int selected_height = 0; selected_height <= part.height;
+                 ++selected_height) {
+                LocalChildren children = split_part(part, selected, selected_height);
+                Option option{selected, static_cast<std::uint8_t>(selected_height),
+                              std::move(children)};
+                if (!mixed_supply_loss_possible(
+                        state, depth, local_mixed_supply_loss(part, option)))
+                    continue;
+                const State &child = option.children.state[1];
+                if (necessary_child_possible(child, depth - 1))
+                    options.push_back(std::move(option));
+            }
+        }
+        if (options.empty()) {
+            mixed_path_memo.emplace(key, false);
+            return false;
+        }
+        candidates.push_back(
+            {static_cast<int>(part_index), part, std::move(options)});
+    }
+    std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
+                                                              const Candidate &right) {
+        if (left.options.size() != right.options.size())
+            return left.options.size() < right.options.size();
+        const int comparison = compare_profiles(left.part.profile, right.part.profile);
+        if (comparison != 0) return comparison < 0;
+        return left.part.height > right.part.height;
+    });
+
+    std::vector<Split> selected_original(state.size());
+    auto combine = [&](auto &&self, int index, const State &partial,
+                       Deficit accumulated_loss) -> bool {
+        if (index == static_cast<int>(candidates.size())) {
+            if (!mixed_path_possible(partial, depth - 1)) return false;
+            mixed_path_witnesses[key] = selected_original;
+            return true;
+        }
+        const Candidate &candidate = candidates[index];
+        for (const Option &option : candidate.options) {
+            ++counters.mixed_path_assignments;
+            const Deficit local_loss = local_mixed_supply_loss(candidate.part, option);
+            Deficit next_loss{};
+            for (int coefficient = 0; coefficient < 3; ++coefficient)
+                next_loss[coefficient] =
+                    accumulated_loss[coefficient] + local_loss[coefficient];
+            if (!mixed_supply_loss_possible(state, depth, next_loss)) continue;
+            const State next = add_states(partial, option.children.state[1]);
+            if (!necessary_child_possible(next, depth - 1))
+                continue;
+            selected_original[candidate.original] =
+                {option.selected_profile, option.selected_height};
+            if (self(self, index + 1, next, next_loss)) return true;
+        }
+        return false;
+    };
+
+    const bool answer = combine(combine, 0, State{}, Deficit{});
+    mixed_path_memo.emplace(key, answer);
+    return answer;
+}
+
 bool construct(const State &input, int depth, bool allow_complete_product) {
     ++counters.calls;
     State state = input;
@@ -837,6 +1030,11 @@ bool construct(const State &input, int depth, bool allow_complete_product) {
         remember(key, false);
         return false;
     }
+    if (!height_aware_mixed_possible(state, depth)) {
+        ++counters.mixed_envelope_rejects;
+        remember(key, false);
+        return false;
+    }
     const DCState projected = project_dc(state);
     if (!construct_dc(projected, depth)) {
         ++counters.dc_rejects;
@@ -844,6 +1042,11 @@ bool construct(const State &input, int depth, bool allow_complete_product) {
         return false;
     }
     if (!full_star_eventual(state)) {
+        remember(key, false);
+        return false;
+    }
+    if (!mixed_path_possible(state, depth)) {
+        ++counters.mixed_path_rejects;
         remember(key, false);
         return false;
     }
@@ -889,6 +1092,22 @@ bool construct(const State &input, int depth, bool allow_complete_product) {
             return false;
         }
         candidates.push_back({static_cast<int>(i), state[i], std::move(options)});
+    }
+    if (const auto preferred = mixed_path_witnesses.find(make_key(state, depth));
+        preferred != mixed_path_witnesses.end()) {
+        for (Candidate &candidate : candidates) {
+            const Split wanted = preferred->second[candidate.original];
+            std::stable_sort(candidate.options.begin(), candidate.options.end(),
+                             [&](const Option &left, const Option &right) {
+                                 const bool left_match =
+                                     left.selected_profile == wanted.selected_profile &&
+                                     left.selected_height == wanted.selected_height;
+                                 const bool right_match =
+                                     right.selected_profile == wanted.selected_profile &&
+                                     right.selected_height == wanted.selected_height;
+                                 return left_match > right_match;
+                             });
+        }
     }
     std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
                                                               const Candidate &right) {
@@ -968,9 +1187,17 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
         ++counters.supply_rejects;
         return false;
     }
+    if (!height_aware_mixed_possible(state, depth)) {
+        ++counters.mixed_envelope_rejects;
+        return false;
+    }
     if (!full_star_eventual(state)) return false;
     if (!construct_dc(project_dc(state), depth)) {
         ++counters.dc_rejects;
+        return false;
+    }
+    if (!mixed_path_possible(state, depth)) {
+        ++counters.mixed_path_rejects;
         return false;
     }
 
@@ -982,7 +1209,7 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
     std::vector<Candidate> candidates;
     for (std::size_t i = 0; i < state.size(); ++i) {
         std::vector<Option> options =
-            viable_part_options(state[i], state, depth);
+            necessary_part_options(state[i], state, depth);
         if (options.empty()) return false;
         candidates.push_back({static_cast<int>(i), state[i], std::move(options)});
     }
@@ -1008,6 +1235,22 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
                              });
         }
     }
+    if (const auto preferred = mixed_path_witnesses.find(make_key(state, depth));
+        preferred != mixed_path_witnesses.end()) {
+        for (Candidate &candidate : candidates) {
+            const Split wanted = preferred->second[candidate.original];
+            std::stable_sort(candidate.options.begin(), candidate.options.end(),
+                             [&](const Option &left, const Option &right) {
+                                 const bool left_match =
+                                     left.selected_profile == wanted.selected_profile &&
+                                     left.selected_height == wanted.selected_height;
+                                 const bool right_match =
+                                     right.selected_profile == wanted.selected_profile &&
+                                     right.selected_height == wanted.selected_height;
+                                 return left_match > right_match;
+                             });
+        }
+    }
     std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
                                                               const Candidate &right) {
         if (left.options.size() != right.options.size())
@@ -1030,7 +1273,8 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
     int slow_children_reported = 0;
     const std::array<int, 3> outcome_order =
         report_progress ? std::array<int, 3>{0, 2, 1} : std::array<int, 3>{1, 0, 2};
-    auto dfs = [&](auto &&self, int index, Deficit mixed_supply_loss) -> bool {
+    auto dfs = [&](auto &&self, int index, Deficit mixed_supply_loss,
+                   const std::array<State, 3> &partial) -> bool {
         if (index < static_cast<int>(candidates.size())) {
             const Candidate &candidate = candidates[index];
             for (const Option &option : candidate.options) {
@@ -1049,9 +1293,23 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
                     ++counters.supply_loss_rejects;
                     continue;
                 }
+                std::array<State, 3> next;
+                bool possible = true;
+                for (int outcome : {1, 0, 2}) {
+                    next[outcome] =
+                        add_states(partial[outcome], option.children.state[outcome]);
+                    if (!necessary_child_possible(next[outcome], depth - 1)) {
+                        possible = false;
+                        break;
+                    }
+                }
+                if (!possible) {
+                    ++counters.prefix_rejects;
+                    continue;
+                }
                 selected[index] = {option.selected_profile, option.selected_height};
                 selected_original[candidate.original] = selected[index];
-                if (self(self, index + 1, next_mixed_supply_loss)) return true;
+                if (self(self, index + 1, next_mixed_supply_loss, next)) return true;
             }
             return false;
         }
@@ -1062,13 +1320,13 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
             std::cerr << "flat_root_progress combinations=" << flat_combinations
                       << " exact_memo=" << memo.size() << " dc_memo=" << dc_memo.size()
                       << '\n';
-        std::array<State, 3> children;
-        for (std::size_t i = 0; i < state.size(); ++i) {
-            const LocalChildren local =
-                split_part(state[i], selected_original[i].selected_profile,
-                           selected_original[i].selected_height);
-            for (int outcome = 0; outcome < 3; ++outcome)
-                children[outcome] = add_states(children[outcome], local.state[outcome]);
+        const std::array<State, 3> &children = partial;
+        for (int outcome : outcome_order) {
+            if (!mixed_path_possible(children[outcome], depth - 1)) {
+                ++counters.mixed_path_rejects;
+                ++counters.prefix_rejects;
+                return false;
+            }
         }
         if (report_progress && flat_combinations == 1) {
             std::cerr << "flat_root_first_candidate split=";
@@ -1086,17 +1344,6 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
                 }
             }
             std::cerr << '\n';
-        }
-        // Most complete products fail one of the inexpensive symbolic bounds.  Test those before
-        // entering exact recursion so they do not manufacture millions of one-use memo entries.
-        for (int outcome : outcome_order) {
-            if (!d_lineage_possible(children[outcome]) ||
-                !mixed_supply_possible(children[outcome], depth - 1) ||
-                !full_star_eventual(children[outcome]) ||
-                !construct_dc(project_dc(children[outcome]), depth - 1)) {
-                ++counters.prefix_rejects;
-                return false;
-            }
         }
         ++exact_combinations;
         if (report_progress && exact_combinations == 1) {
@@ -1143,7 +1390,291 @@ bool construct_flat_root(const State &input, int depth, bool report_progress) {
         witnesses.emplace(make_key(state, depth), selected_original);
         return true;
     };
-    return dfs(dfs, 0, Deficit{});
+    return dfs(dfs, 0, Deficit{}, std::array<State, 3>{});
+}
+
+// A complete root product can still be expensive when many different cuts share the same hard
+// child.  The flat order above follows cuts one by one and may therefore solve an uncommon child
+// before discovering the common obstruction.  This alternative first materializes every root cut
+// that passes the inexpensive exact bounds, interns its three children, and then solves the
+// unresolved child occurring in the largest number of surviving cuts.  A negative child removes
+// all of those cuts at once; a positive child is cached and reused.  The candidate set and child
+// predicate are identical to construct_flat_root, so this changes search order only.
+bool construct_cover_root(const State &input, int depth, bool stop_after_pure,
+                          bool *stopped_at_pure) {
+    State state = input;
+    normalize(state);
+    if (depth <= 0 || state.size() < 2) return construct(state, depth);
+    if (!d_lineage_possible(state)) {
+        ++counters.lineage_rejects;
+        return false;
+    }
+    if (!mixed_supply_possible(state, depth)) {
+        ++counters.supply_rejects;
+        return false;
+    }
+    if (!height_aware_mixed_possible(state, depth)) {
+        ++counters.mixed_envelope_rejects;
+        return false;
+    }
+    if (!full_star_eventual(state)) return false;
+    if (!construct_dc(project_dc(state), depth)) {
+        ++counters.dc_rejects;
+        return false;
+    }
+    if (!mixed_path_possible(state, depth)) {
+        ++counters.mixed_path_rejects;
+        return false;
+    }
+
+    struct Candidate {
+        int original{};
+        Part part{};
+        std::vector<Option> options;
+    };
+    std::vector<Candidate> candidates;
+    for (std::size_t i = 0; i < state.size(); ++i) {
+        std::vector<Option> options = necessary_part_options(state[i], state, depth);
+        if (options.empty()) return false;
+        candidates.push_back({static_cast<int>(i), state[i], std::move(options)});
+    }
+    std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
+                                                              const Candidate &right) {
+        if (left.options.size() != right.options.size())
+            return left.options.size() < right.options.size();
+        const int comparison = compare_profiles(left.part.profile, right.part.profile);
+        if (comparison != 0) return comparison < 0;
+        return left.part.height > right.part.height;
+    });
+    std::cerr << "cover_root_options";
+    for (const Candidate &candidate : candidates)
+        std::cerr << ' ' << candidate.options.size();
+    std::cerr << '\n';
+
+    struct Combination {
+        std::array<int, 3> child_ids{};
+        std::array<Split, MAX_PARTS> split{};
+        bool active{true};
+    };
+    std::vector<Combination> combinations;
+    std::vector<State> child_states;
+    std::unordered_map<Key, int, KeyHash> child_ids;
+    std::vector<Split> selected(candidates.size());
+    std::vector<Split> selected_original(candidates.size());
+    std::uint64_t products = 0;
+    std::uint64_t cheap_rejects = 0;
+
+    auto intern_child = [&](const State &child) {
+        const Key key = make_key(child, depth - 1);
+        if (const auto found = child_ids.find(key); found != child_ids.end())
+            return found->second;
+        const int id = static_cast<int>(child_states.size());
+        child_states.push_back(child);
+        child_ids.emplace(key, id);
+        return id;
+    };
+
+    auto enumerate = [&](auto &&self, int index, Deficit mixed_supply_loss,
+                         const std::array<State, 3> &partial) -> void {
+        if (index < static_cast<int>(candidates.size())) {
+            const Candidate &candidate = candidates[index];
+            for (const Option &option : candidate.options) {
+                if (index > 0 && candidates[index - 1].part == candidate.part) {
+                    const Split previous = selected[index - 1];
+                    if (std::pair(option.selected_profile, option.selected_height) <
+                        std::pair(previous.selected_profile, previous.selected_height))
+                        continue;
+                }
+                const Deficit local_loss = local_mixed_supply_loss(candidate.part, option);
+                Deficit next_loss{};
+                for (int coefficient = 0; coefficient < 3; ++coefficient)
+                    next_loss[coefficient] =
+                        mixed_supply_loss[coefficient] + local_loss[coefficient];
+                if (!mixed_supply_loss_possible(state, depth, next_loss)) {
+                    ++counters.supply_loss_rejects;
+                    continue;
+                }
+                std::array<State, 3> next;
+                bool possible = true;
+                for (int outcome : {1, 0, 2}) {
+                    next[outcome] =
+                        add_states(partial[outcome], option.children.state[outcome]);
+                    if (!necessary_child_possible(next[outcome], depth - 1)) {
+                        possible = false;
+                        break;
+                    }
+                }
+                if (!possible) {
+                    ++cheap_rejects;
+                    continue;
+                }
+                selected[index] = {option.selected_profile, option.selected_height};
+                selected_original[candidate.original] = selected[index];
+                self(self, index + 1, next_loss, next);
+            }
+            return;
+        }
+
+        ++products;
+        Combination combination;
+        for (int outcome = 0; outcome < 3; ++outcome)
+            combination.child_ids[outcome] = intern_child(partial[outcome]);
+        for (std::size_t i = 0; i < selected_original.size(); ++i)
+            combination.split[i] = selected_original[i];
+        combinations.push_back(combination);
+    };
+    enumerate(enumerate, 0, Deficit{}, std::array<State, 3>{});
+    counters.assignments += products;
+    counters.prefix_rejects += cheap_rejects;
+    std::cerr << "cover_root_materialized products=" << products
+              << " cheap_rejects=" << cheap_rejects
+              << " candidates=" << combinations.size()
+              << " unique_children=" << child_states.size() << '\n';
+
+    enum class Answer : std::uint8_t { UNKNOWN, NO, YES };
+    std::vector<Answer> answers(child_states.size(), Answer::UNKNOWN);
+    for (std::size_t id = 0; id < child_states.size(); ++id) {
+        const auto found = memo.find(make_key(child_states[id], depth - 1));
+        if (found != memo.end())
+            answers[id] = found->second ? Answer::YES : Answer::NO;
+    }
+
+    std::size_t active_count = combinations.size();
+    std::size_t solved_children = 0;
+    bool pure_frontier_reported = false;
+    while (active_count > 0) {
+        std::vector<std::uint64_t> pure_frequency(child_states.size());
+        std::vector<std::uint64_t> mixed_frequency(child_states.size());
+        bool removed = false;
+        for (Combination &combination : combinations) {
+            if (!combination.active) continue;
+            bool rejected = false;
+            bool complete = true;
+            for (int child_id : combination.child_ids) {
+                if (answers[child_id] == Answer::NO) {
+                    rejected = true;
+                    break;
+                }
+                if (answers[child_id] != Answer::YES) complete = false;
+            }
+            if (rejected) {
+                combination.active = false;
+                --active_count;
+                removed = true;
+                continue;
+            }
+            if (complete) {
+                std::vector<Split> root_split(state.size());
+                for (std::size_t i = 0; i < state.size(); ++i)
+                    root_split[i] = combination.split[i];
+                witnesses[make_key(state, depth)] = std::move(root_split);
+                std::cerr << "cover_root_result answer=YES active=" << active_count
+                          << " solved_children=" << solved_children << '\n';
+                return true;
+            }
+            for (int outcome : {0, 2}) {
+                const int child_id = combination.child_ids[outcome];
+                if (answers[child_id] == Answer::UNKNOWN) ++pure_frequency[child_id];
+            }
+            const int mixed_child = combination.child_ids[1];
+            if (answers[mixed_child] == Answer::UNKNOWN)
+                ++mixed_frequency[mixed_child];
+        }
+        if (active_count == 0) break;
+        if (removed) continue;
+
+        const bool unresolved_pure =
+            std::any_of(pure_frequency.begin(), pure_frequency.end(),
+                        [](std::uint64_t count) { return count != 0; });
+        if (!unresolved_pure && !pure_frontier_reported) {
+            pure_frontier_reported = true;
+            struct LossClass {
+                std::size_t candidates{};
+                std::set<int> mixed_children;
+            };
+            std::map<Deficit, LossClass> loss_classes;
+            std::set<int> all_mixed_children;
+            Deficit refined_root{};
+            for (Part part : state) {
+                const Deficit refined = refined_supply(part.profile);
+                for (int coefficient = 0; coefficient < 3; ++coefficient)
+                    refined_root[coefficient] += refined[coefficient];
+            }
+            for (const Combination &combination : combinations) {
+                if (!combination.active) continue;
+                const int child_id = combination.child_ids[1];
+                all_mixed_children.insert(child_id);
+                const Deficit child_supply =
+                    unweighted_supply(child_states[child_id]);
+                Deficit loss{};
+                for (int coefficient = 0; coefficient < 3; ++coefficient)
+                    loss[coefficient] =
+                        refined_root[coefficient] - child_supply[coefficient];
+                LossClass &summary = loss_classes[loss];
+                ++summary.candidates;
+                summary.mixed_children.insert(child_id);
+            }
+            std::cerr << "cover_root_pure_frontier candidates=" << active_count
+                      << " unique_mixed_children=" << all_mixed_children.size()
+                      << " loss_classes=" << loss_classes.size()
+                      << " pure_children_solved=" << solved_children << '\n';
+            for (const auto &[loss, summary] : loss_classes)
+                std::cerr << "cover_root_loss loss=" << loss[0] << ',' << loss[1]
+                          << ',' << loss[2]
+                          << " candidates=" << summary.candidates
+                          << " unique_mixed_children="
+                          << summary.mixed_children.size() << '\n';
+            if (stop_after_pure) {
+                if (stopped_at_pure != nullptr) *stopped_at_pure = true;
+                return false;
+            }
+        }
+        int chosen = -1;
+        const std::vector<std::uint64_t> &frequency =
+            unresolved_pure ? pure_frequency : mixed_frequency;
+        for (std::size_t id = 0; id < frequency.size(); ++id) {
+            if (frequency[id] == 0) continue;
+            const auto score = std::tuple(
+                frequency[id], total_height(child_states[id]),
+                mixed_supply_preserved_coordinates(child_states[id], depth - 1));
+            const auto chosen_score =
+                chosen < 0
+                    ? std::tuple<std::uint64_t, std::size_t, int>{0, 0, 0}
+                    : std::tuple(frequency[chosen], total_height(child_states[chosen]),
+                                 mixed_supply_preserved_coordinates(child_states[chosen],
+                                                                    depth - 1));
+            if (chosen < 0 || score > chosen_score)
+                chosen = static_cast<int>(id);
+        }
+        if (chosen < 0)
+            throw std::logic_error("cover search has active cuts but no unresolved child");
+
+        const auto started = std::chrono::steady_clock::now();
+        const bool answer = construct(child_states[chosen], depth - 1);
+        const double seconds = std::chrono::duration<double>(
+                                   std::chrono::steady_clock::now() - started)
+                                   .count();
+        answers[chosen] = answer ? Answer::YES : Answer::NO;
+        ++solved_children;
+        if (solved_children <= 20 || solved_children % 50 == 0 || seconds >= 1.0) {
+            std::cerr << "cover_root_child id=" << chosen
+                      << " kind=" << (unresolved_pure ? "pure" : "mixed")
+                      << " frequency=" << frequency[chosen]
+                      << " answer=" << (answer ? "YES" : "NO")
+                      << " seconds=" << seconds << " active=" << active_count
+                      << " solved_children=" << solved_children << " state=";
+            for (std::size_t i = 0; i < child_states[chosen].size(); ++i) {
+                if (i) std::cerr << ',';
+                std::cerr << profile_text(child_states[chosen][i].profile) << ':'
+                          << static_cast<int>(child_states[chosen][i].height);
+            }
+            std::cerr << '\n';
+        }
+    }
+
+    std::cerr << "cover_root_result answer=NO active=0 solved_children="
+              << solved_children << '\n';
+    return false;
 }
 
 void print_state(const State &state) {
@@ -1471,6 +2002,8 @@ void reset_search() {
     witnesses.clear();
     dc_memo.clear();
     dc_witnesses.clear();
+    mixed_path_memo.clear();
+    mixed_path_witnesses.clear();
     counters = {};
 }
 
@@ -1485,6 +2018,10 @@ void print_result(const State &state, int depth, bool answer, double seconds) {
               << " lineage_rejects=" << counters.lineage_rejects
               << " supply_rejects=" << counters.supply_rejects
               << " supply_loss_rejects=" << counters.supply_loss_rejects
+              << " mixed_envelope_rejects=" << counters.mixed_envelope_rejects
+              << " mixed_path_rejects=" << counters.mixed_path_rejects
+              << " mixed_path_calls=" << counters.mixed_path_calls
+              << " mixed_path_assignments=" << counters.mixed_path_assignments
               << " dc_rejects=" << counters.dc_rejects << " dc_memo=" << dc_memo.size()
               << " dc_kernel_exact_cores=" << dc_kernel_exact_cores.size()
               << " raw_options=" << counters.raw_options
@@ -1811,14 +2348,26 @@ int main(int argc, char **argv) {
              std::string(argv[1]) == "profile-state-prefix" ||
              std::string(argv[1]) == "profile-state-prefix-dc-kernel" ||
              std::string(argv[1]) == "profile-state-flat" ||
-             std::string(argv[1]) == "profile-state-flat-dc-kernel")) {
+             std::string(argv[1]) == "profile-state-flat-dc-kernel" ||
+             std::string(argv[1]) == "profile-state-cover" ||
+             std::string(argv[1]) == "profile-state-cover-dc-kernel" ||
+             std::string(argv[1]) == "profile-state-pure-frontier" ||
+             std::string(argv[1]) == "profile-state-pure-frontier-dc-kernel")) {
             const std::string mode = argv[1];
             const bool flat_root = mode == "profile-state-flat" ||
                                    mode == "profile-state-flat-dc-kernel";
+            const bool cover_root = mode == "profile-state-cover" ||
+                                    mode == "profile-state-cover-dc-kernel" ||
+                                    mode == "profile-state-pure-frontier" ||
+                                    mode == "profile-state-pure-frontier-dc-kernel";
+            const bool pure_frontier = mode == "profile-state-pure-frontier" ||
+                                       mode == "profile-state-pure-frontier-dc-kernel";
             const bool prefix_root = mode == "profile-state-prefix" ||
                                      mode == "profile-state-prefix-dc-kernel";
             const bool load_kernel = mode == "profile-state-flat-dc-kernel" ||
-                                     mode == "profile-state-prefix-dc-kernel";
+                                     mode == "profile-state-prefix-dc-kernel" ||
+                                     mode == "profile-state-cover-dc-kernel" ||
+                                     mode == "profile-state-pure-frontier-dc-kernel";
             if (load_kernel && argc < 5)
                 throw std::invalid_argument(
                     "DC-kernel profile mode requires a certificate and a state");
@@ -1833,12 +2382,27 @@ int main(int argc, char **argv) {
                 throw std::invalid_argument("profile state exceeds height bound");
             reset_search();
             const auto started = std::chrono::steady_clock::now();
-            const bool answer = flat_root
-                                    ? construct_flat_root(state, depth)
-                                    : construct(state, depth, !prefix_root);
+            bool stopped_at_pure = false;
+            const bool answer = cover_root
+                                    ? construct_cover_root(state, depth, pure_frontier,
+                                                           &stopped_at_pure)
+                                : flat_root ? construct_flat_root(state, depth)
+                                            : construct(state, depth, !prefix_root);
             const double seconds = std::chrono::duration<double>(
                                        std::chrono::steady_clock::now() - started)
                                        .count();
+            if (pure_frontier && stopped_at_pure) {
+                std::cout << "atom_profile_pure_frontier depth=" << depth
+                          << " state=";
+                print_state(state);
+                std::cout
+                          << " surviving_candidates_have_exact_pure_outcomes=YES"
+                          << " mixed_outcome=UNRESOLVED"
+                          << " restricted=power_of_two_atom_aligned"
+                          << " profile_atoms=" << PROFILE_ATOMS
+                          << " wall=" << seconds << "s\n";
+                return 0;
+            }
             print_result(state, depth, answer, seconds);
             return answer ? 0 : 1;
         }
@@ -1858,6 +2422,14 @@ int main(int argc, char **argv) {
                   << " profile-state-flat depth WORD:height [...]\n"
                   << "       " << argv[0]
                   << " profile-state-flat-dc-kernel depth CERT WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-cover depth WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-cover-dc-kernel depth CERT WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-pure-frontier depth WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-pure-frontier-dc-kernel depth CERT WORD:height [...]\n"
                   << "       " << argv[0] << " height6-dc-kernel-certificate\n"
                   << "       " << argv[0] << " height6-lineage-certificate\n";
         return 2;
