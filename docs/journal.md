@@ -5805,3 +5805,67 @@ was left running.
 The next symbolic problem is therefore narrower: lift a rank-305 projected tree through the third
 coefficient, enumerating alternative projected skeletons if the first one fails, then walk
 ranks 306--318 toward the known refined rank-319 construction.  No Pareto CSV datum changes.
+
+## 2026-08-15 — an alternative lift closes the sixteen-atom slice at rank 305
+
+The dropped coordinate has a simple exact parametrization.  If a parent profile is
+`p=(a,b,c,d)` and a projected cut fixes `(u,v)=(x_D,x_C+x_D)`, write `j=x_B`.  The selected profile
+is forced to be
+
+    x=(N-v-j,j,v-u,u),
+
+and its complete legal range is
+
+    max(0,N-v-(2a+b)) <= j <= min(N-v,b+c).
+
+The projection already enforces the C/D bounds.  These two inequalities are precisely the remaining
+A/B containment in `R(p)`.  Once `j` is chosen, the complement and all three child states are
+forced.  This turns lifting a projected tree into a finite recursive constraint system, including
+all permutations between exact parts whose projected profiles coincide.
+
+The first retained 25-node projected tree genuinely does not lift.  The new independent Python
+implementation exhausts it in about 4.1 wall seconds: 177 exact node-states, 692 equal-projection
+pairings, and 664,939 hidden-coordinate assignments, of which 558,007 fail an exact full-star
+substate prefix.  Unlike the temporary filtered C++ experiment in the previous entry, this result
+is retained and rerun by `tools/atom_profile_regression.sh`.  Its scope is only that skeleton.
+
+The important correction is that the skeleton is not unique.  A product search now streams every
+winning projected split, applies the interval above immediately, and recurses only on exact child
+states.  It found a rank-305 exact tree after 3,981 projected split assignments and 20,448,787 exact
+cut assignments.  The discovery run used 129.75 wall / 129.00 user seconds and 27,525,120 bytes
+maximum RSS on the M4 Pro; its retained summary and regeneration command are in
+`evidence/atom_profile_height6_rank305.cert`.  The successful root split is
+
+    A^12B^3C:1   -> A^16:1,
+    A^9B^5C^2:2  -> A^8B^6C^2:0,
+    A^13CD^2:3   -> A^14C^2:2.
+
+The resulting exact proof has 19 nodes.  `tools/check_atom_profile_tree.py`, which shares no search
+code with the producer, re-derives every complement, child, leaf inequality, and the root-base
+threshold `r>=6`.  This positive and the all-depth exclusions for ranks 1--304 make
+`A^13CD^2` the exact widest sixteen-atom D germ in the aligned height-6 slice.  There is no need to
+walk ranks 306--318.
+
+Attaching the outer profiles at the same normalization gives
+
+    c=A^15B,
+    a-c=A^9B^5C^2,
+    b=A^12B^3C,
+    d=A^13CD^2,
+
+and therefore parent profile `A^49B^9C^4D^2@G_(k-6)`.  It is the double refinement of the old
+spreadsheet row `A^7B^7D^2@G_(k-4)` (`p6'`) and evaluates to
+
+    2^k-k^2+7k-21.
+
+The checked hard-tree threshold proves the conditional aligned-family construction for `k>=12`.
+The same expression gives 473 at `k=9`, the proven maximum 973 at `k=10`, and 1983 at `k=11`; only
+the middle value is a proven maximum, and the symbolic threshold does not settle the `k=11` case.
+The new closed form and dyadic profile are therefore recorded as `conjecture`, sourced to the
+checked conditional construction, rather than promoted to global Pareto facts.  No
+`data/pareto_*.csv` row changed.
+
+This closes the eight- and sixteen-atom finite optimizers, not arbitrary excessive `q`.  The next
+slice is 32 atoms: recheck the no-C projected kernel and test whether `A^29CD^2` (which is wider than
+the pure refinement of the rank-305 germ) admits an exact lift.  All local discovery processes
+exited normally; none remains running.

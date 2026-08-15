@@ -1,8 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-14** (the D-lineage and two-coordinate kernels close the
-eight-atom slice and 16-atom ranks through 304, isolating the exact rank-305 lifting problem;
+don't know it. Last refreshed **2026-08-15** (an exact alternative lift closes the sixteen-atom
+height-6 slice at rank 305 and yields the conditional `m=6` profile `A^7B^7D^2`; arbitrary
+excessive `q` now begins at 32 atoms;
 proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
 `run3`/`run8` performance baselines).
 
@@ -30,7 +31,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
-| **Do not extrapolate the one-D `ABBBBBCD` accounting by adding depth or pure refinement—or call the first two-D profile feasible.** | One D lineage cannot serve a height-6 mixed path. At 16 atoms, the stronger `(D,C+D)` kernel also excludes every rank-290--304 two-D/no-C germ at all depths. Rank 305 has a projected depth-3 tree, but that relaxation drops the third deficit coefficient and is not a full A--D construction. See [the atom-lineage note](theorems/atom-lineage.md). |
+| **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify one projected skeleton with the exact problem.** | One D lineage cannot serve a height-6 mixed path, and the 16-atom `(D,C+D)` kernel excludes ranks 290--304. The first projected rank-305 tree also has no exact lift, but a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof, and failure of one skeleton is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 
 ## Goals
 
@@ -185,13 +186,17 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   every depth, including `ABBBBBCD` (rank 59): the finite 229 accounting cannot stabilize by pure
   refinement.  Rank 82, `A^6D^2`, has an independently checked 19-node, three-level tree with root
   base threshold 13.  It is therefore the exact widest A--D eight-atom germ and gives the conditional
-  parent construction `2^k-k^2+6k-16` for `k>=18` inside this height triple.  This does **not** close
-  arbitrary excessive `q`: at 16 atoms the D-lineage theorem excludes ranks 1--289 (the refined 229
-  class is rank 191), and a separately checked 242-core `(D,C+D)` coinductive kernel excludes ranks
-  290--304 at every depth.  Rank 305, `A^13CD^2`, has a 25-node depth-3 tree only in that projected
-  relaxation; lifting it through the dropped third coefficient is open.  Thus the exact unresolved
-  interval is now ranks 305--318 before the known refined winner at rank 319.  Both losing and
-  positive certificates are independently checked by `tools/atom_profile_regression.sh`; see
+  parent construction `2^k-k^2+6k-16` for `k>=18` inside this height triple.  At 16 atoms the
+  D-lineage theorem excludes ranks 1--289 (the refined 229 class is rank 191), and a separately
+  checked 242-core `(D,C+D)` coinductive kernel excludes ranks 290--304 at every depth.  The first
+  25-node projected tree for rank 305, `A^13CD^2`, does not lift exactly, but an all-skeleton product
+  search finds a different 19-node exact tree with root-base threshold 6.  Rank 305 is consequently
+  the exact sixteen-atom optimum.  Attaching the outer branches yields the conditional profile
+  `A^49B^9C^4D^2@G_(k-6)`, equivalently `A^7B^7D^2@G_(k-4)`, and width
+  `2^k-k^2+7k-21` for `k>=12`.  This reproduces 473 at `k=9` and the exact 973 at `k=10`, but
+  predicts the still-open 1983 at `k=11`; the symbolic threshold does not settle that finite case.
+  Arbitrary excessive `q` remains open at the 32-atom slice.  All losing and positive certificates
+  are independently checked by `tools/atom_profile_regression.sh`; see
   [the atom-lineage note](theorems/atom-lineage.md).  No Pareto datum changes.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
@@ -206,7 +211,8 @@ fixed-small-m exact recurrence and complete assembly rank/enumeration modes in
 `tools/search_singletonization.cpp`,
 together with its guarded-piece combiner `tools/optimize_mixed_frontier.py`.  The aligned symbolic
 track is independently checked by `tools/check_atom_profile_certificate.py` and
-`tools/check_atom_profile_tree.py` through `tools/atom_profile_regression.sh`.
+`tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
+searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.
 
 Artifact store `fedork/radio-data` (private): 12 tags, 33 assets plus a manifest per tag,
 about 394 MB stored, `check-index` green.
@@ -664,11 +670,14 @@ The proof sources are `evidence/sb_m6_k10_frontier.txt` and
 `witnesses/majorized_973_6_at10.tree`.  `tools/search_singletonization.cpp` is independent of the
 old fitted witness: at full depth its recurrence is exact solvability, it enumerates the complete
 short deficit interval for each cut, and its positive tree is re-derived by `check_witness.py`.
-The next large-k target is the two-bundle mixed frontier behind the working `2+4` root.  A tempting
-`-3` lift to `k=11` reduces to `Sb(503:1,495:2,478:3)@9`, but its first five-minute exact run timed
-out without a verdict.  The literal scaled next split is nevertheless dead: it produces the
-exactly unsolvable residual `Sb(247:1,247:1,240:2,231:2)@8` (277.622 s).  A different first split
-of the parent remains possible.  Do not promote that one-point correction to a formula.
+The finite `k=11` target remains open.  The candidate reduces to
+`Sb(503:1,495:2,478:3)@9`; its first five-minute exact run timed out, and the literal scaled split
+is dead because it produces the exactly unsolvable residual
+`Sb(247:1,247:1,240:2,231:2)@8` (277.622 s).  Separately, the aligned atom construction now finds
+the different structural continuation `2^k-k^2+7k-21` for `k>=12`, conditional on the outer
+assembly.  It predicts 1983 at `k=11` but its root threshold is one level too high to settle that
+case.  This formula comes from a checked 19-node symbolic tree, not from promoting the one-point
+`-3` correction.
 
 ## Immediate next steps
 

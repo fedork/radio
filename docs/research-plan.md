@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-14.
+entries. Last revised 2026-08-15.
 
 ## High-level goals
 
@@ -49,10 +49,11 @@ diagnostic-only. See
 [`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt) and
 [`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 
-**H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
-`m=6` closed form and `BBCD` profile are now refuted by the exact `n(10,6)=973` frontier.  The
-next question is the large-`k` two-bundle construction/obstruction behind its successful `2+4`
-root, not whether the particular `473:6@9` witness scales.
+**H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The old
+`m=6` closed form and `BBCD` profile are refuted by the exact `n(10,6)=973` frontier.  A checked
+sixteen-atom aligned tree now gives the different conditional continuation
+`2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  The next
+excessive-`q` question is whether the 32-atom slice improves on this refinement class.
 
 ## Proximate goals
 
@@ -209,23 +210,25 @@ should the minimal production form be tried: a transient lineage-aware hint, one
 a bounded pass, and unchanged fallback.  Split hints must influence order only; they are not cache
 facts.  Use `tools/pareto_census_status.sh` for a one-shot progress query.
 
-**Separate theoretical m=6 thread (updated 2026-08-10).** The first large-`k` classification is
+**Separate theoretical m=6 thread (updated 2026-08-15).** The first large-`k` classification is
 complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified
 singleton-majorized tree at 973.  This refutes both the closed form and `BBCD` profile, which
 predict 976.  The working root is `[477:2]`, with mixed child `Sb(496:2,477:4)@9`; it avoids the
-`Z_7` kernel rather than repairing it.  Next, work forward from this **state family**, not from its
-particular stored subtree:
+`Z_7` kernel rather than repairing it.  The separate aligned atom track now supplies a structural
+continuation `2^k-k^2+7k-21` for `k>=12`, conditional on the outer assembly; it is not a fit to this
+stored subtree.  Next:
 
 1. classify the working root splits at 973 and express the `m=4 + m=2` mixed-child boundary in
    deficit coordinates;
 2. decide the proposed one-level lift, whose only new hard child is
    `Sb(503:1,495:2,478:3)@9` (the first five-minute run was inconclusive, and the literal scaled
    continuation is refuted by the exact negative `Sb(247:1,247:1,240:2,231:2)@8`);
-3. derive a parametric lower construction or synchronized upper obstruction for that two-bundle
-   frontier, then recover the low-`k` degeneracies backwards.
+3. compare the unrestricted two-bundle frontier with the new aligned construction, then recover the
+   low-`k` degeneracies backwards or find an upper obstruction.
 
-Do not infer a constant `-3` correction from one value.  Reproduction, correctness argument and
-costs are in the latest journal entry and `docs/tools.md`.
+The new formula predicts 1983 at `k=11`, but its checked hard-tree threshold starts at `k=12`, so it
+does not decide item 2.  Do not infer a constant `-3` correction from one value.  Reproduction,
+correctness argument and costs are in the latest journal entry and `docs/tools.md`.
 
 **Conditional excess-q construction track (2026-08-14).** Under the explicitly unproved working
 assumption that every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf regime,
@@ -251,13 +254,15 @@ eight-atom ranks 1--81 are all-depth negative.  Rank 82, `A^6D^2`, has a checked
 and is the exact A--D eight-atom optimum, yielding the conditional construction
 `2^k-k^2+6k-16` from `k>=18`.  The next task is no longer deeper search for 229.  At 16 atoms the
 D-lineage certificate excludes ranks 1--289, and the new 242-core `(D,C+D)` coinductive kernel
-excludes ranks 290--304 at every depth.  Rank 305 is therefore the first live exact target: its
-projection has a checked 25-node depth-3 tree, but the dropped third deficit coordinate has not been
-lifted.  Treat that projected tree as a finite skeleton and solve its A/B allocation constraints;
-if the first skeleton has no lift, enumerate alternative projected trees before returning to an
-unstructured exact search.  Then walk ranks 306--318 until meeting the refined rank-319 control.
-This carries no inner A/B/C witness data, changes no Pareto datum, and remains conditional on the
-outer assembly; definitions, proof and controls are in
+excludes ranks 290--304 at every depth.  The first projected rank-305 tree has no exact lift, but the
+product search over alternative projected splits finds a checked 19-node exact tree for
+`A^13CD^2`.  Thus rank 305 is the exact sixteen-atom optimum and yields the conditional parent
+profile `A^49B^9C^4D^2@G[k-6]`, equivalently `A^7B^7D^2@G[k-4]`, with width
+`2^k-k^2+7k-21` from `k>=12`.  The next finite optimizer is the 32-atom slice: first test whether the
+same projected skeleton lifts the wider germ `A^29CD^2`, then enumerate alternatives and synthesize
+an all-depth losing kernel for every preceding projection band.  This carries no inner A/B/C
+witness data, changes no Pareto datum, and remains conditional on the outer assembly; definitions,
+proof and controls are in
 [the atom-lineage note](theorems/atom-lineage.md) and
 [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 
@@ -279,11 +284,12 @@ It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the re
 passed in 471.6 CPU seconds in run8 and 479.2 in proof-safe run9. Use run8 as the
 matched baseline for run9's natural `Sa(193)` progress, visible-attempt cost and memory, but use only
 run9 for a new negative claim. Do not add split history before that comparison matures.
-The theory track now has two compatible large-k targets: work from the exact `k=10,m=6` mixed-child
-boundary toward a parametric construction/obstruction, and test whether recursive Pareto lifting
-stabilises once low-k degeneration disappears.  In both cases retain alternative Pareto upgrades
-and split classes, then recover small k backwards. Do not use witness-tree shape as evidence that
-either track has a unique continuation.
+The theory track now has two compatible large-k targets: determine whether the 32-atom aligned
+slice improves the new `m=6` continuation (while the separate exact `k=11` case remains open), and
+test whether recursive Pareto lifting stabilises once low-k degeneration disappears.  In both cases
+retain alternative Pareto upgrades and split classes, then recover small k backwards.  The
+rank-305 result is the warning in miniature: its first projected tree does not lift, while another
+one does.  Do not use one witness-tree shape as evidence that either track has a unique continuation.
 
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`

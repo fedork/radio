@@ -125,19 +125,64 @@ over-approximation, so this excludes the full A--D profiles at ranks 290--304 as
 was discovered as a repeated pair of bounded-search layers, but the proof no longer depends on
 that depth: the checker exhausts the transition closure directly.
 
+The omitted coordinate also has a closed exact lift rule.  Let the parent profile be
+`p=(a,b,c,d)`, let a projected cut select `(u,v)=(x_D,x_C+x_D)`, and write `j=x_B` for its only
+remaining freedom.  Then
+
+    x=(N-v-j, j, v-u, u),
+    max(0, N-v-(2a+b)) <= j <= min(N-v, b+c).                       (8)
+
+The projected legality conditions already handle C and D; (8) is exactly the remaining A/B
+containment in `R(p)`.  Thus a projected skeleton lifts by choosing one integer from this interval
+for each part at each node.  Every choice forces the complement and all three exact children, so
+the problem is a finite recursive constraint system rather than an unstructured profile search.
+
 Rank 305, `A^13CD^2`, adds exactly one C atom and changes only the last root part to `((2,3):3)`.
 It lies outside the losing kernel.  A separately retained 25-node projected tree solves it at
 depth three, so the `(D,C+D)` abstraction is sharp at this boundary.  This positive is only an
-abstraction witness: it does not assign the dropped B/C/D deficit coefficient and therefore is
-not yet a full profile construction.  The exact ranks 305--318 remain open; the known eight-atom
-positive refines to the constructible `A^12C^2D^2` at rank 319.
+abstraction witness: it does not assign the dropped B/C/D deficit coefficient.  That particular
+skeleton does **not** lift through the omitted coordinate; `tools/check_dc_tree_lift.py` exhausts
+every legal hidden-coordinate assignment on it.  This is not an obstruction, because a projected
+state can have several inequivalent winning splits.
+
+Enumerating those projected splits lazily and lifting each one immediately finds a different exact
+tree.  Its root is
+
+    (A^12B^3C:1), (A^9B^5C^2:2), (A^13CD^2:3),
+
+and its first selected profiles are respectively
+
+    (A^16:1), (A^8B^6C^2:0), (A^14C^2:2).                         (9)
+
+The independently checked proof object has 19 nodes and all leaves satisfy exact three-coordinate
+majorization for root base `r>=6`.  Since ranks 1--304 already have all-depth exclusions, rank 305
+is therefore the exact widest sixteen-atom D germ, again with no synchronized-depth qualifier.
+
+At this normalization the already constructed outer quantities are
+
+    c=A^15B,   a-c=A^9B^5C^2,   b=A^12B^3C,
+
+so attaching the new germ gives the conditional parent profile
+
+    A^49B^9C^4D^2 @ G_(k-6)
+      = R^2(A^7B^7D^2) @ G_(k-6).
+
+Its width is
+
+    2^k - 2 binom(k-6,2) - 6(k-6) - 15
+      = 2^k - k^2 + 7k - 21,                                    (10)
+
+and the hard-tree threshold `r>=6` gives `k>=12`.  As in (5), this is conditional on the working
+outer assembly and is a lower construction inside the aligned height triple, not a global Pareto
+maximality theorem.
 
 So the symbolic result is sharp but scoped:
 
 - the one-D proposal is refuted at *all* depths and under every pure refinement;
-- the eight-atom A--D optimum is proved exactly;
+- the eight- and sixteen-atom A--D optima are proved exactly;
 - the new 16-atom ranks 290--304 are also all-depth negative;
-- the remaining larger-`q` maximization now begins at the exact rank-305 lifting problem.
+- the remaining arbitrary-excess-`q` maximization now begins at the 32-atom slice, where a profile
+  wider than the refinement of rank 305 may still exist.
 
 ## Mechanical verification
 
@@ -151,6 +196,13 @@ the C++ search.  The combined durable eight-atom proof object is
 
 For the new two-coordinate result, `tools/check_dc_kernel_certificate.py` independently replays
 the projected algebra.  It checks all 242 minimal cores, 641,741 partial global cut assignments,
-their upward-substate closure, and all 25 nodes of the rank-305 projected tree.  The durable object
-is `evidence/atom_profile_height6_dc16.cert`.  The checker does not trust the producer's search
-depth or memo answers.
+their upward-substate closure, and all 25 nodes of the first rank-305 projected tree.  The durable
+object is `evidence/atom_profile_height6_dc16.cert`.  The checker does not trust the producer's
+search depth or memo answers.
+
+`tools/check_dc_tree_lift.py` then reimplements the omitted-coordinate intervals and proves that
+this first skeleton has no exact lift.  Its all-skeleton mode produced the alternative exact tree
+in `evidence/atom_profile_height6_rank305.cert`; `tools/check_atom_profile_tree.py` independently
+re-derives every one of its profiles, splits, children, leaf inequalities, and threshold.  The
+ordinary regression verifies both the fixed-skeleton negative and the retained positive tree;
+rerunning the two-minute all-skeleton discovery is optional because the tree itself is the proof.

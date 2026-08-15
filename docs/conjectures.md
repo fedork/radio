@@ -749,19 +749,30 @@ outer branches gives the conditional parent profile `A^21B^6C^3D^2@G_(k-5)` and 
 
     2^k-k^2+6k-16,       k>=18.                                    (12)
 
-This closes the fixed eight-atom A--D slice, not arbitrary excessive `q`.  The 165 profiles are all
-A--D words of length eight, not all possible longer words.  At 16 atoms the same certificate excludes
-ranks 1--289 (including the refined 229 class at rank 191).  A finite 242-core coinductive kernel
-in the sound `(p_D,p_C+p_D)` abstraction then excludes ranks 290--304 at every depth.  Rank 305,
-`A^13CD^2`, has a checked depth-3 tree in that projection but no full third-coordinate lift yet,
-while the known eight-atom winner refines to rank 319, `A^12C^2D^2`.  Thus ranks 305--318 are the
-first genuinely larger-`q` exact band still open.  Full proof and scope are in
-[the atom-lineage note](theorems/atom-lineage.md).
+That eight-atom answer is not stable under arbitrary excessive `q`.  At 16 atoms the same lineage
+certificate excludes ranks 1--289 (including the refined 229 class at rank 191), and a finite
+242-core coinductive kernel in the sound `(p_D,p_C+p_D)` abstraction excludes ranks 290--304 at
+every depth.  The first retained projected tree for rank 305, `A^13CD^2`, has no exact lift, but an
+all-skeleton product search finds a different 19-node exact tree.  Its root-base threshold is
+`r>=6`, so rank 305 is the exact sixteen-atom optimum and gives the conditional parent profile
+
+    A^49B^9C^4D^2@G[k-6] = R^2(A^7B^7D^2)@G[k-6]
+
+with width
+
+    2^k-k^2+7k-21,       k>=12.                                  (13)
+
+The compact `A^7B^7D^2@G[k-4]` spelling is the old spreadsheet's `p6'` row: it reproduces 473 at
+`k=9`, the exact 973 at `k=10`, and predicts 1983 at the still-open `k=11`.  The construction needs
+the twice-refined 64-atom realization; the compact spelling alone does not lower its proved atomic
+depth.  Arbitrary excessive `q` remains open—the next finite slice is 32 atoms.  Full proof and
+scope are in [the atom-lineage note](theorems/atom-lineage.md).
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
+`tools/check_dc_tree_lift.py` supplies the exact-coordinate product search.
 `tools/atom_profile_regression.sh` invokes independent checkers for the D-lineage certificate, the
-two-coordinate kernel, and both positive trees.  This is the concrete version of the abstract `H`
-state below and still uses only the outer profiles of A/B/C.
+two-coordinate kernel, the failed first lift, and all retained positive trees.  This is the concrete
+version of the abstract `H` state below and still uses only the outer profiles of A/B/C.
 
 ### Minimal state for a height-first D optimizer
 

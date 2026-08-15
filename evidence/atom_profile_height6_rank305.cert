@@ -1,0 +1,35 @@
+# Exact sixteen-atom rank-305 aligned-profile construction.
+#
+# Discover/regenerate (about two minutes on the recorded M4 Pro run):
+#   python3 tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \
+#       --rank 305 --all-skeletons --depth 3 --expect YES --emit-tree
+#
+# Verify the proof object without rerunning discovery:
+#   tools/check_atom_profile_tree.py evidence/atom_profile_height6_rank305.cert
+#
+# Recorded all-skeleton discovery on the M4 Pro: 129.75 s wall, 129.00 s user,
+# 27,525,120 bytes maximum RSS.  The first retained projected skeleton is separately
+# exhausted as NO by the fixed-skeleton command in tools/atom_profile_regression.sh.
+
+projected_tree_exact_lift rank=305 candidate=AAAAAAAAAAAAACDD answer=YES scope=all_skeletons depth=3 projected_splits=3981 exact_cut_assignments=20448787 exact_states=742 dc_states=4851
+height6_candidate rank=305 D=AAAAAAAAAAAAACDD answer=YES depth=3
+atom_profile_tree_node id=0 parent=-1 outcome=-1 level=0 state=AAAAAAAAAAAABBBC:1,AAAAAAAAABBBBBCC:2,AAAAAAAAAAAAACDD:3 split=AAAAAAAAAAAAAAAA:1,AAAAAAAABBBBBBCC:0,AAAAAAAAAAAAAACC:2
+atom_profile_tree_node id=1 parent=0 outcome=0 level=1 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAACC:2 split=AAAAAAAAAAAAAAAA:0,AAAAAAAAAAAAAAAB:1
+atom_profile_tree_node id=2 parent=1 outcome=0 level=2 state=AAAAAAAAAAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_node id=3 parent=1 outcome=1 level=2 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAAAAAAAABCC:1 leaf_threshold=3
+atom_profile_tree_node id=4 parent=1 outcome=2 level=2 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAABCC:1 leaf_threshold=3
+atom_profile_tree_node id=5 parent=0 outcome=1 level=1 state=AAAAAAAAAAABBBBC:1,AAAAAAAAAAAAAACC:1,AAAAAAAABBBBBBCC:2,AAAAAAAAAAAABCDD:2 split=AAAAAAAAAAAAAAAB:1,AAAAAAAAAAAAAAAA:1,AAAAAAAAAAABBBBC:1,AAAAAAAAAABCCCDD:0
+atom_profile_tree_node id=6 parent=5 outcome=0 level=2 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAAAAAABBBBC:1 leaf_threshold=3
+atom_profile_tree_node id=7 parent=5 outcome=1 level=2 state=AAAAAAAAAAABBBBC:1,AAAAAAAAAAABBBBC:1,AAAAAAAAAAABBBBC:1,AAAAAAAAAAAABBCC:1,AAAAAAAAAABCCCDD:2 split=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAAAAABBBBBC:0,AAAAAAAAAAABBBCC:0,AAAAAAAAAAAAAACD:1
+atom_profile_tree_node id=8 parent=7 outcome=0 level=3 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAAAAAAAAACD:1 leaf_threshold=3
+atom_profile_tree_node id=9 parent=7 outcome=1 level=3 state=AAAAAAAAAAABBBBC:1,AAAAAAAAAABBBBBC:1,AAAAAAAAAABBBBBC:1,AAAAAAAAAAABBBCC:1,AAAAAAAAAAAAAACD:1,AAAAAAABBBBCCCCD:1 leaf_threshold=3
+atom_profile_tree_node id=10 parent=7 outcome=2 level=3 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAABBBBCCCCD:1 leaf_threshold=3
+atom_profile_tree_node id=11 parent=5 outcome=2 level=2 state=AAAAAAAAAAAAAAAB:2,AAAAAAAAAAABBBBC:1 split=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1
+atom_profile_tree_node id=12 parent=11 outcome=0 level=3 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_node id=13 parent=11 outcome=1 level=3 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAAAAAABBBBC:1 leaf_threshold=3
+atom_profile_tree_node id=14 parent=11 outcome=2 level=3 state=AAAAAAAAAAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_node id=15 parent=0 outcome=2 level=1 state=AAAAAAAAAAAAAAAB:2,AAAAAAAAAAAABCDD:1 split=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1
+atom_profile_tree_node id=16 parent=15 outcome=0 level=2 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_node id=17 parent=15 outcome=1 level=2 state=AAAAAAAAAAAAAAAA:1,AAAAAAAAAAAAAAAB:1,AAAAAAAAAABCCCDD:1 leaf_threshold=3
+atom_profile_tree_node id=18 parent=15 outcome=2 level=2 state=AAAAAAAAAAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_certificate version=1 root=0 nodes=19 root_base_threshold=6 profile_atoms=16 normalization_levels=4

@@ -20,6 +20,7 @@ numerical fit only.
 | 4 | `2^k - 2*k + 2` | k >= 3 | conjecture |
 | 5 | `2^k - k*(k-3)/2 - 5` | k >= 4 | conjecture |
 | 6 | `2^k - k*(k-1)/2 - 3` | k >= 4 | refuted |
+| 6 | `2^k - k*k + 7*k - 21` | k >= 9 | conjecture |
 | 7 | `2^k - k*k + 4*k - 10` | k >= 5 | conjecture |
 | 8 | `2^k - k*k + 2*k - 2` | k >= 5 | conjecture |
 | 9 | `(31*2^k)/32 - k*k + 2*k - 2` | k >= 5 | conjecture |

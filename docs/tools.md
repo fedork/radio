@@ -707,6 +707,11 @@ CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     -DATOM_PROFILE_ATOMS=16 tools/search_atom_profiles.cpp -o /tmp/search_atom_profiles16
 tools/run_with_provenance.py /tmp/search_atom_profiles16 height6-dc-kernel-certificate
 tools/run_with_provenance.py /tmp/search_atom_profiles16 height6-dc 3 305
+tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert --rank 305 --expect NO
+tools/check_atom_profile_tree.py evidence/atom_profile_height6_rank305.cert
+# Optional two-minute rediscovery of the retained exact tree:
+tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \
+    --rank 305 --all-skeletons --depth 3 --expect YES --emit-tree
 tools/atom_profile_regression.sh
 ```
 
@@ -718,15 +723,19 @@ At eight atoms, ranks 1--81 have all-depth D-lineage certificates and rank 82 `A
 independently checked depth-3 tree, so the first 82 scan proves the exact all-depth optimum of that
 slice.  At 16 atoms, ranks 1--289 are lineage-excluded and rank 290 is abstractly negative through
 all depths by the 242-core projected kernel.  Since ranks 290--304 share that projection, all are
-excluded.  Rank 305 has a checked depth-3 projected tree but no full A--D lift yet; ranks 305--318
-remain open before the refined rank-319 winner.  The retained kernel and projected tree are
-`evidence/atom_profile_height6_dc16.cert`.
+excluded.  The first checked rank-305 projected tree has no exact lift, but
+`check_dc_tree_lift.py` streams alternative winning projected splits and finds a different exact
+19-node tree.  Rank 305 is consequently the exact widest sixteen-atom D germ.  The retained kernel
+and first projected tree are `evidence/atom_profile_height6_dc16.cert`; the exact positive is
+`evidence/atom_profile_height6_rank305.cert`.
 
 This does not maximize arbitrary excessive `q`: 165 is the number of A--D words of length eight,
-not the whole longer-profile universe.  Range slicing still prevents one hard germ from hiding
-completed work on later germs.  The default two-million exact memo-entry ceiling aborts explicitly
-rather than printing `NO`; external time and memory caps remain appropriate for deeper runs.  The
-proof and scope are in [the atom-lineage note](theorems/atom-lineage.md).
+and 969 the number at sixteen, not the whole longer-profile universe.  The next slice is 32 atoms;
+the C++ producer must be generalized beyond its current 16-atom bound before scanning it.  Range
+slicing still prevents one hard germ from hiding completed work on later germs.  The default
+two-million exact memo-entry ceiling aborts explicitly rather than printing `NO`; external time and
+memory caps remain appropriate for deeper runs.  The proof and scope are in
+[the atom-lineage note](theorems/atom-lineage.md).
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

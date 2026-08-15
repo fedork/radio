@@ -9,6 +9,9 @@ cd "$repo_dir"
 tools/check_atom_profile_certificate.py evidence/atom_profile_height6_ad8.cert
 tools/check_atom_profile_tree.py evidence/atom_profile_height6_ad8.cert
 tools/check_dc_kernel_certificate.py evidence/atom_profile_height6_dc16.cert
+tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \
+    --rank 305 --expect NO
+tools/check_atom_profile_tree.py evidence/atom_profile_height6_rank305.cert
 
 CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_atom_profiles.cpp -o "$work_dir/search_atom_profiles"
