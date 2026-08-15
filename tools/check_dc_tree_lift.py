@@ -7,12 +7,16 @@ free.  This checker exhausts that finite interval at every internal node and
 re-derives all exact children.  It deliberately shares no search code with the
 C++ producer.
 
-The result is scoped to the serialized projected skeleton.  A NO does not say
-that another projected tree, or a deeper tree, cannot lift.
+The default result is scoped to the serialized projected skeleton.  In
+``--all-skeletons`` mode the checker instead enumerates every winning projected
+split at the requested depth, so a NO is exhaustive within that bounded aligned
+model.  Neither mode says anything about a deeper tree.
 
 Partial-child pruning is sound by subgraph monotonicity: if a partial child
 already fails the necessary full-star condition (or the projected recursion),
-adjoining the remaining disjoint parts cannot make that substate solvable.
+adjoining the remaining disjoint parts cannot make that substate solvable.  The
+all-skeleton search also propagates nonnegative mixed-supply loss through the
+remaining depth, independently reimplementing the symbolic transition bound.
 """
 
 from __future__ import annotations
@@ -250,6 +254,7 @@ class LiftChecker:
         self.cut_assignments = 0
         self.prefix_rejects = 0
         self.supply_rejects = 0
+        self.supply_loss_rejects = 0
         self.leaf_checks = 0
         self.witness: dict[tuple[int, State], tuple[tuple[Profile, int], ...]] = {}
 
@@ -274,11 +279,7 @@ class LiftChecker:
 
     @functools.lru_cache(maxsize=None)
     def mixed_supply_possible(self, state: State, depth: int) -> bool:
-        supply = [0, 0, 0]
-        for profile, _ in state:
-            coordinates = deficit(profile)
-            for coefficient in range(3):
-                supply[coefficient] += coordinates[coefficient]
+        supply = list(self.unweighted_supply(state))
         initial_d, initial_v = supply[0], supply[1]
         supply[1] += depth * initial_d
         supply[2] += depth * initial_v + math.comb(depth, 2) * initial_d
@@ -292,6 +293,53 @@ class LiftChecker:
         return eventually_nonnegative(
             tuple(supply[index] - required[index] for index in range(3))
         )
+
+    @staticmethod
+    def unweighted_supply(state: State) -> tuple[int, int, int]:
+        supply = [0, 0, 0]
+        for profile, _ in state:
+            coordinates = deficit(profile)
+            for coefficient in range(3):
+                supply[coefficient] += coordinates[coefficient]
+        return tuple(supply)  # type: ignore[return-value]
+
+    def mixed_supply_loss_possible(
+        self, state: State, depth: int, loss: tuple[int, int, int]
+    ) -> bool:
+        if depth <= 0:
+            return loss == (0, 0, 0)
+        supply = list(self.unweighted_supply(state))
+        initial_d, initial_v = supply[0], supply[1]
+        supply[1] += depth * initial_d
+        supply[2] += depth * initial_v + math.comb(depth, 2) * initial_d
+
+        remaining = depth - 1
+        terminal_loss = (
+            loss[0],
+            loss[1] + remaining * loss[0],
+            loss[2] + remaining * loss[1] + math.comb(remaining, 2) * loss[0],
+        )
+        required = [0, 0, 0]
+        height = sum(part_height for _, part_height in state)
+        for profile in self.reference[:height]:
+            coordinates = deficit(profile)
+            for coefficient in range(3):
+                required[coefficient] += coordinates[coefficient]
+        return eventually_nonnegative(
+            tuple(
+                supply[index] - terminal_loss[index] - required[index]
+                for index in range(3)
+            )
+        )
+
+    def local_mixed_supply_loss(
+        self, part: Part, local: tuple[State, State, State]
+    ) -> tuple[int, int, int]:
+        available = deficit(refine(part[0]))
+        retained = self.unweighted_supply(local[1])
+        return tuple(
+            available[index] - retained[index] for index in range(3)
+        )  # type: ignore[return-value]
 
     @functools.lru_cache(maxsize=None)
     def exact_cuts(self, part: Part, projected_split: DCSplit) -> tuple[Profile, ...]:
@@ -825,7 +873,11 @@ class GuidedLiftChecker(LiftChecker):
                 )
                 selected_by_index: list[tuple[Profile, int] | None] = [None] * len(state)
 
-                def assign(index: int, partial: tuple[State, State, State]) -> bool:
+                def assign(
+                    index: int,
+                    partial: tuple[State, State, State],
+                    mixed_loss: tuple[int, int, int],
+                ) -> bool:
                     if index == len(choices):
                         for outcome in (1, 0, 2):
                             if not self.solve_guided(partial[outcome], depth - 1):
@@ -842,6 +894,16 @@ class GuidedLiftChecker(LiftChecker):
                     for selected in cuts:
                         self.cut_assignments += 1
                         local = self.split_part(part, selected, selected_height)
+                        local_loss = self.local_mixed_supply_loss(part, local)
+                        next_mixed_loss = tuple(
+                            mixed_loss[coefficient] + local_loss[coefficient]
+                            for coefficient in range(3)
+                        )
+                        if not self.mixed_supply_loss_possible(
+                            state, depth, next_mixed_loss  # type: ignore[arg-type]
+                        ):
+                            self.supply_loss_rejects += 1
+                            continue
                         next_children = tuple(
                             self.add_states(partial[outcome], local[outcome])
                             for outcome in range(3)
@@ -859,12 +921,16 @@ class GuidedLiftChecker(LiftChecker):
                             )
                             continue
                         selected_by_index[original] = (selected, selected_height)
-                        if assign(index + 1, next_children):
+                        if assign(
+                            index + 1,
+                            next_children,  # type: ignore[arg-type]
+                            next_mixed_loss,  # type: ignore[arg-type]
+                        ):
                             return True
                         selected_by_index[original] = None
                     return False
 
-                if assign(0, ((), (), ())):
+                if assign(0, ((), (), ()), (0, 0, 0)):
                     return True
         return False
 
@@ -964,6 +1030,7 @@ def main() -> int:
                 f"cut_assignments={checker.cut_assignments} "
                 f"prefix_rejects={checker.prefix_rejects} leaf_checks={checker.leaf_checks}"
                 f" supply_rejects={checker.supply_rejects}"
+                f" supply_loss_rejects={checker.supply_loss_rejects}"
                 + (
                     f" projected_splits={checker.projected_splits} "
                     f"dc_states={checker.dc.solve.cache_info().currsize}"

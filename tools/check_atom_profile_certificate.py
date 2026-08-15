@@ -49,6 +49,18 @@ def deficit(profile: tuple[int, int, int, int]) -> tuple[int, int, int]:
     return d, c + d, b + c + d
 
 
+def transform(supply: tuple[int, int, int]) -> tuple[int, int, int]:
+    d, v, w = supply
+    return d, v + d, w + v
+
+
+def iterate_transform(supply: tuple[int, int, int], steps: int) -> tuple[int, int, int]:
+    value = supply
+    for _ in range(steps):
+        value = transform(value)
+    return value
+
+
 def profiles(atom_count: int) -> list[tuple[int, int, int, int]]:
     out = []
     for a in range(atom_count + 1):
@@ -203,13 +215,40 @@ def main() -> int:
                         for actual, available in zip(mixed_supply, refined_supply)
                     ):
                         raise ValueError("mixed outcome exceeds refined deficit supply")
+                    loss = tuple(
+                        available - actual
+                        for actual, available in zip(mixed_supply, refined_supply)
+                    )
+                    if not (0 <= loss[0] <= loss[1] <= loss[2]):
+                        raise ValueError("mixed outcome has a non-profile supply loss")
                     local_cases += 1
+
+    # Independently check the closed propagation formula used to reject a partial global cut.
+    # A first-transition loss ell is transformed once for every remaining mixed outcome.  The
+    # explicit polynomial below must agree with literal iteration of the triangular recurrence.
+    propagation_cases = 0
+    for loss_d in range(atom_count + 1):
+        for loss_v in range(loss_d, atom_count + 1):
+            for loss_w in range(loss_v, atom_count + 1):
+                loss = loss_d, loss_v, loss_w
+                for remaining in range(6):
+                    expected = (
+                        loss_d,
+                        loss_v + remaining * loss_d,
+                        loss_w
+                        + remaining * loss_v
+                        + remaining * (remaining - 1) // 2 * loss_d,
+                    )
+                    if iterate_transform(loss, remaining) != expected:
+                        raise ValueError("closed mixed-supply loss propagation is incorrect")
+                    propagation_cases += 1
 
     print(
         "atom lineage certificate verified: "
         f"ranks 1..{last_rank} all-depth excluded; "
         f"target rank {ordered.index(target) + 1}; next rank {last_rank + 1} "
-        f"{profile_text(ordered[last_rank])}; {local_cases} local mixed-supply transitions checked"
+        f"{profile_text(ordered[last_rank])}; {local_cases} local mixed-supply transitions and "
+        f"{propagation_cases} propagated losses checked"
     )
     return 0
 

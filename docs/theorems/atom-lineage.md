@@ -83,6 +83,29 @@ exactly the D-lineage theorem; lower-coordinate failures can disappear when more
 The compiled search uses this bound before recursion, and the independent lineage checker verifies
 the local triangular inequality on every enumerated cut at the 8- and 16-atom controls.
 
+The same calculation gives a stronger *transition* constraint.  If the first mixed child loses
+
+    ell = T(Sigma(S)) - Sigma(S_1) = (ell_D,ell_V,ell_W),
+
+then `ell` is nonnegative and additive over the state parts.  Propagating the child optimistically
+for the remaining `t-1` tests gives
+
+    Sigma(S_t) <= T^t(Sigma(S)) - T^(t-1)(ell),                  (2b)
+
+where
+
+    T^(t-1)(ell) =
+      (ell_D,
+       ell_V+(t-1)ell_D,
+       ell_W+(t-1)ell_V+binom(t-1,2)ell_D).
+
+Consequently a partial global cut can be discarded as soon as the right side of (2b) falls below
+`Q_h`: unchosen parts can incur zero further loss but cannot compensate for loss already incurred.
+This is the **propagated-loss bound**.  In particular, equality with `Q_h` in the leading `j`
+coordinates forces the corresponding propagated losses to vanish.  The C++ recursion applies
+this lexicographic test both to each local cut and after every added state part; it is a necessary
+condition only and does not turn a bounded negative into an all-depth result.
+
 ## Height-6 consequence
 
 For the `(alpha,beta,gamma)=(4,3,2)` hard branch, the two fixed profiles have no D atoms:
@@ -99,7 +122,7 @@ The first survivor is rank 82, `A^6D^2`.  The exact aligned recursion finds a th
     Sb(A^5B^2C:1, A^3B^3C^2:2, A^6D^2:3),                          (4)
 
 and the independently implemented checker verifies all 19 nodes.  The largest terminal threshold
-is root base `r>=13`.  Consequently (4) is the widest D germ among all 165 A--D eight-atom profiles,
+is root base `r>=12`.  Consequently (4) is the widest D germ among all 165 A--D eight-atom profiles,
 with no synchronized-depth qualifier: every wider germ has the all-depth obstruction above.
 
 Attaching the already constructed outer A/B/C branches in the working four-segment assembly gives
@@ -112,7 +135,7 @@ whose width is
     2^k - 2 binom(k-5,2) - 5(k-5) - 11
       = 2^k - k^2 + 6k - 16,                                      (5)
 
-valid from the symbolic hard-branch threshold `k>=18`.  Equation (5) is an aligned-family lower
+valid from the symbolic hard-branch threshold `k>=17`.  Equation (5) is an aligned-family lower
 construction, not a global Pareto maximum over other height triples or normalization sizes.
 
 ## Sixteen-atom two-coordinate kernel
@@ -231,9 +254,17 @@ The next profile is rank 1180, `A^27C^3D^2`, whose projected last part is `((2,5
 covered by this kernel.  Rank 1181, `A^26BC^3D^2`, is the pure refinement
 `R(A^13CD^2)` and hence inherits the exact rank-305 construction.  Consequently the exact
 32-atom optimum has been narrowed to a one-rank alternative: rank 1180 if that state is
-constructible, otherwise rank 1181.  A capped exact depth-three product search for rank 1180 made
-no determination; larger capped runs in both exact implementations did not change that.  None is a
-negative result.
+constructible, otherwise rank 1181.
+
+The propagated-loss bound makes the rank-1180 depth-three product finite enough to exhaust.  Its
+root has exact leading-coordinate tightness, so every first mixed transition must lose no D or V
+supply and at most four W supply.  The complete aligned product then returns `NO` in 6.7 solver
+seconds in the measured run; `tools/atom_profile_regression.sh` reproduces the exhaustive bounded
+verdict.  The separately implemented Python all-skeleton search independently reaches the same
+`NO` by enumerating every winning two-coordinate skeleton and every exact hidden-coordinate lift.
+Thus no rank-1180 aligned tree has depth at most three.  This is not an all-depth exclusion.  Exact
+depth-four runs using both complete-product and outer-prefix order reached their explicit ten-minute
+CPU caps without a verdict, so rank 1180 and the 32-atom optimum remain open.
 
 ## Scalar form of the remaining D optimization
 
@@ -269,7 +300,9 @@ For the height-6 root, its unweighted supply and the six-item terminal requireme
 At depth three, (2a) and (14) force `c>=2s-7`.  If equality holds, the last coordinate further
 requires `b>=s^2-8s+11`.  These are necessary depth-three bounds, not all-depth bounds.  At
 `s=5`, the first one forces `c>=3`, agreeing with the stronger all-depth kernel; the second places
-no restriction on `b`.  The exact 32-atom question is consequently the single step `b=1 -> 0`:
+no restriction on `b`.  The exact product search nevertheless excludes the boundary `b=0,c=3`
+through depth three.  The exact 32-atom all-depth question is consequently still the single step
+`b=1 -> 0`:
 
     b=1: A^26BC^3D^2, constructible by refinement, parent width
          2^k-k^2+7k-21;
@@ -281,6 +314,17 @@ the second line of (15) is constructible.  It is the unique wider candidate left
 larger `s`, neither `c=2s-7` nor `b=0` may be assumed without another all-depth
 exclusion/positive argument.  Equation (13), rather than a guessed word, is the scalable objective
 for those slices.
+
+At this boundary the two finite-depth supply budgets are especially concrete:
+
+    Sigma(S_1180) = (2,8,19),       Q_6 = (2,14,45),
+    T^3 Sigma      = (2,14,49),     T^4 Sigma = (2,16,63).        (16)
+
+For a first-transition loss `ell`, depth three therefore requires
+`ell_D=ell_V=0, ell_W<=4`.  Depth four requires `ell_D=0, ell_V<=2`; if the full two units of
+V slack are spent, (2b) further gives `ell_W+3ell_V<=18`, hence `ell_W<=12`.  These constraints
+depend only on the outer profiles and the candidate D germ, not on the inner witness trees.  They
+are the finite symbolic interface for maximizing the D branch at the next depth.
 
 ## Mechanical verification
 
@@ -309,9 +353,13 @@ re-derives every one of its profiles, splits, children, leaf inequalities, and t
 ordinary regression verifies both the fixed-skeleton negative and the retained positive tree;
 rerunning the two-minute all-skeleton discovery is optional because the tree itself is the proof.
 
-The same regression builds the 32-atom exact engine, checks a 32-atom singleton tree, and locks a
-sharp mixed-supply rejection.  `tools/check_atom_profile_certificate.py` independently checks the
-local triangular supply inequality while replaying 5,540,319 transitions at 16 atoms.
+The same regression builds the 32-atom exact engine, checks a 32-atom singleton tree, locks a sharp
+mixed-supply rejection, and exhausts rank 1180 through depth three.  A small positive two-part tree
+guards the complete-product search path used there; `tools/check_dc_tree_lift.py --all-skeletons`
+independently repeats the bounded rank-1180 negative.  `tools/check_atom_profile_certificate.py`
+independently checks the local triangular supply inequality while replaying 5,540,319 transitions
+at 16 atoms and checks 5,814 ordered-triple/depth propagation cases against literal triangular
+iteration.
 `tools/check_atom_parent_formula.py` separately reconstructs (12) from the three outer profiles and
 compares (13) with direct atom evaluation in 5,136 cases, including all three boundary
-specializations in (15).
+specializations in (15); it also independently derives every value and loss budget in (16).

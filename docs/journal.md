@@ -5722,12 +5722,13 @@ pure refinement.  The earlier depth-3 inconclusive result is superseded, not ext
 
 The first survivor is rank 82, `A^6D^2`.  Adding the sound two-coordinate over-approximation
 `(D,C+D)` changed its exact depth-3 search from a 60-second timeout (0.02 GB peak RSS) to a positive
-in 1.97468 solver seconds.  The resulting 19-node tree has root-base threshold 13.  Since every
-wider germ has an all-depth certificate, this is the exact widest A--D eight-atom germ without a
-depth qualifier.  The working outer assembly then has parent profile
+in 1.97468 solver seconds.  That first 19-node tree had root-base threshold 13; the alternative
+tree found on 2026-08-15 and retained in the same certificate improves the threshold to 12.  Since
+every wider germ has an all-depth certificate, this is the exact widest A--D eight-atom germ
+without a depth qualifier.  The working outer assembly then has parent profile
 `A^21B^6C^3D^2@G_(k-5)` and conditional width
 
-    2^k - k^2 + 6k - 16,     k>=18.
+    2^k - k^2 + 6k - 16,     k>=17.
 
 This is a construction within the `(alpha,beta,gamma)=(4,3,2)` aligned family, not a new Pareto
 maximum.  No CSV datum changed.
@@ -5982,3 +5983,81 @@ is known.
 `tools/check_atom_parent_formula.py` independently reconstructs the parent counts and checks 5,136
 direct atom evaluations, including both 32-atom alternatives.  No Pareto CSV datum changed, and the
 final local process inventory was empty.
+
+## 2026-08-15 — propagated loss closes depth three, not the rank-1180 problem
+
+The mixed-supply bound has a transition form that is much more selective than testing a completed
+child.  If the first mixed transition loses
+
+    ell = T(Sigma(S)) - Sigma(S_1),
+
+then after `t-1` further optimistic refinements its terminal loss is
+
+    T^(t-1)(ell)
+      = (ell_D,
+         ell_V+(t-1)ell_D,
+         ell_W+(t-1)ell_V+binom(t-1,2)ell_D).
+
+Losses are nonnegative and additive over parts.  Thus the partial global cut can be rejected as
+soon as `T^t(Sigma(S))-T^(t-1)(ell)` is lexicographically below the terminal requirement; unchosen
+parts cannot recover supply already discarded.  This generalizes the initial equality-only rule.
+The independent lineage checker now compares the closed propagation formula with literal
+triangular iteration on 990 ordered-triple/depth cases at eight atoms and 5,814 at sixteen atoms.
+
+For rank 1180 the independently derived data are
+
+    Sigma=(2,8,19), Q_6=(2,14,45), T^3 Sigma=(2,14,49), T^4 Sigma=(2,16,63).
+
+Hence a depth-three first transition must have `ell_D=ell_V=0, ell_W<=4`.  The complete exact
+product then exhausts in 6.69201 solver seconds with `answer=NO`: 1,724,872 calls, 23,129 exact memo
+states, 9,057,359 complete assignments and 820,472 propagated-loss rejections.  The process took
+7.58 wall / 7.09 user seconds and 36.7 MB maximum RSS.  This bounded negative is now reproduced by
+`tools/atom_profile_regression.sh`; it proves that rank 1180 has no aligned tree of depth at most
+three, not that the state is impossible for sufficiently large `q`.
+
+The independent Python all-skeleton implementation now corroborates that negative.  With the loss
+formula implemented separately, it enumerated every winning projected skeleton and returned `NO`
+after 1,342 exact states, 14,218 projected splits, 2,265,596 hidden-coordinate cut assignments and
+1,801,750 propagated-loss rejections.  It took 38.47 wall / 38.16 user seconds and 39.4 MB maximum
+RSS.  This replay is part of `tools/atom_profile_regression.sh`; agreement does not remove the
+depth-three qualifier.
+
+At depth four, the first transition instead has the sharp necessary budget
+
+    ell_D=0, ell_V<=2; if ell_V=2, then ell_W<=12.
+
+This is the promised outer-dimensional interface: it depends only on the known A/B/C profiles and
+the candidate D profile, not on any inner witness structure.  It reduces the root's locally viable
+option counts to `24 x 86 x 148`.  It did not yet settle the state.  A flat search with the checked
+504-core projected kernel was interrupted after 417.78 wall / 415.32 user seconds at 348.5 MB RSS,
+and an outer-prefix search reached its 600-CPU-second cap after 604.54 wall / 596.30 user seconds at
+180.4 MB RSS.  Neither printed a verdict.  Earlier equality-only depth-four orders likewise hit
+their caps; one 600-second run completed five concrete mixed-child negatives, while a loss-first
+order spent 333.12 user seconds in one high-supply child.  These are search-order measurements, not
+evidence against depth-four constructibility.
+
+Two targeted lifts were also closed.  Preserving both D lineages in the natural refined rank-305
+split gives a one-test mixed child with supply upper `(2,12,43)` against requirement `(2,14,45)`, so
+no choice of its final cut can work.  Separately, the two-part state
+
+    A^21B^9C^2:1, A^23B^2C^5D^2:2
+
+looked hard only because prefix recursion manufactured irrelevant partial states: complete-product
+order finds the one-test split `A^32:1, A^31B:1` in 0.0577194 solver seconds, and the independent
+tree checker accepts its four-node certificate.  The solver now automatically uses complete
+products for two-part states through depth three.  A sampled attempt to turn full
+three-coordinate deficit thresholds into a small coinductive kernel reached its 200-core discovery
+cap after 59.51 seconds, with 163 new cores all descending from the first seed; that route did not
+produce a certificate and should not be mistaken for an all-depth proof.
+
+The changed exact order also exposed a better positive that is independent of rank 1180.  The
+eight-atom rank-82 scan now finds an alternative 19-node tree in 0.0669238 solver seconds whose
+independently checked root-base threshold is 12, improving the previously retained threshold 13.
+`evidence/atom_profile_height6_ad8.cert` now contains this tree.  Equation (5)'s conditional
+`2^k-k^2+6k-16` construction therefore starts at `k>=17`, one level earlier than previously
+recorded; its profile and scope are unchanged.
+
+The next useful search should enumerate A/B/C prefix pairs under the propagated-loss budget and
+retain the surviving D constraints, or construct a closed three-coordinate losing kernel.  Another
+unstructured depth-four run is unlikely to add information.  No Pareto CSV datum changed, and all
+processes launched for this work had exited by the final inventory.

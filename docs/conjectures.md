@@ -743,11 +743,11 @@ D atom is impossible at every depth.  For eight atoms these are exactly ranks 1-
 this model; increasing `q` by pure refinement cannot repair their single D lineage.
 
 Rank 82, `A^6D^2`, is the first survivor, and exact recursion finds a three-level construction.  An
-independent 19-node tree checker gives root-base threshold `r>=13`.  Hence it is the exact widest
+independent 19-node tree checker gives root-base threshold `r>=12`.  Hence it is the exact widest
 A--D eight-atom D germ at *all* depths, not merely at depth 3.  Attaching the already constructed
 outer branches gives the conditional parent profile `A^21B^6C^3D^2@G_(k-5)` and width
 
-    2^k-k^2+6k-16,       k>=18.                                    (12)
+    2^k-k^2+6k-16,       k>=17.                                    (12)
 
 That eight-atom answer is not stable under arbitrary excessive `q`.  At 16 atoms the same lineage
 certificate excludes ranks 1--289 (including the refined 229 class at rank 191), and a finite
@@ -767,9 +767,11 @@ The compact `A^7B^7D^2@G[k-4]` spelling is the old spreadsheet's `p6'` row: it r
 the twice-refined 64-atom realization; the compact spelling alone does not lower its proved atomic
 depth.  At 32 atoms, D lineage and a checked 504-core `(D,C+D)` kernel exclude ranks 1--1179 at
 every depth.  Rank 1181, `A^26BC^3D^2`, is the pure refinement of the rank-305 construction, leaving
-only the wider rank 1180, `A^27C^3D^2`, unresolved in that slice.  Thus arbitrary excessive `q`
-remains open, but the next symbolic decision is a single profile rather than a band.  Full proof
-and scope are in [the atom-lineage note](theorems/atom-lineage.md).
+only the wider rank 1180, `A^27C^3D^2`, unresolved in that slice.  Exact propagated-loss search now
+excludes that profile through depth three, but depth four and eventual constructibility remain
+open.  Thus arbitrary excessive `q` remains open, but the next symbolic decision is a single
+profile rather than a band.  Full proof and scope are in
+[the atom-lineage note](theorems/atom-lineage.md).
 
 There is now a scale-free objective for that decision.  At normalization `N=2^s`, write the D germ
 as `A^(N-b-c-2)B^bC^cD^2`.  Attaching the three known outer branches gives width
@@ -783,6 +785,11 @@ unique wider candidate still open.  Its formal parent is `A^108B^12C^6D^2@G[k-7]
 does not supply this missing construction.  This row is deliberately not added to
 `data/conjectures.csv`: no starting `k` or construction is known, and the next normalization could
 change the optimum again.
+
+At depth four, any first mixed transition for this candidate must preserve both D lineages, lose at
+most two units of `C+D`, and, when both units are lost, lose at most twelve units of `B+C+D`.
+These are constraints on the outer dimensions alone; they do not inspect the solved internals of
+the A/B/C branches.
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
 `tools/check_dc_tree_lift.py` supplies the exact-coordinate product search.

@@ -4,11 +4,13 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -149,6 +151,7 @@ struct Counters {
     std::uint64_t memo_hits{};
     std::uint64_t lineage_rejects{};
     std::uint64_t supply_rejects{};
+    std::uint64_t supply_loss_rejects{};
     std::uint64_t dc_rejects{};
     std::uint64_t raw_options{};
     std::uint64_t assignments{};
@@ -167,6 +170,8 @@ std::unordered_map<Key, bool, KeyHash> memo;
 std::unordered_map<Key, std::vector<Split>, KeyHash> witnesses;
 std::unordered_map<DCKey, bool, DCKeyHash> dc_memo;
 std::unordered_map<DCKey, std::vector<DCSplit>, DCKeyHash> dc_witnesses;
+std::unordered_set<DCKey, DCKeyHash> dc_kernel_exact_cores;
+bool dc_kernel_upward_substate = false;
 Counters counters;
 
 Deficit make_deficit(const Counts &count) {
@@ -457,6 +462,19 @@ Deficit mixed_supply_upper(const State &state, int depth) {
     return supply;
 }
 
+Deficit unweighted_supply(const State &state) {
+    Deficit supply{};
+    for (Part part : state)
+        for (int coefficient = 0; coefficient < 3; ++coefficient)
+            supply[coefficient] += profiles[part.profile].deficit[coefficient];
+    return supply;
+}
+
+Deficit refined_supply(ProfileId profile) {
+    const Deficit &supply = profiles[profile].deficit;
+    return {supply[0], supply[1] + supply[0], supply[2] + supply[1]};
+}
+
 Deficit singleton_prefix_requirement(const State &state) {
     Deficit required{};
     const std::size_t height = total_height(state);
@@ -473,6 +491,40 @@ bool mixed_supply_possible(const State &state, int depth) {
     for (int coefficient = 0; coefficient < 3; ++coefficient) {
         if (supply[coefficient] != required[coefficient])
             return supply[coefficient] > required[coefficient];
+    }
+    return true;
+}
+
+int mixed_supply_preserved_coordinates(const State &state, int depth) {
+    const Deficit upper = mixed_supply_upper(state, depth);
+    const Deficit required = singleton_prefix_requirement(state);
+    int preserved = 0;
+    while (preserved < 3 && upper[preserved] == required[preserved]) ++preserved;
+    return preserved;
+}
+
+Deficit local_mixed_supply_loss(Part part, const Option &option) {
+    const Deficit available = refined_supply(part.profile);
+    const Deficit retained = unweighted_supply(option.children.state[1]);
+    return {available[0] - retained[0], available[1] - retained[1],
+            available[2] - retained[2]};
+}
+
+// A loss ell at the first mixed transition propagates through the remaining t-1 optimistic
+// refinements by the same triangular map as supply.  Missing parts can contribute zero further
+// loss but can never compensate for loss already accumulated, so this is also a sound prefix
+// test while assembling a global cut.
+bool mixed_supply_loss_possible(const State &state, int depth, const Deficit &loss) {
+    if (depth <= 0) return loss == Deficit{};
+    const int remaining = depth - 1;
+    const Deficit terminal_loss{
+        loss[0], loss[1] + remaining * loss[0],
+        loss[2] + remaining * loss[1] + remaining * (remaining - 1) / 2 * loss[0]};
+    const Deficit upper = mixed_supply_upper(state, depth);
+    const Deficit required = singleton_prefix_requirement(state);
+    for (int coefficient = 0; coefficient < 3; ++coefficient) {
+        const int retained = upper[coefficient] - terminal_loss[coefficient];
+        if (retained != required[coefficient]) return retained > required[coefficient];
     }
     return true;
 }
@@ -522,6 +574,20 @@ DCKey make_dc_key(const DCState &state, int depth) {
                                                   state[i].height);
     }
     return key;
+}
+
+bool dc_kernel_rejects(const DCState &state) {
+    if (dc_kernel_exact_cores.empty()) return false;
+    const std::uint64_t subset_count = std::uint64_t{1} << state.size();
+    const std::uint64_t first_subset = dc_kernel_upward_substate ? 1 : subset_count - 1;
+    for (std::uint64_t mask = first_subset; mask < subset_count; ++mask) {
+        DCState subset;
+        for (std::size_t index = 0; index < state.size(); ++index)
+            if (mask & (std::uint64_t{1} << index)) subset.push_back(state[index]);
+        if (dc_kernel_exact_cores.contains(make_dc_key(subset, 0))) return true;
+        if (!dc_kernel_upward_substate) break;
+    }
+    return false;
 }
 
 std::size_t dc_total_height(const DCState &state) {
@@ -614,6 +680,10 @@ bool construct_dc(const DCState &input, int depth) {
     normalize_dc(state);
     const DCKey key = make_dc_key(state, depth);
     if (const auto found = dc_memo.find(key); found != dc_memo.end()) return found->second;
+    if (dc_kernel_rejects(state)) {
+        dc_memo.emplace(key, false);
+        return false;
+    }
     if (!dc_lineage_possible(state) || !dc_full_star(state)) {
         dc_memo.emplace(key, false);
         return false;
@@ -702,7 +772,8 @@ LocalChildren split_part(Part part, ProfileId selected, int selected_height) {
     return children;
 }
 
-bool construct(const State &input, int depth);
+bool construct(const State &input, int depth, bool allow_complete_product = true);
+bool construct_flat_root(const State &input, int depth, bool report_progress = true);
 
 std::array<int, 3> height_score(const LocalChildren &children) {
     std::array<int, 3> score{};
@@ -712,22 +783,28 @@ std::array<int, 3> height_score(const LocalChildren &children) {
     return score;
 }
 
-std::vector<Option> viable_part_options(Part part, int depth) {
+std::vector<Option> viable_part_options(Part part, const State &whole_state, int depth) {
     std::vector<Option> out;
     for (ProfileId selected : cuts[part.profile]) {
         for (int selected_height = 0; selected_height <= part.height; ++selected_height) {
             ++counters.raw_options;
             LocalChildren children = split_part(part, selected, selected_height);
+            Option candidate{selected, static_cast<std::uint8_t>(selected_height),
+                             std::move(children)};
+            if (!mixed_supply_loss_possible(
+                    whole_state, depth, local_mixed_supply_loss(part, candidate))) {
+                ++counters.supply_loss_rejects;
+                continue;
+            }
             bool possible = true;
-            for (const State &child : children.state) {
+            for (const State &child : candidate.children.state) {
                 if (!construct(child, depth - 1)) {
                     possible = false;
                     break;
                 }
             }
             if (possible)
-                out.push_back({selected, static_cast<std::uint8_t>(selected_height),
-                               std::move(children)});
+                out.push_back(std::move(candidate));
         }
     }
     std::sort(out.begin(), out.end(), [](const Option &left, const Option &right) {
@@ -741,7 +818,7 @@ std::vector<Option> viable_part_options(Part part, int depth) {
     return out;
 }
 
-bool construct(const State &input, int depth) {
+bool construct(const State &input, int depth, bool allow_complete_product) {
     ++counters.calls;
     State state = input;
     normalize(state);
@@ -779,6 +856,25 @@ bool construct(const State &input, int depth) {
         return false;
     }
 
+    const int preserved_mixed_coordinates =
+        mixed_supply_preserved_coordinates(state, depth);
+    // Two-part states, and small tight states at depths two and three, are much cheaper when
+    // complete global cuts are formed before any recursive child is queried.  The ordinary prefix
+    // recursion otherwise proves millions of partial states that never occur as outcomes of a
+    // complete test.  This changes only search order; construct_flat_root uses the same exact
+    // local cuts and child predicate.
+    const bool use_complete_product =
+        (depth <= 3 && state.size() == 2) ||
+        (depth == 2 && state.size() >= 3 && state.size() <= 4 &&
+         preserved_mixed_coordinates >= 2) ||
+        (depth == 3 && state.size() >= 3 && state.size() <= 4 &&
+         preserved_mixed_coordinates >= 1);
+    if (allow_complete_product && use_complete_product) {
+        const bool answer = construct_flat_root(state, depth, false);
+        remember(key, answer);
+        return answer;
+    }
+
     struct Candidate {
         int original{};
         Part part{};
@@ -786,7 +882,8 @@ bool construct(const State &input, int depth) {
     };
     std::vector<Candidate> candidates;
     for (std::size_t i = 0; i < state.size(); ++i) {
-        std::vector<Option> options = viable_part_options(state[i], depth);
+        std::vector<Option> options =
+            viable_part_options(state[i], state, depth);
         if (options.empty()) {
             remember(key, false);
             return false;
@@ -805,7 +902,7 @@ bool construct(const State &input, int depth) {
     std::array<State, 3> partial;
     std::vector<Split> selected(candidates.size());
     std::vector<Split> selected_original(candidates.size());
-    auto dfs = [&](auto &&self, int index) -> bool {
+    auto dfs = [&](auto &&self, int index, Deficit mixed_supply_loss) -> bool {
         if (index == static_cast<int>(candidates.size())) return true;
         const Candidate &candidate = candidates[index];
         for (const Option &option : candidate.options) {
@@ -814,6 +911,15 @@ bool construct(const State &input, int depth) {
                 if (std::pair(option.selected_profile, option.selected_height) <
                     std::pair(previous.selected_profile, previous.selected_height))
                     continue;
+            }
+            const Deficit local_loss = local_mixed_supply_loss(candidate.part, option);
+            Deficit next_mixed_supply_loss{};
+            for (int coefficient = 0; coefficient < 3; ++coefficient)
+                next_mixed_supply_loss[coefficient] =
+                    mixed_supply_loss[coefficient] + local_loss[coefficient];
+            if (!mixed_supply_loss_possible(state, depth, next_mixed_supply_loss)) {
+                ++counters.supply_loss_rejects;
+                continue;
             }
             ++counters.assignments;
             std::array<State, 3> next;
@@ -833,16 +939,211 @@ bool construct(const State &input, int depth) {
             partial = std::move(next);
             selected[index] = {option.selected_profile, option.selected_height};
             selected_original[candidate.original] = selected[index];
-            if (self(self, index + 1)) return true;
+            if (self(self, index + 1, next_mixed_supply_loss)) return true;
             partial = saved;
         }
         return false;
     };
 
-    const bool answer = dfs(dfs, 0);
+    const bool answer = dfs(dfs, 0, Deficit{});
     remember(key, answer);
     if (answer) witnesses.emplace(key, std::move(selected_original));
     return answer;
+}
+
+// The ordinary recursion prunes after each part, which is effective for long states but can be
+// counterproductive at a small root: it solves a large number of partial children that never
+// occur as complete outcomes.  This exact alternative enumerates the Cartesian product of the
+// already viable local options, constructs all three full children, and only then recurses.  It is
+// intended as a root diagnostic; descendants still use construct().
+bool construct_flat_root(const State &input, int depth, bool report_progress) {
+    State state = input;
+    normalize(state);
+    if (depth <= 0 || state.size() < 2) return construct(state, depth);
+    if (!d_lineage_possible(state)) {
+        ++counters.lineage_rejects;
+        return false;
+    }
+    if (!mixed_supply_possible(state, depth)) {
+        ++counters.supply_rejects;
+        return false;
+    }
+    if (!full_star_eventual(state)) return false;
+    if (!construct_dc(project_dc(state), depth)) {
+        ++counters.dc_rejects;
+        return false;
+    }
+
+    struct Candidate {
+        int original{};
+        Part part{};
+        std::vector<Option> options;
+    };
+    std::vector<Candidate> candidates;
+    for (std::size_t i = 0; i < state.size(); ++i) {
+        std::vector<Option> options =
+            viable_part_options(state[i], state, depth);
+        if (options.empty()) return false;
+        candidates.push_back({static_cast<int>(i), state[i], std::move(options)});
+    }
+    if (report_progress) {
+        for (Candidate &candidate : candidates) {
+            std::stable_sort(candidate.options.begin(), candidate.options.end(),
+                             [&](const Option &left, const Option &right) {
+                                 const Deficit available =
+                                     refined_supply(candidate.part.profile);
+                                 const Deficit left_mixed =
+                                     unweighted_supply(left.children.state[1]);
+                                 const Deficit right_mixed =
+                                     unweighted_supply(right.children.state[1]);
+                                 Deficit left_loss{};
+                                 Deficit right_loss{};
+                                 for (int coefficient = 0; coefficient < 3; ++coefficient) {
+                                     left_loss[coefficient] =
+                                         available[coefficient] - left_mixed[coefficient];
+                                     right_loss[coefficient] =
+                                         available[coefficient] - right_mixed[coefficient];
+                                 }
+                                 return left_loss < right_loss;
+                             });
+        }
+    }
+    std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
+                                                              const Candidate &right) {
+        if (left.options.size() != right.options.size())
+            return left.options.size() < right.options.size();
+        const int comparison = compare_profiles(left.part.profile, right.part.profile);
+        if (comparison != 0) return comparison < 0;
+        return left.part.height > right.part.height;
+    });
+    if (report_progress) {
+        std::cerr << "flat_root_options";
+        for (const Candidate &candidate : candidates)
+            std::cerr << ' ' << candidate.options.size();
+        std::cerr << '\n';
+    }
+
+    std::vector<Split> selected(candidates.size());
+    std::vector<Split> selected_original(candidates.size());
+    std::uint64_t flat_combinations = 0;
+    std::uint64_t exact_combinations = 0;
+    int slow_children_reported = 0;
+    const std::array<int, 3> outcome_order =
+        report_progress ? std::array<int, 3>{0, 2, 1} : std::array<int, 3>{1, 0, 2};
+    auto dfs = [&](auto &&self, int index, Deficit mixed_supply_loss) -> bool {
+        if (index < static_cast<int>(candidates.size())) {
+            const Candidate &candidate = candidates[index];
+            for (const Option &option : candidate.options) {
+                if (index > 0 && candidates[index - 1].part == candidate.part) {
+                    const Split previous = selected[index - 1];
+                    if (std::pair(option.selected_profile, option.selected_height) <
+                        std::pair(previous.selected_profile, previous.selected_height))
+                        continue;
+                }
+                const Deficit local_loss = local_mixed_supply_loss(candidate.part, option);
+                Deficit next_mixed_supply_loss{};
+                for (int coefficient = 0; coefficient < 3; ++coefficient)
+                    next_mixed_supply_loss[coefficient] =
+                        mixed_supply_loss[coefficient] + local_loss[coefficient];
+                if (!mixed_supply_loss_possible(state, depth, next_mixed_supply_loss)) {
+                    ++counters.supply_loss_rejects;
+                    continue;
+                }
+                selected[index] = {option.selected_profile, option.selected_height};
+                selected_original[candidate.original] = selected[index];
+                if (self(self, index + 1, next_mixed_supply_loss)) return true;
+            }
+            return false;
+        }
+
+        ++counters.assignments;
+        ++flat_combinations;
+        if (report_progress && flat_combinations % 10000 == 0)
+            std::cerr << "flat_root_progress combinations=" << flat_combinations
+                      << " exact_memo=" << memo.size() << " dc_memo=" << dc_memo.size()
+                      << '\n';
+        std::array<State, 3> children;
+        for (std::size_t i = 0; i < state.size(); ++i) {
+            const LocalChildren local =
+                split_part(state[i], selected_original[i].selected_profile,
+                           selected_original[i].selected_height);
+            for (int outcome = 0; outcome < 3; ++outcome)
+                children[outcome] = add_states(children[outcome], local.state[outcome]);
+        }
+        if (report_progress && flat_combinations == 1) {
+            std::cerr << "flat_root_first_candidate split=";
+            for (std::size_t i = 0; i < selected_original.size(); ++i) {
+                if (i) std::cerr << ',';
+                std::cerr << profile_text(selected_original[i].selected_profile) << ':'
+                          << static_cast<int>(selected_original[i].selected_height);
+            }
+            for (int outcome = 0; outcome < 3; ++outcome) {
+                std::cerr << " outcome" << outcome << '=';
+                for (std::size_t i = 0; i < children[outcome].size(); ++i) {
+                    if (i) std::cerr << ',';
+                    std::cerr << profile_text(children[outcome][i].profile) << ':'
+                              << static_cast<int>(children[outcome][i].height);
+                }
+            }
+            std::cerr << '\n';
+        }
+        // Most complete products fail one of the inexpensive symbolic bounds.  Test those before
+        // entering exact recursion so they do not manufacture millions of one-use memo entries.
+        for (int outcome : outcome_order) {
+            if (!d_lineage_possible(children[outcome]) ||
+                !mixed_supply_possible(children[outcome], depth - 1) ||
+                !full_star_eventual(children[outcome]) ||
+                !construct_dc(project_dc(children[outcome]), depth - 1)) {
+                ++counters.prefix_rejects;
+                return false;
+            }
+        }
+        ++exact_combinations;
+        if (report_progress && exact_combinations == 1) {
+            std::cerr << "flat_root_first_exact_candidate combination=" << flat_combinations
+                      << " split=";
+            for (std::size_t i = 0; i < selected_original.size(); ++i) {
+                if (i) std::cerr << ',';
+                std::cerr << profile_text(selected_original[i].selected_profile) << ':'
+                          << static_cast<int>(selected_original[i].selected_height);
+            }
+            for (int outcome = 0; outcome < 3; ++outcome) {
+                std::cerr << " outcome" << outcome << '=';
+                for (std::size_t i = 0; i < children[outcome].size(); ++i) {
+                    if (i) std::cerr << ',';
+                    std::cerr << profile_text(children[outcome][i].profile) << ':'
+                              << static_cast<int>(children[outcome][i].height);
+                }
+            }
+            std::cerr << '\n';
+        }
+        for (int outcome : outcome_order) {
+            const auto child_started = std::chrono::steady_clock::now();
+            const bool child_answer = construct(children[outcome], depth - 1);
+            const double child_seconds = std::chrono::duration<double>(
+                                             std::chrono::steady_clock::now() - child_started)
+                                             .count();
+            if (report_progress && child_seconds >= 1.0 && slow_children_reported < 20) {
+                ++slow_children_reported;
+                std::cerr << "flat_root_slow_child outcome=" << outcome
+                          << " seconds=" << child_seconds
+                          << " answer=" << (child_answer ? "YES" : "NO") << " state=";
+                for (std::size_t i = 0; i < children[outcome].size(); ++i) {
+                    if (i) std::cerr << ',';
+                    std::cerr << profile_text(children[outcome][i].profile) << ':'
+                              << static_cast<int>(children[outcome][i].height);
+                }
+                std::cerr << '\n';
+            }
+            if (!child_answer) {
+                ++counters.prefix_rejects;
+                return false;
+            }
+        }
+        witnesses.emplace(make_key(state, depth), selected_original);
+        return true;
+    };
+    return dfs(dfs, 0, Deficit{});
 }
 
 void print_state(const State &state) {
@@ -1183,7 +1484,9 @@ void print_result(const State &state, int depth, bool answer, double seconds) {
               << " memo_hits=" << counters.memo_hits << " memo=" << memo.size()
               << " lineage_rejects=" << counters.lineage_rejects
               << " supply_rejects=" << counters.supply_rejects
+              << " supply_loss_rejects=" << counters.supply_loss_rejects
               << " dc_rejects=" << counters.dc_rejects << " dc_memo=" << dc_memo.size()
+              << " dc_kernel_exact_cores=" << dc_kernel_exact_cores.size()
               << " raw_options=" << counters.raw_options
               << " assignments=" << counters.assignments
               << " prefix_rejects=" << counters.prefix_rejects << '\n';
@@ -1254,6 +1557,54 @@ DCPart parse_dc_part(const char *text) {
         throw std::invalid_argument("invalid DC part (expected d,cd,height)");
     return {static_cast<std::uint8_t>(d), static_cast<std::uint8_t>(cd),
             static_cast<std::uint8_t>(height)};
+}
+
+void load_dc_kernel_exact_cores(const char *path) {
+    std::ifstream input(path);
+    if (!input) throw std::invalid_argument("cannot open DC kernel certificate");
+    dc_kernel_exact_cores.clear();
+    dc_kernel_upward_substate = false;
+    std::string line;
+    bool matching_atoms = false;
+    bool all_depth_verdict = false;
+    while (std::getline(input, line)) {
+        if (line.starts_with("dc_kernel_certificate ")) {
+            matching_atoms =
+                line.find("profile_atoms=" + std::to_string(PROFILE_ATOMS) + " ") !=
+                std::string::npos;
+            all_depth_verdict =
+                line.find("verdict=ALL_DEPTH_NO") != std::string::npos;
+            dc_kernel_upward_substate =
+                line.find("closure=upward_substate") != std::string::npos;
+            continue;
+        }
+        constexpr const char *PREFIX = "dc_kernel_state state=";
+        if (!line.starts_with(PREFIX)) continue;
+        DCState state;
+        const char *cursor = line.c_str() + std::char_traits<char>::length(PREFIX);
+        while (*cursor) {
+            int d = -1;
+            int cd = -1;
+            int height = -1;
+            int consumed = 0;
+            if (std::sscanf(cursor, "(%d,%d):%d%n", &d, &cd, &height, &consumed) != 3 ||
+                consumed <= 0 || d < 0 || d > cd || cd > PROFILE_ATOMS || height < 1 ||
+                height > MAX_HEIGHT)
+                throw std::invalid_argument("malformed DC kernel state");
+            state.push_back({static_cast<std::uint8_t>(d), static_cast<std::uint8_t>(cd),
+                             static_cast<std::uint8_t>(height)});
+            cursor += consumed;
+            if (*cursor == ',') ++cursor;
+            else if (*cursor != '\0')
+                throw std::invalid_argument("malformed DC kernel separator");
+        }
+        normalize_dc(state);
+        dc_kernel_exact_cores.insert(make_dc_key(state, 0));
+    }
+    if (!matching_atoms || !all_depth_verdict || !dc_kernel_upward_substate ||
+        dc_kernel_exact_cores.empty())
+        throw std::invalid_argument(
+            "DC kernel certificate has wrong normalization, verdict, or no cores");
 }
 
 std::vector<ProfileId> ordered_profiles() {
@@ -1455,16 +1806,36 @@ int main(int argc, char **argv) {
             return answer ? 0 : 1;
         }
 
-        if (argc >= 4 && std::string(argv[1]) == "profile-state") {
+        if (argc >= 4 &&
+            (std::string(argv[1]) == "profile-state" ||
+             std::string(argv[1]) == "profile-state-prefix" ||
+             std::string(argv[1]) == "profile-state-prefix-dc-kernel" ||
+             std::string(argv[1]) == "profile-state-flat" ||
+             std::string(argv[1]) == "profile-state-flat-dc-kernel")) {
+            const std::string mode = argv[1];
+            const bool flat_root = mode == "profile-state-flat" ||
+                                   mode == "profile-state-flat-dc-kernel";
+            const bool prefix_root = mode == "profile-state-prefix" ||
+                                     mode == "profile-state-prefix-dc-kernel";
+            const bool load_kernel = mode == "profile-state-flat-dc-kernel" ||
+                                     mode == "profile-state-prefix-dc-kernel";
+            if (load_kernel && argc < 5)
+                throw std::invalid_argument(
+                    "DC-kernel profile mode requires a certificate and a state");
             const int depth = parse_nonnegative(argv[2], "depth", 255);
+            const int first_part = load_kernel ? 4 : 3;
+            if (load_kernel) load_dc_kernel_exact_cores(argv[3]);
             State state;
-            for (int i = 3; i < argc; ++i) state.push_back(parse_profile_part(argv[i]));
+            for (int i = first_part; i < argc; ++i)
+                state.push_back(parse_profile_part(argv[i]));
             normalize(state);
             if (total_height(state) > MAX_HEIGHT)
                 throw std::invalid_argument("profile state exceeds height bound");
             reset_search();
             const auto started = std::chrono::steady_clock::now();
-            const bool answer = construct(state, depth);
+            const bool answer = flat_root
+                                    ? construct_flat_root(state, depth)
+                                    : construct(state, depth, !prefix_root);
             const double seconds = std::chrono::duration<double>(
                                        std::chrono::steady_clock::now() - started)
                                        .count();
@@ -1479,6 +1850,14 @@ int main(int argc, char **argv) {
                   << "       " << argv[0] << " height6-dc depth rank\n"
                   << "       " << argv[0] << " dc-state depth d,cd,height [...]\n"
                   << "       " << argv[0] << " profile-state depth WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-prefix depth WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-prefix-dc-kernel depth CERT WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-flat depth WORD:height [...]\n"
+                  << "       " << argv[0]
+                  << " profile-state-flat-dc-kernel depth CERT WORD:height [...]\n"
                   << "       " << argv[0] << " height6-dc-kernel-certificate\n"
                   << "       " << argv[0] << " height6-lineage-certificate\n";
         return 2;

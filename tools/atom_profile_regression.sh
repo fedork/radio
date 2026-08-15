@@ -14,6 +14,10 @@ tools/check_dc_kernel_certificate.py evidence/atom_profile_height6_dc32.cert
 tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \
     --rank 305 --expect NO
 tools/check_atom_profile_tree.py evidence/atom_profile_height6_rank305.cert
+tools/check_dc_tree_lift.py --atoms 32 --rank 1180 --all-skeletons \
+    --depth 3 --expect NO > "$work_dir/rank1180-depth3-independent.out"
+rg -q 'rank=1180 .*answer=NO scope=all_skeletons depth=3 .*supply_loss_rejects=[1-9][0-9]*' \
+    "$work_dir/rank1180-depth3-independent.out"
 
 CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_atom_profiles.cpp -o "$work_dir/search_atom_profiles"
@@ -98,7 +102,7 @@ rg -q 'rank=82 D=AAAAAADD .*answer=NO depth=2 .*all_depth_obstruction=NO' \
 
 run_profile height6-max 3 1 82 > "$work_dir/height6-symbolic-max.out"
 rg -q 'rank=82 D=AAAAAADD .*answer=YES depth=3 ' "$work_dir/height6-symbolic-max.out"
-rg -q 'height6_max_proof root_base_threshold=13 maximal_at_requested_depth=YES maximal_all_depth=YES' \
+rg -q 'height6_max_proof root_base_threshold=12 maximal_at_requested_depth=YES maximal_all_depth=YES' \
     "$work_dir/height6-symbolic-max.out"
 tools/check_atom_profile_tree.py "$work_dir/height6-symbolic-max.out"
 
@@ -176,5 +180,38 @@ rg -q 'answer=NO .*profile_atoms=32 .*supply_rejects=1' \
     "$work_dir/mixed-supply32.out"
 rg -q 'atom_profile_depth_obstruction=mixed_supply depth=3 supply_upper=0,2,11 required=0,2,13' \
     "$work_dir/mixed-supply32.out"
+
+# The unique open 32-atom boundary profile is not blocked by the scalar supply bound, but an
+# exhaustive complete-product search rules out every aligned tree of depth at most three.  This is
+# deliberately a bounded negative: deeper synchronized trees remain open.
+if run_profile_32 profile-state-flat 3 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3 \
+    > "$work_dir/rank1180-depth3.out"; then
+    echo '32-atom rank 1180 unexpectedly solved within depth 3' >&2
+    exit 1
+else
+    status=$?
+    if [[ $status -ne 1 ]]; then
+        echo "32-atom rank 1180 depth-3 search aborted with status $status" >&2
+        exit "$status"
+    fi
+fi
+rg -q 'answer=NO .*profile_atoms=32 .*supply_loss_rejects=[1-9][0-9]*' \
+    "$work_dir/rank1180-depth3.out"
+if rg -q 'atom_profile_depth_obstruction=' "$work_dir/rank1180-depth3.out"; then
+    echo 'rank-1180 depth-3 result was only a root obstruction, not exhaustive' >&2
+    exit 1
+fi
+
+# A two-part child that traps prefix recursion has a one-test exact construction.  Keep this as a
+# positive control for the complete-product path used by the depth-three boundary search.
+run_profile_32 profile-state-flat 3 \
+    AAAAAAAAAAAAAAAAAAAAABBBBBBBBBCC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBCCCCCDD:2 \
+    > "$work_dir/two-part-flat32.out"
+rg -q 'answer=YES .*profile_atoms=32' "$work_dir/two-part-flat32.out"
+tools/check_atom_profile_tree.py "$work_dir/two-part-flat32.out"
 
 echo 'atom profile regression passed'

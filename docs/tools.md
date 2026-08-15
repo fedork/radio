@@ -692,7 +692,9 @@ Three symbolic necessary tests precede exact recursion.  The all-depth D-lineage
 height-`h` state when the unweighted sum of its D counts is below `max(0,h-4)`; this is a closed
 losing-set proof, not a depth cutoff.  The finite-depth mixed-supply bound iterates the full
 triangular deficit transform along the adversarial mixed path and rejects a state when even its
-optimistic supply cannot reach the terminal prefix.  The `(D,C+D)` projection retains the first two deficit
+optimistic supply cannot reach the terminal prefix.  Its propagated-loss refinement applies the
+same transform to supply discarded by the first mixed transition, giving a sound lexicographic
+budget while a global cut is assembled.  The `(D,C+D)` projection retains the first two deficit
 coefficients and over-approximates aligned play, so its `NO` is a sound exclusion at the requested
 depth.  For the 16-atom rank-290 projection, the program can also synthesize a finite coinductive
 kernel: its independently checked upward closure replaces the depth qualifier entirely.
@@ -744,17 +746,24 @@ This does not maximize arbitrary excessive `q`: 165 is the number of A--D words 
 and 969 the number at sixteen, not the whole longer-profile universe.  At 32 atoms, D lineage and
 the 504-core certificate in `evidence/atom_profile_height6_dc32.cert` exclude ranks 1--1179 at all
 depths.  Pure refinement constructs rank 1181, leaving only rank 1180 open in that slice.  The
-Python product search accepts `--atoms 32` without a tree certificate for this work; its capped
-rank-1180 exact search was inconclusive, so no negative is recorded.  Range slicing still prevents
-one hard germ from hiding completed work on later germs.  The C++ tool's default two-million exact
+propagated-loss budget makes the C++ rank-1180 depth-three product exhaustive and negative; this is
+a bounded result and does not decide depth four or eventual constructibility.  The Python
+all-skeleton implementation independently reproduces the bounded negative after applying the same
+symbolic loss lemma.  Range slicing still prevents one hard germ from hiding completed work on later
+germs.  The C++ tool's default two-million exact
 memo-entry ceiling aborts explicitly rather than printing `NO`; external time and memory caps
 remain appropriate for deeper runs.  The proof and scope are in
 [the atom-lineage note](theorems/atom-lineage.md).
 
 For a custom exact state, `profile-state depth WORD:height [...]` runs the same recursion and emits
-a machine-checkable tree on success.  `check_dc_tree_lift.py --projected-only` skips exact lifts and
-is the appropriate mode for discovering a larger-normalization two-coordinate kernel.  The
-mixed-supply control used by the regression is
+a machine-checkable tree on success.  `profile-state-flat` enumerates complete global cuts at the
+requested root before recursing; `profile-state-prefix` forces the ordinary outer-part prefix order
+at that root.  Both are exact search-order variants.  Append `-dc-kernel` to either variant and pass
+a checked `dc_kernel_certificate` path before the state to use its upward-substate closure as a
+sound projected rejection cache.  The ordinary recursion automatically uses complete products for
+two-part states through depth three and for small supply-tight states where that order is cheaper.
+`check_dc_tree_lift.py --projected-only` skips exact lifts and is the appropriate mode for discovering
+a larger-normalization two-coordinate kernel.  The mixed-supply control used by the regression is
 
 ```
 /tmp/search_atom_profiles32 profile-state 3 \
@@ -764,6 +773,27 @@ mixed-supply control used by the regression is
 
 It is rejected immediately with supply upper bound `(0,2,11)` below the height-4 requirement
 `(0,2,13)`.  This is a depth-three obstruction only.
+
+The regression also exhausts the unique 32-atom boundary state
+
+```
+/tmp/search_atom_profiles32 profile-state-flat 3 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+```
+
+and expects `answer=NO`.  Its root supply bound itself passes; the negative comes from exhausting
+the loss-constrained complete product, so it proves only that no aligned tree of depth at most three
+exists.  The independent replay is
+
+```
+tools/check_dc_tree_lift.py --atoms 32 --rank 1180 \
+    --all-skeletons --depth 3 --expect NO
+```
+
+The corresponding depth-four first transition must satisfy
+`ell_D=0, ell_V<=2`, with `ell_W<=12` when `ell_V=2`.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees
