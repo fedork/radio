@@ -5647,3 +5647,57 @@ An attempted bounded-singletonization follow-up launched depths 3 through 8 conc
 their cost was known.  All six were interrupted after about 36 seconds each (about 216 CPU seconds
 total) without a summary or verdict; process inventory was empty afterward.  Do not repeat those
 depths in parallel.  This abort contributes no mathematical evidence.
+
+## 2026-08-14 — the 229 split refines exactly once, then hits the known k=11 obstruction
+
+The `k=10` hard state is more structured than its integer split initially suggests.  Normalize its
+three widths at `G_5` as
+
+    B-side = A^5 B^2 C,  A-C = A^3 B^3 C^2,  D = A B^5 C D.
+
+After refinement to `G_4`, the stored cuts 120, 127 and 109 have unique eight-atom subprofiles inside
+their respective refined totals:
+
+    A^4 B^3 C,  A^7 B,  A^3 B^3 C D.
+
+The complementary profiles are `A^8`, `A^2 B^4 C^2`, and `A^4 B^3 C`.  Thus the mixed child is
+`(A^4B^3C:1)^2,(A^2B^4C^2:2),(A^3B^3CD:2)`.  Evaluating the identical profile split one level later
+gives `[247:0,255:2,231:1]`, whose mixed child is exactly the already retained negative
+`Sb(247:1,247:1,240:2,231:2)@8`.  This identifies the previous “literal scaling” failure as the
+literal atom refinement of the successful 229 split.  It rules out that split template at the next
+level, not the parent `Sb(503:1,495:2,478:3)@9` and not eventual stabilization after more levels.
+Finite sources remain `witnesses/majorized_973_6_at10.tree` and
+`evidence/m6_k11_scaled_attempt.txt`.
+
+The correct excessive-q object is finite.  An eight-atom profile `p=(a,b,c,d)` refines to
+`(2a+b,b+c,c+d,d)`; an aligned cut chooses an eight-atom subprofile and uses its complement.  The
+first six terminal reference profiles at the same normalization are
+`A^8,A^7B,A^4B^3C,A^4B^3C,AB^3C^3D,AB^3C^3D`.  Since the deficit polynomial is
+
+    d binom(r,2) + (c+d)r + (b+c+d),
+
+the 165 possible D germs have an eventual total order by `(d,c+d,b+c+d)`.  This supplies the general
+ground-up maximizer: enumerate D germs in that order and apply exact profile recursion to its finite
+fixed point; the first positive is then widest inside the explicitly restricted non-wasteful aligned
+model.  At a bounded synchronized depth, a first positive is widest only at that depth.  No A/B/C
+witness internals enter.
+
+`tools/search_atom_profiles.cpp` implements that recursion with an explicit two-million-state abort,
+rank slicing, symbolic terminal thresholds, and positive-tree output.  The separate
+`tools/atom_profile_regression.sh` reproduces height 4 at aligned depth 1 and height 5 at depth 2.
+For height 6, all 165 D germs fail at depth 1; the first 45 germs also fail the full-star necessary
+condition.  Rank 46 `AAAAAAAD` is the first full-star survivor, the old `AAAABBCD` is rank 56, and
+`ABBBBBCD` is rank 59.  Therefore the finite 229 word cannot yet be called the eventual maximum:
+ranks 46--58 need synchronized exclusions or a construction first.  `ABBBBBCD` itself is exhaustively
+negative through aligned depth 2 (2.61105 solver seconds in the first optimized run).  The literal
+five-part core is exhaustively negative at aligned depth 1 (0.121449 solver seconds).
+
+Deeper exploratory work was deliberately bounded and produced no verdict: `ABBBBBCD` depth 3,
+the widest-first depth-2 scan, the literal residual at depth 2, and the literal five-part core at
+depth 2 each hit independent 60-second caps; observed peak RSS was respectively 0.03, 0.03, 0.02 and
+0.01 GB.  An earlier JavaScript prototype completed depth 2 in 31.320 seconds and was stopped about
+25 seconds into depth 3.  These five aborted probes are scheduling information only.  The retained
+regression covers only completed statements, no solver process remains, and no Pareto CSV datum
+changes.  If the rank-59 germ eventually stabilizes, its parent accounting evaluates arithmetically
+to `2^k-binom(k,2)-6`; that implication is not a conjecture that it does stabilize.  AddressSanitizer
+and UndefinedBehaviorSanitizer builds passed the height-4, height-5, and literal-core controls.

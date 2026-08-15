@@ -244,8 +244,12 @@ later triples, and use guarded mixed-frontier pieces in parallel to seek an even
 constructed outer profiles, while the four-segment D state is the sole synchronized obligation.
 The calculation closes conditionally through the `AACC` and `BBBD` profiles and first fails at the
 known height-6 `k=10` transition, where refinement changes the candidate D accounting from
-`AAAABBCD` (232) to `ABBBBBCD` (229).  Prove or refute stabilization of that D accounting rather
-than carrying inner A/B/C witness data.  The exact generic piece checks through residual level
+`AAAABBCD` (232) to `ABBBBBCD` (229).  The literal refinement of the successful split is now
+refuted at `k=11`; do not retry it.  Continue with the finite eight-atom profile DP: its eventual
+order puts `AAAABBCD` at rank 56 and `ABBBBBCD` at rank 59, so ranks 46--58 must be discharged (or
+one constructed) before the 229 germ can be called maximal.  Make that search resumable by rank
+and synchronized depth, then extract a symbolic tree if a positive stabilizes.  This carries no
+inner A/B/C witness data.  The exact generic piece checks through residual level
 11 remain finite evidence only, and this track changes no Pareto datum; definitions and controls are
 in [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 

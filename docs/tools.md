@@ -383,6 +383,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, exact variable-width synchronization, and memo-exhaustion abort semantics |
+| `tools/search_atom_profiles.cpp` | exact symbolic recursion inside the eventual eight-atom-aligned height-6 model; refine profiles, test a fixed D germ, or scan D germs in deficit order |
+| `tools/atom_profile_regression.sh` | reproduce the symbolic height-4/5 controls and the completed shallow height-6 exclusions |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -670,6 +672,35 @@ Given exact pure-child thresholds `U_2,U_0`, `optimize_mixed_frontier.py` minimi
 `p in [L,R], q=C-p`, the unconstrained optimum is `max(C,U_2+U_0)`; restricting `p` to `[L,R]`
 adds the distance from that interval to the interval joining `U_2` and `C-U_0`.  Thus a stable finite
 piece description gives a constant-size D optimizer even when the antichain itself grows with `k`.
+
+### Eventual eight-atom profile search
+
+`search_atom_profiles.cpp` is narrower than `search_singletonization.cpp`: it searches only
+non-wasteful strategies whose every current width is a sum of eight `G_r` atoms and whose cuts take
+eight of the sixteen atoms produced by refinement.  A profile `(a,b,c,d)` means
+`a A_r+b B_r+c C_r+d D_r`.  Its eventual deficit coefficients are
+`(d,c+d,b+c+d)` in the basis `(binom(r,2),r,1)`, so the program compares profiles symbolically and
+prints a concrete lower threshold for every positive tree.  A negative result is exhaustive only
+inside this aligned model and at the requested synchronized depth.
+
+Build and run it as follows:
+
+```
+CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+    tools/search_atom_profiles.cpp -o /tmp/search_atom_profiles
+tools/run_with_provenance.py /tmp/search_atom_profiles height6 2
+tools/run_with_provenance.py /tmp/search_atom_profiles height6-max 2 46 46
+tools/atom_profile_regression.sh
+```
+
+`height6` tests D=`ABBBBBCD`; the two control modes reproduce the established height-4 and height-5
+symbolic constructions.  `height6-max depth [first_rank [last_rank]]` orders all 165 D profiles from
+eventually widest to narrowest and retains one memo across the requested inclusive rank interval.
+A positive started at rank 1 is maximal at the requested depth only; a later start is discovery
+only.  Maximality over arbitrary excessive `q` additionally needs fixed-point exhaustion or an
+all-depth exclusion of every earlier germ.  Range slicing prevents one hard germ from hiding
+completed work on later germs.  The default two-million memo-entry ceiling aborts explicitly rather
+than printing `NO`; external time and memory caps remain appropriate for deeper runs.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

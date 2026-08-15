@@ -690,6 +690,60 @@ prove—the working expectation that C fits inside A after sufficient refinement
 parent accounting `A^16 B^11 C^4 D` is likewise only an outer width decomposition; it is not claimed
 to be a symmetric profile derived from the stored witness tree.
 
+The successful first split of the finite hard branch does have an exact atom description one level
+lower.  Refine its three width words from `G_r` to `G_(r-1)`.  The refined totals and the selected
+eight-atom subwords are
+
+    A^5 B^2 C   -> A^12 B^3 C    : select A^4 B^3 C  at height 0,
+    A^3 B^3 C^2 -> A^9 B^5 C^2  : select A^7 B      at height 2,
+    A B^5 C D   -> A^7 B^6 C^2 D: select A^3 B^3 C D at height 1.       (7)
+
+The complements are respectively `A^8`, `A^2 B^4 C^2`, and `A^4 B^3 C`.  At `r=5`, (7) evaluates
+to the stored split `[120:0,127:2,109:1]`.  Its mixed child is
+
+    (A^4 B^3 C:1)^2, (A^2 B^4 C^2:2), (A^3 B^3 C D:2).                (8)
+
+This exposes exactly why repeating the finite split is not an induction.  At `r=6`, (7) evaluates
+to `[247:0,255:2,231:1]`, and (8) becomes
+`Sb(247:1,247:1,240:2,231:2)@8`, which is exactly unsolvable.  The source is
+`evidence/m6_k11_scaled_attempt.txt`.  Thus the literal refinement of the `k=10` split fails at the
+next level.  This does **not** refute the parent `Sb(503:1,495:2,478:3)@9`, another first split, or
+eventual reuse of the same width germ after still more refinement.
+
+There is nevertheless a finite excessive-`q` optimizer for the explicitly restricted aligned
+model.  Represent every width by `p=(p_A,p_B,p_C,p_D)` with `|p|=8`.  One refinement is
+
+    R(p)=(2p_A+p_B, p_B+p_C, p_C+p_D, p_D).
+
+A legal aligned cut chooses `x<=R(p)` with `|x|=8`; its complement is `R(p)-x`, and the usual height
+cut produces the three child states.  The terminal reference profiles—the first six atoms of
+`G_(r+3)`, refined to `G_r`—are
+
+    A^8, A^7B, A^4B^3C, A^4B^3C, AB^3C^3D, AB^3C^3D.                 (9)
+
+No numerical scale is needed to order candidates.  The deficit of `p` is
+
+    p_D binom(r,2) + (p_C+p_D)r + (p_B+p_C+p_D),                    (10)
+
+so eventual width is decreasing lexicographic order of
+`(p_D,p_C+p_D,p_B+p_C+p_D)`.  Exact recursion over the 165 eight-atom profiles, with (9) as the
+singleton-majorization terminal, therefore returns the widest D germ at any fixed synchronized-depth
+bound if it scans from rank 1 to the first positive.  A global excessive-`q` maximum additionally
+requires the recursion to reach its finite-state fixed point, or a separate proof that every earlier
+germ fails at all depths.  This is the concrete version of the abstract `H` state below; it still uses
+only the outer profiles of A/B/C.
+
+`tools/search_atom_profiles.cpp` implements this recursion and
+`tools/atom_profile_regression.sh` locks the height-4 and height-5 controls.  In the eventual order,
+the old `AAAABBCD` D germ has rank 56 and `ABBBBBCD` rank 59; the first 45 wider germs fail the
+full-star necessary condition (rank 46, `AAAAAAAD`, is the first survivor), but ranks 46 through 58
+have not been excluded at sufficient depth.
+The target `ABBBBBCD` has no aligned construction using at most two synchronized levels.  A bounded
+depth-3 run was inconclusive.  These are results about the eight-atom aligned model only, not
+unrestricted unsolvability claims.  If `ABBBBBCD` did stabilize, the parent word
+`A^16B^11C^4D@G_(k-5)` would evaluate to the conditional candidate
+`2^k-binom(k,2)-6`; neither stabilization nor maximality is claimed.
+
 ### Minimal state for a height-first D optimizer
 
 No routed catalog for A/B/C is needed.  A scale-free implementation needs only two kinds of entry:

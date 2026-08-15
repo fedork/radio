@@ -173,8 +173,16 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   constructions for the `AACC` height-4 profile and, for `k>=7`, the `BBBD` height-5 profile.  At
   height 6 it lands on the known obstruction exactly: the old D word `ABBD@G_6` has width 232,
   whereas the exact `k=10` slice has `d=229`, expressible after refinement as `ABBBBBCD@G_5`.
-  This finite three-unit synchronization loss is not extrapolated.  No eventual formula or new
-  Pareto datum is claimed.
+  Each selected width in the stored split has a unique aligned decomposition inside its refined
+  component one level lower; the resulting literal lift is exactly
+  the already refuted `Sb(247:1,247:1,240:2,231:2)@8` residual, so that split is not an induction.
+  `search_atom_profiles.cpp` now makes the excessive-`q` proposal finite inside the non-wasteful
+  eight-atom model: refine count vectors, choose eight of sixteen atoms at every cut, and order the
+  165 possible D germs by their three-term binomial deficit.  It reproduces the height-4/5 symbolic
+  controls.  `ABBBBBCD` is rank 59, not the first eventual candidate; ranks 1--45 fail full-star,
+  while ranks 46--58 remain to be excluded.  `ABBBBBCD` has no aligned proof within depth 2 and the
+  bounded depth-3 attempt was inconclusive.  This finite three-unit loss is not extrapolated.  No
+  eventual formula or new Pareto datum is claimed.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.
