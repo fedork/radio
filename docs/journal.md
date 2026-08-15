@@ -5669,28 +5669,30 @@ level, not the parent `Sb(503:1,495:2,478:3)@9` and not eventual stabilization a
 Finite sources remain `witnesses/majorized_973_6_at10.tree` and
 `evidence/m6_k11_scaled_attempt.txt`.
 
-The correct excessive-q object is finite.  An eight-atom profile `p=(a,b,c,d)` refines to
+At a fixed eight-atom A--D normalization, the search object is finite.  An eight-atom profile
+`p=(a,b,c,d)` refines to
 `(2a+b,b+c,c+d,d)`; an aligned cut chooses an eight-atom subprofile and uses its complement.  The
 first six terminal reference profiles at the same normalization are
 `A^8,A^7B,A^4B^3C,A^4B^3C,AB^3C^3D,AB^3C^3D`.  Since the deficit polynomial is
 
     d binom(r,2) + (c+d)r + (b+c+d),
 
-the 165 possible D germs have an eventual total order by `(d,c+d,b+c+d)`.  This supplies the general
-ground-up maximizer: enumerate D germs in that order and apply exact profile recursion to its finite
-fixed point; the first positive is then widest inside the explicitly restricted non-wasteful aligned
-model.  At a bounded synchronized depth, a first positive is widest only at that depth.  No A/B/C
-witness internals enter.
+the 165 A--D eight-atom D germs have an eventual total order by `(d,c+d,b+c+d)`.  This supplies the
+maximizer for that fixed slice: enumerate D germs in that order and apply exact profile recursion to
+its finite fixed point; the first positive is then widest inside the explicitly restricted
+non-wasteful aligned model.  At a bounded synchronized depth, a first positive is widest only at
+that depth.  No A/B/C witness internals enter.  The next entry corrects the still-broader
+excessive-`q` interpretation.
 
 `tools/search_atom_profiles.cpp` implements that recursion with an explicit two-million-state abort,
 rank slicing, symbolic terminal thresholds, and positive-tree output.  The separate
 `tools/atom_profile_regression.sh` reproduces height 4 at aligned depth 1 and height 5 at depth 2.
 For height 6, all 165 D germs fail at depth 1; the first 45 germs also fail the full-star necessary
 condition.  Rank 46 `AAAAAAAD` is the first full-star survivor, the old `AAAABBCD` is rank 56, and
-`ABBBBBCD` is rank 59.  Therefore the finite 229 word cannot yet be called the eventual maximum:
-ranks 46--58 need synchronized exclusions or a construction first.  `ABBBBBCD` itself is exhaustively
+`ABBBBBCD` is rank 59.  At this stage ranks 46--58 still lacked synchronized exclusions;
+the next entry supplies the stronger all-depth lineage proof.  `ABBBBBCD` itself was exhaustively
 negative through aligned depth 2 (2.61105 solver seconds in the first optimized run).  The literal
-five-part core is exhaustively negative at aligned depth 1 (0.121449 solver seconds).
+five-part core was exhaustively negative at aligned depth 1 (0.121449 solver seconds).
 
 Deeper exploratory work was deliberately bounded and produced no verdict: `ABBBBBCD` depth 3,
 the widest-first depth-2 scan, the literal residual at depth 2, and the literal five-part core at
@@ -5698,6 +5700,62 @@ depth 2 each hit independent 60-second caps; observed peak RSS was respectively 
 0.01 GB.  An earlier JavaScript prototype completed depth 2 in 31.320 seconds and was stopped about
 25 seconds into depth 3.  These five aborted probes are scheduling information only.  The retained
 regression covers only completed statements, no solver process remains, and no Pareto CSV datum
-changes.  If the rank-59 germ eventually stabilizes, its parent accounting evaluates arithmetically
-to `2^k-binom(k,2)-6`; that implication is not a conjecture that it does stabilize.  AddressSanitizer
-and UndefinedBehaviorSanitizer builds passed the height-4, height-5, and literal-core controls.
+changes.  The then-open rank-59 stabilization possibility—and therefore its conditional
+`2^k-binom(k,2)-6` continuation—is refuted inside the aligned model by the next entry.
+AddressSanitizer and UndefinedBehaviorSanitizer builds passed the height-4, height-5, and
+literal-core controls.
+
+## 2026-08-14 — D lineages close the eight-atom symbolic height-6 slice
+
+The bounded-depth framing above was too weak.  In the aligned profile model, D is a non-branching
+lineage: `D->CD` contains exactly one D, and a selected profile plus its complement partitions the
+parent's D atoms.  Define `L_D(S)` as the sum of profile D counts over state parts, without multiplying
+by part height.  Every mixed child preserves total height and has `L_D` no larger than its parent.
+An eventual singleton leaf of height `h` needs at least `max(0,h-4)` D atoms, from the leading
+coefficient of the first `h` terminal-reference profiles.  Following the mixed outcome at every node
+therefore gives a closed losing set whenever `L_D(S)<max(0,h-4)`.
+
+This settles the old 229 germ in the restricted model at all depths.  The two fixed profiles in the
+height-6 hard branch have no D atoms, so every eight-atom D germ with zero or one D is impossible.
+Those are ranks 1--81.  `AAAABBCD` is rank 56 and `ABBBBBCD` rank 59; neither can stabilize under
+pure refinement.  The earlier depth-3 inconclusive result is superseded, not extended.
+
+The first survivor is rank 82, `A^6D^2`.  Adding the sound two-coordinate over-approximation
+`(D,C+D)` changed its exact depth-3 search from a 60-second timeout (0.02 GB peak RSS) to a positive
+in 1.97468 solver seconds.  The resulting 19-node tree has root-base threshold 13.  Since every
+wider germ has an all-depth certificate, this is the exact widest A--D eight-atom germ without a
+depth qualifier.  The working outer assembly then has parent profile
+`A^21B^6C^3D^2@G_(k-5)` and conditional width
+
+    2^k - k^2 + 6k - 16,     k>=18.
+
+This is a construction within the `(alpha,beta,gamma)=(4,3,2)` aligned family, not a new Pareto
+maximum.  No CSV datum changed.
+
+The proof is now mechanically split from discovery.  `search_atom_profiles.cpp` emits a closed
+D-lineage certificate and a machine-readable positive tree.  `check_atom_profile_certificate.py`
+independently enumerates profiles, refinements, cuts and mixed transitions; it checks 174,069 local
+cases at eight atoms.  `check_atom_profile_tree.py` independently re-derives every child, eventual
+majorization inequality and threshold.  The regression also rechecks the earlier height-4 and
+height-5 trees.  The exact solver now uses the first-two-coefficient abstraction only as a sound
+necessary filter; positive claims still come from the full profile tree.  The combined durable
+proof object is `evidence/atom_profile_height6_ad8.cert`.  A combined AddressSanitizer and
+UndefinedBehaviorSanitizer build reproduced the rank-82 positive in 16.609 solver seconds at
+0.66 GB peak RSS with no diagnostic.
+
+The phrase “the 165 possible D germs” in the preceding entry was too broad.  They are all A--D words
+of length eight, not all profiles introduced by arbitrary excessive `q`.  The program now also
+builds at 16 atoms.  Its independent certificate checks 5,540,319 local transitions and excludes
+ranks 1--289 at all depths; the refined 229 class is rank 191 and the first survivor is rank 290,
+`A^14D^2`.  The `(D,C+D)` abstraction rejects rank 290 through depth 5 in the retained regression.
+An exploratory abstraction-only run remained negative through depth 16 and was stopped after about
+81 single-threaded seconds; this is not an all-depth verdict.
+
+The genuinely new 16-atom band remains open.  A 60-second exact depth-3 range run discharged ranks
+290--304 via the abstraction, then stalled on rank 305 with 0.05 GB peak RSS.  A separate 60-second
+depth-3 run for rank 319, `A^12C^2D^2`, also timed out at 0.10 GB even though its construction follows
+abstractly by refining the verified eight-atom tree; the timeout measures search order, not
+constructibility.  These runs were capped and left no solver process.  The next symbolic target is
+an all-depth `(D,C+D)` invariant for the rank-290 band, followed by the rank-305 band where that
+two-coordinate relaxation first permits depth-3 play.  Full proof and scope are in
+`docs/theorems/atom-lineage.md`.

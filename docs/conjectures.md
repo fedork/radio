@@ -707,17 +707,19 @@ This exposes exactly why repeating the finite split is not an induction.  At `r=
 to `[247:0,255:2,231:1]`, and (8) becomes
 `Sb(247:1,247:1,240:2,231:2)@8`, which is exactly unsolvable.  The source is
 `evidence/m6_k11_scaled_attempt.txt`.  Thus the literal refinement of the `k=10` split fails at the
-next level.  This does **not** refute the parent `Sb(503:1,495:2,478:3)@9`, another first split, or
-eventual reuse of the same width germ after still more refinement.
+next level.  This does **not** refute the parent `Sb(503:1,495:2,478:3)@9` or another unrestricted
+first split.  The all-depth lineage argument below now separately rules out eventual reuse of the
+same one-D germ inside the aligned profile model.
 
-There is nevertheless a finite excessive-`q` optimizer for the explicitly restricted aligned
-model.  Represent every width by `p=(p_A,p_B,p_C,p_D)` with `|p|=8`.  One refinement is
+There is nevertheless a finite optimizer at each fixed power-of-two normalization in the explicitly
+restricted aligned model.  Represent every width by `p=(p_A,p_B,p_C,p_D)` with `|p|=N`.  One
+refinement is
 
     R(p)=(2p_A+p_B, p_B+p_C, p_C+p_D, p_D).
 
-A legal aligned cut chooses `x<=R(p)` with `|x|=8`; its complement is `R(p)-x`, and the usual height
-cut produces the three child states.  The terminal reference profiles—the first six atoms of
-`G_(r+3)`, refined to `G_r`—are
+A legal aligned cut chooses `x<=R(p)` with `|x|=N`; its complement is `R(p)-x`, and the usual height
+cut produces the three child states.  At `N=8`, the terminal reference profiles—the first six atoms
+of `G_(r+3)`, refined to `G_r`—are
 
     A^8, A^7B, A^4B^3C, A^4B^3C, AB^3C^3D, AB^3C^3D.                 (9)
 
@@ -726,23 +728,39 @@ No numerical scale is needed to order candidates.  The deficit of `p` is
     p_D binom(r,2) + (p_C+p_D)r + (p_B+p_C+p_D),                    (10)
 
 so eventual width is decreasing lexicographic order of
-`(p_D,p_C+p_D,p_B+p_C+p_D)`.  Exact recursion over the 165 eight-atom profiles, with (9) as the
-singleton-majorization terminal, therefore returns the widest D germ at any fixed synchronized-depth
-bound if it scans from rank 1 to the first positive.  A global excessive-`q` maximum additionally
-requires the recursion to reach its finite-state fixed point, or a separate proof that every earlier
-germ fails at all depths.  This is the concrete version of the abstract `H` state below; it still uses
-only the outer profiles of A/B/C.
+`(p_D,p_C+p_D,p_B+p_C+p_D)`.
 
-`tools/search_atom_profiles.cpp` implements this recursion and
-`tools/atom_profile_regression.sh` locks the height-4 and height-5 controls.  In the eventual order,
-the old `AAAABBCD` D germ has rank 56 and `ABBBBBCD` rank 59; the first 45 wider germs fail the
-full-star necessary condition (rank 46, `AAAAAAAD`, is the first survivor), but ranks 46 through 58
-have not been excluded at sufficient depth.
-The target `ABBBBBCD` has no aligned construction using at most two synchronized levels.  A bounded
-depth-3 run was inconclusive.  These are results about the eight-atom aligned model only, not
-unrestricted unsolvability claims.  If `ABBBBBCD` did stabilize, the parent word
-`A^16B^11C^4D@G_(k-5)` would evaluate to the conditional candidate
-`2^k-binom(k,2)-6`; neither stabilization nor maximality is claimed.
+The recursion now has an all-depth symbolic obstruction.  Let `L_D(S)` be the sum of `p_D` over
+state parts, **without** multiplying by their heights.  Refinement preserves each D atom and the
+mixed outcome only partitions those atoms, while preserving total height.  Following mixed outcomes
+therefore proves that every constructible height-`h` state needs
+
+    L_D(S) >= max(0,h-4).                                           (11)
+
+At height 6 the two fixed profiles in the hard branch contain no D, so every D germ with at most one
+D atom is impossible at every depth.  For eight atoms these are exactly ranks 1--81.  Thus the old
+`AAAABBCD` germ (rank 56) and the finite 229 accounting `ABBBBBCD` (rank 59) do **not** stabilize in
+this model; increasing `q` by pure refinement cannot repair their single D lineage.
+
+Rank 82, `A^6D^2`, is the first survivor, and exact recursion finds a three-level construction.  An
+independent 19-node tree checker gives root-base threshold `r>=13`.  Hence it is the exact widest
+A--D eight-atom D germ at *all* depths, not merely at depth 3.  Attaching the already constructed
+outer branches gives the conditional parent profile `A^21B^6C^3D^2@G_(k-5)` and width
+
+    2^k-k^2+6k-16,       k>=18.                                    (12)
+
+This closes the fixed eight-atom A--D slice, not arbitrary excessive `q`.  The 165 profiles are all
+A--D words of length eight, not all possible longer words.  At 16 atoms the same certificate excludes
+ranks 1--289 (including the refined 229 class at rank 191); the first survivor is rank 290,
+`A^14D^2`.  The sound `(p_D,p_C+p_D)` abstraction rejects it through depth 5, while the known
+eight-atom winner refines to rank 319, `A^12C^2D^2`.  Ranks 290--318 remain the first genuinely
+larger-`q` symbolic band.  Full proof and scope are in
+[the atom-lineage note](theorems/atom-lineage.md).
+
+`tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
+`tools/atom_profile_regression.sh` invokes independent checkers for the closed losing certificate
+and positive tree.  This is the concrete version of the abstract `H` state below and still uses only
+the outer profiles of A/B/C.
 
 ### Minimal state for a height-first D optimizer
 
@@ -761,8 +779,10 @@ chosen.
 If the cell interpretation requires whole atoms, `c` fitting in `a` means only that the scalar
 difference `a-c` has a nonnegative atom decomposition at the selected refinement.  It does not mean
 that C must select cells from a previously fixed decomposition of A.  Likewise, if the maximal
-integer D has no decomposition with exactly `2^(q-2)` atoms, increase `q` and refine; the 229 example
-first acquires the displayed eight-atom D accounting one level below the failed four-atom attempt.
+integer D has no decomposition with exactly `2^(q-2)` atoms, a larger normalization may expose a
+new profile.  That is not the same as purely refining the old profile: the 229 value first acquires
+an eight-atom accounting one level below its failed four-atom attempt, but its single D lineage now
+proves that this refinement class cannot stabilize.
 
 The computational stabilization test is therefore
 

@@ -1,9 +1,9 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-14** (complete proven-Pareto triple enumeration added to the
-corrected four-segment assembly; proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census
-are running beside the retained `run3`/`run8` performance baselines).
+don't know it. Last refreshed **2026-08-14** (the D-lineage certificate closes the eight-atom
+height-6 aligned slice and isolates the open 16-atom band; proof-safe cold AWS `run9` and the resumed
+k=8 Pareto-prefix census are running beside the retained `run3`/`run8` performance baselines).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -29,6 +29,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
+| **Do not extrapolate the one-D `ABBBBBCD` accounting by adding depth or pure refinement.** | It has only one unweighted D lineage, while every eventual height-6 mixed path needs two. The closed losing-set certificate excludes the whole refinement class at all depths. The first eight-atom survivor is `A^6D^2`; genuinely new longer profiles, rather than refinements of 229, are the remaining excessive-q question. See [the atom-lineage note](theorems/atom-lineage.md). |
 
 ## Goals
 
@@ -76,9 +77,10 @@ profile model), and 31 verdicts from the 2023 build.
 For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the base sequence
 `G_{k−q}` (a "profile"). Established this session:
 
-- Profiles form **refinement classes** under `A→aa, B→ab, C→bc, D→cd`. Refinement preserves
-  the value function and doubles the length, so choosing a larger `q` adds **no** expressive
-  power. Verified against the spreadsheet's own columns.
+- Profiles form **refinement classes** under `A→aa, B→ab, C→bc, D→cd`. Pure refinement preserves
+  the value function and doubles the length, so it adds no expressive power *within that class*.
+  A larger `q` also admits genuinely new, non-refined profiles; the 16-atom height-6 band now makes
+  this distinction operational.  The class invariance is verified against the spreadsheet columns.
 - **`length = 2^q` is a refinement invariant** — a property of the whole class, not of the
   shortest representative. Holds for every m ≤ 13.
 - Given that constraint the profile is **unique** for m ≤ 9 and m = 11..13, hence so is its
@@ -176,13 +178,19 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   Each selected width in the stored split has a unique aligned decomposition inside its refined
   component one level lower; the resulting literal lift is exactly
   the already refuted `Sb(247:1,247:1,240:2,231:2)@8` residual, so that split is not an induction.
-  `search_atom_profiles.cpp` now makes the excessive-`q` proposal finite inside the non-wasteful
-  eight-atom model: refine count vectors, choose eight of sixteen atoms at every cut, and order the
-  165 possible D germs by their three-term binomial deficit.  It reproduces the height-4/5 symbolic
-  controls.  `ABBBBBCD` is rank 59, not the first eventual candidate; ranks 1--45 fail full-star,
-  while ranks 46--58 remain to be excluded.  `ABBBBBCD` has no aligned proof within depth 2 and the
-  bounded depth-3 attempt was inconclusive.  This finite three-unit loss is not extrapolated.  No
-  eventual formula or new Pareto datum is claimed.
+  The symbolic fixed-depth search is now supplemented by an all-depth D-lineage certificate.
+  Refinement `D->CD` never branches a D lineage, and the mixed outcome preserves height, so a
+  height-6 eventual leaf needs two unweighted D lineages.  This excludes eight-atom ranks 1--81 at
+  every depth, including `ABBBBBCD` (rank 59): the finite 229 accounting cannot stabilize by pure
+  refinement.  Rank 82, `A^6D^2`, has an independently checked 19-node, three-level tree with root
+  base threshold 13.  It is therefore the exact widest A--D eight-atom germ and gives the conditional
+  parent construction `2^k-k^2+6k-16` for `k>=18` inside this height triple.  This does **not** close
+  arbitrary excessive `q`: at 16 atoms the same theorem excludes ranks 1--289 (the refined 229 class
+  is rank 191), while ranks 290--318 precede the known refined winner at rank 319.  The first
+  survivor, `A^14D^2`, is rejected by the sound `(D,C+D)` abstraction through depth 5; the remaining
+  larger-normalization band is open.  Both losing and positive certificates are independently
+  checked by `tools/atom_profile_regression.sh`; see
+  [the atom-lineage note](theorems/atom-lineage.md).  No Pareto datum changes.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.
@@ -194,7 +202,9 @@ Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
 fixed-small-m exact recurrence and complete assembly rank/enumeration modes in
 `tools/search_singletonization.cpp`,
-together with its guarded-piece combiner `tools/optimize_mixed_frontier.py`.
+together with its guarded-piece combiner `tools/optimize_mixed_frontier.py`.  The aligned symbolic
+track is independently checked by `tools/check_atom_profile_certificate.py` and
+`tools/check_atom_profile_tree.py` through `tools/atom_profile_regression.sh`.
 
 Artifact store `fedork/radio-data` (private): 12 tags, 33 assets plus a manifest per tag,
 about 394 MB stored, `check-index` green.

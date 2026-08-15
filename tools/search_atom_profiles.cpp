@@ -10,15 +10,16 @@
 #include <utility>
 #include <vector>
 
-// Symbolic search for the excessive-q, eight-atom height-6 construction.
+// Symbolic search for the excessive-q, power-of-two-atom height-6 construction.
 //
-// A profile (a,b,c,d) denotes a*A_r+b*B_r+c*C_r+d*D_r, with a+b+c+d=8.
+// A profile (a,b,c,d) denotes a*A_r+b*B_r+c*C_r+d*D_r, with
+// a+b+c+d=PROFILE_ATOMS (8 by default, optionally 16 at compile time).
 // Refinement from G_r to G_(r-1) is
 //
 //   A -> AA,  B -> AB,  C -> BC,  D -> CD.
 //
-// A synchronized cut selects exactly eight of the sixteen refined atoms.  Consequently every
-// descendant width is again an eight-atom profile and, after any fixed number of synchronized
+// A synchronized cut selects exactly half of the refined atoms.  Consequently every
+// descendant width has the configured profile size and, after any fixed number of synchronized
 // levels, a singleton leaf can be compared with G_(r+3) independently of scale.  Since
 //
 //   A_r = 2^r,
@@ -32,10 +33,17 @@
 
 namespace {
 
-constexpr int PROFILE_ATOMS = 8;
+#ifndef ATOM_PROFILE_ATOMS
+#define ATOM_PROFILE_ATOMS 8
+#endif
+constexpr int PROFILE_ATOMS = ATOM_PROFILE_ATOMS;
 constexpr int TYPES = 4;
 constexpr int MAX_HEIGHT = 6;
 constexpr int MAX_PARTS = MAX_HEIGHT;
+static_assert(PROFILE_ATOMS >= 8 && PROFILE_ATOMS <= 16,
+              "supported normalizations contain 8 or 16 atoms");
+static_assert((PROFILE_ATOMS & (PROFILE_ATOMS - 1)) == 0,
+              "profile atom count must be a power of two");
 #ifndef ATOM_PROFILE_MAX_MEMO
 #define ATOM_PROFILE_MAX_MEMO 2000000
 #endif
@@ -43,6 +51,7 @@ constexpr std::size_t MAX_MEMO = ATOM_PROFILE_MAX_MEMO;
 
 using Counts = std::array<std::uint8_t, TYPES>;
 using Deficit = std::array<int, 3>;  // coefficients of C(r,2), r, 1
+using ProfileId = std::uint16_t;
 
 struct Profile {
     Counts count{};
@@ -50,7 +59,7 @@ struct Profile {
 };
 
 struct Part {
-    std::uint8_t profile{};
+    ProfileId profile{};
     std::uint8_t height{};
 
     friend bool operator==(const Part &, const Part &) = default;
@@ -59,7 +68,7 @@ struct Part {
 using State = std::vector<Part>;
 
 struct Key {
-    std::array<std::uint16_t, MAX_PARTS> parts{};
+    std::array<std::uint32_t, MAX_PARTS> parts{};
     std::uint8_t size{};
     std::uint8_t depth{};
 
@@ -80,24 +89,56 @@ struct KeyHash {
     }
 };
 
+struct DCPart {
+    std::uint8_t d{};
+    std::uint8_t cd{};
+    std::uint8_t height{};
+};
+
+using DCState = std::vector<DCPart>;
+
+struct DCKey {
+    std::array<std::uint32_t, MAX_PARTS> parts{};
+    std::uint8_t size{};
+    std::uint8_t depth{};
+
+    friend bool operator==(const DCKey &, const DCKey &) = default;
+};
+
+struct DCKeyHash {
+    std::size_t operator()(const DCKey &key) const noexcept {
+        std::size_t value = 1469598103934665603ULL;
+        auto mix = [&](std::size_t item) {
+            value ^= item;
+            value *= 1099511628211ULL;
+        };
+        mix(key.size);
+        mix(key.depth);
+        for (int i = 0; i < key.size; ++i) mix(key.parts[i]);
+        return value;
+    }
+};
+
 struct LocalChildren {
     std::array<State, 3> state;  // both, mixed, neither
 };
 
 struct Option {
-    std::uint8_t selected_profile{};
+    ProfileId selected_profile{};
     std::uint8_t selected_height{};
     LocalChildren children;
 };
 
 struct Split {
-    std::uint8_t selected_profile{};
+    ProfileId selected_profile{};
     std::uint8_t selected_height{};
 };
 
 struct Counters {
     std::uint64_t calls{};
     std::uint64_t memo_hits{};
+    std::uint64_t lineage_rejects{};
+    std::uint64_t dc_rejects{};
     std::uint64_t raw_options{};
     std::uint64_t assignments{};
     std::uint64_t prefix_rejects{};
@@ -108,11 +149,12 @@ std::array<std::array<std::array<std::array<int, PROFILE_ATOMS + 1>, PROFILE_ATO
                       PROFILE_ATOMS + 1>,
            PROFILE_ATOMS + 1>
     profile_id{};
-std::vector<std::vector<std::uint8_t>> cuts;
-std::array<std::uint8_t, MAX_HEIGHT> reference_profiles{};
+std::vector<std::vector<ProfileId>> cuts;
+std::array<ProfileId, MAX_HEIGHT> reference_profiles{};
 
 std::unordered_map<Key, bool, KeyHash> memo;
 std::unordered_map<Key, std::vector<Split>, KeyHash> witnesses;
+std::unordered_map<DCKey, bool, DCKeyHash> dc_memo;
 Counters counters;
 
 Deficit make_deficit(const Counts &count) {
@@ -121,7 +163,35 @@ Deficit make_deficit(const Counts &count) {
 
 // Negative means left is eventually wider.  Equal deficits imply equal profiles because both
 // profiles contain exactly eight atoms.
-int compare_profiles(std::uint8_t left, std::uint8_t right) {
+constexpr int normalization_levels() {
+    int atoms = PROFILE_ATOMS;
+    int levels = 0;
+    while (atoms > 1) {
+        atoms /= 2;
+        ++levels;
+    }
+    return levels;
+}
+
+Counts refine_counts_raw(const Counts &old) {
+    return {static_cast<std::uint8_t>(2 * old[0] + old[1]),
+            static_cast<std::uint8_t>(old[1] + old[2]),
+            static_cast<std::uint8_t>(old[2] + old[3]), old[3]};
+}
+
+Counts refine_to_profile_atoms(Counts count) {
+    int atoms = 0;
+    for (int value : count) atoms += value;
+    while (atoms < PROFILE_ATOMS) {
+        count = refine_counts_raw(count);
+        atoms *= 2;
+    }
+    if (atoms != PROFILE_ATOMS)
+        throw std::logic_error("profile cannot be refined to configured atom count");
+    return count;
+}
+
+int compare_profiles(ProfileId left, ProfileId right) {
     for (int i = 0; i < 3; ++i) {
         if (profiles[left].deficit[i] != profiles[right].deficit[i])
             return profiles[left].deficit[i] - profiles[right].deficit[i];
@@ -129,7 +199,7 @@ int compare_profiles(std::uint8_t left, std::uint8_t right) {
     return 0;
 }
 
-std::string profile_text(std::uint8_t id) {
+std::string profile_text(ProfileId id) {
     static constexpr std::array<char, TYPES> LETTERS{'A', 'B', 'C', 'D'};
     std::string out;
     for (int i = 0; i < TYPES; ++i)
@@ -137,10 +207,10 @@ std::string profile_text(std::uint8_t id) {
     return out.empty() ? "-" : out;
 }
 
-std::uint8_t lookup_profile(const Counts &count) {
+ProfileId lookup_profile(const Counts &count) {
     const int id = profile_id[count[0]][count[1]][count[2]][count[3]];
     if (id < 0) throw std::logic_error("profile lookup failed");
-    return static_cast<std::uint8_t>(id);
+    return static_cast<ProfileId>(id);
 }
 
 void initialize_profiles() {
@@ -162,10 +232,7 @@ void initialize_profiles() {
     cuts.resize(profiles.size());
     for (std::size_t id = 0; id < profiles.size(); ++id) {
         const Counts &old = profiles[id].count;
-        const Counts refined{
-            static_cast<std::uint8_t>(2 * old[0] + old[1]),
-            static_cast<std::uint8_t>(old[1] + old[2]),
-            static_cast<std::uint8_t>(old[2] + old[3]), old[3]};
+        const Counts refined = refine_counts_raw(old);
         for (int a = 0; a <= std::min(PROFILE_ATOMS, static_cast<int>(refined[0])); ++a)
             for (int b = 0;
                  b <= std::min(PROFILE_ATOMS - a, static_cast<int>(refined[1])); ++b)
@@ -180,26 +247,24 @@ void initialize_profiles() {
                         cuts[id].push_back(lookup_profile(selected));
                     }
                 }
-        std::sort(cuts[id].begin(), cuts[id].end(), [](std::uint8_t left, std::uint8_t right) {
+        std::sort(cuts[id].begin(), cuts[id].end(), [](ProfileId left, ProfileId right) {
             return compare_profiles(left, right) < 0;
         });
     }
 
-    // The first six atoms of G_(r+3), each refined three times to G_r.
-    reference_profiles = {
-        lookup_profile({8, 0, 0, 0}), lookup_profile({7, 1, 0, 0}),
-        lookup_profile({4, 3, 1, 0}), lookup_profile({4, 3, 1, 0}),
-        lookup_profile({1, 3, 3, 1}), lookup_profile({1, 3, 3, 1})};
+    // The first six atoms of G_(r+s), each refined s=log2(PROFILE_ATOMS) times to G_r.
+    const std::array<Counts, MAX_HEIGHT> units{
+        Counts{1, 0, 0, 0}, Counts{0, 1, 0, 0}, Counts{0, 0, 1, 0},
+        Counts{0, 0, 1, 0}, Counts{0, 0, 0, 1}, Counts{0, 0, 0, 1}};
+    for (int i = 0; i < MAX_HEIGHT; ++i)
+        reference_profiles[i] = lookup_profile(refine_to_profile_atoms(units[i]));
 }
 
-Counts refined_counts(std::uint8_t id) {
-    const Counts &old = profiles[id].count;
-    return {static_cast<std::uint8_t>(2 * old[0] + old[1]),
-            static_cast<std::uint8_t>(old[1] + old[2]),
-            static_cast<std::uint8_t>(old[2] + old[3]), old[3]};
+Counts refined_counts(ProfileId id) {
+    return refine_counts_raw(profiles[id].count);
 }
 
-std::uint8_t complement_profile(std::uint8_t parent, std::uint8_t selected) {
+ProfileId complement_profile(ProfileId parent, ProfileId selected) {
     const Counts total = refined_counts(parent);
     const Counts &take = profiles[selected].count;
     Counts complement{};
@@ -231,7 +296,7 @@ Key make_key(const State &state, int depth) {
     key.size = static_cast<std::uint8_t>(state.size());
     key.depth = static_cast<std::uint8_t>(depth);
     for (std::size_t i = 0; i < state.size(); ++i)
-        key.parts[i] = static_cast<std::uint16_t>(state[i].profile * (MAX_HEIGHT + 1) +
+        key.parts[i] = static_cast<std::uint32_t>(state[i].profile * (MAX_HEIGHT + 1) +
                                                   state[i].height);
     return key;
 }
@@ -261,19 +326,19 @@ int eventual_threshold(const Deficit &value) {
 
 std::size_t total_height(const State &state);
 
-std::vector<std::uint8_t> expanded_profiles(const State &state) {
-    std::vector<std::uint8_t> expanded;
+std::vector<ProfileId> expanded_profiles(const State &state) {
+    std::vector<ProfileId> expanded;
     for (Part part : state)
         for (int i = 0; i < part.height; ++i) expanded.push_back(part.profile);
     if (expanded.size() > MAX_HEIGHT) return {};
-    std::sort(expanded.begin(), expanded.end(), [](std::uint8_t left, std::uint8_t right) {
+    std::sort(expanded.begin(), expanded.end(), [](ProfileId left, ProfileId right) {
         return compare_profiles(left, right) < 0;
     });
     return expanded;
 }
 
 std::vector<Deficit> full_star_differences(const State &state) {
-    const std::vector<std::uint8_t> expanded = expanded_profiles(state);
+    const std::vector<ProfileId> expanded = expanded_profiles(state);
     if (expanded.size() != total_height(state)) return {};
 
     std::vector<Deficit> differences;
@@ -302,7 +367,7 @@ bool full_star_eventual(const State &state) {
 
 int singleton_threshold(const State &state) {
     int threshold = 3;
-    const std::vector<std::uint8_t> expanded = expanded_profiles(state);
+    const std::vector<ProfileId> expanded = expanded_profiles(state);
     for (std::size_t i = 1; i < expanded.size(); ++i) {
         Deficit order_difference{};
         for (int coefficient = 0; coefficient < 3; ++coefficient)
@@ -333,8 +398,233 @@ std::size_t total_height(const State &state) {
     return height;
 }
 
-LocalChildren split_part(Part part, std::uint8_t selected, int selected_height) {
-    const std::uint8_t complement = complement_profile(part.profile, selected);
+// D is a non-branching lineage under refinement: D -> CD contains exactly one D.  In the
+// mixed child, the selected and complementary D atoms therefore partition the parent's D
+// atoms, while total height is preserved.  Following mixed outcomes forever shows that a
+// state can reach an eventual singleton leaf only if it already has at least h-4 distinct
+// D lineages: the first h profiles of the terminal reference contain max(0,h-4) D atoms.
+// Unlike full-star majorization, the lineage count is not multiplied by part height.
+int d_lineages(const State &state) {
+    int lineages = 0;
+    for (Part part : state) lineages += profiles[part.profile].count[3];
+    return lineages;
+}
+
+int required_d_lineages(const State &state) {
+    return std::max(0, static_cast<int>(total_height(state)) - 4);
+}
+
+bool d_lineage_possible(const State &state) {
+    return d_lineages(state) >= required_d_lineages(state);
+}
+
+// Sound two-coefficient over-approximation.  A projected profile keeps only
+// (p_D,p_C+p_D).  Its refinement and every possible projected N-of-2N cut depend only on
+// those two coordinates.  Terminal comparison deliberately ignores the final deficit
+// coefficient, so construct_dc can prove bounded-depth NO; a DC YES is only permission to
+// continue the full search, never a full verdict.
+void normalize_dc(DCState &state) {
+    state.erase(std::remove_if(state.begin(), state.end(),
+                               [](DCPart part) { return part.height == 0; }),
+                state.end());
+    std::sort(state.begin(), state.end(), [](DCPart left, DCPart right) {
+        if (left.d != right.d) return left.d < right.d;
+        if (left.cd != right.cd) return left.cd < right.cd;
+        return left.height > right.height;
+    });
+    if (state.size() > MAX_PARTS) throw std::logic_error("DC state exceeds height bound");
+}
+
+DCState project_dc(const State &state) {
+    DCState out;
+    for (Part part : state) {
+        const Counts &count = profiles[part.profile].count;
+        out.push_back({count[3], static_cast<std::uint8_t>(count[2] + count[3]),
+                       part.height});
+    }
+    normalize_dc(out);
+    return out;
+}
+
+DCState add_dc_states(const DCState &left, const DCState &right) {
+    DCState out = left;
+    out.insert(out.end(), right.begin(), right.end());
+    normalize_dc(out);
+    return out;
+}
+
+DCKey make_dc_key(const DCState &state, int depth) {
+    DCKey key;
+    key.size = static_cast<std::uint8_t>(state.size());
+    key.depth = static_cast<std::uint8_t>(depth);
+    for (std::size_t i = 0; i < state.size(); ++i) {
+        const int profile = state[i].d * (PROFILE_ATOMS + 1) + state[i].cd;
+        key.parts[i] = static_cast<std::uint32_t>(profile * (MAX_HEIGHT + 1) +
+                                                  state[i].height);
+    }
+    return key;
+}
+
+std::size_t dc_total_height(const DCState &state) {
+    std::size_t height = 0;
+    for (DCPart part : state) height += part.height;
+    return height;
+}
+
+bool dc_lineage_possible(const DCState &state) {
+    int lineages = 0;
+    for (DCPart part : state) lineages += part.d;
+    return lineages >= std::max(0, static_cast<int>(dc_total_height(state)) - 4);
+}
+
+bool dc_full_star(const DCState &state) {
+    std::vector<std::pair<int, int>> expanded;
+    for (DCPart part : state)
+        for (int i = 0; i < part.height; ++i) expanded.emplace_back(part.d, part.cd);
+    if (expanded.size() > MAX_HEIGHT) return false;
+    std::sort(expanded.begin(), expanded.end());
+
+    int left_d = 0;
+    int left_cd = 0;
+    int right_d = 0;
+    int right_cd = 0;
+    for (std::size_t i = 0; i < expanded.size(); ++i) {
+        left_d += expanded[i].first;
+        left_cd += expanded[i].second;
+        const Deficit &reference = profiles[reference_profiles[i]].deficit;
+        right_d += reference[0];
+        right_cd += reference[1];
+        if (left_d < right_d || (left_d == right_d && left_cd < right_cd)) return false;
+    }
+    return true;
+}
+
+bool dc_singleton(const DCState &state) {
+    return std::all_of(state.begin(), state.end(),
+                       [](DCPart part) { return part.height == 1; });
+}
+
+struct DCOption {
+    std::uint8_t selected_d{};
+    std::uint8_t selected_cd{};
+    std::uint8_t selected_height{};
+    std::array<DCState, 3> children;
+};
+
+std::vector<DCOption> dc_local_options(DCPart part) {
+    std::vector<DCOption> out;
+    const int refined_d = part.d;
+    const int refined_cd = part.d + part.cd;
+    const int refined_non_cd = 2 * PROFILE_ATOMS - refined_cd;
+    for (int selected_d = 0; selected_d <= part.d; ++selected_d) {
+        for (int selected_cd = selected_d; selected_cd <= PROFILE_ATOMS; ++selected_cd) {
+            const int selected_c = selected_cd - selected_d;
+            if (selected_c > part.cd) continue;
+            if (PROFILE_ATOMS - selected_cd > refined_non_cd) continue;
+            const int complement_d = refined_d - selected_d;
+            const int complement_cd = refined_cd - selected_cd;
+            if (complement_cd < complement_d || complement_cd > PROFILE_ATOMS) continue;
+            for (int selected_height = 0; selected_height <= part.height; ++selected_height) {
+                std::array<DCState, 3> children;
+                children[0] = {{static_cast<std::uint8_t>(selected_d),
+                                static_cast<std::uint8_t>(selected_cd),
+                                static_cast<std::uint8_t>(selected_height)}};
+                children[1] = {
+                    {static_cast<std::uint8_t>(selected_d),
+                     static_cast<std::uint8_t>(selected_cd),
+                     static_cast<std::uint8_t>(part.height - selected_height)},
+                    {static_cast<std::uint8_t>(complement_d),
+                     static_cast<std::uint8_t>(complement_cd),
+                     static_cast<std::uint8_t>(selected_height)}};
+                children[2] = {{static_cast<std::uint8_t>(complement_d),
+                                static_cast<std::uint8_t>(complement_cd),
+                                static_cast<std::uint8_t>(part.height - selected_height)}};
+                for (DCState &child : children) normalize_dc(child);
+                out.push_back({static_cast<std::uint8_t>(selected_d),
+                               static_cast<std::uint8_t>(selected_cd),
+                               static_cast<std::uint8_t>(selected_height),
+                               std::move(children)});
+            }
+        }
+    }
+    return out;
+}
+
+bool construct_dc(const DCState &input, int depth) {
+    DCState state = input;
+    normalize_dc(state);
+    const DCKey key = make_dc_key(state, depth);
+    if (const auto found = dc_memo.find(key); found != dc_memo.end()) return found->second;
+    if (!dc_lineage_possible(state) || !dc_full_star(state)) {
+        dc_memo.emplace(key, false);
+        return false;
+    }
+    if (state.empty() || dc_singleton(state)) {
+        dc_memo.emplace(key, true);
+        return true;
+    }
+    if (depth == 0) {
+        dc_memo.emplace(key, false);
+        return false;
+    }
+
+    struct Candidate {
+        DCPart part{};
+        std::vector<DCOption> options;
+    };
+    std::vector<Candidate> candidates;
+    for (DCPart part : state) {
+        std::vector<DCOption> viable;
+        for (DCOption option : dc_local_options(part)) {
+            bool possible = true;
+            for (int outcome : {1, 0, 2}) {
+                if (!construct_dc(option.children[outcome], depth - 1)) {
+                    possible = false;
+                    break;
+                }
+            }
+            if (possible) viable.push_back(std::move(option));
+        }
+        if (viable.empty()) {
+            dc_memo.emplace(key, false);
+            return false;
+        }
+        candidates.push_back({part, std::move(viable)});
+    }
+    std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate &left,
+                                                              const Candidate &right) {
+        return left.options.size() < right.options.size();
+    });
+
+    std::array<DCState, 3> partial;
+    auto dfs = [&](auto &&self, int index) -> bool {
+        if (index == static_cast<int>(candidates.size())) return true;
+        for (const DCOption &option : candidates[index].options) {
+            std::array<DCState, 3> next;
+            bool possible = true;
+            for (int outcome : {1, 0, 2}) {
+                next[outcome] = add_dc_states(partial[outcome], option.children[outcome]);
+                if (!construct_dc(next[outcome], depth - 1)) {
+                    possible = false;
+                    break;
+                }
+            }
+            if (!possible) continue;
+            const auto saved = partial;
+            partial = std::move(next);
+            if (self(self, index + 1)) return true;
+            partial = saved;
+        }
+        return false;
+    };
+
+    const bool answer = dfs(dfs, 0);
+    dc_memo.emplace(key, answer);
+    return answer;
+}
+
+LocalChildren split_part(Part part, ProfileId selected, int selected_height) {
+    const ProfileId complement = complement_profile(part.profile, selected);
     LocalChildren children;
     children.state[0] = {{selected, static_cast<std::uint8_t>(selected_height)}};
     children.state[1] = {
@@ -358,7 +648,7 @@ std::array<int, 3> height_score(const LocalChildren &children) {
 
 std::vector<Option> viable_part_options(Part part, int depth) {
     std::vector<Option> out;
-    for (std::uint8_t selected : cuts[part.profile]) {
+    for (ProfileId selected : cuts[part.profile]) {
         for (int selected_height = 0; selected_height <= part.height; ++selected_height) {
             ++counters.raw_options;
             LocalChildren children = split_part(part, selected, selected_height);
@@ -393,6 +683,16 @@ bool construct(const State &input, int depth) {
     if (const auto found = memo.find(key); found != memo.end()) {
         ++counters.memo_hits;
         return found->second;
+    }
+    if (!d_lineage_possible(state)) {
+        ++counters.lineage_rejects;
+        remember(key, false);
+        return false;
+    }
+    if (!construct_dc(project_dc(state), depth)) {
+        ++counters.dc_rejects;
+        remember(key, false);
+        return false;
     }
     if (!full_star_eventual(state)) {
         remember(key, false);
@@ -518,21 +818,70 @@ int print_tree(const State &input, int depth, int level = 0, int indent = 0) {
     return root_threshold;
 }
 
-State height6_state(std::uint8_t d_profile) {
-    State state{{lookup_profile({5, 2, 1, 0}), 1},
-                {lookup_profile({3, 3, 2, 0}), 2},
+int print_machine_tree(const State &input, int depth, int parent, int outcome, int level,
+                       int &next_id, int &root_threshold) {
+    State state = input;
+    normalize(state);
+    const int id = next_id++;
+    const Key key = make_key(state, depth);
+    const auto found = witnesses.find(key);
+
+    std::cout << "atom_profile_tree_node id=" << id << " parent=" << parent
+              << " outcome=" << outcome << " level=" << level << " state=";
+    print_state(state);
+    if (found == witnesses.end()) {
+        const int threshold = singleton_threshold(state);
+        root_threshold = std::max(root_threshold, level + threshold);
+        std::cout << " leaf_threshold=" << threshold << '\n';
+        return id;
+    }
+
+    std::cout << " split=";
+    for (std::size_t i = 0; i < found->second.size(); ++i) {
+        if (i) std::cout << ',';
+        std::cout << profile_text(found->second[i].selected_profile) << ':'
+                  << static_cast<int>(found->second[i].selected_height);
+    }
+    std::cout << '\n';
+    const std::array<State, 3> children = children_of(state, found->second);
+    for (int child_outcome = 0; child_outcome < 3; ++child_outcome)
+        print_machine_tree(children[child_outcome], depth - 1, id, child_outcome, level + 1,
+                           next_id, root_threshold);
+    return id;
+}
+
+void print_machine_tree_certificate(const State &state, int depth, int expected_threshold) {
+    int next_id = 0;
+    int root_threshold = 3;
+    const int root = print_machine_tree(state, depth, -1, -1, 0, next_id, root_threshold);
+    if (root != 0 || root_threshold != expected_threshold)
+        throw std::logic_error("machine tree threshold disagrees with human tree");
+    std::cout << "atom_profile_tree_certificate version=1 root=0 nodes=" << next_id
+              << " root_base_threshold=" << root_threshold
+              << " profile_atoms=" << PROFILE_ATOMS
+              << " normalization_levels=" << normalization_levels() << '\n';
+}
+
+ProfileId lifted_profile(const Counts &eight_atom_profile) {
+    return lookup_profile(refine_to_profile_atoms(eight_atom_profile));
+}
+
+State height6_state(ProfileId d_profile) {
+    State state{{lifted_profile({5, 2, 1, 0}), 1},
+                {lifted_profile({3, 3, 2, 0}), 2},
                 {d_profile, 3}};
     normalize(state);
     return state;
 }
 
 State height6_literal_residual_state() {
-    // The mixed child of the unique aligned refinement of the k=10 witness split:
+    // The mixed child of the unique aligned refinement of the k=10 witness split,
+    // lifted further when the configured normalization has sixteen atoms:
     // P=A^4B^3C, Q=A^2B^4C^2, R=A^3B^3CD.
-    State state{{lookup_profile({4, 3, 1, 0}), 1},
-                {lookup_profile({4, 3, 1, 0}), 1},
-                {lookup_profile({2, 4, 2, 0}), 2},
-                {lookup_profile({3, 3, 1, 1}), 2}};
+    State state{{lifted_profile({4, 3, 1, 0}), 1},
+                {lifted_profile({4, 3, 1, 0}), 1},
+                {lifted_profile({2, 4, 2, 0}), 2},
+                {lifted_profile({3, 3, 1, 1}), 2}};
     normalize(state);
     return state;
 }
@@ -540,30 +889,29 @@ State height6_literal_residual_state() {
 State height6_literal_core_state() {
     // The mixed child after the literal residual split.  This is the symbolic version of
     // Sb(57:1,57:1,57:1,56:1,46:2)@6 in the stored k=10 witness.
-    State state{{lookup_profile({4, 3, 1, 0}), 1},
-                {lookup_profile({4, 3, 1, 0}), 1},
-                {lookup_profile({4, 3, 1, 0}), 1},
-                {lookup_profile({3, 4, 1, 0}), 1},
-                {lookup_profile({2, 3, 2, 1}), 2}};
+    State state{{lifted_profile({4, 3, 1, 0}), 1},
+                {lifted_profile({4, 3, 1, 0}), 1},
+                {lifted_profile({4, 3, 1, 0}), 1},
+                {lifted_profile({3, 4, 1, 0}), 1},
+                {lifted_profile({2, 3, 2, 1}), 2}};
     normalize(state);
     return state;
 }
 
 State height5_control_state() {
-    // Refine the four-atom profiles ABCD, AAAB, AABC once so they use the common
-    // eight-atom / three-level normalization of this tool.
-    State state{{lookup_profile({3, 2, 2, 1}), 2},
-                {lookup_profile({7, 1, 0, 0}), 1},
-                {lookup_profile({5, 2, 1, 0}), 2}};
+    // Refine the four-atom profiles ABCD, AAAB, AABC to the configured normalization.
+    State state{{lifted_profile({3, 2, 2, 1}), 2},
+                {lifted_profile({7, 1, 0, 0}), 1},
+                {lifted_profile({5, 2, 1, 0}), 2}};
     normalize(state);
     return state;
 }
 
 State height4_control_state() {
     // Refine CC, AA, AB twice to the same normalization.
-    State state{{lookup_profile({2, 4, 2, 0}), 2},
-                {lookup_profile({8, 0, 0, 0}), 1},
-                {lookup_profile({7, 1, 0, 0}), 1}};
+    State state{{lifted_profile({2, 4, 2, 0}), 2},
+                {lifted_profile({8, 0, 0, 0}), 1},
+                {lifted_profile({7, 1, 0, 0}), 1}};
     normalize(state);
     return state;
 }
@@ -571,6 +919,7 @@ State height4_control_state() {
 void reset_search() {
     memo.clear();
     witnesses.clear();
+    dc_memo.clear();
     counters = {};
 }
 
@@ -578,25 +927,78 @@ void print_result(const State &state, int depth, bool answer, double seconds) {
     std::cout << "atom_profile depth=" << depth << " answer=" << (answer ? "YES" : "NO")
               << " state=";
     print_state(state);
-    std::cout << " eventual_model=YES restricted=eight_atom_aligned"
+    std::cout << " eventual_model=YES restricted=power_of_two_atom_aligned"
+              << " profile_atoms=" << PROFILE_ATOMS
               << " wall=" << seconds << "s calls=" << counters.calls
               << " memo_hits=" << counters.memo_hits << " memo=" << memo.size()
+              << " lineage_rejects=" << counters.lineage_rejects
+              << " dc_rejects=" << counters.dc_rejects << " dc_memo=" << dc_memo.size()
               << " raw_options=" << counters.raw_options
               << " assignments=" << counters.assignments
               << " prefix_rejects=" << counters.prefix_rejects << '\n';
+    if (!d_lineage_possible(state))
+        std::cout << "atom_profile_all_depth_obstruction=d_lineage"
+                  << " d_lineages=" << d_lineages(state)
+                  << " required=" << required_d_lineages(state)
+                  << " preserving_outcome=mixed\n";
     if (answer) {
         const int threshold = print_tree(state, depth);
         std::cout << "atom_profile_proof root_base_threshold=" << threshold
                   << " meaning=valid_for_every_integer_base_at_or_above_threshold\n";
+        print_machine_tree_certificate(state, depth, threshold);
     }
 }
 
-int parse_nonnegative(const char *text, const char *name) {
+int parse_nonnegative(const char *text, const char *name, int maximum = 1000000) {
     char *end = nullptr;
     const long value = std::strtol(text, &end, 10);
-    if (end == text || *end != '\0' || value < 0 || value > 255)
+    if (end == text || *end != '\0' || value < 0 || value > maximum)
         throw std::invalid_argument(std::string("invalid ") + name);
     return static_cast<int>(value);
+}
+
+std::vector<ProfileId> ordered_profiles() {
+    std::vector<ProfileId> ordered;
+    for (std::size_t id = 0; id < profiles.size(); ++id)
+        ordered.push_back(static_cast<ProfileId>(id));
+    std::sort(ordered.begin(), ordered.end(), [](ProfileId left, ProfileId right) {
+        return compare_profiles(left, right) < 0;
+    });
+    return ordered;
+}
+
+int profile_rank(const std::vector<ProfileId> &ordered, ProfileId profile) {
+    const auto found = std::find(ordered.begin(), ordered.end(), profile);
+    if (found == ordered.end()) throw std::logic_error("rank lookup failed");
+    return static_cast<int>(found - ordered.begin()) + 1;
+}
+
+void print_height6_lineage_certificate() {
+    const std::vector<ProfileId> ordered = ordered_profiles();
+    int last_excluded = 0;
+    while (last_excluded < static_cast<int>(ordered.size()) &&
+           profiles[ordered[last_excluded]].count[3] < 2)
+        ++last_excluded;
+    if (last_excluded == 0 || last_excluded == static_cast<int>(ordered.size()))
+        throw std::logic_error("unexpected D-lineage rank boundary");
+
+    const ProfileId target = lifted_profile({1, 5, 1, 1});
+    const ProfileId fixed_b = lifted_profile({5, 2, 1, 0});
+    const ProfileId fixed_ac = lifted_profile({3, 3, 2, 0});
+    std::cout
+        << "atom_lineage_certificate version=1 model=power_of_two_atom_aligned"
+        << " profile_atoms=" << PROFILE_ATOMS
+        << " normalization_levels=" << normalization_levels()
+        << " fixed_parts=" << profile_text(fixed_b) << ":1," << profile_text(fixed_ac)
+        << ":2 candidate_height=3"
+        << " candidate_rank_first=1 candidate_rank_last=" << last_excluded
+        << " candidate_d_max=1 root_height=6 root_d_lineages_max=1"
+        << " terminal_reference_d=0,0,0,0,1,1 required_d_lineages=2"
+        << " target_rank=" << profile_rank(ordered, target)
+        << " target=" << profile_text(target)
+        << " next_rank=" << last_excluded + 1
+        << " next=" << profile_text(ordered[last_excluded])
+        << " closure_outcome=mixed verdict=ALL_DEPTH_NO\n";
 }
 
 }  // namespace
@@ -604,12 +1006,16 @@ int parse_nonnegative(const char *text, const char *name) {
 int main(int argc, char **argv) {
     try {
         initialize_profiles();
+        if (argc == 2 && std::string(argv[1]) == "height6-lineage-certificate") {
+            print_height6_lineage_certificate();
+            return 0;
+        }
         if (argc == 3 && (std::string(argv[1]) == "height4-control" ||
                           std::string(argv[1]) == "height5-control" ||
                           std::string(argv[1]) == "height6" ||
                           std::string(argv[1]) == "height6-literal-residual" ||
                           std::string(argv[1]) == "height6-literal-core")) {
-            const int maximum_depth = parse_nonnegative(argv[2], "maximum depth");
+            const int maximum_depth = parse_nonnegative(argv[2], "maximum depth", 255);
             State state;
             if (std::string(argv[1]) == "height4-control")
                 state = height4_control_state();
@@ -620,7 +1026,7 @@ int main(int argc, char **argv) {
             else if (std::string(argv[1]) == "height6-literal-core")
                 state = height6_literal_core_state();
             else
-                state = height6_state(lookup_profile({1, 5, 1, 1}));  // ABBBBBCD
+                state = height6_state(lifted_profile({1, 5, 1, 1}));  // ABBBBBCD class
             for (int depth = 0; depth <= maximum_depth; ++depth) {
                 reset_search();
                 const auto started = std::chrono::steady_clock::now();
@@ -635,25 +1041,22 @@ int main(int argc, char **argv) {
         }
 
         if (argc >= 3 && argc <= 5 && std::string(argv[1]) == "height6-max") {
-            const int depth = parse_nonnegative(argv[2], "depth");
-            std::vector<std::uint8_t> ordered;
-            for (std::size_t id = 0; id < profiles.size(); ++id)
-                ordered.push_back(static_cast<std::uint8_t>(id));
-            std::sort(ordered.begin(), ordered.end(), [](std::uint8_t left, std::uint8_t right) {
-                return compare_profiles(left, right) < 0;
-            });
+            const int depth = parse_nonnegative(argv[2], "depth", 255);
+            const std::vector<ProfileId> ordered = ordered_profiles();
             const int first_rank = argc >= 4 ? parse_nonnegative(argv[3], "first rank") : 1;
             const int last_rank =
                 argc >= 5 ? parse_nonnegative(argv[4], "last rank")
                           : static_cast<int>(ordered.size());
             if (first_rank < 1 || last_rank < first_rank ||
                 last_rank > static_cast<int>(ordered.size()))
-                throw std::invalid_argument("require 1 <= first rank <= last rank <= 165");
+                throw std::invalid_argument("rank interval lies outside configured profile list");
 
             reset_search();
+            bool range_all_depth_excluded = true;
             for (int rank = first_rank - 1; rank < last_rank; ++rank) {
                 const State state = height6_state(ordered[rank]);
                 const bool root_full_star = full_star_eventual(state);
+                const bool lineage_possible = d_lineage_possible(state);
                 const Counters before = counters;
                 const auto started = std::chrono::steady_clock::now();
                 const bool answer = construct(state, depth);
@@ -667,29 +1070,43 @@ int main(int argc, char **argv) {
                           << profiles[ordered[rank]].deficit[2]
                           << " answer=" << (answer ? "YES" : "NO") << " depth=" << depth
                           << " full_star=" << (root_full_star ? "YES" : "NO")
+                          << " d_lineages=" << d_lineages(state)
+                          << " required_d_lineages=" << required_d_lineages(state)
+                          << " all_depth_obstruction="
+                          << (lineage_possible ? "NO" : "d_lineage")
                           << " wall=" << seconds << "s calls=" << counters.calls - before.calls
                           << " assignments=" << counters.assignments - before.assignments
-                          << " shared_memo=" << memo.size() << '\n'
+                          << " dc_rejects=" << counters.dc_rejects - before.dc_rejects
+                          << " shared_memo=" << memo.size() << " dc_memo=" << dc_memo.size()
+                          << '\n'
                           << std::flush;
                 if (answer) {
                     const int threshold = print_tree(state, depth);
                     std::cout << "height6_max_proof root_base_threshold=" << threshold
                               << " maximal_at_requested_depth="
-                              << (first_rank == 1 ? "YES" : "NO") << '\n';
+                              << (first_rank == 1 ? "YES" : "NO")
+                              << " maximal_all_depth="
+                              << (first_rank == 1 && range_all_depth_excluded ? "YES" : "NO")
+                              << '\n';
+                    print_machine_tree_certificate(state, depth, threshold);
                     return 0;
                 }
+                if (lineage_possible) range_all_depth_excluded = false;
             }
             std::cout << "height6_max_result feasible=NONE depth=" << depth
                       << " first_rank=" << first_rank << " last_rank=" << last_rank
-                      << " range_complete=YES restricted=eight_atom_aligned"
-                         " eventual_model=YES\n";
+                      << " range_complete=YES restricted=power_of_two_atom_aligned"
+                         " eventual_model=YES profile_atoms="
+                      << PROFILE_ATOMS << " all_depth_excluded="
+                      << (range_all_depth_excluded ? "YES" : "NO") << '\n';
             return 1;
         }
 
         std::cerr << "usage: " << argv[0]
                   << " height4-control|height5-control|height6|height6-literal-residual"
                      "|height6-literal-core maximum_depth\n"
-                  << "       " << argv[0] << " height6-max depth [first_rank [last_rank]]\n";
+                  << "       " << argv[0] << " height6-max depth [first_rank [last_rank]]\n"
+                  << "       " << argv[0] << " height6-lineage-certificate\n";
         return 2;
     } catch (const std::exception &error) {
         std::cerr << "ABORT: " << error.what() << " (not a negative verdict)\n";

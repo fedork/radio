@@ -383,8 +383,10 @@ tools, not yet part of `radiobase.c`:
 | `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, exact variable-width synchronization, and memo-exhaustion abort semantics |
-| `tools/search_atom_profiles.cpp` | exact symbolic recursion inside the eventual eight-atom-aligned height-6 model; refine profiles, test a fixed D germ, or scan D germs in deficit order |
-| `tools/atom_profile_regression.sh` | reproduce the symbolic height-4/5 controls and the completed shallow height-6 exclusions |
+| `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8 or 16 atoms, with an all-depth D-lineage obstruction and a sound `(D,C+D)` abstraction |
+| `tools/check_atom_profile_certificate.py` | independently exhaust the local algebra behind a D-lineage closed losing-set certificate |
+| `tools/check_atom_profile_tree.py` | independently re-derive every split, leaf inequality and threshold in a symbolic positive tree |
+| `tools/atom_profile_regression.sh` | verify the height-4/5 controls, exact eight-atom height-6 optimum, and the first 16-atom exclusions |
 | `tools/pareto_lift_probe.c` | search the lineage-preserving lift box of a known lower-level split; diagnose whether a known parent split descends from any lower split |
 | `tools/pareto_prefix_census.c` | enumerate both cuts below every one-part Pareto root, globally upgrade every effective descendant to its residual fixed-dimension Pareto antichain, and fully map every endpoint |
 | `tools/analyze_pareto_prefix_census.py` | structurally validate a completed census and summarize raw, symmetry-quotiented, structured-prefix and upgrade distributions |
@@ -673,15 +675,22 @@ Given exact pure-child thresholds `U_2,U_0`, `optimize_mixed_frontier.py` minimi
 adds the distance from that interval to the interval joining `U_2` and `C-U_0`.  Thus a stable finite
 piece description gives a constant-size D optimizer even when the antichain itself grows with `k`.
 
-### Eventual eight-atom profile search
+### Eventual power-of-two atom-profile search
 
 `search_atom_profiles.cpp` is narrower than `search_singletonization.cpp`: it searches only
-non-wasteful strategies whose every current width is a sum of eight `G_r` atoms and whose cuts take
-eight of the sixteen atoms produced by refinement.  A profile `(a,b,c,d)` means
+non-wasteful strategies whose every current width is a sum of `N` `G_r` atoms and whose cuts take
+`N` of the `2N` atoms produced by refinement.  The default is `N=8`; compile with
+`-DATOM_PROFILE_ATOMS=16` for the next normalization.  A profile `(a,b,c,d)` means
 `a A_r+b B_r+c C_r+d D_r`.  Its eventual deficit coefficients are
 `(d,c+d,b+c+d)` in the basis `(binom(r,2),r,1)`, so the program compares profiles symbolically and
-prints a concrete lower threshold for every positive tree.  A negative result is exhaustive only
-inside this aligned model and at the requested synchronized depth.
+prints a concrete lower threshold for every positive tree.
+
+Two symbolic necessary tests precede exact recursion.  The all-depth D-lineage theorem rejects a
+height-`h` state when the unweighted sum of its D counts is below `max(0,h-4)`; this is a closed
+losing-set proof, not a depth cutoff.  The `(D,C+D)` projection retains the first two deficit
+coefficients and over-approximates aligned play, so its `NO` is a sound exclusion at the requested
+depth.  Other negative results remain exhaustive only inside the configured aligned model and at
+that depth.
 
 Build and run it as follows:
 
@@ -689,18 +698,25 @@ Build and run it as follows:
 CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_atom_profiles.cpp -o /tmp/search_atom_profiles
 tools/run_with_provenance.py /tmp/search_atom_profiles height6 2
-tools/run_with_provenance.py /tmp/search_atom_profiles height6-max 2 46 46
+tools/run_with_provenance.py /tmp/search_atom_profiles height6-lineage-certificate
+tools/run_with_provenance.py /tmp/search_atom_profiles height6-max 3 1 82
 tools/atom_profile_regression.sh
 ```
 
-`height6` tests D=`ABBBBBCD`; the two control modes reproduce the established height-4 and height-5
-symbolic constructions.  `height6-max depth [first_rank [last_rank]]` orders all 165 D profiles from
-eventually widest to narrowest and retains one memo across the requested inclusive rank interval.
-A positive started at rank 1 is maximal at the requested depth only; a later start is discovery
-only.  Maximality over arbitrary excessive `q` additionally needs fixed-point exhaustion or an
-all-depth exclusion of every earlier germ.  Range slicing prevents one hard germ from hiding
-completed work on later germs.  The default two-million memo-entry ceiling aborts explicitly rather
-than printing `NO`; external time and memory caps remain appropriate for deeper runs.
+`height6` tests the `ABBBBBCD` refinement class; it now returns the all-depth one-D obstruction
+immediately.  The two control modes reproduce the established height-4 and height-5 constructions.
+`height6-max depth [first_rank [last_rank]]` orders every configured A--D profile from eventually
+widest to narrowest and retains both exact and abstract memos across the inclusive rank interval.
+At eight atoms, ranks 1--81 have all-depth D-lineage certificates and rank 82 `A^6D^2` has an
+independently checked depth-3 tree, so the first 82 scan proves the exact all-depth optimum of that
+slice.  At 16 atoms, ranks 1--289 are lineage-excluded and rank 290 is abstractly negative through
+depth 5; ranks 290--318 remain open before the refined rank-319 winner.
+
+This does not maximize arbitrary excessive `q`: 165 is the number of A--D words of length eight,
+not the whole longer-profile universe.  Range slicing still prevents one hard germ from hiding
+completed work on later germs.  The default two-million exact memo-entry ceiling aborts explicitly
+rather than printing `NO`; external time and memory caps remain appropriate for deeper runs.  The
+proof and scope are in [the atom-lineage note](theorems/atom-lineage.md).
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

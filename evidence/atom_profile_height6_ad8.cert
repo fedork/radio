@@ -1,0 +1,27 @@
+# atom-profile-v1
+# Combined all-depth losing-prefix and positive-tree certificate for the A--D eight-atom
+# height-6 hard branch.  Verify independently with:
+#   tools/check_atom_profile_certificate.py evidence/atom_profile_height6_ad8.cert
+#   tools/check_atom_profile_tree.py evidence/atom_profile_height6_ad8.cert
+atom_lineage_certificate version=1 model=power_of_two_atom_aligned profile_atoms=8 normalization_levels=3 fixed_parts=AAAAABBC:1,AAABBBCC:2 candidate_height=3 candidate_rank_first=1 candidate_rank_last=81 candidate_d_max=1 root_height=6 root_d_lineages_max=1 terminal_reference_d=0,0,0,0,1,1 required_d_lineages=2 target_rank=59 target=ABBBBBCD next_rank=82 next=AAAAAADD closure_outcome=mixed verdict=ALL_DEPTH_NO
+height6_candidate rank=82 D=AAAAAADD answer=YES
+atom_profile_tree_node id=0 parent=-1 outcome=-1 level=0 state=AAAAABBC:1,AAABBBCC:2,AAAAAADD:3 split=AAAAAAAA:1,AAAAAACC:0,AAAAAACC:2
+atom_profile_tree_node id=1 parent=0 outcome=0 level=1 state=AAAAAAAA:1,AAAAAACC:2 split=AAAAAAAA:0,AAAAAAAB:1
+atom_profile_tree_node id=2 parent=1 outcome=0 level=2 state=AAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_node id=3 parent=1 outcome=1 level=2 state=AAAAAAAA:1,AAAAAAAB:1,AAAAABCC:1 leaf_threshold=3
+atom_profile_tree_node id=4 parent=1 outcome=2 level=2 state=AAAAAAAA:1,AAAAABCC:1 leaf_threshold=3
+atom_profile_tree_node id=5 parent=0 outcome=1 level=1 state=AAAABBBC:1,AAAAAACC:2,AAAAAACC:1,AAAAAADD:2 split=AAAAAAAB:1,AAAAAACC:0,AAAAAAAA:1,AAAAAAAD:1
+atom_profile_tree_node id=6 parent=5 outcome=0 level=2 state=AAAAAAAA:1,AAAAAAAB:1,AAAAAAAD:1 leaf_threshold=3
+atom_profile_tree_node id=7 parent=5 outcome=1 level=2 state=AAAABBBC:1,AAAAAACC:2,AAAABBCC:1,AAAAAAAD:1,AAAAACCD:1 split=AAAABBBB:1,AAAAAAAC:1,AAAAAACC:0,AAAAAAAA:1,AAAACCCD:0
+atom_profile_tree_node id=8 parent=7 outcome=0 level=3 state=AAAAAAAA:1,AAAABBBB:1,AAAAAAAC:1 leaf_threshold=3
+atom_profile_tree_node id=9 parent=7 outcome=1 level=3 state=AAAAAAAC:1,AAAAAAAC:1,AAAAABBC:1,AAAAAACC:1,AAAAAACD:1,AAAACCCD:1 leaf_threshold=10
+atom_profile_tree_node id=10 parent=7 outcome=2 level=3 state=AAAAAABB:1,AAAABBBB:1,AAAAABBC:1 leaf_threshold=3
+atom_profile_tree_node id=11 parent=5 outcome=2 level=2 state=AAAAAABB:2,AAAAACCD:1 split=AAAAAAAA:1,AAAAAAAB:1
+atom_profile_tree_node id=12 parent=11 outcome=0 level=3 state=AAAAAAAA:1,AAAAAAAB:1 leaf_threshold=3
+atom_profile_tree_node id=13 parent=11 outcome=1 level=3 state=AAAAAAAA:1,AAAAAABB:1,AAABCCCD:1 leaf_threshold=3
+atom_profile_tree_node id=14 parent=11 outcome=2 level=3 state=AAAAAABB:1 leaf_threshold=3
+atom_profile_tree_node id=15 parent=0 outcome=2 level=1 state=AAABBBBB:2,AAAAAADD:1 split=AAAAAAAA:1,AAAAAAAC:0
+atom_profile_tree_node id=16 parent=15 outcome=0 level=2 state=AAAAAAAA:1 leaf_threshold=3
+atom_profile_tree_node id=17 parent=15 outcome=1 level=2 state=AAAAAAAA:1,AAABBBBB:1,AAAAAAAC:1 leaf_threshold=4
+atom_profile_tree_node id=18 parent=15 outcome=2 level=2 state=AAABBBBB:1,AAAAACDD:1 leaf_threshold=3
+atom_profile_tree_certificate version=1 root=0 nodes=19 root_base_threshold=13 profile_atoms=8 normalization_levels=3

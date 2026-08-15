@@ -245,13 +245,18 @@ constructed outer profiles, while the four-segment D state is the sole synchroni
 The calculation closes conditionally through the `AACC` and `BBBD` profiles and first fails at the
 known height-6 `k=10` transition, where refinement changes the candidate D accounting from
 `AAAABBCD` (232) to `ABBBBBCD` (229).  The literal refinement of the successful split is now
-refuted at `k=11`; do not retry it.  Continue with the finite eight-atom profile DP: its eventual
-order puts `AAAABBCD` at rank 56 and `ABBBBBCD` at rank 59, so ranks 46--58 must be discharged (or
-one constructed) before the 229 germ can be called maximal.  Make that search resumable by rank
-and synchronized depth, then extract a symbolic tree if a positive stabilizes.  This carries no
-inner A/B/C witness data.  The exact generic piece checks through residual level
-11 remain finite evidence only, and this track changes no Pareto datum; definitions and controls are
-in [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
+refuted at `k=11`; do not retry it.  The stronger symbolic result now rules out the entire one-D
+refinement class: following mixed outcomes preserves height and cannot branch a D lineage, so all
+eight-atom ranks 1--81 are all-depth negative.  Rank 82, `A^6D^2`, has a checked three-level tree
+and is the exact A--D eight-atom optimum, yielding the conditional construction
+`2^k-k^2+6k-16` from `k>=18`.  The next task is no longer deeper search for 229.  It is the genuinely
+new 16-atom band: the same certificate excludes ranks 1--289, while ranks 290--318 precede the
+refined rank-319 winner.  Start by seeking an all-depth `(D,C+D)` closed invariant for rank 290 and
+then resolve the rank-305 band where that abstraction first admits depth-3 play.  This carries no
+inner A/B/C witness data, changes no Pareto datum, and remains conditional on the outer assembly;
+definitions, proof and controls are in
+[the atom-lineage note](theorems/atom-lineage.md) and
+[conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 
 ## Ordering
 

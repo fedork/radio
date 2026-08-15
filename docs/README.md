@@ -15,6 +15,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [journal.md](journal.md) | Running log. History, not fact. |
 | [theorems/](theorems/) | Proofs |
 | [theorems/recursive-pareto-lift.md](theorems/recursive-pareto-lift.md) | Proved lift-box lemma and the open recursive Pareto-lift programme |
+| [theorems/atom-lineage.md](theorems/atom-lineage.md) | All-depth D-lineage obstruction and the exact eight-atom height-6 aligned optimum |
 
 ## How facts are recorded
 
