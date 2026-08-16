@@ -93,7 +93,9 @@ exact maximum is 481.  The old `BBBD` construction and its verified 480 tree rem
 lower bounds; they are not optimal from `k=9`.  The corrected 481 value has both the verified
 tree `witnesses/majorized_481_5_at9.tree` and an exact local rejection of 482 in
 `evidence/sb_m5_k9_frontier.txt`.  See
-[../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).
+[../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).  The paper's construction
+is translated into the competing `3+2` / `4+1` outer branches and an exact symbolic D slice in
+[m5-pareto-assembly.md](m5-pareto-assembly.md).
 
 ## (10) `Sb(2^k - k(k-1)/2 - 3 : 6)` - refuted
 

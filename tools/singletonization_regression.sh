@@ -46,6 +46,71 @@ grep -F 'slice delta=6 variable_width=10 YES k=4 depth=4 state=11:2,10:2,9:2,3:2
     "$tmp/slice.out" >/dev/null
 tools/check_witness.py "$tmp/slice.out" >/dev/null
 
+# m=5 is the exact calibration for the corrected Pareto assembly.  Complete enumeration over
+# proven A/B/C frontiers finds the old (3,2,2) family through k=7, a tie at k=8, and the forced
+# (4,3,1) family at k=9.  This is the finite counterpart of the Li--Wu--Triesch regime switch.
+tools/m5_assembly.py --check-through 64 >/dev/null
+for k in {4..9}; do
+    "$tmp/search_singletonization" assembly-enumerate "$k" 5 data/pareto_sb.csv \
+        >"$tmp/assembly-m5-k$k.out"
+    tools/check_witness.py "$tmp/assembly-m5-k$k.out" >/dev/null
+    python3 - "$k" "$tmp/assembly-m5-k$k.out" <<'PY'
+import re
+import sys
+
+k = int(sys.argv[1])
+text = open(sys.argv[2]).read()
+expected = {
+    4: (9, [(1, 5, 3, 3, 2, 3, 2)]),
+    5: (22, [(3, 12, 3, 7, 2, 7, 2)]),
+    6: (50, [(8, 27, 3, 15, 2, 15, 2)]),
+    7: (109, [(20, 58, 3, 31, 2, 31, 2)]),
+    8: (231, [(47, 121, 3, 63, 2, 63, 2),
+              (57, 116, 4, 58, 3, 64, 1)]),
+    9: (481, [(118, 242, 4, 121, 3, 128, 1)]),
+}
+width, winners = expected[k]
+summary = re.search(
+    r"^assembly_enumeration_result best_width=(\d+) winners=(\d+) "
+    r"optimization_complete=YES best_exact=YES .* known_parent_relation=(\w+)",
+    text,
+    re.MULTILINE,
+)
+if not summary:
+    raise SystemExit(f"k={k}: missing complete exact m=5 assembly summary")
+if (int(summary.group(1)), int(summary.group(2)), summary.group(3)) != (width, len(winners), "EQUAL"):
+    raise SystemExit(f"k={k}: unexpected m=5 assembly summary {summary.groups()}")
+actual = [tuple(map(int, match)) for match in re.findall(
+    r"^assembly_winner index=\d+ candidate_width=\d+ d=(\d+) "
+    r"A=(\d+):(\d+) B=(\d+):(\d+) C=(\d+):(\d+) ",
+    text,
+    re.MULTILINE,
+)]
+if actual != winners:
+    raise SystemExit(f"k={k}: expected m=5 winners {winners}, got {actual}")
+PY
+done
+
+# The k=9 Pareto level is incomplete as a whole, so the generic enumerator deliberately cannot
+# consume it at parent k=10 or 11.  Check the published 4+1 construction's exact hard branches
+# directly.  These are positive construction checks; the published theorem supplies the global
+# upper bound at parent widths 985 and 2001.
+"$tmp/search_singletonization" assembly 10 8 5 496 4 248 3 256 1 241 241 \
+    >"$tmp/assembly-m5-k10.out"
+grep -F 'assembly d=241 YES parent_width=985 parent_k=10 residual_k=8 depth=8 total_m=5 A=496:4 B=248:3 C=256:1 branch=248:1,241:3,240:1 ' \
+    "$tmp/assembly-m5-k10.out" >/dev/null
+grep -F 'assembly_result d=241 parent_width=985 global_maximum=NO exact=YES' \
+    "$tmp/assembly-m5-k10.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-m5-k10.out" >/dev/null
+
+"$tmp/search_singletonization" assembly 11 9 5 1006 4 503 3 512 1 492 492 \
+    >"$tmp/assembly-m5-k11.out"
+grep -F 'assembly d=492 YES parent_width=2001 parent_k=11 residual_k=9 depth=9 total_m=5 A=1006:4 B=503:3 C=512:1 branch=503:1,494:1,492:3 ' \
+    "$tmp/assembly-m5-k11.out" >/dev/null
+grep -F 'assembly_result d=492 parent_width=2001 global_maximum=NO exact=YES' \
+    "$tmp/assembly-m5-k11.out" >/dev/null
+tools/check_witness.py "$tmp/assembly-m5-k11.out" >/dev/null
+
 # The corrected q=5 assembly diagram has four-segment branch
 #   (d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma) @ parent_k-2.
 # Three proven m=10 frontier rows are recovered by maximizing d for the displayed Pareto triples.

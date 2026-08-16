@@ -17,6 +17,9 @@ Checks performed:
                   checked as an upper bound wherever the K=k-1 frontier is known.
   formulas        every closed form in conjectures.csv reproduces every known max value of
                   its row at or above its fits_from_k.
+  m=5 theorem     the published piecewise formula matches every recorded maximum; its old/new
+                  Pareto-assembly splits and eventual singleton-majorization template remain
+                  consistent.
   provenance      every row carries a status from the accepted vocabulary, and every
                   status that claims evidence names a source.
   rendered docs   any markdown block delimited by `<!-- generated:NAME -->` and
@@ -38,6 +41,9 @@ import os
 import re
 import sys
 from typing import Dict, List
+
+from m5_assembly import exact_width as exact_m5_width
+from m5_assembly import validate as validate_m5_assembly
 
 STATUSES = {"proven-exhaustive", "proven-theorem", "witness", "solver-lower",
             "legacy", "conjecture", "refuted"}
@@ -282,6 +288,26 @@ def main() -> int:
                 errs.append(f"conjectures m={m} [{model}] at k={k}: predicts {got} "
                             f"but the proven maximum is {col[m]}")
 
+    # Published exact m=5 theorem and its Pareto-assembly transcription.  The
+    # symbolic check catches errors even at levels not represented in the finite
+    # Pareto table; the row check ties every recorded maximum back to the theorem.
+    m5_symbolic_levels = 0
+    for k in range(4, 65):
+        try:
+            validate_m5_assembly(k)
+            m5_symbolic_levels += 1
+        except ValueError as error:
+            errs.append(f"m=5 assembly at k={k}: {error}")
+    m5_data_agreements = 0
+    for k, col in sorted(maxv.items()):
+        if 5 not in col:
+            continue
+        got = exact_m5_width(k)
+        m5_data_agreements += 1
+        if got != col[5]:
+            errs.append(f"published m=5 theorem at k={k}: predicts {got} "
+                        f"but the proven maximum is {col[5]}")
+
     # generated blocks in the docs --------------------------------------------------
     renderers = {"pareto_sb": lambda: render_pareto_sb(sb),
                  "pareto_sa": lambda: render_pareto_sa(sa),
@@ -319,6 +345,8 @@ def main() -> int:
     print(f"pareto_sb.csv  {len(sb)} rows, {ncells} proven maxima, k={min(maxv)}..{max(maxv)}")
     print(f"pareto_sa.csv  {len(sa)} rows, {len(sa_max)} proven maxima")
     print(f"conjectures    {len(cj)} models, {checked} formula/datum agreements checked")
+    print(f"m=5 assembly   {m5_symbolic_levels} symbolic levels, "
+          f"{m5_data_agreements} theorem/data agreements checked")
     print(f"doc blocks     {rendered} generated, "
           f"{'%d rewritten' % stale if args.render else '%d stale' % stale}")
     for w in warns:

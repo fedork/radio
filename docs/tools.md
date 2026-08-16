@@ -640,6 +640,24 @@ construction claims.  The regression locks exact `m=10` family optima through pa
 complete level-8 ranking, rejection of the incomplete level-9 Pareto input, and a level-8 two-part
 state showing that even a simple R_0-permitted target can be exactly negative.
 
+`tools/m5_assembly.py` is the symbolic known-answer calibration.  It rewrites the published exact
+`m=5` theorem as the old `(3,2,2)` and new `(4,3,1)` assembly candidates, prints their A/B/C/D
+dimensions, and checks the identities through a configurable level.  It also verifies the uniform
+two-test singleton-majorization template for the new D branch: rejection at `k=9,10`, followed by
+success at every checked `k>=11`.
+
+```
+tools/m5_assembly.py 8 9 10 11
+tools/m5_assembly.py --check-through 64
+```
+
+`tools/check_tables.py` invokes the same identities and compares every recorded exact `m=5` row
+with the theorem.  `tools/singletonization_regression.sh` performs complete exact assembly
+enumeration for `m=5`, parent levels 4 through 9, then independently constructs the theorem's
+hard branches at parent levels 10 and 11 and verifies their emitted trees.  The symbolic proof and
+the distinction between atom masses and atom-profile realizations are in
+[the m=5 calibration](theorems/m5-pareto-assembly.md).
+
 `slice` adds one variable part `(2^k-delta : variable_m)` to the listed fixed parts, scans `delta`
 from `start_delta` through `maximum_delta`, retains the exact memo, and stops at the first positive.
 Because shrinking one component gives a subgraph, feasibility is monotone in `delta`; the first

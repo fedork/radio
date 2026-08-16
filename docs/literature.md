@@ -114,7 +114,9 @@ This is the decisive source for the correction in this repository.
   consistent and independently confirmed at `k=9` here, but displayed intermediate equations
   (69)–(70) contain apparent index/off-by-one inconsistencies.  Equation (69), for example,
   writes `k-2` in its last singleton width although the immediately preceding selected test
-  uses `k-1`.  Recompute numerical specializations rather than copying those displays.
+  uses `k-1`.  Recompute numerical specializations rather than copying those displays.  The
+  corrected rectangle algebra and exact D-slice consequence are in
+  [the m=5 Pareto-assembly calibration](theorems/m5-pareto-assembly.md).
 
 ## Consequences imported into this project
 

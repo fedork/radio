@@ -1,7 +1,11 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-15** (a 504-core certificate excludes 32-atom height-6
+don't know it. Last refreshed **2026-08-16** (the published exact `m=5` result is now reconstructed
+inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
+and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
+for the winning `4+1` branch;
+a 504-core certificate excludes 32-atom height-6
 ranks through 1179; rank 1181 is constructible by refinement, leaving only rank 1180 unresolved
 at all depths in that slice; exact loss-sliced cover excludes rank 1180 through depth four, while
 depth five and eventual constructibility remain open;
@@ -31,7 +35,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
-| **The old `m=5` formula and `BBBD` profile stop being optimal after `k=8`.** | Li--Wu--Triesch prove the piecewise correction: add 1 at `k=9,10` and add 2 from `k=11`; hence `n(9,5)=481` and `n(10,5)=985`.  The old word is still a valid lower construction, not an equality.  Their displayed intermediate equations (69)–(70) have apparent index/off-by-one inconsistencies, so cite the theorem and recompute specializations rather than copying those displays. |
+| **The old `m=5` formula and `BBBD` profile stop being optimal after `k=8`.** | Li--Wu--Triesch prove the piecewise correction: add 1 at `k=9,10` and add 2 from `k=11`; hence `n(9,5)=481` and `n(10,5)=985`.  The old word is still a valid lower construction, not an equality.  Their displayed intermediate equations (69)–(70) have apparent index/off-by-one inconsistencies, so cite the theorem and use the recomputed assembly in [the exact m=5 calibration](theorems/m5-pareto-assembly.md), not those displays. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
@@ -103,7 +107,19 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   tree starts with the complementary `[239:1]`; Li--Wu--Triesch make the same root-type
   switch.  Atom masses read `BBBD=480`, `ABBD=481`, `AABD=482`, but the latter words are
   presently arithmetic interpretations, not per-coin profiles extracted from the compressed
-  witness.  See [conjectures.md](conjectures.md#exact-m5-transition-and-the-structural-break-2026-08-15).
+  witness.  See [conjectures.md](conjectures.md#exact-m5-transition-and-the-structural-break-updated-2026-08-16).
+- **The exact `m=5` result now calibrates the A/B/C/D assembly (2026-08-16).**  Complete exact
+  enumeration over proven lower frontiers chooses `(alpha,beta,gamma)=(3,2,2)` through parent
+  `k=7`, ties it with `(4,3,1)` at `k=8`, and chooses `(4,3,1)` at `k=9`.  With `t=k-2`, the
+  latter branch's only hard outcome is
+  `Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`.  Finite witnesses and a uniform two-test reduction to
+  singleton-majorized leaves construct its D maximum: `d*=2^t-binomial(t-2,2)` at `t=7,8`, then
+  one larger for every `t>=9`; the published upper bound makes those values sharp.  The uniform
+  leaf inequality first succeeds at `t=9`, internally explaining the `k=11` breakpoint.
+  Direct exact construction checks reach the theorem's 985 and 2001 at `k=10,11`.  This validates
+  black-box A/B/C composition and D maximization for the known case, while refuting any restriction
+  to one outer triple or one non-piecewise D formula.  Proof and reproduction are in
+  [the m=5 calibration](theorems/m5-pareto-assembly.md).
 - The journal's "m=11 first large jump to length 64" **dissolves** if the single
   exactly-diagonal cell `Sb(11:11)` is treated as pre-stabilised; m=11 then fits at length 16
   like its neighbours. Not airtight — m=4 includes *its* diagonal cell and fits fine.
@@ -191,9 +207,12 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   simple target `Sb(50:4,39:6)@6` is negative.  The generic mixed-frontier/guarded-piece optimizer
   remains the recursive route to a scale-free D formula.  A height-first atom calculation now
   clarifies that A/B/C are black boxes: only their outer width-height pairs enter the hard branch;
-  no witness-tree or atom-placement alignment is required.  It gives uniform conditional
-  constructions for the `AACC` height-4 profile and, for `k>=7`, the `BBBD` height-5 profile.  At
-  height 6 it lands on the known obstruction exactly: the old D word `ABBD@G_6` has width 232,
+  no witness-tree or atom-placement alignment is required.  It gives a uniform conditional
+  construction for the `AACC` height-4 profile.  At height 5 the old `(3,2,2)` branch gives the
+  uniform `BBBD` lower construction for `k>=7`, while the exact calibration retains the competing
+  `(4,3,1)` branch and recovers the full published frontier through its sharp piecewise D slice.
+  The `ABBD`/`AABD` parent words remain arithmetic masses rather than aligned-profile proofs.  At
+  height 6 the original track lands on the known obstruction exactly: the old D word `ABBD@G_6` has width 232,
   whereas the exact `k=10` slice has `d=229`, expressible after refinement as `ABBBBBCD@G_5`.
   Each selected width in the stored split has a unique aligned decomposition inside its refined
   component one level lower; the resulting literal lift is exactly
@@ -256,7 +275,8 @@ Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
 fixed-small-m exact recurrence and complete assembly rank/enumeration modes in
 `tools/search_singletonization.cpp`,
-together with its guarded-piece combiner `tools/optimize_mixed_frontier.py`.  The aligned symbolic
+together with its guarded-piece combiner `tools/optimize_mixed_frontier.py` and the exact
+`m=5` symbolic calibration `tools/m5_assembly.py`.  The aligned symbolic
 track is independently checked by `tools/check_atom_profile_certificate.py` and
 `tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
 searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.

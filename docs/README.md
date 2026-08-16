@@ -15,6 +15,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [data.md](data.md) | Index of bulk artifacts and how to fetch them |
 | [journal.md](journal.md) | Running log. History, not fact. |
 | [theorems/](theorems/) | Proofs |
+| [theorems/m5-pareto-assembly.md](theorems/m5-pareto-assembly.md) | Exact `m=5` theorem translated into the competing `3+2` / `4+1` assembly branches and a sharp symbolic D slice |
 | [theorems/recursive-pareto-lift.md](theorems/recursive-pareto-lift.md) | Proved lift-box lemma and the open recursive Pareto-lift programme |
 | [theorems/atom-lineage.md](theorems/atom-lineage.md) | All-depth D-lineage/kernel obstructions, exact eight-/sixteen-atom height-6 optima, and the one-rank 32-atom gap |
 

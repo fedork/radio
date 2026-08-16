@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-15.
+entries. Last revised 2026-08-16.
 
 ## High-level goals
 
@@ -52,12 +52,19 @@ diagnostic-only. See
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 literature now settles `m=5`: the old formula/`BBBD` equality is refuted at `k=9`, and the exact
-piecewise theorem changes the root from `3+2` to `4+1`.  The old `m=6` closed form and `BBCD`
-profile are refuted by the exact `n(10,6)=973` frontier.  A checked
+piecewise theorem changes the root from `3+2` to `4+1`.  That theorem is now reconstructed inside
+the corrected Pareto assembly: complete finite enumeration finds the crossing, and the winning
+`4+1` family reduces to a sharp piecewise D slice.  This is the known-answer standard for every
+proposed generalization: retain competing outer triples, solve each D problem, and take their
+guarded envelope.  The old `m=6` closed form and `BBCD` profile are refuted by the exact
+`n(10,6)=973` frontier.  A checked
 sixteen-atom aligned tree now gives the different conditional continuation
-`2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  The next
-excessive-`q` question has narrowed sharply: a 32-atom all-depth kernel leaves only rank 1180
-between the excluded prefix and the constructible pure refinement at rank 1181.  More generally,
+`2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  Inside the
+fixed `(4,3,2)` aligned height-6 slice, the next excessive-`q` question has narrowed sharply: a
+32-atom all-depth kernel leaves only rank 1180 between the excluded prefix and the constructible
+pure refinement at rank 1181.  That one-rank decision does not by itself establish the global
+`m=6` frontier; an outer-family comparison analogous to the exact `m=5` envelope is separate.
+More generally,
 the outer algebra reduces each `N=2^s` slice to minimizing the D germ's `C` count and then its `B`
 count; no arbitrary word search remains.  The remaining rank has now been exactly excluded through
 depth four.  Exact pure-outcome solution reduces the last level to 1,818 distinct mixed children,
@@ -257,11 +264,20 @@ does not decide item 2.  Do not infer either a constant `-3` correction to the o
 a constant `-4` correction to the finite recurrence from one value.  Reproduction,
 correctness argument and costs are in the latest journal entry and `docs/tools.md`.
 
-**Conditional excess-q construction track (2026-08-14).** Under the explicitly unproved working
+**Conditional excess-q construction track (updated 2026-08-16).** Under the explicitly unproved working
 assumption that every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf regime,
 the corrected diagram gives a concrete branch rather than a missing map.  For
 `A=(a:alpha)@k-1` and `B=(b:beta),C=(c:gamma)@k-2`, maximize `d` in
 `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, then score the candidate `a+b+d`.
+The known-answer `m=5` calibration is now complete.  Exact enumeration chooses `(3,2,2)` through
+parent `k=7`, ties it with `(4,3,1)` at `k=8`, and switches to `(4,3,1)` at `k=9`.  For the latter
+family, the published proof reduces to an exact D frontier
+`Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`: its maximum is
+`2^t-binomial(t-2,2)` at `t=7,8` and one larger from `t=9`.  The latter has a direct two-test
+reduction to singleton-majorized leaves, whose decisive prefix inequality first holds at `t=9`.
+This proves that a scalable state must
+store a guarded family envelope, not one atom word or one preferred height triple.  See
+[the exact calibration](theorems/m5-pareto-assembly.md).
 The direct finite mode recovers the proven `m=10` widths at parent levels 5 through 7 and shows why
 all Pareto triples must be retained: the repeated `(6,4,3)` height choice falls one short at level 7,
 while B-height 5 reaches the frontier.  That complete enumerator now exists: at each requested `m`
@@ -292,11 +308,13 @@ by refining the rank-305 tree, so the only unresolved profile in this slice is t
 negative.  At depth four its first mixed transition must have
 `ell_D=ell_V=0` and `1<=ell_W<=14`.  Exact pure-outcome solution leaves 6,696 oriented first tests
 and 1,818 distinct mixed children in those fourteen classes; loss-sliced guided cover exhausts all
-of them, proving that no aligned tree of depth at most four exists.  The next symbolic task is
-therefore singular but genuinely infinite-depth: build a three-coordinate closed kernel or a
+of them, proving that no aligned tree of depth at most four exists.  Inside this fixed height-6
+slice, the next symbolic task is therefore singular but genuinely infinite-depth: build a
+three-coordinate closed kernel or a
 W-indexed recurrence that decides rank 1180, or find an exact tree of depth at least five.  Only
-after that one-rank decision should the finite
-optimizer move to 64 atoms and test stabilization.  The general candidate
+after that one-rank decision should the slice optimizer move to 64 atoms and test stabilization.
+Separately, before any slice formula is promoted to the unrestricted `m=6` frontier, enumerate and
+compare the competing outer families as in the `m=5` calibration.  The general candidate
 `A^(N-b-c-2)B^bC^cD^2`, `N=2^s`, has parent width
 `2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2`; use this formula to compare slices, and keep the
 postulated `s=5,b=0,c=3` value `2^k-k^2+7k-20` explicitly separate from the checked `b=1`

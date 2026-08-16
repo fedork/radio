@@ -92,7 +92,7 @@ the `k=9` column from `m <= 6` to `m <= 8`:
 ./run_radio_canon_search_generic.sh 4 9 447 8
 ```
 
-## Exact m=5 transition and the structural break (2026-08-15)
+## Exact m=5 transition and the structural break (updated 2026-08-16)
 
 Li--Wu--Triesch prove the exact piecewise answer.  If
 
@@ -108,6 +108,25 @@ This is not merely a numerical correction.  Their construction changes its first
 type `3+2` through `k=8` to type `4+1` at `k=9,10`; from `k=11` the first two tests remain,
 but another recursive stage supplies the second extra coin.  See
 [literature.md#li-wu-triesch-2018](literature.md#li-wu-triesch-2018).
+
+The construction now has an exact translation into the corrected assembly.  Put `t=k-2`,
+`P=2^t`, and `Q=binomial(t-2,2)`.  The new height choice is
+`(alpha,beta,gamma)=(4,3,1)`, with
+
+    a=2P-2t,  b=P-t,  c=P,  a-c=P-2t.
+
+After its two outer tests, the sole hard outcome is
+
+    R_t(d) = Sb(d:3,(P-t):1,(P-2t):1) @t.
+
+The construction and published upper bound together make this D slice exact:
+`d*=P-Q` for `t=7,8`, and `d*=P-Q+1` for `t>=9`.  Exact local assembly also gives the tied
+base `d*=P-Q-1=57` at `t=6`.  The proof, including the recomputed off-by-one index in the paper's
+displayed descendants, is in
+[the m=5 Pareto-assembly calibration](theorems/m5-pareto-assembly.md).
+In particular, the eventual branch has a self-contained two-test reduction to singleton leaves.
+One of its `G_(t-2)` prefix inequalities fails at `t=7,8` and all of them hold from `t=9`, so the
+second regime change is visible inside D rather than merely fitted to the theorem values.
 
 The local exact replay sees the same transition.  For `Sb(481:5)@9`, every capacity-feasible
 `3+2` root is negative: `[a:3]` fails for all 23 values `a=226..248`.  In the `4+1` class,
@@ -714,6 +733,13 @@ bounded by `(A_r,B_r,C_r,C_r,D_r)`.  This proves (5) for `r>=3`.  Finally,
 so the construction has profile `BBBD@G[k-2]`, equivalently the old height-5 formula, for
 all `k>=7`.  This proves a lower bound only.  Equality is now **refuted** at `k=9`, where the
 published exact answer and independent replay gain one coin via the `4+1` regime above.
+
+The complete height-5 calibration therefore retains both outer families rather than replacing this
+proof.  Exact assembly chooses `(3,2,2)` through `k=7`, ties it with `(4,3,1)` at `k=8`, and
+chooses `(4,3,1)` at `k=9`; the latter branch then realizes the published exact formula for every
+larger `k`.  Its D maximum is piecewise even though the outer height triple is unchanged.  See
+[the exact reconstruction](theorems/m5-pareto-assembly.md) and the locked finite controls in
+`tools/singletonization_regression.sh`.
 
 **Height 6 is exactly the first synchronization obstruction.**  The repeated finite winner uses
 `(alpha,beta,gamma)=(4,3,2)`.  With `r=k-4`, the refuted `BBCD` continuation would require the hard

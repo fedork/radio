@@ -6291,3 +6291,73 @@ for product composition and asymptotic limits, Gargano--Montuori--Setaro--Vaccar
 explicit scalable algorithm and `T(32,32)=7`, and Christen (1994) for the adaptive/limited-round
 taxonomy.  No presently needed article remains blocked behind institutional access; Aigner's 1988
 book is the highest-value item still worth obtaining.
+
+## 2026-08-16 — rebuilding m=5 inside the Pareto assembly
+
+The exact Li--Wu--Triesch result was used as a known-answer calibration rather than merely as a
+replacement formula.  Pages 230--234 of the primary paper were reread visually and its selected
+tests were recomputed with the repository's rectangle algebra.  Put `t=k-2`, `P=2^t`, and
+`Q=binomial(t-2,2)`.  The old `(alpha,beta,gamma)=(3,2,2)` assembly has
+
+```text
+a=2P-t-1, b=c=P-1, d=P-2t-Q+1,
+hard branch Sb(d:2,(P-1):1,(P-t):2)@t,
+parent width 4P-3t-Q-1.
+```
+
+This is the already proved `BBBD` lower family.  The paper's new first test instead gives the
+`(4,3,1)` assembly
+
+```text
+a=2P-2t, b=P-t, c=P, a-c=P-2t,
+hard branch R_t(d)=Sb(d:3,(P-t):1,(P-2t):1)@t,
+parent width 3P-3t+d.
+```
+
+The two outer tests were checked directly.  The root `[a:4]` has pure outcomes `(a:4)` and
+`(b+d:1)`.  In its mixed outcome `(a:1,b+d:4)`, selecting `[a-c:0]` and `[b:3]` gives `(b:3)`,
+`(c:1,d:1)`, and exactly `R_t(d)`.  Thus D is the only synchronized obligation.  This also fixes
+the paper's displayed off-by-one: the singleton width is
+`a-c=2^(k-2)-2(k-1)+2`, which is 114 at `k=9`, not the 116 produced by replacing `k-1` with
+`k-2` in equation (69).
+
+The exact D values are
+
+```text
+d*(t)=P-Q     for t=7,8,
+       P-Q+1  for t>=9.
+```
+
+This is an exact D maximum, not just a lower construction.  If `R_t(d*+1)` were solvable, the
+other branches would remain solvable (`d*+1<=P-1`, `b+d*+1<=2P`), and the two outer tests would
+construct `Sb(n(k,5)+1:5)`, contradicting the published upper bound.  Subgraph monotonicity excludes
+all larger D.  The finite `k=8` tie separately has `d*=P-Q-1=57`.
+
+The eventual lower construction was also reduced to a self-contained symbolic template.  For
+`d=P-Q+1`, one test of `R_t(d)` followed by one test in each non-singleton child leaves only
+singleton states.  Their decisive five-part deficit multiset relative to `P/4` is
+`{1,Q-t-2,t,t,2t-1}`, versus `{0,1,t-1,t-1,Q+t-1}` for the first five entries of `G_(t-2)`.
+The candidate is weakly majorized throughout the intended range `t>=9`; a three-part leaf already
+violates majorization at `t=7,8`.  Thus the `k=11` breakpoint arises inside the D strategy, not from
+fitting the published final values.  The finite `t=7,8` constructions plus this template supply
+achievability, while the paper supplies the sharp global upper bound.
+
+Complete `assembly-enumerate` replay over proven Pareto inputs now locks the crossing: `(3,2,2)` is
+the sole winner for parent `k=4..7`, both `(3,2,2)` and `(4,3,1)` reach 231 at `k=8`, and only
+`(4,3,1)` reaches 481 at `k=9`.  Direct exact construction checks of the latter hard branch give
+`d=241` at `k=10` and `d=492` at `k=11`, producing the published widths 985 and 2001; their emitted
+trees verify independently.  The global upper bounds remain sourced to the paper, so no new solver
+artifact or Pareto row was created.
+
+`tools/m5_assembly.py` now evaluates both symbolic candidates and separately labels the atom-mass
+identities `BBBD`, `ABBD`, and `AABD`.  `tools/check_tables.py` validates the assembly algebra for
+61 levels (`k=4..64`) and matches all seven recorded exact `m=5` rows to the theorem.
+`tools/singletonization_regression.sh` contains the complete finite assembly controls plus the
+`k=10,11` constructions.  The full regression passed in 74.87 wall seconds (70.15 user, 1.52 sys)
+on this machine.
+
+Strategic consequence: the general track survives, but its scalable state is a guarded envelope of
+outer families and piecewise D frontiers, not one preferred height triple or one atom word.  The
+height-6 rank-1180 problem remains a genuine all-depth question inside the fixed `(4,3,2)` aligned
+slice; deciding it alone would not establish the unrestricted `m=6` frontier.  The complete proof
+and scope boundary are recorded in `docs/theorems/m5-pareto-assembly.md`.
