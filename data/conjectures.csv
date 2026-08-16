@@ -2,8 +2,9 @@ m,model,formula,fits_from_k,status,source,note
 1,closed-form,2**k,1,proven-theorem,docs/theorems/special-cases.md#lemma-1,lemma-1 (proved)
 2,closed-form,2**k - 1,2,proven-theorem,docs/theorems/special-cases.md#lemma-3,lemma-3 (proved)
 3,closed-form,2**k - k,3,proven-theorem,docs/theorems/special-cases.md#lemma-6,lemma-6 (proved)
-4,closed-form,2**k - 2*k + 2,3,conjecture,data/sheets/wbB_pareto7/formulas.csv,lemma-8 (unproved)
-5,closed-form,2**k - k*(k-3)//2 - 5,4,conjecture,data/sheets/wbB_pareto7/formulas.csv,lemma-9 (unproved)
+4,closed-form,2**k - 2*k + 2,3,proven-theorem,docs/literature.md#li-wu-triesch-2018,Corollary 3
+5,closed-form,2**k - 3*k - (k-4)*(k-5)//2 + (5 if k <= 8 else 6 if k <= 10 else 7),3,proven-theorem,docs/literature.md#li-wu-triesch-2018,"Theorems 1--3 and Remark 1; old fit gains +1 at k=9,10 and +2 from k=11"
+5,closed-form,2**k - k*(k-3)//2 - 5,4,refuted,evidence/sb_m5_k9_frontier.txt,"REFUTED as an equality: predicts n(9,5)=480; exact maximum is 481; remains a valid lower construction"
 6,closed-form,2**k - k*(k-1)//2 - 3,4,refuted,evidence/sb_m6_k10_frontier.txt,"REFUTED: predicts n(10,6)=976; exact maximum is 973"
 6,closed-form,2**k - k*k + 7*k - 21,9,conjecture,evidence/atom_profile_height6_rank305.cert,"aligned-family lower construction is conditional for k>=12; global equality remains conjectural"
 7,closed-form,2**k - k*k + 4*k - 10,5,conjecture,data/sheets/wbB_pareto7/formulas.csv,lemma-11 (unproved)
@@ -15,7 +16,7 @@ m,model,formula,fits_from_k,status,source,note
 2,dyadic-profile,B@G[k-0],,proven-theorem,docs/theorems/special-cases.md#lemma-3,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
 3,dyadic-profile,AC@G[k-1],,proven-theorem,docs/theorems/special-cases.md#lemma-6,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
 4,dyadic-profile,AACC@G[k-2],,conjecture,docs/journal.md,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
-5,dyadic-profile,BBBD@G[k-2],,conjecture,docs/journal.md,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)
+5,dyadic-profile,BBBD@G[k-2],,refuted,evidence/sb_m5_k9_root_transition.txt,"REFUTED as the optimal profile at k=9; remains a valid lower construction for k>=7"
 6,dyadic-profile,BBCD@G[k-2],,refuted,evidence/sb_m6_k10_frontier.txt,"REFUTED: predicts n(10,6)=976; exact maximum is 973"
 6,dyadic-profile,AAAAAAABBBBBBBDD@G[k-4],9,conjecture,evidence/atom_profile_height6_rank305.cert,"equivalently A^49B^9C^4D^2@G[k-6]; conditional aligned-family construction for k>=12"
 7,dyadic-profile,ABBBBCDD@G[k-3],,conjecture,docs/journal.md,journal power-2 dyadic refit; letters index dyadic blocks of G_(k-q)

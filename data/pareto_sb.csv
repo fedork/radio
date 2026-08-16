@@ -130,11 +130,11 @@ k,m,n1,bound,status,source,note
 8,54,57,max,proven-exhaustive,k8-2026-05-12:out_k8.txt,
 8,55,56,max,proven-exhaustive,k8-2026-05-12:out_k8.txt,
 9,1,512,max,proven-theorem,lemma-1,"Sb(2^k:1); dichotomy, both directions"
-9,2,511,lower,proven-theorem,lemma-3,Sb(2^k-1:2)
-9,3,503,lower,proven-theorem,lemma-6,Sb(2^k-k:3)
-9,4,496,lower,witness,witnesses/canon_496_4_at9.tree,matches unproven lemma-8 (2^k-2k+2)
-9,5,480,lower,witness,witnesses/canon_480_5_at9.tree,matches unproven lemma-9
-9,6,473,lower,witness,witnesses/canon_473_6_at9.tree,matches unproven lemma-10 (corrected)
+9,2,511,max,proven-theorem,docs/literature.md#aigner-1986,exact formula n(k;2)=2^k-1
+9,3,503,max,proven-theorem,docs/literature.md#aigner-1986,exact formula n(k;3)=2^k-k
+9,4,496,max,proven-theorem,docs/literature.md#li-wu-triesch-2018,exact formula n(k;4)=2^k-2k+2; independent verified witness
+9,5,481,max,proven-exhaustive,witnesses/majorized_481_5_at9.tree+evidence/sb_m5_k9_frontier.txt,"verified singleton-majorized witness at 481; exact replay refutes 482; independently Theorem 2 of Li--Wu--Triesch (2018)"
+9,6,473,max,proven-exhaustive,witnesses/canon_473_6_at9.tree+evidence/sb_m6_k9_frontier.txt,"verified witness at 473; exact replay refutes 474; old lemma-10 happens to match here but fails at k=10"
 9,65,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
 9,66,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
 9,67,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
@@ -181,4 +181,5 @@ k,m,n1,bound,status,source,note
 9,94,98,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(99:94) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
 9,95,97,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(98:95) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
 9,96,96,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(97:96) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+10,5,985,max,proven-theorem,docs/literature.md#li-wu-triesch-2018,Theorem 2 exact formula
 10,6,973,max,proven-exhaustive,witnesses/majorized_973_6_at10.tree+evidence/sb_m6_k10_frontier.txt,"verified singleton-majorized witness at 973; exact synchronized search refutes 974"

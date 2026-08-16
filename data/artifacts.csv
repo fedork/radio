@@ -40,3 +40,5 @@ rank1180-depth4-2026-08-15,guided-rank1180-w11.log.zst,guided-rank1180-w11.log,2
 rank1180-depth4-2026-08-15,guided-rank1180-w12.log.zst,guided-rank1180-w12.log,2026,exact bounded,"rank-1180 depth-four W-loss class 12: 398 oriented tests and 105 distinct mixed children, all NO"
 rank1180-depth4-2026-08-15,guided-rank1180-w13.log.zst,guided-rank1180-w13.log,2026,exact bounded,"rank-1180 depth-four W-loss class 13: 268 oriented tests and 71 distinct mixed children, all NO"
 rank1180-depth4-2026-08-15,guided-rank1180-w14.log.zst,guided-rank1180-w14.log,2026,exact bounded,"rank-1180 depth-four W-loss class 14: 136 oriented tests and 36 distinct mixed children, all NO"
+small-m-frontier-2026-08-15,small-m-frontier-2026-08-15.tar.zst,m1_k1.log..m6_k9.log plus validation.log,2026,validated,"46 exact small-m frontier replays for m<=6 and k<=9; every raw log has complete provenance and an n+1 NO / n YES pair"
+small-m-frontier-2026-08-15,m5-k9-forced-roots-2026-08-15.tar.zst,44 forced-root solver logs,2026,validated,"all 23 feasible 3+2 roots at Sb(481:5)@9 are NO; 4+1 roots are NO through width 239 and YES at 240..242; three transition controls are YES"

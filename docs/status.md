@@ -5,6 +5,8 @@ don't know it. Last refreshed **2026-08-15** (a 504-core certificate excludes 32
 ranks through 1179; rank 1181 is constructible by refinement, leaving only rank 1180 unresolved
 at all depths in that slice; exact loss-sliced cover excludes rank 1180 through depth four, while
 depth five and eventual constructibility remain open;
+the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correct the old
+`n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
 proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
 `run3`/`run8` performance baselines).
 
@@ -29,6 +31,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
+| **The old `m=5` formula and `BBBD` profile stop being optimal after `k=8`.** | Li--Wu--Triesch prove the piecewise correction: add 1 at `k=9,10` and add 2 from `k=11`; hence `n(9,5)=481` and `n(10,5)=985`.  The old word is still a valid lower construction, not an equality.  Their displayed intermediate equations (69)–(70) have apparent index/off-by-one inconsistencies, so cite the theorem and recompute specializations rather than copying those displays. |
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
@@ -39,7 +42,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | | goal | state |
 |---|---|---|
 | **H1** | Publish | Draft in `paper/`. K≤8 table and both theorems are solid; `<TODO>` sections and the stale K=8 column remain. See P5. |
-| **H2** | The K=9 Sb column | **Main open front.** Six lower bounds at small m; `legacy` bounds at m=65..96; the band **m = 7..64 is entirely blank**. |
+| **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`, `legacy` bounds remain at `m=65..96`, and the band **m = 7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Open.** A 2023 run says yes over ~47 days, but that corpus is unreliable. Needs a cold re-run of **all 16** states — conjecture (u1) would collapse them to one, but it is unproved and 2026-08-03 closed the two obvious routes to it. |
 | **H4** | Structural theory | Active and promising — see below. |
 
@@ -60,20 +63,24 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   but was load-bearing and unwritten: it is
   what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
   on, and what lets a negative certificate store antichains instead of closures.
-- **16 verified witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
-  `Sb(248:3)@8`, `Sb(496:4)@9`, `Sb(480:5)@9`, `Sb(473:6)@9`, and a two-sided-only
-  `Sb(480:5)@9`, and the singleton-majorized proof of the exact frontier
-  `Sb(973:6)@10`. All pass
+- **Exact small-`m` frontiers** — Aigner gives `m=2,3`; Li--Wu--Triesch gives `m=4` and the
+  piecewise `m=5` formula; the retained local replay gives the `m=6` upper boundary.  Thus the
+  K=9 column is exact through `m=6`, with values 512, 511, 503, 496, 481, 473.
+- **17 verified witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
+  `Sb(248:3)@8`, `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
+  `Sb(473:6)@9`, their two-sided variants where available, and the singleton-majorized proof
+  of the exact frontier `Sb(973:6)@10`. All pass
   `tools/check_witness.py`, which re-derives every step without consulting the solver.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
 
 ## What is refuted
 
-Kept on record so it is not re-derived: the `m=6` closed form and `BBCD` profile (both predict
-`n(10,6)=976`, while the exact maximum is 973), the `m=11` closed form (violates monotonicity in
-m), the hand-typed `409?` as a *derivation* (though see below — it is *consistent* with the
-profile model), and 31 verdicts from the 2023 build.
+Kept on record so it is not re-derived: the old `m=5` closed form and `BBBD` profile as
+equalities (both predict 480 instead of exact 481 at `k=9`), the `m=6` closed form and `BBCD`
+profile (both predict `n(10,6)=976`, while the exact maximum is 973), the `m=11` closed form
+(violates monotonicity in m), the hand-typed `409?` as a *derivation* (though see below — it is
+*consistent* with the profile model), and 31 verdicts from the 2023 build.
 
 ## Where H4 stands — the most active thread
 
@@ -86,9 +93,17 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   this distinction operational.  The class invariance is verified against the spreadsheet columns.
 - **`length = 2^q` is a refinement invariant** — a property of the whole class, not of the
   shortest representative. Holds for every m ≤ 13.
-- Given that constraint the profile is **unique** for m ≤ 9 and m = 11..13, hence so is its
-  `n(9,m)` prediction: `512, 511, 503, 496, 480, 473, 457, 447, 432`, then `414..416` (m=10,
-  two fits), `410`, `395`, `388`.
+- Within the originally fitted refinement classes the profile is **unique** for m ≤ 9 and
+  m = 11..13, but that no longer implies a frontier value: `BBBD` uniquely gives 480 for
+  `m=5`, while the exact frontier is 481 in a new `4+1` regime.  The still-open row-wise
+  predictions are 457, 447 and 432 for `m=7,8,9`, then `414..416` for `m=10` (two fits),
+  followed by 410, 395 and 388.
+- **The `m=5` transition is structural, not just +1.**  At `Sb(481:5)@9` all 23 feasible
+  `3+2` roots fail, while the `4+1` roots of selected width 240–242 succeed.  The verified
+  tree starts with the complementary `[239:1]`; Li--Wu--Triesch make the same root-type
+  switch.  Atom masses read `BBBD=480`, `ABBD=481`, `AABD=482`, but the latter words are
+  presently arithmetic interpretations, not per-coin profiles extracted from the compressed
+  witness.  See [conjectures.md](conjectures.md#exact-m5-transition-and-the-structural-break-2026-08-15).
 - The journal's "m=11 first large jump to length 64" **dissolves** if the single
   exactly-diagonal cell `Sb(11:11)` is treated as pre-stabilised; m=11 then fits at length 16
   like its neighbours. Not airtight — m=4 includes *its* diagonal cell and fits fine.
@@ -142,9 +157,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   `G_k`-atom singleton state, so conclusions about tree interiors from those trees are
   conditional on that hypothesis.
 - **The apparent m=6 recursion is refuted at its first extrapolation.**
-  `n(k,6) = n(k-1,4) + n(k-1,5)` is exact for `k=5..9` but predicts 976 at `k=10`; the exact
+  `n(k,6) = n(k-1,4) + n(k-1,5)` is exact for `k=5..9` but, using the corrected
+  `n(9,5)=481`, predicts 977 at `k=10`; the exact
   value is 973.  The verified construction still uses a `2+4` root and saturates the `m=4`
-  pure child, but backs the other width down from 480 to 477.  This is one datum, not a new
+  pure child, but backs the other width down from 481 to 477.  The separate old `BBCD`
+  closed form predicts 976.  This is one datum, not a new
   constant-correction formula.  See
   [conjectures.md](conjectures.md#finite-m5m6-recurrences-and-the-k10-break-2026-08-10).
 - **Ruled out:** the non-adaptive reformulation. Each test returns
@@ -244,7 +261,7 @@ track is independently checked by `tools/check_atom_profile_certificate.py` and
 `tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
 searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.
 
-Artifact store `fedork/radio-data` (private): 13 tags, 41 assets plus a manifest per tag,
+Artifact store `fedork/radio-data` (private): 14 tags, 43 assets plus a manifest per tag,
 about 394 MB stored, `check-index` green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
@@ -738,9 +755,10 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
    next recursive node.  One greedy low-k path is already known to fail.
 3. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.
-4. Read the m=5 profile off `witnesses/canon_480_5_at9.tree`. This would turn the `2^q`
-   invariant from a fit into a derivation, and needs no new compute.
-5. `... 432 9` — discriminates the profile model (432) from the closed form (431).
+4. If a genuine `ABBD` realization is needed, search for a symmetric non-wasteful 481 tree.
+   The committed singleton-majorized tree proves achievability but compresses its leaves too
+   aggressively for `profile_from_tree.py` to recover a per-coin atom census.
+5. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
 6. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
    here needing no compute at all. An exchange argument is the natural shape; the surviving
    obligations are listed in

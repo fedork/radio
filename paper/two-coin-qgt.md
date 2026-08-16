@@ -6,6 +6,8 @@ KNOWN WORK REMAINING - see docs/research-plan.md item P5:
   - lemma numbering: (7) duplicates (5); "(7) holds true k up to 8" refers to (u1)
   - <TODO> sections: Terminology, Unit Group Triviality Lemma, Insights, Refuted lemmas
   - lemma (10)'s transcription is corrected, but the corrected conjecture is now refuted at k=10
+  - lemma (8) and the exact piecewise replacement for lemma (9) are now known from
+    Li--Wu--Triesch (2018); integrate the citation style with the final bibliography
   - add lemma (12) for m=8 and the G_k = sum-of-binomials closed form
   - the Sa table should mark k<=9 proven vs k=10 constructed
 Do not treat any number in this file as authoritative; data/*.csv is.
@@ -13,7 +15,21 @@ Do not treat any number in this file as authoritative; data/*.csv is.
 
 **Introduction**
 
-A specific case of quantity group testing is considered: given a group on *n* coins 2 of which are known to be defective and a test procedure that gives the number of defective coins in a subset of coins (0,1 or 2 in this case) determine the largest *n* for which both coins can be detected with at most *k* tests. Best solutions for *k* up to 10 are found and proven by exhaustive search using a computer program provided with additional intermediate results and lemmas.
+A specific case of quantity group testing is considered: given a group on *n* coins, two of which are known to be defective, and a test procedure that reports the number of defective coins in a tested subset (0, 1 or 2), determine the largest *n* for which both coins can be detected with at most *k* adaptive tests.  The computation proves the `Sa` sequence through *k*=9, supplies a verified construction at *k*=10, and extends the exact and constructive record for the two-set `Sb` problem.  Every computational claim is separated into a verified lower witness and, where available, an exhaustive or published upper bound.
+
+**Relation to prior work**
+
+Aigner's graph formulation identifies `Sa(n)` with search on the complete graph `K_n` and
+`Sb(n:m)` with search on `K_{m,n}`; his canonical sequence is the predecessor of the `G_k`
+sequence used below ([Aigner 1986](https://doi.org/10.1016/0166-218X(86)90026-0)).  The exact
+`m=4` result and the piecewise exact `m=5` result are due to Li, Wu and Triesch
+([2018](https://doi.org/10.1016/j.dam.2018.05.026)).  Hao's product inequality
+([1990](https://doi.org/10.1016/0166-218X(90)90022-5)) and the explicit recursive algorithm of
+Gargano, Montuori, Setaro and Vaccaro
+([1992](https://doi.org/10.1016/0166-218X(92)90260-H)) provide the scalable asymptotic context.
+Hwang's survey ([1987](https://doi.org/10.2307/2322412)) is a concise historical introduction
+to the two-coin quantitative model.  Full source notes and cautions are maintained in
+`../docs/literature.md`.
 
 **Terminology and notation**
 
@@ -136,8 +152,9 @@ Sb(2^(k-1)-1:1) (solvable per (1))
 	Sb(2^(k-1)-1:2, 2^(k-1)-(k-1):1) solvable per (5)  
 (7) **Sb(2^k-1:2, 2^k-k:1)**
 
-(8) Sb(2^k-2k+2 : 4) solvable in k   
-…..
+(8) `n(k,4)=2^k-2k+2` exactly for `k>=3` (Li--Wu--Triesch, Corollary 3).  The local
+construction remains useful as an independent lower proof; the published theorem supplies the
+upper bound.
 
 3k-2k \= i=0k-12il=0ik!/(l!(k-l)!) where l=0ik!/(l!(k-l)!) is partial sum of binomial sequence
 
@@ -147,7 +164,19 @@ Sb(2^(k-1)-1:1) (solvable per (1))
 
 (7) holds true k up to 8 and is expected to also hold for any k, but the author was unable to find a rigorous proof. 
 
-(9) Sb(2^k-k(k-3)/2-5 : 5) solvable in k  
+(9) The former formula `F(k)=2^k-k(k-3)/2-5` is exact only through `k=8`.
+Li--Wu--Triesch, Theorems 1--3 and Remark 1, prove
+
+```
+n(k,5) = F(k)       for 3 <= k <= 8,
+         F(k) + 1   for 9 <= k <= 10,
+         F(k) + 2   for k >= 11.
+```
+
+In particular `n(9,5)=481`, not 480.  The repository contains an independent exact replay:
+`witnesses/majorized_481_5_at9.tree` proves 481 achievable and
+`evidence/sb_m5_k9_frontier.txt` records the exact rejection of 482.  The root changes from
+type `3+2` through `k=8` to type `4+1` at `k=9`, matching the published construction.
 (11) Sb(2^k-k^2+4k-10 : 7) solvable in k
 
 **Proposed and refuted lemmas:**  

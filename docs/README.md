@@ -8,6 +8,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 |---|---|
 | [problem.md](problem.md) | Definitions, notation, the information bound, the base sequence `G_k` |
 | [results.md](results.md) | What is established, with provenance |
+| [literature.md](literature.md) | Primary-source map, exact imported theorems, scalable algorithms, citation notes |
 | [conjectures.md](conjectures.md) | What is predicted, and the experiment that would settle each |
 | [research-plan.md](research-plan.md) | Goals and what to work on next |
 | [tools.md](tools.md) | The solver, its drivers, and the verification tools |

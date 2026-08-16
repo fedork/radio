@@ -7,9 +7,9 @@ The machine-readable versions live in `data/conjectures.csv` and are checked aga
 proven datum by `tools/check_tables.py`. **Do not copy a formula out of this file into
 another document** - reference it. Lemma 10 below was corrupted exactly that way once.
 
-Status key: **proved** = full argument given here; **construction** = the split is exhibited
-and gives a valid lower bound, but no matching upper bound is proved; **conjecture** =
-numerical fit only.
+Status key: **proved** = full argument given here; **published theorem** = both directions
+are supplied by the cited primary source; **construction** = the split is exhibited and gives
+a valid lower bound, but no matching upper bound is proved; **conjecture** = numerical fit only.
 
 <!-- generated:conjectures -->
 | m | closed form | fits from | status |
@@ -17,8 +17,9 @@ numerical fit only.
 | 1 | `2^k` | k >= 1 | proven-theorem |
 | 2 | `2^k - 1` | k >= 2 | proven-theorem |
 | 3 | `2^k - k` | k >= 3 | proven-theorem |
-| 4 | `2^k - 2*k + 2` | k >= 3 | conjecture |
-| 5 | `2^k - k*(k-3)/2 - 5` | k >= 4 | conjecture |
+| 4 | `2^k - 2*k + 2` | k >= 3 | proven-theorem |
+| 5 | `2^k - 3*k - (k-4)*(k-5)/2 + (5 if k <= 8 else 6 if k <= 10 else 7)` | k >= 3 | proven-theorem |
+| 5 | `2^k - k*(k-3)/2 - 5` | k >= 4 | refuted |
 | 6 | `2^k - k*(k-1)/2 - 3` | k >= 4 | refuted |
 | 6 | `2^k - k*k + 7*k - 21` | k >= 9 | conjecture |
 | 7 | `2^k - k*k + 4*k - 10` | k >= 5 | conjecture |
@@ -64,26 +65,41 @@ Split `[2^(k-1) : 0, 2^(k-1) : 1, 2^(k-1) - 1 : 1]`, giving
 Split `[2^(k-1) - 1 : 1, 2^(k-1) : 1]`, giving `Sb(2^(k-1) - 1 : 1, 2^(k-1) : 1)` by (2),
 `Sb(2^(k-1) : 1)` by (1), and `Sb(2^(k-1) : 1, 2^(k-1) - 1 : 1, 2^(k-1) - k : 1)` by (4).
 
-## (6) `Sb(2^k - k : 3)` - construction
+## (6) `Sb(2^k - k : 3)` - published exact theorem
 
 Split `[2^(k-1) - 1 : 1]`, giving `Sb(2^(k-1) - 1 : 1)` by (1), `Sb(2^(k-1) - k : 2)` by (3),
-and `Sb(2^(k-1) - 1 : 2, 2^(k-1) - (k-1) : 1)` by (5). Lower bound only; matches the proven
-maximum for every `k <= 8`.
+and `Sb(2^(k-1) - 1 : 2, 2^(k-1) - (k-1) : 1)` by (5).  This gives the lower bound;
+Aigner's exact complete-bipartite result supplies the matching upper bound for every `k`.
+See [../literature.md#aigner-1986](../literature.md#aigner-1986).
 
-## (8) `Sb(2^k - 2k + 2 : 4)` - construction
+## (8) `Sb(2^k - 2k + 2 : 4)` - published exact theorem
 
-Matches the proven maximum for `k = 3..8`. The `k=9` value 496 has a verified witness tree,
-`witnesses/canon_496_4_at9.tree`.
+Li--Wu--Triesch, Corollary 3, proves this is the exact maximum for every `k>=3`; see
+[../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).  The `k=9` value
+496 also has the independent verified witness `witnesses/canon_496_4_at9.tree`.
 
-## (9) `Sb(2^k - k(k-3)/2 - 5 : 5)` - conjecture
+## (9) `m=5` - published exact piecewise theorem
 
-Exact for `k = 4..8`. The `k=9` value 480 has a verified witness tree,
-`witnesses/canon_480_5_at9.tree`.
+Write `F(k)=2^k-k(k-3)/2-5`.  Li--Wu--Triesch, Theorems 1–3 and Remark 1, prove
+
+```text
+n(k,5) = F(k)       for 3 <= k <= 8,
+         F(k) + 1   for 9 <= k <= 10,
+         F(k) + 2   for k >= 11.
+```
+
+Thus the former formula was exact only through `k=8`: it predicts 480 at `k=9`, while the
+exact maximum is 481.  The old `BBBD` construction and its verified 480 tree remain valid
+lower bounds; they are not optimal from `k=9`.  The corrected 481 value has both the verified
+tree `witnesses/majorized_481_5_at9.tree` and an exact local rejection of 482 in
+`evidence/sb_m5_k9_frontier.txt`.  See
+[../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).
 
 ## (10) `Sb(2^k - k(k-1)/2 - 3 : 6)` - refuted
 
-Exact for `k = 4..8`: gives 7, 19, 46, 104, 225. The `k=9` value 473 has a verified witness
-tree, `witnesses/canon_473_6_at9.tree`.
+Exact for `k = 4..9`: gives 7, 19, 46, 104, 225, 473.  At `k=9` the verified tree
+`witnesses/canon_473_6_at9.tree` supplies the lower proof and
+`evidence/sb_m6_k9_frontier.txt` retains the exact rejection at 474.
 
 It fails at `k=10`: the formula predicts 976, while exact synchronized search proves the maximum
 is 973.  The lower witness is `witnesses/majorized_973_6_at10.tree`; the exhaustive 974 rejection
@@ -129,7 +145,9 @@ Fitting `c * 2^k + a*k^2 + b*k + d` through the last four known points is four u
 through four equations - it always succeeds, so the fit itself is not evidence. What carries
 information is where the free leading coefficient `c` lands:
 
-- `m = 5..8`: `c = 1` exactly. A constraint satisfied with no freedom left over.
+- On the old finite `k<=8` data, `m = 5..8` gave `c = 1` exactly.  The exact `m=5`
+  theorem now shows why a four-point fit was not a continuation: its additive term changes at
+  `k=9` and again at `k=11`.
 - `m = 9`: `c = 31/32 = 1 - 2^-5`, and the tail `-k^2 + 2k - 2` is *identical* to `m = 8`.
 - `m = 10`: `c = 15/16 = 1 - 2^-4`, same tail, constant shifted by one.
 - `m = 11`: `c = 33/32 > 1`, no structure - and **refuted**, see below.

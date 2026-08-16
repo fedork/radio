@@ -1,0 +1,24 @@
+# Exact fixed-m frontier replay, 2026-08-15 (America/Los_Angeles).
+#
+# Build:
+#   tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+#       tools/search_singletonization.cpp \
+#       -o /tmp/search_singletonization_m1_6_k9
+# Run:
+#   tools/capped_run.sh --seconds 600 --rss-gb 8 --label m5-k9 -- \
+#       tools/run_with_provenance.py /tmp/search_singletonization_m1_6_k9 \
+#       frontier 9 5 482 481
+#
+# Complete raw output, including embedded build/run provenance, is archived as
+# small-m-frontier-2026-08-15:m5_k9.log.  It passed
+# tools/check_provenance.py.  The emitted positive tree is committed separately
+# as witnesses/majorized_481_5_at9.tree and rechecked independently by
+# tools/check_witness.py.
+
+n=482 NO wall=2.73659s calls=39901768 assignments=20083620 memo=42718
+n=481 YES wall=0.295632s calls=4018881 assignments=2088375 memo=44432
+
+# The verified tree proves achievability without trusting the search.  Exact
+# rejection of Sb(482:5), together with Subgraph Monotonicity, proves that no
+# larger width is possible.  Independently, Li, Wu and Triesch (2018), Theorem 2,
+# gives n(9,5)=481; see docs/literature.md#li-wu-triesch-2018.

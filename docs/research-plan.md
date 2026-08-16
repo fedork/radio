@@ -11,9 +11,10 @@ frontier proven for `k <= 8`, and the two theorems. The draft in `paper/` is clo
 of optimality through `k <= 9` is exactly right - do not "upgrade" it to 10 without redoing
 the `Sa(193)` computation.
 
-**H2 - The K=9 Sb column.** Six lower bounds at small `m`, plus `legacy` bounds at
-`m = 65..96` recovered from the Sa work. The band `m = 7..64` is entirely blank. This is the
-main open front.
+**H2 - The K=9 Sb column.** Published theorems now make `m=1..5` exact, including the
+corrected `n(9,5)=481`; a retained exact replay makes `n(9,6)=473` exact as well.  There are also `legacy`
+bounds at `m = 65..96` recovered from the Sa work. The band `m = 7..64` is entirely blank.
+This is the main open front.
 
 **H3 - Is `Sa = 192` maximal at k=10?** Still open, and now better understood. A 2023 run
 refuted all 16 states `Sb(n1 : 193-n1)` in 9 over ~47 days, and that log was recovered on
@@ -49,8 +50,10 @@ diagnostic-only. See
 [`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt) and
 [`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 
-**H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The old
-`m=6` closed form and `BBCD` profile are refuted by the exact `n(10,6)=973` frontier.  A checked
+**H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
+literature now settles `m=5`: the old formula/`BBBD` equality is refuted at `k=9`, and the exact
+piecewise theorem changes the root from `3+2` to `4+1`.  The old `m=6` closed form and `BBCD`
+profile are refuted by the exact `n(10,6)=973` frontier.  A checked
 sixteen-atom aligned tree now gives the different conditional continuation
 `2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  The next
 excessive-`q` question has narrowed sharply: a 32-atom all-depth kernel leaves only rank 1180
@@ -105,13 +108,14 @@ agree. Each success is a proof standing on the Singleton Majorization Theorem al
 **Done when** a validated tree is committed for each, or the attempt is recorded in
 [journal.md](journal.md) with its cost and where it stalled.
 
-### P3 - Kill one of the two models
+### P3 - Distinguish the remaining m=9,10 rows
 
-`Sb(432:9)` in 9 decides it: the dyadic-profile model says solvable, the closed form says
-the maximum is 431. `Sb(416:10)` replicates the question independently. Details and the
-asymmetry of the test in [conjectures.md](conjectures.md#the-discriminating-experiment).
+The models are already dead as global laws at `m=5,6`, but their row-wise `m=9,10`
+predictions remain open.  `Sb(432:9)` in 9 distinguishes 432 from the closed-form equality
+431; `Sb(416:10)` independently distinguishes 416 from 414. Details and the asymmetry of
+the test are in [conjectures.md](conjectures.md#the-remaining-m910-discriminating-experiment).
 
-**Done when** one model is refuted, or both searches are recorded as inconclusive with
+**Done when** one row is refuted, or both searches are recorded as inconclusive with
 their cost. Also worth recovering: the length-64 `m = 11` profile string, which the journal
 mentions but never wrote down, and which would let `n(9,11)` be predicted at all.
 
@@ -142,6 +146,13 @@ pursue it at all.
   maximality at k=10 is open. Do not repeat the 2023 `Sa(193)` verdict as established.
 - Fix the numbering collision: `(7)` is currently a duplicate of `(5)`, and the sentence
   "(7) holds true k up to 8" plainly refers to `(u1)`.
+- Replace proposed lemma (8) by the published exact `m=4` theorem and proposed lemma (9) by
+  Li--Wu--Triesch's exact piecewise `m=5` theorem.  Record the independently replayed
+  `n(9,5)=481` / `n(9,5)<482` boundary and the `3+2` to `4+1` structural switch.
+- Add the primary-source discussion from [literature.md](literature.md): Aigner for the graph
+  model and exact `m=2,3`, Li--Wu--Triesch for `m=4,5`, and Hao/Gargano et al. for scalable
+  product constructions.  Do not copy Li et al.'s apparently inconsistent intermediate
+  equations (69)–(70) without recomputing their indices.
 - State the `k <= 9` / `k = 10` distinction in the `Sa` table itself, not only in prose.
 
 **Done when** the draft passes `tools/check_tables.py` with no stale generated blocks and
@@ -226,8 +237,10 @@ facts.  Use `tools/pareto_census_status.sh` for a one-shot progress query.
 **Separate theoretical m=6 thread (updated 2026-08-15).** The first large-`k` classification is
 complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified
 singleton-majorized tree at 973.  This refutes both the closed form and `BBCD` profile, which
-predict 976.  The working root is `[477:2]`, with mixed child `Sb(496:2,477:4)@9`; it avoids the
-`Z_7` kernel rather than repairing it.  The separate aligned atom track now supplies a structural
+predict 976.  The separate finite recurrence, when fed the corrected `n(9,5)=481`, predicts
+977 and misses by four.  The working root is `[477:2]`, with mixed child
+`Sb(496:2,477:4)@9`; it avoids the `Z_7` kernel rather than repairing it.  The separate aligned
+atom track now supplies a structural
 continuation `2^k-k^2+7k-21` for `k>=12`, conditional on the outer assembly; it is not a fit to this
 stored subtree.  Next:
 
@@ -240,7 +253,8 @@ stored subtree.  Next:
    low-`k` degeneracies backwards or find an upper obstruction.
 
 The new formula predicts 1983 at `k=11`, but its checked hard-tree threshold starts at `k=12`, so it
-does not decide item 2.  Do not infer a constant `-3` correction from one value.  Reproduction,
+does not decide item 2.  Do not infer either a constant `-3` correction to the old closed form or
+a constant `-4` correction to the finite recurrence from one value.  Reproduction,
 correctness argument and costs are in the latest journal entry and `docs/tools.md`.
 
 **Conditional excess-q construction track (2026-08-14).** Under the explicitly unproved working

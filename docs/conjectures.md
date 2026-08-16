@@ -23,7 +23,7 @@ first dyadic block of `G_{k-q}`, `B` the second, and so on:
 | 2 | `B` | 0 |
 | 3 | `AC` | 1 |
 | 4 | `AACC` | 2 |
-| 5 | `BBBD` | 2 |
+| 5 | ~~`BBBD`~~ **refuted as optimal at k=9** | 2 |
 | 6 | ~~`BBCD`~~ **refuted at k=10** | 2 |
 | 7 | `ABBBBCDD` | 3 |
 | 8 | `AAACCCDD` | 3 |
@@ -36,29 +36,30 @@ was not recorded - a gap worth closing, since it is the only thing blocking an i
 check of `n(9,11)`.
 
 Both models reproduce **every** proven value for `k = 1..8`, `m = 1..10`.  They are no longer
-globally viable models: both give 976 from their `m=6` row at `k=10`, while the exact maximum is
-973.  The disagreement below remains useful for distinguishing their still-open `m=9,10` rows,
-but neither model should be extrapolated wholesale.
+globally viable models.  At `m=5` both predict 480 at `k=9`, while the exact maximum is 481;
+at `m=6` both give 976 at `k=10`, while the exact maximum is 973.  Their disagreement remains
+useful for distinguishing the still-open *row-wise* `m=9,10` extrapolations, but neither model
+should be extrapolated wholesale.
 
 ## The remaining m=9,10 discriminating experiment
 
-The two models agree everywhere data exists and diverge at `k = 9`:
+The two remaining row-wise extrapolations diverge at `k = 9`:
 
-| m | closed form | dyadic profile | | |
-|---|---|---|---|---|
-| 1-8 | 512, 511, 503, 496, 480, 473, 457, 447 | identical | agree | |
-| **9** | **431** | **432** | disagree by 1 | |
-| **10** | **414** | **416** | disagree by 2 | |
+| m | closed form | dyadic profile | difference |
+|---|---:|---:|---:|
+| **9** | **431** | **432** | 1 |
+| **10** | **414** | **416** | 2 |
 
 So:
 
-> **If `Sb(432 : 9)` is solvable in 9 tests, the closed-form model is dead.**
+> **If `Sb(432 : 9)` is solvable in 9 tests, the `m=9` closed-form row is dead.**
 
 The test is asymmetric and that matters for how to spend compute:
 
-- **Finding** a canonical witness tree for `Sb(432:9)` proves the profile model right
-  outright, via the Singleton Majorization Theorem, with no solver trust required. This is
-  cheap - the same tool already produced trees for `496:4`, `480:5` and `473:6` at `k=9`.
+- **Finding** a canonical witness tree for `Sb(432:9)` proves the profile prediction achievable
+  and refutes the 431 equality outright, via the Singleton Majorization Theorem, with no solver
+  trust required.  It would not by itself prove 432 maximal.  This is cheap - the same tool
+  already produced trees for `496:4`, `480:5` and `473:6` at `k=9`.
 - **Failing** to find one proves nothing. Ruling out 432 requires exhaustive search, which
   is expensive.
 
@@ -83,13 +84,54 @@ Where the models agree, they still predict:
 |---|---|---|
 | n(9,m) | 457 | 447 |
 
-Both are natural canonical-search targets and would extend the artifact-backed part of the
-`k=9` column from `m <= 6` to `m <= 8`:
+Both are natural canonical-search targets and would extend the exact/witness-backed prefix of
+the `k=9` column from `m <= 6` to `m <= 8`:
 
 ```
 ./run_radio_canon_search_generic.sh 4 9 457 7
 ./run_radio_canon_search_generic.sh 4 9 447 8
 ```
+
+## Exact m=5 transition and the structural break (2026-08-15)
+
+Li--Wu--Triesch prove the exact piecewise answer.  If
+
+    F(k) = 2^k - k(k-3)/2 - 5,
+
+then
+
+    n(k,5) = F(k)       for 3 <= k <= 8,
+             F(k) + 1   for 9 <= k <= 10,
+             F(k) + 2   for k >= 11.
+
+This is not merely a numerical correction.  Their construction changes its first test from
+type `3+2` through `k=8` to type `4+1` at `k=9,10`; from `k=11` the first two tests remain,
+but another recursive stage supplies the second extra coin.  See
+[literature.md#li-wu-triesch-2018](literature.md#li-wu-triesch-2018).
+
+The local exact replay sees the same transition.  For `Sb(481:5)@9`, every capacity-feasible
+`3+2` root is negative: `[a:3]` fails for all 23 values `a=226..248`.  In the `4+1` class,
+`[a:4]` fails for `a=225..239` and succeeds for `a=240,241,242`.  A `5+0` split cannot fit
+481 because its two `k=8`, `m=5` pure branches total at most `2*231=462`.  Thus every feasible
+root is `4+1`, up to complement.  The compact verified witness begins with `[239:1]`, the
+complement of the paper's `[242:4]`.  Full diagnostic details are retained in
+`evidence/sb_m5_k9_root_transition.txt`; the 481/482 boundary and proof tree are in
+`evidence/sb_m5_k9_frontier.txt` and `witnesses/majorized_481_5_at9.tree`.
+
+There is a useful atom arithmetic behind the three regimes.  At normalization `t=k-2`, let
+
+    A=2^t,  B=A-1,  D=A-1-t-binomial(t,2).
+
+Then `3B+D=F(k)`, replacing one `B` by `A` adds one, and replacing two adds two:
+
+    BBBD = F(k),    ABBD = F(k)+1,    AABD = F(k)+2.
+
+At `k=9`, `(A,B,D)=(128,127,99)`, so these masses are 480, 481 and 482, and the exact answer
+selects the middle one.  This is an arithmetic interpretation of the published piecewise
+formula, **not yet a tree-derived symmetric per-coin profile** for the 481 witness: its leaves
+are arbitrary sequences majorized by `G_k`, and `profile_from_tree.py` cannot infer an atom
+census from those compressed leaves.  The old `BBBD` construction remains valid for `k>=7`,
+but its claim to optimality is refuted.
 
 ## Conjecture (u1) - the antidiagonal conjecture
 
@@ -366,30 +408,33 @@ Full split enumerations of the frontier states, from `radio_full`:
 The `a`-windows are exactly `[n - n(k-1,3), n(k-1,3)]` for m=5, so the m=3 child is the
 binding single-part constraint, and the window is nonempty because `n(k,5) <= 2·n(k-1,3)`.
 
-**Two numerical identities, exact on the then-available range `k=5..9`:**
+**Two numerical identities on the old data, now both refuted at their first new datum:**
 
     n(k,5) = n(k-1,2) + n(k-1,6)
     n(k,6) = n(k-1,4) + n(k-1,5)
 
-On that finite range the second is realised directly by a split: `b = 2`,
+The first identity is exact only for `k=5..8`.  At `k=9` its right side is
+`n(8,2)+n(8,6)=255+225=480`, while the exact left side is 481.  It was numerical only:
+`m=6 > 5` cannot appear as a child of an `m=5` part, and the split that would saturate it
+(`a=n(k-1,2)`) is not in the working set.
+
+The second identity is exact for `k=5..9` and on that finite range is realised directly by a
+split: `b = 2`,
 `a = n(k-1,5)`, giving
 `n(k-1,5):2` on outcome 2 and `n(k-1,4):4` **saturated** on outcome 0. The `473:6@9` witness
 uses the mirror form `[242:4]`, i.e. `a = n(8,4) = 242`, `n-a = n(8,5) = 231`.
 
-The first is a numerical identity only — `m=6 > 5` cannot appear as a child of an m=5 part, and
-the split that would saturate it (`a = n(k-1,2)`) is *not* in the working set, so it is not
-realised structurally.
-
-**2026-08-10 correction.**  The apparent `m=6` recursion fails at its first extrapolation.  It
-predicts `496+480=976` at `k=10`, but exact synchronized search proves `n(10,6)=973`.  A verified
-tree uses root `[477:2]`, with children
+The apparent `m=6` recursion fails at its first extrapolation.  With the corrected exact
+`n(9,5)=481`, it predicts `496+481=977` at `k=10`, but exact synchronized search proves
+`n(10,6)=973`.  A verified tree uses root `[477:2]`, with children
 
     Sb(477:2),  Sb(496:2,477:4),  Sb(496:4).
 
-Thus the `m=4` pure child remains saturated while the other width retreats by three.  The old
-continuation through `Sb(496:2,480:4)` reaches the impossible `Z_7` kernel; the new mixed state
-avoids it.  This establishes a break, **not** the replacement formula
-`n(k-1,4)+n(k-1,5)-3`.  Its natural `k=11` lift reduces to
+Thus the `m=4` pure child remains saturated while the other width retreats from the true
+`m=5` frontier 481 to 477, a loss of four.  Separately, the old `BBCD`/closed-form model still
+predicts 976; its continuation through `Sb(496:2,480:4)` reaches the impossible `Z_7` kernel.
+The new mixed state avoids it.  This establishes a break, **not** the replacement formula
+`n(k-1,4)+n(k-1,5)-4`.  Its natural `k=11` lift reduces to
 `Sb(503:1,495:2,478:3)@9`; a five-minute exact run was inconclusive.  The two-part/mixed-state
 frontier, rather than either fitted witness, is where the work now is.  In particular, literally
 scaling the witness's next split produces the exactly unsolvable residual
@@ -666,9 +711,9 @@ bounded by `(A_r,B_r,C_r,C_r,D_r)`.  This proves (5) for `r>=3`.  Finally,
 
     a+b+d = 3 B_s+D_s,
 
-so the construction has profile `BBBD@G[k-2]`, equivalently the recorded height-5 formula, for
-all `k>=7`.  Again, this proves the lower bound only; equality remains conjectural beyond the
-finite proven frontier.
+so the construction has profile `BBBD@G[k-2]`, equivalently the old height-5 formula, for
+all `k>=7`.  This proves a lower bound only.  Equality is now **refuted** at `k=9`, where the
+published exact answer and independent replay gain one coin via the `4+1` regime above.
 
 **Height 6 is exactly the first synchronization obstruction.**  The repeated finite winner uses
 `(alpha,beta,gamma)=(4,3,2)`.  With `r=k-4`, the refuted `BBCD` continuation would require the hard
@@ -1043,6 +1088,9 @@ Carried over from [journal.md](journal.md), unresolved:
 - **What replaces the refuted `m=6` profile.** The exact `k=10` maximum is 973, reached through
   `Sb(496:2,477:4)@9`, so the old `BBCD`/closed-form value 976 is dead.  The next task is a
   parametric construction or obstruction for this `m=2 + m=4` mixed-state frontier.  Do not fit
-  the 973 witness's later subtree or infer a constant three-unit correction from one level.
-- **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs.
-  Nothing beyond `m = 4` has a matching upper bound.
+  the 973 witness's later subtree or infer either a constant three-unit correction to the old
+  formula or a four-unit correction to the finite recurrence from one level.
+- **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs;
+  Aigner and Li--Wu--Triesch supply published matching upper bounds through `m=5`.  No general
+  exact formula beyond `m=5` is known, although the retained replay makes the individual
+  `n(9,6)=473` and `n(10,6)=973` boundaries exact.

@@ -1,0 +1,14 @@
+# Exact fixed-m frontier replay, 2026-08-15 (America/Los_Angeles).
+#
+# Build and driver are the same fully provenanced small-m sweep documented in
+# evidence/sb_m5_k9_frontier.txt.  Complete raw output is archived as
+# small-m-frontier-2026-08-15:m6_k9.log and passes tools/check_provenance.py.
+# The positive tree emitted by that run also passes tools/check_witness.py; the
+# earlier canonical proof witnesses/canon_473_6_at9.tree independently proves
+# achievability.
+
+n=474 NO wall=26.2015s calls=341093536 assignments=179126909 memo=207155
+n=473 YES wall=4.12989s calls=50834342 assignments=27123410 memo=229309
+
+# The exact rejection at 474 plus Subgraph Monotonicity is the upper proof; the
+# independently verified tree at 473 is the lower proof.  Therefore n(9,6)=473.

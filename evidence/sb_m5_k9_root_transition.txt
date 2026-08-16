@@ -1,0 +1,31 @@
+# Structural replay for the m=5 transition at k=9, 2026-08-15.
+#
+# Status: exact solver diagnostic, not used as the maximality source.  The
+# independently verified witness and the published theorem are the durable
+# proof sources; see evidence/sb_m5_k9_frontier.txt and docs/literature.md.
+#
+# Driver: tools/search_singletonization.cpp, build id
+# 41cf8850fbf0da7c00c60c117aa68cc6a8e319cf045901e074693d689c9b99f4.
+# All 44 complete raw outputs are retained in
+# small-m-frontier-2026-08-15:m5-k9-forced-roots-2026-08-15.tar; every log
+# passes tools/check_provenance.py.  Summed solver wall time was 15.424464 s.
+# Each line below was checked with the driver's exact `forced` mode.  A root
+# `[a:r]` selects a coins from the width-481 side and r coins from the size-5
+# side; complements are identified.
+
+# Controls around the transition:
+#   Sb(231:5)@8, old 3+2 root [121:3]  -> YES
+#   Sb(231:5)@8, new 4+1 root [116:4]  -> YES
+#   Sb(480:5)@9, old 3+2 root [248:3]  -> YES
+#   Sb(481:5)@9, old 3+2 root [248:3]  -> NO
+#   Sb(481:5)@9, new 4+1 root [242:4]  -> YES
+
+# Exhaustive capacity-feasible root scan for Sb(481:5)@9, up to complement:
+#   3+2 roots [a:3], a=226..248: all 23 are NO.
+#   4+1 roots [a:4], a=225..239: NO; a=240..242: YES.
+#   5+0 is impossible by capacity: both k=8 branches would have width at most
+#   n(8,5)=231, hence total width at most 462 < 481.
+# Therefore every feasible first test has type 4+1, up to complement.  This is
+# the local structural reason the old 3+2/BBBD extrapolation stops at k=8.
+# Li--Wu--Triesch's proof makes the same regime change: Theorem 1 uses a 3+2
+# first test for k=3..8, while Theorem 2 uses 4+1 for k=9,10.

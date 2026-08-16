@@ -91,6 +91,7 @@ Sizes are raw. Divide by roughly 10 for the stored size.
 | `cache-2025` | `parsed_260.txt` (19.5 M entries) + the unbroken `pareto9_36..116` chain, tarred | 822 M | clean |
 | `sa193-2023` | `out26_2.txt`, `out26_3.txt` — the only record of the `Sa(193)` refutation | 350 M | **suspect era** |
 | `trees-2023` | `print*` (26 files, source of 13 verified trees) + `full_*` (18 files, source of the 16 exhaustive results), tarred | 246 M | positives only |
+| `small-m-frontier-2026-08-15` | 46 raw frontier logs for every normalized `m<=6`, `k<=9` case, plus 44 forced-root logs classifying the `m=5`, `k=9` transition | 762 K | complete embedded provenance in every solver log; every boundary has `n+1 NO` and `n YES`; all positive trees rechecked; forced-root outcome ranges validated |
 
 "Clean" means `tools/extract_evidence.py audit` found no contradictions. `sa193-2023` comes
 from the build with known false negatives — the lines are kept as a record, and the claim they
@@ -128,9 +129,9 @@ an all-depth exclusion.
 - `evidence/pareto_certification_k1_8.txt` — all 276 obligations behind the K≤8 table, 30 KB
 - `evidence/sa193_unsolvable_in_10.txt` — the `Sa(193)` lines, 40 lines, `legacy`
 - `evidence/refuted_2023_negatives.txt` — the 31 verdicts that corpus got wrong
-- `witnesses/*.tree` — 13 verified trees, `Sa(38)` through `Sa(192)` plus four canonical ones
+- `witnesses/*.tree` — 17 verified trees, including the new singleton-majorized proof of `Sb(481:5)@9`
 - `data/exhaustive_multipart.csv` — the 16 `full*` enumerations
-- `data/pareto_sb.csv` — 46 K=9 bound rows, all `legacy`
+- `data/pareto_sb.csv` — 52 K=9 rows: six exact small-`m` maxima and 46 `legacy` bounds
 
 ### Warm-starting from `parsed_260.txt`: two traps
 
@@ -164,7 +165,7 @@ row here.
 
 Small enough to live in git, and too valuable to risk:
 
-- `witnesses/*.tree` - the six verified proof trees.
+- `witnesses/*.tree` - the 17 verified proof trees.
 - `data/pareto_*.csv`, `data/conjectures.csv` - the source-of-truth tables.
 - `data/sheets/` - 46 tabs from the three research spreadsheets, values and formulas, with
   the `.xlsx` originals. Imported 2026-08-02; note that the tab named `INCORRECT pareto` in

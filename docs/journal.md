@@ -751,8 +751,10 @@ the stabilisation doctrine already sets aside. Same corner as the `Sb(11:11)` an
 
 ## 2026-08-03 — m=5 and m=6 scalable constructions; the one-sided evidence reconsidered
 
-Full `radio_full` split enumerations of the frontier states, m=5 and m=6 at k=5,6,7. Two
-recursions, exact on every available k:
+Full `radio_full` split enumerations of the frontier states, m=5 and m=6 at k=5,6,7.  The two
+identities below matched the values recorded at the time.  **Superseded 2026-08-15:** the first is
+exact only for `k=5..8` and fails at `k=9` (480 versus exact 481); the second is exact through
+`k=9` but predicts `496+481=977` versus exact 973 at `k=10`.
 
     n(k,5) = n(k-1,2) + n(k-1,6)      numerical identity only, not realised by a split
     n(k,6) = n(k-1,4) + n(k-1,5)      realised: b=2, a=n(k-1,5), outcome-0 saturated
@@ -6203,3 +6205,89 @@ must contain a listed losing core after refinement.  If that closed kernel conta
 result becomes all-depth.  If closure fails, the uncovered transitions identify the only routes a
 depth-at-least-five positive tree can use.  This is the scalable symbolic fork.  No Pareto CSV datum
 changed.
+
+## 2026-08-15 — literature and exact replay replace the m=5 extrapolation
+
+The small-`m` formulas were checked against both a fresh exact sweep and the primary literature.
+This changed the record materially: the former lemma-9 formula is not the `m=5` frontier after
+`k=8`.
+
+The exact `tools/search_singletonization.cpp` frontier mode was rebuilt through the provenance
+builder and run for every normalized one-part case with `m<=6`, `k<=9`.  Each of the 46 logs has a
+complete `radio-provenance-v1` block, an exact `n+1 NO` / `n YES` pair, and a positive tree that
+passes `tools/check_witness.py`.  The nontrivial rows, omitting pre-diagonal orientations, are:
+
+```text
+m=1, k=1..9: 2, 4, 8, 16, 32, 64, 128, 256, 512
+m=2, k=2..9: 3, 7, 15, 31, 63, 127, 255, 511
+m=3, k=3..9: 5, 12, 27, 58, 121, 248, 503
+m=4, k=3..9: 4, 10, 24, 54, 116, 242, 496
+m=5, k=4..9: 9, 22, 50, 109, 231, 481
+m=6, k=4..9: 7, 19, 46, 104, 225, 473
+```
+
+The 92 decision lines consumed 36.676203 summed solver-wall seconds.  At the two new K=9
+boundaries, `Sb(482:5)` was rejected in 2.73659 seconds and `Sb(481:5)` solved in 0.295632
+seconds; `Sb(474:6)` was rejected in 26.2015 seconds and `Sb(473:6)` solved in 4.12989 seconds.
+The complete 416 KiB tar, including validation output, is archived as
+`small-m-frontier-2026-08-15` (raw SHA-256
+`0b6ec2d9933d210d671a7301f63d676ebb84ae3ce1c63d3d1f877f98979b923b`).  Compact boundary
+summaries are committed at `evidence/sb_m5_k9_frontier.txt` and
+`evidence/sb_m6_k9_frontier.txt`.  Consequently the K=9 column is now exact through `m=6`, not
+merely witness-backed there.
+
+The new 481 strategy was extracted as `witnesses/majorized_481_5_at9.tree`.  Its 61 nodes, 20
+splits and 41 singleton-majorized leaves re-verify independently of the exact solver.  The root is
+`[239:1]`, equivalently its complement `[242:4]`.
+
+An exact forced-root scan explains the extra coin.  At `Sb(481:5)@9`, every capacity-feasible
+`3+2` root `[a:3]`, `a=226..248`, is negative.  Among `4+1` roots, `[a:4]` is negative for
+`a=225..239` and positive for `a=240,241,242`; `5+0` is impossible because two pure `m=5`,
+`k=8` branches have total capacity only `2*231=462`.  Thus the root type is forced to switch from
+`3+2` to `4+1`, up to complement.  The diagnostic is retained in
+`evidence/sb_m5_k9_root_transition.txt`; it is structural solver evidence, while the verified tree
+and published theorem carry the mathematical claim.  All 44 raw forced-root outputs have complete
+provenance and are archived in the same tag as `m5-k9-forced-roots-2026-08-15.tar`; their summed
+solver-wall cost was 15.424464 seconds (raw tar SHA-256
+`32b78cc020c11edf4497267522f11ed5f6b248e0c1ef46831f5131df8a6f022b`).
+
+The decisive paper was already among the downloaded ScienceDirect PDFs: Shengjia Li, Xiaohui Wu
+and Eberhard Triesch, “A ternary search problem on two disjoint sets,” *Discrete Applied
+Mathematics* 251 (2018), 221–235.  Its Corollary 3 proves the exact `m=4` formula, and Theorems
+1–3 plus Remark 1 prove, with `F(k)=2^k-k(k-3)/2-5`,
+
+```text
+n(k,5)=F(k)     for 3<=k<=8,
+         F(k)+1 for 9<=k<=10,
+         F(k)+2 for k>=11.
+```
+
+Hence `n(9,5)=481`, `n(10,5)=985`, and `n(11,5)=2001`.  The paper itself changes its first
+test from `3+2` in Theorem 1 to `4+1` in Theorem 2, exactly as the forced-root scan does; Theorem 3
+adds a further recursive stage.  There are apparent transcription/index errors in displayed
+equations (69)–(70): in particular equation (69) uses `k-2` for a singleton width whose preceding
+selected test uses `k-1`.  The theorem statement is consistent and independently confirmed here,
+but numerical proof displays must be recomputed rather than copied.
+
+At normalization `t=k-2`, put
+`A=2^t`, `B=A-1`, `D=A-1-t-binomial(t,2)`.  Then the old profile mass is
+`BBBD=F(k)`; `ABBD=F(k)+1`; and `AABD=F(k)+2`.  For `k=9`, these are respectively 480, 481 and
+482 because `(A,B,D)=(128,127,99)`.  This explains the three pieces arithmetically, but it is not
+yet a symmetric per-coin profile proof for the compressed 481 tree.  The old `BBBD` construction
+remains a valid lower family for `k>=7`; only its equality/optimality claim is refuted.
+
+The m5 correction also retracts two recurrence statements.  The numerical identity
+`n(k,5)=n(k-1,2)+n(k-1,6)` holds only for `k=5..8`; at `k=9` its right side is
+`255+225=480`, one below the exact 481.  The separate identity
+`n(k,6)=n(k-1,4)+n(k-1,5)` holds through `k=9`, but its first extrapolation now predicts
+`496+481=977`, not 976, against the exact `n(10,6)=973`.  The successful root backs the relevant
+width down from 481 to 477, a loss of four.  The old `BBCD` closed form independently predicts 976
+and remains refuted by three.  These are distinct failed continuations and must not be conflated.
+
+The other primary PDFs were also read and indexed in `docs/literature.md`: Hwang (1987) for the
+historical two-coin/model-Q introduction, Aigner (1986) for the graph formulation, canonical
+sequence and exact `m=2,3` cases, Andreae (1989) for the broader graph-search setting, Hao (1990)
+for product composition and asymptotic limits, Gargano--Montuori--Setaro--Vaccaro (1992) for an
+explicit scalable algorithm and `T(32,32)=7`, and Christen (1994) for the adaptive/limited-round
+taxonomy.  No presently needed article remains blocked behind institutional access; Aigner's 1988
+book is the highest-value item still worth obtaining.

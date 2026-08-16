@@ -69,11 +69,11 @@ Largest `n1` such that `Sb(n1 : m)` is solvable in `k` tests.
 | m\k | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **1** | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 |  |
-| **2** |  | 3 | 7 | 15 | 31 | 63 | 127 | 255 | ≥511 |  |
-| **3** |  |  | 5 | 12 | 27 | 58 | 121 | 248 | ≥503 |  |
-| **4** |  |  | 4 | 10 | 24 | 54 | 116 | 242 | ≥496 |  |
-| **5** |  |  |  | 9 | 22 | 50 | 109 | 231 | ≥480 |  |
-| **6** |  |  |  | 7 | 19 | 46 | 104 | 225 | ≥473 | 973 |
+| **2** |  | 3 | 7 | 15 | 31 | 63 | 127 | 255 | 511 |  |
+| **3** |  |  | 5 | 12 | 27 | 58 | 121 | 248 | 503 |  |
+| **4** |  |  | 4 | 10 | 24 | 54 | 116 | 242 | 496 |  |
+| **5** |  |  |  | 9 | 22 | 50 | 109 | 231 | 481 | 985 |
+| **6** |  |  |  | 7 | 19 | 46 | 104 | 225 | 473 | 973 |
 | **7** |  |  |  |  | 17 | 42 | 97 | 214 |  |  |
 | **8** |  |  |  |  | 15 | 38 | 91 | 206 |  |  |
 | **9** |  |  |  |  | 14 | 36 | 87 | 198 |  |  |
@@ -172,44 +172,45 @@ The `k=8` column for `m = 10..17` was corrected in the 2026-05-12 recomputation
 circulate with the superseded values `182, 176, 170, 165, 159, 153, 148, 142`; they are
 wrong. `data/pareto_sb.csv` is the only copy that should be consulted.
 
-The K=9 column has three kinds of entry. Small `m` has lower bounds from constructions and
-verified witness trees. `m = 65..96` has bounds recovered from the `Sa(192)` / `Sa(193)`
-computations - but those come from the 2023 build and are `status=legacy`, including all
-sixteen ceilings; treat the `≤` values as unconfirmed. The whole band `m = 7..64` is blank.
+The K=9 column has three kinds of entry.  For `m=1..5`, published theorems give exact
+maxima; the new `m=5` boundary was also replayed independently with a verified witness at
+481 and an exact rejection at 482.  At `m=6`, a retained exact replay rejects 474 and a
+verified tree proves 473.  Values at
+`m = 65..96` were recovered from the `Sa(192)` / `Sa(193)` computations, but those come from
+the 2023 build and are `status=legacy`, including all sixteen ceilings; treat the `≤` values
+as unconfirmed. The whole band `m = 7..64` is blank.
 
-The lone `k=10` Sb cell is exact: **`n(10,6)=973`**.  The upper half is the exhaustive rejection
-of `Sb(974:6)` by the exact small-m synchronized recurrence; the lower half is the independently
-checked 115-node tree `witnesses/majorized_973_6_at10.tree`.  Its 77 terminal states are arbitrary
-singleton sequences weakly majorized by `G_k`, a strictly broader certificate than requiring each
-leaf to be an atom sub-multiset.  Full run provenance is in
-`evidence/sb_m6_k10_frontier.txt`.
+There are now two exact `k=10` Sb cells.  Li--Wu--Triesch's theorem gives
+**`n(10,5)=985`**.  Independently, **`n(10,6)=973`** follows from the exhaustive rejection of
+`Sb(974:6)` and the checked 115-node tree `witnesses/majorized_973_6_at10.tree`.  Its 77
+terminal states are arbitrary singleton sequences weakly majorized by `G_k`, a strictly
+broader certificate than requiring each leaf to be an atom sub-multiset.  Full run
+provenance for the latter is in `evidence/sb_m6_k10_frontier.txt`.
 
-`k = 9`, small `m`: six established entries, all **lower bounds** except `m=1`:
+The generated grid above shows six exact K=9 maxima at `m=1..6`.  Their per-cell theorem,
+witness and exhaustive-replay sources live in `data/pareto_sb.csv`; no second hand-maintained
+copy is kept here.
 
-| m | value | how |
-|---|---|---|
-| 1 | 512 | `2^k`, dichotomy - proven maximal |
-| 2 | 511 | lemma 3, proved |
-| 3 | 503 | lemma 6, proved |
-| 4 | 496 | verified tree `witnesses/canon_496_4_at9.tree` |
-| 5 | 480 | verified tree `witnesses/canon_480_5_at9.tree` |
-| 6 | 473 | verified tree `witnesses/canon_473_6_at9.tree` |
+The local trees are self-contained proofs.  In the canonical trees every leaf is a
+singleton state whose parts form a sub-multiset of `G_k`; the new 481 tree uses the more
+general weak-majorization criterion.  In both cases the Singleton Majorization Theorem
+certifies every leaf directly, so no solver soundness is assumed for achievability.
+`tools/check_witness.py` re-derives all of it.
 
-Those three trees are self-contained proofs. Every leaf is a singleton state whose parts
-form a sub-multiset of `G_k`, so the Singleton Majorization Theorem certifies it directly -
-no solver soundness is assumed anywhere. `tools/check_witness.py` re-derives all of it.
-
-Maximality at `k=9` is open for every `m`, including these six.
+Maximality at `k=9` is open in the unfilled band, not for `m=1..6`.
 
 ## Theorems
 
-Two results are proved in full:
+Three foundational results are proved in full:
 
 - [Singleton Majorization Theorem](theorems/singleton-majorization.md) - decides singleton
   states exactly, by weak majorization against `G_k`. This is what turns a canonical tree
   into a proof.
 - [Unit-Group Elimination Theorem](theorems/unit-group-elimination.md) - `1:1` parts can be
   deleted from any state without affecting solvability, subject only to the mass bound.
+- [Subgraph Monotonicity Theorem](theorems/subgraph-monotonicity.md) - deleting candidate
+  edges cannot make a solvable graph harder; this supplies the upward closure of every exact
+  frontier rejection.
 
 The special-case constructions (lemmas 1-11) are in
 [theorems/special-cases.md](theorems/special-cases.md), each marked proved or not.
@@ -221,15 +222,19 @@ The special-case constructions (lemmas 1-11) are in
 | `canon_248_3_at8.tree` | `Sb(248:3)` in 8 | 2 trees, 7 splits, 16 canonical leaves |
 | `canon_496_4_at9.tree` | `Sb(496:4)` in 9 | 2 trees, 20 splits, 42 leaves |
 | `canon_480_5_at9.tree` | `Sb(480:5)` in 9 | 9 trees, 182 splits, 373 leaves |
+| `canon_480_5_at9_twosided.tree` | `Sb(480:5)` in 9 with two-sided roots | 5 trees |
+| `majorized_481_5_at9.tree` | `Sb(481:5)` in 9 | 61 nodes, 20 splits, 41 majorized leaves |
 | `canon_473_6_at9.tree` | `Sb(473:6)` in 9 | 154 nodes, 51 splits, 103 leaves |
+| `canon_473_6_at9_twosided.tree` | `Sb(473:6)` in 9 with two-sided roots | 1 tree |
+| `majorized_973_6_at10.tree` | `Sb(973:6)` in 10 | 115 nodes, 38 splits, 77 majorized leaves |
 | `sa38_k7.tree` | `Sa(38)` in 7 | 24 numbered nodes |
 | `sa65_k8_{a,b,c}.tree` | `Sa(65)` in 8 | 46 / 40 / 35 nodes |
 | `sa112_k9_{a,b,c}.tree` | `Sa(112)` in 9 | 78 / 72 / 74 nodes |
 | `sa192_k10_a.tree` | `Sa(192)` in 10 | 154 numbered nodes |
 | `sa192_k10_b.tree` | `Sa(192)` in 10 | 149 numbered nodes (tighter) |
 
-All thirteen pass `tools/check_witness.py`. The seven `Sa(38)` / `Sa(65)` / `Sa(112)` trees
-were recovered from `radio.zip` on 2026-08-02.
+All seventeen files pass `tools/check_witness.py`. The seven `Sa(38)` / `Sa(65)` /
+`Sa(112)` trees were recovered from `radio.zip` on 2026-08-02.
 
 ## Exhaustively enumerated multi-part states
 
