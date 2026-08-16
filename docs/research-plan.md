@@ -51,7 +51,10 @@ diagnostic-only. See
 [`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
-literature now settles `m=5`: the old formula/`BBBD` equality is refuted at `k=9`, and the exact
+conditional excess-`q` Pareto-assembly programme is **parked as of 2026-08-16**: retain its proved
+local reductions and conditional constructions, but do not treat further normalization/rank scans
+as a proximate goal.  The literature now settles `m=5`: the old formula/`BBBD` equality is refuted
+at `k=9`, and the exact
 piecewise theorem changes the root from `3+2` to `4+1`.  That theorem is now reconstructed inside
 the corrected Pareto assembly: complete finite enumeration finds the crossing, and the winning
 `4+1` family reduces to a sharp piecewise D slice.  This is the known-answer standard for every
@@ -60,7 +63,7 @@ guarded envelope.  The old `m=6` closed form and `BBCD` profile are refuted by t
 `n(10,6)=973` frontier.  A checked
 sixteen-atom aligned tree now gives the different conditional continuation
 `2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  Inside the
-fixed `(4,3,2)` aligned height-6 slice, the next excessive-`q` question has narrowed sharply: a
+fixed `(4,3,2)` aligned height-6 slice, the unresolved excessive-`q` question narrowed sharply: a
 32-atom all-depth kernel leaves only rank 1180 between the excluded prefix and the constructible
 pure refinement at rank 1181.  That one-rank decision does not by itself establish the global
 `m=6` frontier; an outer-family comparison analogous to the exact `m=5` envelope is separate.
@@ -68,10 +71,10 @@ More generally,
 the outer algebra reduces each `N=2^s` slice to minimizing the D germ's `C` count and then its `B`
 count; no arbitrary word search remains.  The remaining rank has now been exactly excluded through
 depth four.  Exact pure-outcome solution reduces the last level to 1,818 distinct mixed children,
-indexed by the single loss `1<=ell_W<=14`, and guided cover exhausts every one.  The next target is
-therefore the all-depth decision: find a synchronized closed kernel/recurrence containing rank 1180,
-or construct an exact tree whose depth is necessarily at least five.  Do not restart the closed
-depth-four frontier.
+indexed by the single loss `1<=ell_W<=14`, and guided cover exhausts every one.  An all-depth
+decision would require a synchronized closed kernel/recurrence containing rank 1180 or an exact
+tree whose depth is necessarily at least five.  That question is preserved but not scheduled; do
+not restart the closed depth-four frontier.
 For a general normalization `N=2^s` and a fixed mixed-depth budget `t`, scalar supply gives the
 sharp necessary boundary `c>=max(0,2s-1-2t)` and a quadratic B bound when equality holds.  Its
 depth-three specialization has only five persistent B-saving tracks, but it becomes vacuous in C
@@ -264,8 +267,9 @@ does not decide item 2.  Do not infer either a constant `-3` correction to the o
 a constant `-4` correction to the finite recurrence from one value.  Reproduction,
 correctness argument and costs are in the latest journal entry and `docs/tools.md`.
 
-**Conditional excess-q construction track (updated 2026-08-16).** Under the explicitly unproved working
-assumption that every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf regime,
+**Conditional excess-q construction track (parked 2026-08-16).** This is retained as a completed
+investigation, not an active work queue.  Under the explicitly unproved working assumption that
+every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf regime,
 the corrected diagram gives a concrete branch rather than a missing map.  For
 `A=(a:alpha)@k-1` and `B=(b:beta),C=(c:gamma)@k-2`, maximize `d` in
 `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, then score the candidate `a+b+d`.
@@ -284,10 +288,11 @@ while B-height 5 reaches the frontier.  That complete enumerator now exists: at 
 it validates the proven Pareto input levels, exhausts ordered triples, emits a complete full-star
 ranking, and exact-solves all candidates still able to tie its incumbent.  It closes the `m=10`
 working family through parent level 7; the level-8 ranking completes but its exact optimization does
-not.  Next, add an exact resumable/per-slice schedule so one hard level-8 query cannot block cheaper
-later triples, and use guarded mixed-frontier pieces in parallel to seek an eventual formula for
-`d*`.  The atom-induction side should now proceed by height: A/B/C contribute only their already
-constructed outer profiles, while the four-segment D state is the sole synchronized obligation.
+not.  If the track is ever reopened, the missing finite capability is an exact resumable/per-slice
+schedule so one hard level-8 query cannot block cheaper later triples; the missing symbolic object
+is a proved refinement law for the guarded mixed-frontier pieces.  The completed atom-induction
+exploration proceeded by height: A/B/C contribute only their already constructed outer profiles,
+while the four-segment D state is the sole synchronized obligation.
 The calculation closes conditionally through the `AACC` and `BBBD` profiles and first fails at the
 known height-6 `k=10` transition, where refinement changes the candidate D accounting from
 `AAAABBCD` (232) to `ABBBBBCD` (229).  The literal refinement of the successful split is now
@@ -295,7 +300,8 @@ refuted at `k=11`; do not retry it.  The stronger symbolic result now rules out 
 refinement class: following mixed outcomes preserves height and cannot branch a D lineage, so all
 eight-atom ranks 1--81 are all-depth negative.  Rank 82, `A^6D^2`, has a checked three-level tree
 and is the exact A--D eight-atom optimum, yielding the conditional construction
-`2^k-k^2+6k-16` from `k>=17`.  The next task is no longer deeper search for 229.  At 16 atoms the
+`2^k-k^2+6k-16` from `k>=17`.  Deeper search for the finite 229 accounting was thereby superseded.
+At 16 atoms the
 D-lineage certificate excludes ranks 1--289, and the new 242-core `(D,C+D)` coinductive kernel
 excludes ranks 290--304 at every depth.  The first projected rank-305 tree has no exact lift, but the
 product search over alternative projected splits finds a checked 19-node exact tree for
@@ -309,10 +315,10 @@ negative.  At depth four its first mixed transition must have
 `ell_D=ell_V=0` and `1<=ell_W<=14`.  Exact pure-outcome solution leaves 6,696 oriented first tests
 and 1,818 distinct mixed children in those fourteen classes; loss-sliced guided cover exhausts all
 of them, proving that no aligned tree of depth at most four exists.  Inside this fixed height-6
-slice, the next symbolic task is therefore singular but genuinely infinite-depth: build a
-three-coordinate closed kernel or a
-W-indexed recurrence that decides rank 1180, or find an exact tree of depth at least five.  Only
-after that one-rank decision should the slice optimizer move to 64 atoms and test stabilization.
+slice, the remaining symbolic question is singular but genuinely infinite-depth: a
+three-coordinate closed kernel or W-indexed recurrence would have to decide rank 1180, or an exact
+tree would need depth at least five.  It is parked with the rest of the track; moving the slice
+optimizer to 64 atoms before that decision would add data without resolving the structural gap.
 Separately, before any slice formula is promoted to the unrestricted `m=6` frontier, enumerate and
 compare the competing outer families as in the `m=5` calibration.  The general candidate
 `A^(N-b-c-2)B^bC^cD^2`, `N=2^s`, has parent width
@@ -324,6 +330,11 @@ proof and controls are in
 [the atom-lineage note](theorems/atom-lineage.md) and
 [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14).
 
+Reopen this track only if new mathematics addresses at least one of its missing global links: a
+complete outer-family theorem, a refinement-stable exact description of the synchronized D
+antichain, or an all-depth construction/obstruction that connects successive normalizations.  A
+new finite winner, another bounded-depth exclusion, or a fitted atom word is not enough.
+
 ## Ordering
 
 P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed
@@ -334,30 +345,20 @@ Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not conten
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6 now has two distinct tracks while proof-safe cold `run9` and the retained run3/run8 baselines
-continue remotely. The solver track's bounded ordering approximation is deployed in run8/run9:
+P6's solver work continues while proof-safe cold `run9` and the retained run3/run8 baselines
+run remotely. The bounded ordering approximation is deployed in run8/run9:
 long candidates receive a geometric local probe while the one/two-segment constructive spine keeps
 the shared parent budget.
 It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the remote control has now
 passed in 471.6 CPU seconds in run8 and 479.2 in proof-safe run9. Use run8 as the
 matched baseline for run9's natural `Sa(193)` progress, visible-attempt cost and memory, but use only
 run9 for a new negative claim. Do not add split history before that comparison matures.
-The theory track now has two compatible large-k targets: decide the sole all-depth-open 32-atom
-profile at rank 1180, now that exact cover has excluded every depth-at-most-four strategy (while
-the separate exact `k=11` case remains open), and test whether recursive Pareto
-lifting stabilises once low-k degeneration disappears.  In both cases retain alternative Pareto
-upgrades and split classes, then recover small k backwards.  The rank-305 result is the warning in
-miniature: its first projected tree does not lift, while another one does.  Do not use one
-witness-tree shape—or the old timeout on rank 1180—as evidence that either track has a unique
-continuation.  The A/B/C witness internals are not part of this frontier; only their outer profiles
-constrain the synchronized D child.  The next rank-1180 attack should seek a reusable coinductive
-kernel or recurrence rather than re-enumerating the closed finite frontier.  Concretely, export the
-normalized exact-negative memo layers from guided slices, union and minimize them under substate
-inclusion, and make an independent checker exhaust every cut of every proposed core.  Repeated
-bounded layers are discovery evidence only; the checked one-bad-outcome closure is the proof.  Once
-rank 1180 is decided, the 64-atom projected search should minimize `c` before
-any exact `b` search; that ordering follows from the symbolic width formula and prevents another
-undirected profile scan.
+The separate recursive Pareto-lift corpus may still be analyzed as a bounded solver-ordering
+question after its k=8 remainder finishes.  The excess-`q` profile branch—including rank 1180,
+larger normalizations, and attempts to extract a global formula from the A/B/C/D assembly—is parked.
+Its positive trees, all-depth kernels, depth-four cover, and exact `m=5` calibration remain durable
+evidence; they are not an instruction to continue the scan.  The reopening criteria are recorded
+in the parked-track section above.
 
 The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`

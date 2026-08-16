@@ -228,3 +228,10 @@ The executable arithmetic and two-test rectangle algebra are in `tools/m5_assemb
 through `k=64` and checks every recorded exact `m=5` datum against the published theorem.  The exact
 finite construction controls and their independently checked branch trees are part of
 `tools/singletonization_regression.sh`.
+
+## Research status
+
+This calibration is complete.  The broader excess-`q` assembly programme was parked on 2026-08-16.
+Nothing above proves that the assembly family is globally exhaustive, that a sufficiently large
+normalization always stabilizes, or that a fixed outer triple has one uniform D formula.  The note
+remains the known-answer test that any future general construction must pass.

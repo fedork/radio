@@ -6361,3 +6361,47 @@ outer families and piecewise D frontiers, not one preferred height triple or one
 height-6 rank-1180 problem remains a genuine all-depth question inside the fixed `(4,3,2)` aligned
 slice; deciding it alone would not establish the unrestricted `m=6` frontier.  The complete proof
 and scope boundary are recorded in `docs/theorems/m5-pareto-assembly.md`.
+
+## 2026-08-16 — parking the excess-q Pareto-assembly track
+
+The user chose to close this construction track for now.  This is a prioritization decision, not a
+refutation of the sufficiently-large-`q` postulate.  The investigation found a sound local assembly
+mechanism, but the exact `m=5` calibration shows that a general theorem—if one exists—is not the
+simple repetition of one outer height triple, one atom word, or one D recurrence that motivated the
+track.
+
+The durable findings are:
+
+- The corrected diagram reduces every chosen A/B/C triple to the four-segment state
+  `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, with parent width `a+b+d`.
+  A/B/C are genuine black boxes: their internal witness trees do not constrain this residual; only
+  their outer width-height pairs do.
+- For fixed A/B/C, maximizing D is an exact one-dimensional monotone frontier problem.  Its natural
+  scale-free object is nevertheless two-dimensional: the guarded antichain of mixed-child deficits.
+  Full-star majorization supplies only a necessary bound and can overestimate D.
+- The known-answer `m=5` case is completely reconstructed.  Its outer envelope changes from the
+  `(3,2,2)` family to `(4,3,1)`, and the winning family's D maximum itself changes formula.  The
+  eventual branch has a direct singleton-majorization construction, so this is a positive
+  calibration of the local mechanism and a negative calibration of the hoped-for simplification.
+- Atom masses `BBBD`, `ABBD`, and `AABD` reproduce the three exact `m=5` values arithmetically, but
+  `ABBD` and `AABD` have not been established as symmetric non-wasteful atom profiles.
+- At height 6, literal refinement of the finite successful split is exactly negative.  D-lineage
+  and coinductive kernels then give real all-depth obstructions inside the restricted aligned model,
+  while checked trees give conditional lower constructions.  The unresolved rank 1180 is only a
+  question inside one 32-atom `(4,3,2)` slice; deciding it would not establish the unrestricted
+  `m=6` frontier.
+- The finite assembly enumerator, guarded mixed-frontier optimizer, atom-profile certificates,
+  positive trees, and depth-four cover remain useful reproducible tools and controls.  They are no
+  longer an instruction to continue scanning larger normalizations.
+
+What remains unproved is just as important: the proposed `m<=2a` admissibility condition, existence
+of a sufficiently large stabilizing `q`, completeness of the outer assembly family among arbitrary
+strategies, refinement stability of the synchronized D frontier, and any global formula beyond the
+published `m=5` case.  No Pareto datum is changed by closing the track.
+
+The reopening threshold is intentionally high.  Resume only if new mathematics supplies a complete
+outer-family theorem, a refinement-stable exact recurrence for the guarded D antichain, or an
+all-depth construction/obstruction that connects successive normalizations.  Another finite winner,
+bounded-depth negative, fitted word, or larger rank scan does not close the missing global link.
+This closure launched no solver and changed no source-of-truth datum; the table, witness, and
+documentation checks all passed.

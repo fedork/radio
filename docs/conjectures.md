@@ -462,6 +462,18 @@ open.
 
 ## Excess-q Pareto assembly as a variable-D slice (working hypothesis, 2026-08-14)
 
+**Status — parked 2026-08-16.**  The reduction and all results below are retained, but this is no
+longer an active construction programme.  The exact `m=5` calibration confirms the local geometry
+and black-box use of A/B/C, while showing that a global answer already needs competing outer
+families and a piecewise synchronized D frontier.  The height-6 work supplies strong conditional
+constructions and obstructions inside one aligned family, but neither proves the sufficiently-large-
+`q` postulate nor exhausts unrestricted strategies.
+
+Reopening requires a genuinely global bridge: a theorem that the outer family enumeration is
+complete, a refinement-stable exact recurrence for the guarded mixed-child antichain, or an
+all-depth construction/obstruction connecting successive normalizations.  More finite ranks,
+bounded-depth exclusions, or fitted atom words alone do not address the missing implication.
+
 The corrected diagram supplied later on 2026-08-14 makes the geometry explicit and supersedes the
 initial attachment.  Write the chosen one-part Pareto states as
 
@@ -657,11 +669,11 @@ as a list: the `(2,2)` frontier has `2s-1` points.  What can stabilize is a fini
 description whose endpoints and sums depend on `s`.
 
 The corrected diagram removes the supposed missing A/B/C map: the three fixed parts are already
-given by (1), and the finite triple enumerator now exists.  The next finite step is to schedule the
-still-competitive level-8 slices without letting one hard negative block every later triple, while
-retaining an exact proof obligation for each skipped query.  The scale-free step is to fit and then
-prove eventual dyadic-polynomial formulae for `d*`—or for its guarded mixed-frontier pieces—while
-testing whether those descriptions survive atom refinement.
+given by (1), and the finite triple enumerator now exists.  If the track is reopened, the unfinished
+finite engineering task is to schedule the still-competitive level-8 slices without letting one
+hard negative block every later triple, while retaining an exact proof obligation for each skipped
+query.  The missing scale-free mathematics is a proof that eventual dyadic-polynomial formulae for
+`d*`—or for its guarded mixed-frontier pieces—survive atom refinement.
 
 ### Ground-up atom induction: the outer states are black boxes
 
@@ -842,8 +854,9 @@ only the wider rank 1180, `A^27C^3D^2`, unresolved in that slice.  Exact propaga
 excludes that profile through depth three.  At depth four, solving the two pure outcomes exactly
 leaves 1,818 distinct mixed children, and loss-sliced guided cover exhausts all of them.  Hence no
 aligned tree of depth at most four exists, but eventual constructibility is still undecided.  Thus
-arbitrary excessive `q` remains open, but the next symbolic decision is a single profile requiring
-either a depth-at-least-five construction or an all-depth obstruction, rather than a band.  Full
+arbitrary excessive `q` remains open.  Within this one slice, the unresolved symbolic decision is a
+single profile requiring either a depth-at-least-five construction or an all-depth obstruction,
+rather than a band; it is recorded but not scheduled.  Full
 proof and scope are in
 [the atom-lineage note](theorems/atom-lineage.md).
 
@@ -882,8 +895,8 @@ must preserve all D and `C+D` supply and lose between one and fourteen units of 
 6,696 oriented first tests and 1,818 distinct hard children in fourteen loss classes.  Guided exact
 cover returns `NO` on every child, proving the bounded depth-four exclusion.  Both the reduction and
 the exact recursion use only outer dimensions; they do not inspect the solved internals of the A/B/C
-branches.  Scalar supply itself cannot extend this result to all depths, so the remaining step is a
-synchronized closed kernel/recurrence or a deeper positive tree.
+branches.  Scalar supply itself cannot extend this result to all depths; a future resolution would
+need a synchronized closed kernel/recurrence or a deeper positive tree.
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
 `tools/check_dc_tree_lift.py` supplies the exact-coordinate product search.
@@ -931,9 +944,10 @@ core as a substate.  A finite exact antichain `K` is an all-depth D certificate 
     for every S in K and every legal test x,
     some child H_o(S,x) lies in up(K union I).
 
-This is the practical next representation for `H`: minimize the bounded exact-negative memo into
-candidate cores, check the displayed closure without a depth parameter, and add uncovered children
-until it closes or leaves an explicit transition graph for constructive search.  If rank 1180 lies
+If the track is reopened, this is the appropriate representation for `H`: minimize the bounded
+exact-negative memo into candidate cores, check the displayed closure without a depth parameter,
+and add uncovered children until it closes or leaves an explicit transition graph for constructive
+search.  If rank 1180 lies
 in the final upward closure,
 the `-21` family wins the 32-atom slice at all depths.  If not, the uncovered transitions are the
 only candidates for a depth-at-least-five `-20` construction.  Either outcome reuses only outer
@@ -1112,8 +1126,9 @@ Carried over from [journal.md](journal.md), unresolved:
   the right invariants has been found. The depth-2 block clue is a conservative 3-block
   rewrite `{AACC, AB, BC} <-> {AA, AC, BBCC}`.
 - **What replaces the refuted `m=6` profile.** The exact `k=10` maximum is 973, reached through
-  `Sb(496:2,477:4)@9`, so the old `BBCD`/closed-form value 976 is dead.  The next task is a
-  parametric construction or obstruction for this `m=2 + m=4` mixed-state frontier.  Do not fit
+  `Sb(496:2,477:4)@9`, so the old `BBCD`/closed-form value 976 is dead.  The open problem is a
+  parametric construction or obstruction for this `m=2 + m=4` mixed-state frontier; the parked
+  aligned assembly is not presumed to supply it.  Do not fit
   the 973 witness's later subtree or infer either a constant three-unit correction to the old
   formula or a four-unit correction to the finite recurrence from one level.
 - **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs;

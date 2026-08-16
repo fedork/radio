@@ -4,10 +4,11 @@
 don't know it. Last refreshed **2026-08-16** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
-for the winning `4+1` branch;
+for the winning `4+1` branch; the broader excess-`q` assembly programme is now parked because this
+calibration requires a guarded family envelope and the height-6 continuation remains conditional;
 a 504-core certificate excludes 32-atom height-6
 ranks through 1179; rank 1181 is constructible by refinement, leaving only rank 1180 unresolved
-at all depths in that slice; exact loss-sliced cover excludes rank 1180 through depth four, while
+at all depths in that parked slice; exact loss-sliced cover excludes rank 1180 through depth four, while
 depth five and eventual constructibility remain open;
 the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correct the old
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
@@ -40,6 +41,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Exact cover now excludes rank 1180 through depth four; this is still bounded, so depth five and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one finite depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
+| **The excess-`q` Pareto assembly is parked, not a pending global formula.** | Its corrected four-segment reduction and exact `m=5` calibration are durable, but the sufficiently-large-`q` postulate, completeness of the outer-family list, and stabilization of the synchronized D frontier are unproved. `m=5` already needs competing outer triples and a piecewise D solution; the height-6 rank-1180 question concerns only one restricted aligned slice. Do not restart finite normalization/rank searches unless a new theorem or construction addresses one of those global gaps. |
 
 ## Goals
 
@@ -48,7 +50,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. K≤8 table and both theorems are solid; `<TODO>` sections and the stale K=8 column remain. See P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`, `legacy` bounds remain at `m=65..96`, and the band **m = 7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Open.** A 2023 run says yes over ~47 days, but that corpus is unreliable. Needs a cold re-run of **all 16** states — conjecture (u1) would collapse them to one, but it is unproved and 2026-08-03 closed the two obvious routes to it. |
-| **H4** | Structural theory | Active and promising — see below. |
+| **H4** | Structural theory | Active, but the excess-`q` Pareto-assembly avenue is parked — see below. |
 
 ## What is established
 
@@ -86,7 +88,7 @@ profile (both predict `n(10,6)=976`, while the exact maximum is 973), the `m=11`
 (violates monotonicity in m), the hand-typed `409?` as a *derivation* (though see below — it is
 *consistent* with the profile model), and 31 verdicts from the 2023 build.
 
-## Where H4 stands — the most active thread
+## Where H4 stands — structural results and the parked profile track
 
 For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the base sequence
 `G_{k−q}` (a "profile"). Established this session:
@@ -193,7 +195,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   lower mass — by Singleton Majorization, not by solver). What remains is one lemma: *the winning
   split minimising `p−q` survives the coin move*, 187/187 at k ≤ 5 plus 28 at k = 6.
   [conjectures.md](conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
-- **New construction track (2026-08-14, explicitly conditional):** assume without proof that every
+- **Parked construction track (opened 2026-08-14; parked 2026-08-16):** the working programme
+  assumed without proof that every
   labelled A/B/C/D component geometry (not the atom-letter notation) reaches an atomic-leaf regime
   for sufficiently large `q`.  For `A=(a:alpha)@k-1` and
   `B=(b:beta),C=(c:gamma)@k-2`, the corrected picture makes the hard branch exactly
@@ -205,7 +208,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   (`tools/singletonization_regression.sh`).  `assembly-rank` completes the level-8 static stage—165
   admissible triples, 37 surviving bounds—but exact optimization remains open; in particular its
   simple target `Sb(50:4,39:6)@6` is negative.  The generic mixed-frontier/guarded-piece optimizer
-  remains the recursive route to a scale-free D formula.  A height-first atom calculation now
+  identifies the recursive object a scale-free D formula would have to control; no such formula was
+  obtained.  A height-first atom calculation
   clarifies that A/B/C are black boxes: only their outer width-height pairs enter the hard branch;
   no witness-tree or atom-placement alignment is required.  It gives a uniform conditional
   construction for the `AACC` height-4 profile.  At height 5 the old `(3,2,2)` branch gives the
@@ -259,7 +263,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   `b=c=0` passes scalar supply, so this calculation cannot itself become an all-depth theorem.
   The depth-four calculation uses only the outer profiles of A/B/C;
   their internal witness trees do not enter the D-branch constraint.  Arbitrary excessive `q`
-  therefore remains open, but the 32-atom slice is
+  therefore remains open and the programme is now parked; no further normalization or rank search
+  is scheduled.  The 32-atom slice is
   a one-rank problem rather than a profile scan.  All losing and positive
   certificates are independently checked by `tools/atom_profile_regression.sh`, and the depth-four
   cover logs by `tools/check_atom_profile_cover_log.py`; see
@@ -774,12 +779,10 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
    preserve lineage labels through equal components, and measure whether one branch survives at the
    next recursive node.  One greedy low-k path is already known to fail.
 3. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
-   of the profile model; minutes each, and a hit is a self-verifying proof.
-4. If a genuine `ABBD` realization is needed, search for a symmetric non-wasteful 481 tree.
-   The committed singleton-majorized tree proves achievability but compresses its leaves too
-   aggressively for `profile_from_tree.py` to recover a per-coin atom census.
-5. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
-6. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
+   of the profile model; minutes each, and a hit is a self-verifying proof.  These are direct H2
+   construction attempts, not a resumption of the parked assembly programme.
+4. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
+5. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
    here needing no compute at all. An exchange argument is the natural shape; the surviving
    obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).
