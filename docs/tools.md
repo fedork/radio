@@ -751,10 +751,11 @@ This does not maximize arbitrary excessive `q`: 165 is the number of A--D words 
 and 969 the number at sixteen, not the whole longer-profile universe.  At 32 atoms, D lineage and
 the 504-core certificate in `evidence/atom_profile_height6_dc32.cert` exclude ranks 1--1179 at all
 depths.  Pure refinement constructs rank 1181, leaving only rank 1180 open in that slice.  The
-propagated-loss budget makes the C++ rank-1180 depth-three product exhaustive and negative; this is
-a bounded result and does not decide depth four or eventual constructibility.  The Python
-all-skeleton implementation independently reproduces the bounded negative after applying the same
-symbolic loss lemma.  Range slicing still prevents one hard germ from hiding completed work on later
+propagated-loss budget makes the C++ rank-1180 depth-three product exhaustive and negative.  Guided
+loss-sliced cover now also excludes rank 1180 through depth four; this is a bounded result and does
+not decide depth five or eventual constructibility.  The Python all-skeleton implementation
+independently reproduces the depth-three negative after applying the same symbolic loss lemma.
+Range slicing still prevents one hard germ from hiding completed work on later
 germs.  The C++ tool's default two-million exact
 memo-entry ceiling aborts explicitly rather than printing `NO`; external time and memory caps
 remain appropriate for deeper runs.  The proof and scope are in
@@ -835,6 +836,13 @@ A negative from this mode is printed as `atom_profile_cover_slice` with
 full strategy and is printed with its exact tree.  `profile-state-pure-frontier` stops deliberately
 after the pure outcomes and prints `mixed_outcome=UNRESOLVED`; its successful process exit is a
 frontier report, not a positive construction.
+
+The archived `rank1180-depth4-2026-08-15` runs cover `ell_W=1..14` without gaps: 6,696 oriented
+tests and 1,818 distinct mixed children, all exact negative.  Together with the pure-frontier
+calculation this proves that rank 1180 has no aligned tree of depth at most four.  Use
+`tools/check_atom_profile_cover_log.py` with the logged interval and expected counts to verify each
+slice; the checker reconstructs losses from the atom words and requires the scoped final verdict.
+It deliberately does not turn this bounded result into an all-depth claim.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees

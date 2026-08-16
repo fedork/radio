@@ -97,6 +97,16 @@ from the build with known false negatives — the lines are kept as a record, an
 support is recorded as `legacy`, not accepted. `trees-2023` holds witness trees, which
 re-verify from first principles, so its era does not matter.
 
+### Archived — exact bounded structural verdicts
+
+| tag | contents | raw | audited |
+|---|---|---:|---|
+| `rank1180-depth4-2026-08-15` | eight guided exact-cover logs partitioning rank 1180's depth-four mixed frontier into W-loss classes 1..14 | 612 K | complete provenance; `tools/check_atom_profile_cover_log.py` replays all 6,696 oriented tests, 1,818 distinct mixed children and eight scoped `NO` verdicts |
+
+This tag proves only that `A^27C^3D^2` has no aligned tree of depth at most four in the
+32-atom profile model.  It is structural evidence, not a Pareto-table maximality source and not
+an all-depth exclusion.
+
 ### Archived — performance measurements, not verdict sources
 
 | tag | contents | raw | audited |

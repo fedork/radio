@@ -3,8 +3,8 @@
 **Read this first.** Where everything stands, and what will silently ruin your work if you
 don't know it. Last refreshed **2026-08-15** (a 504-core certificate excludes 32-atom height-6
 ranks through 1179; rank 1181 is constructible by refinement, leaving only rank 1180 unresolved
-in that slice; rank 1180 is exactly excluded through depth three, while its depth-four root has
-been reduced to 1,818 distinct hard mixed children but remains open;
+at all depths in that slice; exact loss-sliced cover excludes rank 1180 through depth four, while
+depth five and eventual constructibility remain open;
 proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
 `run3`/`run8` performance baselines).
 
@@ -32,7 +32,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never add "move a coin to the larger side" to `compare_solvability`.** | Conjecture (u1) is unproven, and its multi-part form is outright **false**: `Sb(15:2, 5:4)` is solvable in 4, `Sb(15:2, 6:3)` is not, despite lower mass. Wired into the cache as a dominance rule it would manufacture false negatives — the exact failure mode that makes the 2023 corpus unusable. Only *componentwise* part dominance is sound; see [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md). |
 | **Do not reconstruct the Pareto assembly from the first 2026-08-14 attachment.** | The user explicitly reported that it was the wrong picture. Its color/atom transcription is retracted. The corrected diagram gives the four-segment branch `Sb(d:beta, b:alpha-beta, c:m-alpha-gamma, a-c:gamma)@k-2`; see [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
-| **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Its exact depth-three `NO` and the reduced 1,818-state depth-four mixed frontier are still bounded; depth four and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
+| **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Exact cover now excludes rank 1180 through depth four; this is still bounded, so depth five and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one finite depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 
 ## Goals
 
@@ -206,14 +206,18 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   children.  The only eight children that spend any `C+D` supply are all exact depth-three
   negatives in both implementations.  Thus every remaining first transition has
   `ell_D=ell_V=0` and `1<=ell_W<=14`: 6,696 tests and 1,818 distinct mixed children in fourteen
-  scalar W-loss classes.  The depth-four state is still unresolved, so this is not an all-depth
-  exclusion.  The mixed-supply lemma gives the sound
+  scalar W-loss classes.  Guided exact cover exhausts every one of those children and returns
+  `NO`; `tools/check_atom_profile_cover_log.py` independently replays all class counts and scoped
+  verdicts from artifact `rank1180-depth4-2026-08-15`.  Consequently no rank-1180 aligned tree has
+  depth at most four.  This remains a bounded result: depth five and all-depth constructibility are
+  open.  The mixed-supply lemma gives the sound
   finite-depth bound
   `(D,V,W)->(D,V+tD,W+tV+binom(t,2)D)`, and the outer algebra reduces a general `N=2^s` D germ
   `A^(N-b-c-2)B^bC^cD^2` to the width
   `2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2`.  Hence each slice minimizes `c`, then `b`; at 32 atoms
-  the open `b=0,c=3` postulate would give `2^k-k^2+7k-20`, while only `b=1` and the `-21`
-  construction are checked.  At depth `t`, scalar supply forces
+  the still-unconstructed `b=0,c=3` postulate would give `2^k-k^2+7k-20`, while only `b=1` and
+  the `-21` construction are checked.  The former now requires depth at least five if it exists.
+  At depth `t`, scalar supply forces
   `c>=max(0,2s-1-2t)` and a tied-boundary quadratic lower bound on `b`.  At depth three this leaves
   only five persistent B-saving tracks; rank 1180 begins the first.  Once `t>=s`, however, even
   `b=c=0` passes scalar supply, so this calculation cannot itself become an all-depth theorem.
@@ -221,7 +225,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   their internal witness trees do not enter the D-branch constraint.  Arbitrary excessive `q`
   therefore remains open, but the 32-atom slice is
   a one-rank problem rather than a profile scan.  All losing and positive
-  certificates are independently checked by `tools/atom_profile_regression.sh`; see
+  certificates are independently checked by `tools/atom_profile_regression.sh`, and the depth-four
+  cover logs by `tools/check_atom_profile_cover_log.py`; see
   [the atom-lineage note](theorems/atom-lineage.md).  No Pareto datum changes.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
@@ -239,7 +244,7 @@ track is independently checked by `tools/check_atom_profile_certificate.py` and
 `tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
 searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.
 
-Artifact store `fedork/radio-data` (private): 12 tags, 33 assets plus a manifest per tag,
+Artifact store `fedork/radio-data` (private): 13 tags, 41 assets plus a manifest per tag,
 about 394 MB stored, `check-index` green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).

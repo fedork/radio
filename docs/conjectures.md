@@ -769,9 +769,11 @@ depth.  At 32 atoms, D lineage and a checked 504-core `(D,C+D)` kernel exclude r
 every depth.  Rank 1181, `A^26BC^3D^2`, is the pure refinement of the rank-305 construction, leaving
 only the wider rank 1180, `A^27C^3D^2`, unresolved in that slice.  Exact propagated-loss search now
 excludes that profile through depth three.  At depth four, solving the two pure outcomes exactly
-leaves 1,818 distinct mixed children, but neither depth four nor eventual constructibility is
-decided.  Thus arbitrary excessive `q` remains open, but the next symbolic decision is a single
-profile with a finite hard-child frontier rather than a band.  Full proof and scope are in
+leaves 1,818 distinct mixed children, and loss-sliced guided cover exhausts all of them.  Hence no
+aligned tree of depth at most four exists, but eventual constructibility is still undecided.  Thus
+arbitrary excessive `q` remains open, but the next symbolic decision is a single profile requiring
+either a depth-at-least-five construction or an all-depth obstruction, rather than a band.  Full
+proof and scope are in
 [the atom-lineage note](theorems/atom-lineage.md).
 
 There is now a scale-free objective for that decision.  At normalization `N=2^s`, write the D germ
@@ -781,9 +783,10 @@ as `A^(N-b-c-2)B^bC^cD^2`.  Attaching the three known outer branches gives width
 
 Thus eventual maximization at fixed `s` is lexicographic: minimize `c`, then `b`.  For `s=5`, the
 all-depth projected kernel fixes `c=3`; the checked construction has `b=1`, while `b=0` is the
-unique wider candidate still open.  Its formal parent is `A^108B^12C^6D^2@G[k-7]` and its width is
-`2^k-k^2+7k-20`.  The user's sufficiently-large-`q` postulate licenses the eventual comparison; it
-does not supply this missing construction.  This row is deliberately not added to
+unique wider all-depth candidate still open.  Its formal parent is `A^108B^12C^6D^2@G[k-7]` and
+its width is `2^k-k^2+7k-20`; exact cover shows that any construction for it must have depth at
+least five.  The user's sufficiently-large-`q` postulate licenses the eventual comparison; it does
+not supply this missing construction.  This row is deliberately not added to
 `data/conjectures.csv`: no starting `k` or construction is known, and the next normalization could
 change the optimum again.
 
@@ -805,15 +808,19 @@ supply relaxation, so an all-depth conclusion needs a synchronized closed kernel
 
 At depth four, exact solution of both pure children shows that any surviving first mixed transition
 must preserve all D and `C+D` supply and lose between one and fourteen units of `B+C+D`.  This leaves
-6,696 oriented first tests and 1,818 distinct hard children in fourteen loss classes.  These are
-constraints on the outer dimensions alone; they do not inspect the solved internals of the A/B/C
-branches.
+6,696 oriented first tests and 1,818 distinct hard children in fourteen loss classes.  Guided exact
+cover returns `NO` on every child, proving the bounded depth-four exclusion.  Both the reduction and
+the exact recursion use only outer dimensions; they do not inspect the solved internals of the A/B/C
+branches.  Scalar supply itself cannot extend this result to all depths, so the remaining step is a
+synchronized closed kernel/recurrence or a deeper positive tree.
 
 `tools/search_atom_profiles.cpp` implements both normalizations and the two-coordinate abstraction;
 `tools/check_dc_tree_lift.py` supplies the exact-coordinate product search.
 `tools/atom_profile_regression.sh` invokes independent checkers for the D-lineage certificate, the
-two-coordinate kernel, the failed first lift, and all retained positive trees.  This is the concrete
-version of the abstract `H` state below and still uses only the outer profiles of A/B/C.
+two-coordinate kernel, the failed first lift, and all retained positive trees;
+`tools/check_atom_profile_cover_log.py` replays the depth-four loss partition and accounting.  This
+is the concrete version of the abstract `H` state below and still uses only the outer profiles of
+A/B/C.
 
 ### Minimal state for a height-first D optimizer
 
@@ -845,6 +852,21 @@ together with refinement-compatible guarded pieces for the D mixed-child frontie
 numeric widths or atom counts alone is only discovery evidence.  A scalable proof still requires a
 symbolic split template (as above for heights 4 and 5), or an induction showing that the guarded
 frontier description itself refines.
+
+The rank-1180 depth-four closure makes the required induction precise.  Let `I` be the immediate
+lineage/majorization failures and let `up(K union I)` mean every state containing a listed losing
+core as a substate.  A finite exact antichain `K` is an all-depth D certificate exactly when
+
+    for every S in K and every legal test x,
+    some child H_o(S,x) lies in up(K union I).
+
+This is the practical next representation for `H`: minimize the bounded exact-negative memo into
+candidate cores, check the displayed closure without a depth parameter, and add uncovered children
+until it closes or leaves an explicit transition graph for constructive search.  If rank 1180 lies
+in the final upward closure,
+the `-21` family wins the 32-atom slice at all depths.  If not, the uncovered transitions are the
+only candidates for a depth-at-least-five `-20` construction.  Either outcome reuses only outer
+profiles and proof pointers; no inner A/B/C catalog is introduced.
 
 ## One-sided n-splits: avoidable at every node tested, but not proven excludable
 

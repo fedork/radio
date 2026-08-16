@@ -6098,8 +6098,8 @@ depth-four construction must satisfy
 The remaining frontier is 6,696 oriented tests and 1,818 distinct mixed children in fourteen
 one-dimensional W-loss classes.  Counts `(tests/distinct children)` for `w=1,...,14` are
 `108/32, 226/64, 346/97, 468/131, 594/166, 726/202, 744/202, 752/202, 762/202,
-644/170, 524/138, 398/105, 268/71, 136/36`.  This is not a depth-four negative: none of those
-1,818 hard children has yet been collectively decided.
+644/170, 524/138, 398/105, 268/71, 136/36`.  This reduction alone was not a depth-four negative;
+the guided exact-cover closure recorded in the next entry subsequently decided all 1,818 children.
 
 The independent Python frontier and eight-child closure took 18.91 wall / 18.40 user seconds with
 about 104 MB maximum physical footprint and reproduced every aggregate count above.  The C++ path
@@ -6109,8 +6109,97 @@ ended `TIMEOUT` after 62 wall seconds at 0.10 GB peak RSS; it produced no verdic
 per-part exact-envelope prototype was manually stopped after at least 48 CPU seconds without a
 result and was replaced by the cheap sound height-cap formula.
 
-The next symbolic target is therefore the 1,818-state mixed antichain, not the solved A/B/C
-internals and not another undirected root run.  A three-coordinate closed kernel or a recurrence
-indexed by the fourteen W-loss values would turn this finite reduction into either a depth-four
-exclusion or a construction.  Eventual rank-1180 constructibility, the formal `-20` width family,
-and arbitrary excessive `q` all remain open.  No Pareto CSV datum changed.
+At this stage the next target was therefore the 1,818-state mixed antichain, not the solved A/B/C
+internals and not another undirected root run.  The guided cover below closes that finite target.
+Eventual rank-1180 constructibility, the formal `-20` width family, and arbitrary excessive `q`
+remain open.  No Pareto CSV datum changed.
+
+## 2026-08-15 — the symbolic boundary and guided exact cover close depth four
+
+The finite-depth algebra now has a closed general form.  For normalization `N=2^s`, write the only
+eventually competitive D germ as
+
+    A^(N-b-c-2) B^b C^c D^2.
+
+Its initial supply and the height-6 terminal demand are
+
+    Sigma=(2,c+5,3s+b+c+1),       Q_6=(2,2s+4,s^2+3s+5).
+
+After `t` optimistic mixed refinements, comparison with `Q_6` first forces
+
+    c >= max(0,2s-1-2t).
+
+When that unclamped bound is positive and ties the middle coordinate, the last coordinate then
+forces
+
+    b >= max(0,s^2-2s-2st-t+t^2+5).
+
+`tools/check_atom_parent_formula.py` derives these inequalities independently for 63 `(s,t)` cases
+through `s=12`.  At depth three, pure refinement of the checked sixteen-atom germ lies on
+`c=2s-7, b=(s-4)^2`, while supply permits `b>=max(0,s^2-8s+11)`.  The possible B saving is therefore
+zero at 16 atoms, one at 32, four at 64 and five from 128 atoms onward.  Refinement preserves a
+fixed saving, so there are only five persistent nontrivial tracks: saving one begins at 32 atoms,
+savings two through four at 64, and saving five at 128.  This is an exact organization of the
+depth-three supply boundary, not a construction.  Once `t>=s`, even `b=c=0` passes the scalar
+relaxation, which proves that this scalar method cannot by itself settle arbitrary excessive `q`.
+
+The exact search was reorganized around that limitation.  `construct_guided` enumerates every
+winning `(D,C+D)` projected skeleton first and then every compatible hidden B-coordinate lift.  It
+changes only enumeration order: a positive still emits a full exact tree, and a negative is printed
+only after every lift is exhausted.  At the root, cover order first solves the shared pure outcomes
+and then the mixed children in retained-supply order.  The W-loss-slice mode makes a completed
+interval durable and labels a negative explicitly as applying only to the declared root slice.
+`tools/check_atom_profile_cover_log.py` reconstructs every child's loss from its atom words and
+checks candidate multiplicities, distinct-child counts, class coverage, final scope and run
+summary.
+
+Several failed orders were useful in arriving there.  Ordinary identity cover ran about 4m25s,
+rejected only 23 mixed children and produced no verdict.  Supply-first ordinary recursion spent
+more than 90 seconds on its first W=1 child.  A depth-three ordinary W=1 materialization reduced
+4,994 cuts to 2,726 candidates and 1,010 children but was stopped after two minutes.  Recursive W=1
+cover timed out after 303 seconds at 0.03 GB RSS after reaching 81 grandchildren; an independent
+Python W=1 closure timed out after 1,806 seconds at 0.16 GB, also without a verdict.  An attempted
+MRV shortcut was unsound: it changed two locked outputs from `86/78` to `78/74`, so it was reverted.
+After the revert the final-only canonical control returned `86/78` in 1.22 seconds, versus 0.766
+seconds for the prior safe order and 0.103 seconds for the invalid shortcut.  These timings are
+search-order measurements, not mathematical evidence.
+
+The safe guided controls were decisive: rank 305 returned a checked 19-node positive in 0.013
+solver seconds, while rank 1180 returned the already known depth-three `NO` in 0.915 seconds.  The
+first W=1 depth-four child then returned exact `NO` in 55.8798 seconds after 99,340 calls, 9,748 memo
+states and 247,471,270 cut assignments, establishing that the approach could finish individual
+children.  An exploratory full-root run reached its 1,806-second cap at 0.04 GB RSS after completing
+W=1, W=2 and 24 W=3 children, but emitted no root verdict.  A cold W=3-only restart was manually
+stopped after about 7m29s with only 19 children complete: discarding the lower-loss memo lost more
+than it saved.  The final slicing therefore kept W=1..3 together.
+
+The exact completed slices use `W interval: oriented tests / distinct children / solver seconds`:
+`1..3: 680/193/1784.59`, `4..8: 3284/903/1786.34`, `9: 762/202/781.322`,
+`10: 644/170/590.728`, `11: 524/138/424.129`, `12: 398/105/287.151`,
+`13: 268/71/171.830`, and `14: 136/36/98.1987`.  In total, 6,696 oriented tests and all 1,818
+distinct mixed children returned exact `NO` in 5,924.29 solver-wall seconds.  The wrapper-reported
+peak RSS was at most 0.04 GB in every slice; as elsewhere on this Mac, that is not a total-memory
+bound.  All eight logs pass embedded-provenance validation and the independent cover-log accounting
+checker; the verified raw outputs are archived as
+`rank1180-depth4-2026-08-15`.
+
+Combining those negatives with the already exact pure outcomes proves that `A^27C^3D^2` has no
+aligned strategy tree of depth at most four.  Therefore the formal `2^k-k^2+7k-20` parent, if it is
+constructible at all, needs a D-branch tree of depth at least five.  The checked scalable family
+remains `2^k-k^2+7k-21`, obtained from rank 1181 by refinement.  This does **not** prove rank 1181 is
+the all-depth 32-atom optimum: rank 1180 may still have a deeper tree.
+
+A final direct guided probe at depth five was capped at 1,800 seconds.  It timed out after 1,802
+wall seconds with exit 124 and no solver result line; the log contains only valid build/run
+provenance and the capped-run summary.  Its wrapper-reported peak RSS was 0.03 GB, again not a total
+memory bound on this Mac.  This is an inconclusive search-order measurement, not evidence against a
+depth-five construction.  The small no-verdict log remains local and was not added to the artifact
+store.
+
+The logical next step is no longer another scalar supply inequality or a rerun of this finite
+frontier.  Minimize the exact negative memo states into a three-coordinate losing antichain, then
+seek a mechanically checkable fixed point: for every test of every listed core, at least one outcome
+must contain a listed losing core after refinement.  If that closed kernel contains rank 1180, the
+result becomes all-depth.  If closure fails, the uncovered transitions identify the only routes a
+depth-at-least-five positive tree can use.  This is the scalable symbolic fork.  No Pareto CSV datum
+changed.

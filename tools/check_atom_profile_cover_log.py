@@ -55,13 +55,12 @@ def main() -> int:
     frontiers = [line for line in lines if line.startswith("cover_root_pure_frontier ")]
     summaries = [line for line in lines if line.startswith("atom_profile_cover_slice ")]
     final_results = [line for line in lines if line.startswith("cover_root_result ")]
-    if len(materialized) != 1 or len(frontiers) != 1 or len(summaries) != 1:
-        raise ValueError("expected one materialized, frontier, and scoped-summary line")
+    if len(materialized) != 1 or len(summaries) != 1 or len(frontiers) > 1:
+        raise ValueError("expected one materialized/scoped-summary line and at most one frontier")
     if not final_results or "answer=NO" not in final_results[-1] or "active=0" not in final_results[-1]:
         raise ValueError("cover search did not finish with an exhaustive NO")
 
     materialized_fields = parse_fields(materialized[0])
-    frontier_fields = parse_fields(frontiers[0])
     summary_fields = parse_fields(summaries[0])
     if summary_fields.get("answer") != "NO":
         raise ValueError("slice summary is not negative")
@@ -92,10 +91,17 @@ def main() -> int:
         class_candidates[loss] = int(fields["candidates"])
         class_unique[loss] = int(fields["unique_mixed_children"])
 
-    candidates = int(frontier_fields["candidates"])
-    unique = int(frontier_fields["unique_mixed_children"])
-    if candidates > int(materialized_fields["candidates"]):
-        raise ValueError("pure-frontier candidate count exceeds the materialized count")
+    if frontiers:
+        frontier_fields = parse_fields(frontiers[0])
+        candidates = int(frontier_fields["candidates"])
+        unique = int(frontier_fields["unique_mixed_children"])
+        if candidates > int(materialized_fields["candidates"]):
+            raise ValueError("pure-frontier candidate count exceeds the materialized count")
+    else:
+        candidates = int(materialized_fields["candidates"])
+        unique = int(materialized_fields["unique_children"])
+        if candidates != 0 or unique != 0:
+            raise ValueError("nonempty materialized cover has no pure-frontier summary")
     if candidates != sum(class_candidates.values()) or unique != sum(class_unique.values()):
         raise ValueError("loss-class totals do not match the frontier summary")
     if args.expect_candidates is not None and candidates != args.expect_candidates:
@@ -106,6 +112,7 @@ def main() -> int:
     root_state = summary_fields["state"]
     root_supply = refine_supply(state_supply(root_state))
     starts: list[str] = []
+    started_frequency = 0
     observed_losses: Counter[Deficit] = Counter()
     for line in lines:
         if not line.startswith("cover_root_mixed_start "):
@@ -113,6 +120,10 @@ def main() -> int:
         fields = parse_fields(line)
         state = fields["state"]
         starts.append(state)
+        frequency = int(fields["frequency"])
+        if frequency <= 0:
+            raise ValueError("a mixed child was started with zero frequency")
+        started_frequency += frequency
         child_supply = state_supply(state)
         loss = tuple(root_supply[index] - child_supply[index] for index in range(3))
         observed_losses[loss] += 1
@@ -123,6 +134,14 @@ def main() -> int:
     if observed_losses != Counter(class_unique):
         raise ValueError(
             f"started mixed-child loss counts {observed_losses} != frontier {class_unique}"
+        )
+    # A NO child removes exactly its current frequency of active root tests, whereas a YES child
+    # removes none.  Since the final active count is zero, equality here proves that every started
+    # mixed child was negative even when the producer suppressed a fast per-child answer line.
+    if started_frequency != candidates:
+        raise ValueError(
+            f"started-child frequency sum {started_frequency} != {candidates} candidates; "
+            "not every distinct mixed child is certified negative"
         )
     if any(loss[0] or loss[1] or not (loss_range[0] <= loss[2] <= loss_range[1])
            for loss in observed_losses):

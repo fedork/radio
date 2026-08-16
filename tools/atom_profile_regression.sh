@@ -275,6 +275,8 @@ rg -q 'cover_root_materialized .*candidates=0 .*slice_loss=0,0,99..99' \
     "$work_dir/rank1180-empty-slice.out"
 rg -q 'atom_profile_cover_slice .*answer=NO .*loss_W=99..99 .*scope=declared_root_loss_slice_only' \
     "$work_dir/rank1180-empty-slice.out"
+tools/check_atom_profile_cover_log.py "$work_dir/rank1180-empty-slice.out" \
+    --expect-loss 99:99 --expect-candidates 0 --expect-unique 0
 
 # At depth four, exact solution of both pure children leaves a finite mixed-child frontier.  The
 # independent Python implementation above reproduces these counts and exhausts the eight states

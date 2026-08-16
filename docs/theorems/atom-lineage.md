@@ -278,9 +278,10 @@ supply and at most four W supply.  The complete aligned product then returns `NO
 seconds in the measured run; `tools/atom_profile_regression.sh` reproduces the exhaustive bounded
 verdict.  The separately implemented Python all-skeleton search independently reaches the same
 `NO` by enumerating every winning two-coordinate skeleton and every exact hidden-coordinate lift.
-Thus no rank-1180 aligned tree has depth at most three.  This is not an all-depth exclusion.  Exact
-depth-four runs using both complete-product and outer-prefix order reached their explicit ten-minute
-CPU caps without a verdict.
+Thus no rank-1180 aligned tree has depth at most three.  This is not an all-depth exclusion.  The
+first undirected depth-four runs using complete-product and outer-prefix order reached their explicit
+ten-minute CPU caps without a verdict; the finite-frontier decomposition below supersedes those
+inconclusive attempts.
 
 A finite root-frontier calculation now replaces those undirected depth-four attempts.  Sound
 symbolic and projected filters leave 7,266 oriented first tests.  Solving both pure-outcome
@@ -292,8 +293,17 @@ the C++ and Python implementations.  Therefore every possible depth-four tree mu
     ell_D=ell_V=0,       1<=ell_W<=14.                            (11a)
 
 The remaining exact frontier has 6,696 oriented first tests and 1,818 distinct mixed children in
-fourteen scalar W-loss classes.  This is a bounded reduction, not a depth-four verdict: rank 1180,
-the 32-atom optimum, and eventual constructibility all remain open.
+fourteen scalar W-loss classes.  Guided exact cover, partitioned into loss intervals `1..3`, `4..8`
+and the six singleton intervals `9` through `14`, exhausts every child and returns `NO` in every
+slice.  `tools/check_atom_profile_cover_log.py` reconstructs each logged child's three losses from
+its atom words and verifies the expected candidate, distinct-child and class totals.  The eight raw
+logs, with complete run provenance, are archived under `rank1180-depth4-2026-08-15` and indexed in
+`data/artifacts.csv`.  Therefore
+
+    A^27 C^3 D^2 has no aligned strategy tree of depth at most four.        (11b)
+
+This is still a bounded exclusion.  Rank 1180 may have a deeper tree, so the 32-atom all-depth
+optimum and eventual constructibility remain open.
 
 ## Scalar form of the remaining D optimization
 
@@ -395,8 +405,8 @@ For a first-transition loss `ell`, depth three therefore requires
 full two units of V slack are spent, (2b) further gives `ell_W+3ell_V<=18`, hence `ell_W<=12`.
 Exact solution of the two pure children then removes every `ell_V>0` case and the `ell_W=0` case,
 leaving precisely the necessary frontier (11a).  These calculations use only the outer profiles
-and the candidate D germ, not the inner witness trees of A/B/C.  The 1,818 mixed children are the
-finite symbolic interface for the next D-branch calculation.
+and the candidate D germ, not the inner witness trees of A/B/C.  Exact cover closes all 1,818 mixed
+children at depth four; a deeper or coinductive argument is now required.
 
 ## Mechanical verification
 
@@ -431,7 +441,10 @@ guards the complete-product search path used there; `tools/check_dc_tree_lift.py
 independently repeats the bounded rank-1180 negative.  At depth four, both implementations enumerate
 the same 7,266 filtered first tests, 6,712 pure-feasible tests and 1,826 mixed children.  They also
 independently exhaust the same eight positive-`V`-loss children, all negative, which certifies the
-reduced frontier (11a).  `tools/check_atom_profile_certificate.py`
+reduced frontier (11a).  Guided exact cover then closes its remaining 6,696 tests and 1,818 distinct
+children.  `tools/check_atom_profile_cover_log.py` verifies the loss partition, multiplicities,
+distinct-child accounting, complete scoped `NO` lines and run summaries in the archived logs; it
+cannot confuse a slice verdict with a full-state verdict.  `tools/check_atom_profile_certificate.py`
 independently checks the local triangular supply inequality while replaying 5,540,319 transitions
 at 16 atoms and checks 5,814 ordered-triple/depth propagation cases against literal triangular
 iteration.
