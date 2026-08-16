@@ -170,6 +170,17 @@ diff \
     <(rg '^dc_tree' evidence/atom_profile_height6_dc16.cert) \
     <(rg '^dc_tree' "$work_dir/dc-rank305-depth3.out")
 
+# The projected-skeleton-guided exact recursion must still lift a genuine exact tree.  This
+# guards the positive path independently through the generic tree checker.
+run_profile_16 profile-state-guided-dc-kernel 3 \
+    evidence/atom_profile_height6_dc16.cert \
+    AAAAAAAAAAAABBBC:1 \
+    AAAAAAAAABBBBBCC:2 \
+    AAAAAAAAAAAAACDD:3 \
+    > "$work_dir/rank305-guided.out"
+rg -q 'answer=YES .*profile_atoms=16' "$work_dir/rank305-guided.out"
+tools/check_atom_profile_tree.py "$work_dir/rank305-guided.out"
+
 CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     -DATOM_PROFILE_ATOMS=32 tools/search_atom_profiles.cpp \
     -o "$work_dir/search_atom_profiles_32"
@@ -223,6 +234,47 @@ if rg -q 'atom_profile_depth_obstruction=' "$work_dir/rank1180-depth3.out"; then
     echo 'rank-1180 depth-3 result was only a root obstruction, not exhaustive' >&2
     exit 1
 fi
+
+# The alternative exact recursion enumerates winning (D,C+D) skeletons first and then every
+# hidden B-coordinate lift.  It must reproduce the independently established depth-three NO.
+if run_profile_32 profile-state-guided-dc-kernel 3 \
+    evidence/atom_profile_height6_dc32.cert \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3 \
+    > "$work_dir/rank1180-depth3-guided.out"; then
+    echo 'guided rank-1180 search unexpectedly solved depth three' >&2
+    exit 1
+else
+    status=$?
+    if [[ $status -ne 1 ]]; then
+        echo "guided rank-1180 depth-three search aborted with status $status" >&2
+        exit "$status"
+    fi
+fi
+rg -q 'answer=NO .*profile_atoms=32 .*assignments=[1-9][0-9]*' \
+    "$work_dir/rank1180-depth3-guided.out"
+
+# A loss-sliced cover run must label a negative as scoped, never as a full-state verdict.
+if run_profile_32 profile-state-cover-guided-w-range-dc-kernel 4 \
+    evidence/atom_profile_height6_dc32.cert 99 99 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3 \
+    > "$work_dir/rank1180-empty-slice.out" 2>&1; then
+    echo 'empty rank-1180 W-loss slice unexpectedly solved' >&2
+    exit 1
+else
+    status=$?
+    if [[ $status -ne 1 ]]; then
+        echo "empty rank-1180 W-loss slice aborted with status $status" >&2
+        exit "$status"
+    fi
+fi
+rg -q 'cover_root_materialized .*candidates=0 .*slice_loss=0,0,99..99' \
+    "$work_dir/rank1180-empty-slice.out"
+rg -q 'atom_profile_cover_slice .*answer=NO .*loss_W=99..99 .*scope=declared_root_loss_slice_only' \
+    "$work_dir/rank1180-empty-slice.out"
 
 # At depth four, exact solution of both pure children leaves a finite mixed-child frontier.  The
 # independent Python implementation above reproduces these counts and exhausts the eight states

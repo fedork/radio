@@ -41,6 +41,10 @@ def transform_power(supply: Supply, steps: int) -> Supply:
     return d, v + steps * d, w + steps * v + math.comb(steps, 2) * d
 
 
+def eventually_nonnegative(value: Supply) -> bool:
+    return next((coefficient > 0 for coefficient in value if coefficient), True)
+
+
 def profile_value(profile: Profile, base: int) -> int:
     a, b, c, d = profile
     atom_a = 2**base
@@ -155,10 +159,173 @@ def main() -> int:
     if depth4_w_budget_at_v_boundary != 12:
         raise AssertionError("depth-four conditional W-loss budget mismatch")
 
+    # Follow the depth-three boundary at every larger normalization.  The V coordinate first
+    # permits c=2s-7.  At equality the W coordinate requires
+    # b>=max(0,s^2-8s+11).  Purely refining the checked sixteen-atom germ instead gives
+    # b=(s-4)^2, so only five one-unit B savings can ever appear on this boundary: saving one
+    # first appears at s=5, savings two through four at s=6, and saving five at s=7.
+    # This is a finite reduction for the depth-three boundary, not an all-depth lower bound on c.
+    ladder: list[tuple[int, int, int, int, int]] = []
+    finite_depth_cases = 0
+    previous_pure_germ: Profile | None = None
+    previous_saving_germs: dict[int, Profile] = {}
+    expected_best_constants = {4: -21, 5: -20, 6: -17, 7: -16}
+    for s in range(4, 13):
+        atoms = 2**s
+        c_boundary = 2 * s - 7
+        b_minimum = max(0, s * s - 8 * s + 11)
+        pure_b = (s - 4) ** 2
+        pure_germ = (atoms - pure_b - c_boundary - 2, pure_b, c_boundary, 2)
+        if previous_pure_germ is not None and refine(previous_pure_germ) != pure_germ:
+            raise AssertionError("pure boundary germ does not refine recursively")
+        previous_pure_germ = pure_germ
+
+        fixed_parts = (
+            lift((5, 2, 1, 0), atoms),
+            lift((3, 3, 2, 0), atoms),
+        )
+        boundary_germ = (
+            atoms - b_minimum - c_boundary - 2,
+            b_minimum,
+            c_boundary,
+            2,
+        )
+        boundary_supply = add_supplies(
+            *(profile_supply(part) for part in (*fixed_parts, boundary_germ))
+        )
+        requirement = add_supplies(
+            *(profile_supply(lift(unit, atoms)) for unit in units)
+        )
+        if boundary_supply != (2, c_boundary + 5, 3 * s + b_minimum + c_boundary + 1):
+            raise AssertionError("general boundary supply mismatch")
+        if requirement != (2, 2 * s + 4, s * s + 3 * s + 5):
+            raise AssertionError("general terminal requirement mismatch")
+        boundary_upper = transform_power(boundary_supply, 3)
+        if not eventually_nonnegative(
+            tuple(boundary_upper[index] - requirement[index] for index in range(3))
+        ):
+            raise AssertionError("claimed depth-three boundary fails its supply condition")
+        narrower_c_supply = add_supplies(
+            *(profile_supply(part) for part in fixed_parts),
+            profile_supply(
+                (atoms - b_minimum - c_boundary - 1, b_minimum, c_boundary - 1, 2)
+            ),
+        )
+        if eventually_nonnegative(
+            tuple(
+                transform_power(narrower_c_supply, 3)[index] - requirement[index]
+                for index in range(3)
+            )
+        ):
+            raise AssertionError("c below the depth-three boundary passed unexpectedly")
+
+        # At any finite mixed-path budget t, the same two lexicographic comparisons give
+        # c>=max(0,2s-1-2t).  When that value is positive (so the V coordinates tie), W further
+        # requires b>=max(0,s^2-2s-2st-t+t^2+5).  Once t>=s, c=b=0 already passes this scalar
+        # relaxation because its V supply is strictly larger; supply alone therefore cannot be
+        # promoted to an all-depth C bound.
+        for depth in range(3, s + 2):
+            finite_c = max(0, 2 * s - 1 - 2 * depth)
+            finite_b = (
+                max(
+                    0,
+                    s * s
+                    - 2 * s
+                    - 2 * s * depth
+                    - depth
+                    + depth * depth
+                    + 5,
+                )
+                if finite_c > 0
+                else 0
+            )
+            finite_germ = (
+                atoms - finite_b - finite_c - 2,
+                finite_b,
+                finite_c,
+                2,
+            )
+            finite_supply = add_supplies(
+                *(profile_supply(part) for part in fixed_parts),
+                profile_supply(finite_germ),
+            )
+            finite_upper = transform_power(finite_supply, depth)
+            if not eventually_nonnegative(
+                tuple(
+                    finite_upper[index] - requirement[index]
+                    for index in range(3)
+                )
+            ):
+                raise AssertionError("general finite-depth boundary failed")
+            if finite_c > 0:
+                lower_c_germ = (
+                    atoms - finite_b - finite_c - 1,
+                    finite_b,
+                    finite_c - 1,
+                    2,
+                )
+                lower_c_supply = add_supplies(
+                    *(profile_supply(part) for part in fixed_parts),
+                    profile_supply(lower_c_germ),
+                )
+                if eventually_nonnegative(
+                    tuple(
+                        transform_power(lower_c_supply, depth)[index]
+                        - requirement[index]
+                        for index in range(3)
+                    )
+                ):
+                    raise AssertionError("general finite-depth C boundary was not sharp")
+            if finite_b > 0:
+                lower_b_germ = (
+                    atoms - finite_b - finite_c - 1,
+                    finite_b - 1,
+                    finite_c,
+                    2,
+                )
+                lower_b_supply = add_supplies(
+                    *(profile_supply(part) for part in fixed_parts),
+                    profile_supply(lower_b_germ),
+                )
+                if eventually_nonnegative(
+                    tuple(
+                        transform_power(lower_b_supply, depth)[index]
+                        - requirement[index]
+                        for index in range(3)
+                    )
+                ):
+                    raise AssertionError("general finite-depth B boundary was not sharp")
+            finite_depth_cases += 1
+
+        saving = pure_b - b_minimum
+        best_constant = (
+            -s * s - 3 * s + c_boundary * (s + 1) - b_minimum + 2
+        )
+        if best_constant != expected_best_constants.get(s, -16):
+            raise AssertionError("depth-three boundary constant mismatch")
+        expected_saving = {4: 0, 5: 1, 6: 4}.get(s, 5)
+        if saving != expected_saving:
+            raise AssertionError("depth-three refinement-saving ladder mismatch")
+        for retained_saving in range(saving + 1):
+            germ_b = pure_b - retained_saving
+            germ = (
+                atoms - germ_b - c_boundary - 2,
+                germ_b,
+                c_boundary,
+                2,
+            )
+            previous = previous_saving_germs.get(retained_saving)
+            if previous is not None and refine(previous) != germ:
+                raise AssertionError("a boundary saving did not persist under refinement")
+            previous_saving_germs[retained_saving] = germ
+        ladder.append((s, c_boundary, b_minimum, pure_b, saving))
+
     print(
         f"atom parent formula verified: {cases} direct evaluations and 3 boundary cases; "
         "rank-1180 supply=(2,8,19), terminal=(2,14,45), "
-        "depth3_loss=(D=0,V=0,W<=4), depth4_loss=(D=0,V<=2,W<=12_at_V=2)"
+        "depth3_loss=(D=0,V=0,W<=4), depth4_loss=(D=0,V<=2,W<=12_at_V=2); "
+        f"finite_depth_boundaries={finite_depth_cases}; "
+        f"depth3_boundary_ladder={ladder}"
     )
     return 0
 

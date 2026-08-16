@@ -338,6 +338,47 @@ through depth three.  The exact 32-atom all-depth question is consequently still
     b=0: A^27C^3D^2, unresolved, formal parent
          A^108B^12C^6D^2 @ G_(k-7), width 2^k-k^2+7k-20.         (15)
 
+More generally, with `t` mixed transitions still available, the same lexicographic calculation is
+exactly
+
+    c >= max(0,2s-1-2t),                                         (15a)
+
+and, when the unclamped right side is positive so that the V coordinates tie,
+
+    b >= max(0,s^2-2s-2st-t+t^2+5).                              (15b)
+
+This also identifies the limit of the supply method.  Once `t>=s`, the germ with `b=c=0` already
+passes this scalar relaxation because its V coordinate is strictly above the requirement.  Thus no
+fixed finite-depth supply inequality can become the missing all-depth lower bound on `c`; that step
+requires a synchronized/coinductive obstruction such as the projected kernels above.
+
+There is a useful finite refinement pattern inside that depth-three boundary.  Starting from the
+checked sixteen-atom germ, pure refinement has
+
+    c_s=2s-7,                 b_s=(s-4)^2.
+
+At the same minimum `c_s`, the supply bound is actually
+
+    b >= b_min(s) = max(0,s^2-8s+11).                            (15c)
+
+Thus the formal improvement over pure refinement is at most zero units at `s=4`, one at `s=5`,
+four at `s=6`, and five from `s=7` onward.  Equivalently, the best width not excluded by this
+particular depth-three supply calculation has constant term `-21,-20,-17,-16` at `s=4,5,6,7`
+respectively, and `-16` thereafter, always with linear coefficient `7`.
+
+Moreover a saving `j` is preserved exactly by refinement:
+
+    (b,c)=((s-4)^2-j, 2s-7)
+      -> ((s-3)^2-j, 2(s+1)-7).                                  (15d)
+
+So the boundary contains only five nontrivial refinement tracks: saving one first appears at 32
+atoms, savings two through four at 64 atoms, and saving five at 128 atoms.  Rank 1180 is precisely
+the first seed of the saving-one track.  This is a finite organization of the *depth-three supply
+boundary*, not a proof that any saving is constructible and not an exclusion of deeper strategies
+with `c<2s-7`.  Turning it into an arbitrary-excess theorem still requires an all-depth continuation
+of the projected `c` boundary.  `tools/check_atom_parent_formula.py` independently checks
+(15a)--(15d) through `s=12` by direct refinement and supply evaluation.
+
 The working sufficiently-large-`q` postulate licenses this eventual comparison, but does not imply
 the second line of (15) is constructible.  It is the unique wider candidate left at `s=5`.  At
 larger `s`, neither `c=2s-7` nor `b=0` may be assumed without another all-depth

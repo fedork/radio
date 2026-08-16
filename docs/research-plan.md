@@ -60,6 +60,11 @@ count; no arbitrary word search remains.  The remaining rank has now been exactl
 depth three.  At depth four, exact solution of the two pure outcomes removes every first test that
 loses `C+D` supply.  The remaining finite target is 1,818 distinct mixed children, indexed by the
 single loss `1<=ell_W<=14`; attack that frontier rather than restarting an undirected root search.
+For a general normalization `N=2^s` and a fixed mixed-depth budget `t`, scalar supply gives the
+sharp necessary boundary `c>=max(0,2s-1-2t)` and a quadratic B bound when equality holds.  Its
+depth-three specialization has only five persistent B-saving tracks, but it becomes vacuous in C
+once `t>=s`; the arbitrary-excess conclusion therefore needs a synchronized closed kernel or
+recurrence rather than further propagation of this scalar inequality.
 
 ## Proximate goals
 

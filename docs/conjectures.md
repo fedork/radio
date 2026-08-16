@@ -787,6 +787,22 @@ does not supply this missing construction.  This row is deliberately not added t
 `data/conjectures.csv`: no starting `k` or construction is known, and the next normalization could
 change the optimum again.
 
+The scalar supply calculation can be completed at every finite depth.  If `t` mixed transitions
+remain, it requires
+
+    c >= max(0,2s-1-2t),
+
+and, when the unclamped right side is positive and the middle coordinate ties,
+
+    b >= max(0,s^2-2s-2st-t+t^2+5).
+
+At `t=3`, the pure-refinement boundary from the checked sixteen-atom germ has
+`c=2s-7,b=(s-4)^2`; the necessary lower boundary permits only five persistent B savings.  Saving
+one starts with rank 1180 at 32 atoms, savings two through four first appear at 64 atoms, and saving
+five first appears at 128 atoms.  This reduces the whole depth-three boundary to five candidate
+tracks.  It does not solve arbitrary excessive `q`: once `t>=s`, even `b=c=0` passes the scalar
+supply relaxation, so an all-depth conclusion needs a synchronized closed kernel or recurrence.
+
 At depth four, exact solution of both pure children shows that any surviving first mixed transition
 must preserve all D and `C+D` supply and lose between one and fourteen units of `B+C+D`.  This leaves
 6,696 oriented first tests and 1,818 distinct hard children in fourteen loss classes.  These are

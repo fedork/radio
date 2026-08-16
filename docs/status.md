@@ -213,7 +213,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   `A^(N-b-c-2)B^bC^cD^2` to the width
   `2^k-k^2+(2s-c)k-s^2-3s+c(s+1)-b+2`.  Hence each slice minimizes `c`, then `b`; at 32 atoms
   the open `b=0,c=3` postulate would give `2^k-k^2+7k-20`, while only `b=1` and the `-21`
-  construction are checked.  The depth-four calculation uses only the outer profiles of A/B/C;
+  construction are checked.  At depth `t`, scalar supply forces
+  `c>=max(0,2s-1-2t)` and a tied-boundary quadratic lower bound on `b`.  At depth three this leaves
+  only five persistent B-saving tracks; rank 1180 begins the first.  Once `t>=s`, however, even
+  `b=c=0` passes scalar supply, so this calculation cannot itself become an all-depth theorem.
+  The depth-four calculation uses only the outer profiles of A/B/C;
   their internal witness trees do not enter the D-branch constraint.  Arbitrary excessive `q`
   therefore remains open, but the 32-atom slice is
   a one-rank problem rather than a profile scan.  All losing and positive

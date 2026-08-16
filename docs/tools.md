@@ -387,6 +387,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/check_atom_profile_certificate.py` | independently exhaust the local algebra behind a D-lineage closed losing-set certificate |
 | `tools/check_atom_profile_tree.py` | independently re-derive every split, leaf inequality and threshold in a symbolic positive tree |
 | `tools/check_atom_parent_formula.py` | independently derive the general `(s,b,c)` parent profile and compare its closed width formula with direct atom evaluation |
+| `tools/check_atom_profile_cover_log.py` | verify the loss-class accounting and restricted-negative scope of a completed exact cover-slice log |
 | `tools/check_dc_kernel_certificate.py` | independently exhaust every cut from the 16- and 32-atom projected losing kernels, validate their complete rank bands, and replay an optional boundary tree |
 | `tools/check_dc_tree_lift.py` | lift a retained projected tree exactly, stream all projected skeletons with the hidden coordinate, or synthesize a projected losing kernel at any power-of-two normalization |
 | `tools/atom_profile_regression.sh` | verify the height-4/5 controls, exact eight-/sixteen-atom height-6 optima, and the all-depth 32-atom exclusion through rank 1179 |
@@ -762,9 +763,11 @@ remain appropriate for deeper runs.  The proof and scope are in
 For a custom exact state, `profile-state depth WORD:height [...]` runs the same recursion and emits
 a machine-checkable tree on success.  `profile-state-flat` enumerates complete global cuts at the
 requested root before recursing; `profile-state-prefix` forces the ordinary outer-part prefix order
-at that root.  Both are exact search-order variants.  Append `-dc-kernel` to either variant and pass
-a checked `dc_kernel_certificate` path before the state to use its upward-substate closure as a
-sound projected rejection cache.  The ordinary recursion automatically uses complete products for
+at that root.  `profile-state-guided` first enumerates every winning `(D,C+D)` projected skeleton
+and then every compatible hidden B-coordinate cut; this is also only a search-order change, and a
+positive still emits a full exact tree.  Append `-dc-kernel` to any of these variants and pass a
+checked `dc_kernel_certificate` path before the state to use its upward-substate closure as a sound
+projected rejection cache.  The ordinary recursion automatically uses complete products for
 two-part states through depth three and for small supply-tight states where that order is cheaper.
 `check_dc_tree_lift.py --projected-only` skips exact lifts and is the appropriate mode for discovering
 a larger-normalization two-coordinate kernel.  The mixed-supply control used by the regression is
@@ -814,9 +817,24 @@ Both implementations start from 7,266 symbolically filtered oriented tests.  Exa
 two pure children leaves 6,712 tests and 1,826 distinct mixed children; exact rejection of the
 eight positive-`V`-loss children leaves 6,696 tests and 1,818 children in the fourteen W-loss
 classes.  `profile-state-cover[-dc-kernel]` continues from the same materialized root hypergraph,
-choosing the unresolved child shared by the most active tests.  `profile-state-pure-frontier`
-stops deliberately after the pure outcomes and prints `mixed_outcome=UNRESOLVED`; its successful
-process exit is a frontier report, not a positive construction.
+choosing common pure children first and then mixed children in decreasing retained `(D,V,W)`
+supply.  `profile-state-cover-guided[-dc-kernel]` uses the projected-skeleton exact recursion for
+those mixed children.  A long closure can be resumed by restricting the materialized root to
+`ell_D=ell_V=0` and an inclusive W-loss interval:
+
+```
+/tmp/search_atom_profiles32 profile-state-cover-guided-w-range-dc-kernel 4 \
+    evidence/atom_profile_height6_dc32.cert 3 14 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAABBBBC:1 \
+    AAAAAAAAAAAAAAAAAAAAAAABBBBBBBCC:2 \
+    AAAAAAAAAAAAAAAAAAAAAAAAAAACCCDD:3
+```
+
+A negative from this mode is printed as `atom_profile_cover_slice` with
+`scope=declared_root_loss_slice_only`; it is not a full-state verdict.  A positive is a genuine
+full strategy and is printed with its exact tree.  `profile-state-pure-frontier` stops deliberately
+after the pure outcomes and prints `mixed_outcome=UNRESOLVED`; its successful process exit is a
+frontier report, not a positive construction.
 
 FAST replay is deliberately an instrumented build. Each target runs in a forked child, so cache writes,
 split-table initialization and `s[FAST]=1` learning disappear with the child and the next target sees
