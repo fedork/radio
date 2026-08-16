@@ -66,6 +66,72 @@ def singleton_majorized(state: State, level: int) -> bool:
     return all(sum(widths[:i]) <= sum(reference[:i]) for i in range(1, len(widths) + 1))
 
 
+def decisive_majorized_leaf(r: int) -> Tuple[int, ...]:
+    """The five-part leaf which makes the eventual D template non-canonical.
+
+    Here ``r=t-2=k-4`` and the entries are returned in nonincreasing order.
+    The first instance in the published eventual regime is
+    ``(127,119,119,118,111)`` at ``r=7``.
+    """
+    if r < 3:
+        raise ValueError("the decisive leaf notation requires r>=3")
+    scale = 2**r
+    b = scale - 1
+    x = scale - r - 2
+    e = scale + r + 4 - comb(r, 2)
+    y = scale - 2 * r - 3
+    return tuple(sorted((b, x, x, e, y), reverse=True))
+
+
+def uniform_exact_inventory_coefficients(depth: int) -> Tuple[int, int]:
+    """Return the forced C and B counts beside one D in an eventual exact E fit.
+
+    Comparing quadratic and linear deficit coefficients at fixed extra depth
+    forces ``q=depth-2`` C atoms and ``p=(depth-6)(depth+1)/2`` B atoms.  This is
+    a necessary eventual inventory calculation, not a synchronized-tree proof.
+    """
+    if depth < 0:
+        raise ValueError("depth must be nonnegative")
+    return depth - 2, (depth - 6) * (depth + 1) // 2
+
+
+def depth_six_exact_inventories(r: int) -> dict[str, Tuple[int, ...]]:
+    """Candidate 64-piece exact inventories for the decisive leaf's components.
+
+    The identities are meaningful as positive G_s atoms for ``s=r-6>=3``.
+    They prove the scalar per-component fit only; assigning the atoms to one
+    synchronized six-test tree is a separate open packing problem.
+    """
+    if r < 9:
+        raise ValueError("the positive depth-six atom identities require r>=9")
+    s = r - 6
+    a = 2**s
+    b = a - 1
+    c = a - s - 1
+    d = a - 1 - s * (s + 1) // 2
+    return {
+        "B": (a,) * 63 + (b,),
+        "X": (a,) * 56 + (b,) * 7 + (c,),
+        "Y": (a,) * 49 + (b,) * 13 + (c,) * 2,
+        "E": (a,) * 59 + (c,) * 4 + (d,),
+    }
+
+
+def depth_three_y_obstruction() -> bool:
+    """Return whether the first failed depth-three Y inventory is certified.
+
+    At ``r=10`` there would be eight atoms of ``G_7`` summing to
+    ``Y_10=1001``.  Relative to eight A-atoms their deficit is 23.  The only
+    atom deficits below 23 are 0, 1 and 8, but ``p+8q=23`` with
+    ``p+q<=8`` has no nonnegative solution.
+    """
+    deficits = tuple(2**7 - value for value in singleton_prefix(7, 5))
+    if deficits != (0, 1, 8, 8, 29):
+        raise ValueError(f"unexpected first G_7 deficits {deficits}")
+    return not any(p + 8 * q == 23 and p + q <= 8
+                   for p in range(9) for q in range(9))
+
+
 def eventual_d_template_works(t: int) -> bool:
     """Check the uniform two-test D construction for the +1 regime.
 
@@ -102,6 +168,10 @@ def eventual_d_template_works(t: int) -> bool:
     hard_cut = ((quarter - 1, 1), (quarter, 1),
                 (quarter - t, 0), (quarter - 2 * t + 1, 0))
     hard_leaves = split_state(hard_parts, hard_cut)
+
+    decisive = tuple(sorted((n for n, m in hard_leaves[1] for _ in range(m)), reverse=True))
+    if decisive != decisive_majorized_leaf(t - 2):
+        raise ValueError(f"t={t}: decisive singleton leaf mismatch {decisive}")
 
     leaves = ((u0, t - 1),
               *((leaf, t - 2) for leaf in u2_leaves),
@@ -262,6 +332,36 @@ def validate(k: int) -> None:
         raise ValueError(f"k={k}: eventual +1 D template should fail before k=11")
     if k >= 11 and not eventual_d_template_works(t):
         raise ValueError(f"k={k}: eventual +1 D template failed")
+
+    # At any fixed depth <=5, the forced eventual E inventory would need a
+    # negative number of B atoms.  Depth six is the first scalar possibility.
+    for depth in range(6):
+        _, b_count = uniform_exact_inventory_coefficients(depth)
+        if b_count >= 0:
+            raise ValueError(f"depth={depth}: expected negative eventual B count")
+    if uniform_exact_inventory_coefficients(6) != (4, 0):
+        raise ValueError("depth-six eventual inventory coefficients changed")
+    if not depth_three_y_obstruction():
+        raise ValueError("the r=10 depth-three Y obstruction disappeared")
+
+    # From r=9 onward A_s,B_s,C_s,D_s are positive entries of G_s.  Check all
+    # four 64-piece identities against the exact decisive-leaf widths.
+    r = k - 4
+    if r >= 9:
+        inventory = depth_six_exact_inventories(r)
+        scale_r = 2**r
+        targets = {
+            "B": scale_r - 1,
+            "X": scale_r - r - 2,
+            "Y": scale_r - 2 * r - 3,
+            "E": scale_r + r + 4 - comb(r, 2),
+        }
+        base_prefix = set(singleton_prefix(r - 6, 5))
+        for name, atoms in inventory.items():
+            if len(atoms) != 64 or sum(atoms) != targets[name]:
+                raise ValueError(f"r={r}: depth-six {name} inventory mismatch")
+            if any(atom not in base_prefix for atom in atoms):
+                raise ValueError(f"r={r}: depth-six {name} uses a non-atom")
 
 
 def format_candidate(candidate: AssemblyCandidate) -> str:

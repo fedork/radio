@@ -14,10 +14,13 @@
 #include <vector>
 
 // Exact bounded-depth search for a strategy whose frontier consists entirely of
-// singleton rectangles.  With depth == k it is exact solvability: singleton
-// terminals are decided by majorization, and an R_0 state at k == 0 has <= 1 edge.
-// It is specialized to the fixed-small-m, near-2^k regime: full-star
-// majorization bounds every wide-side cut to a short interval.
+// singleton rectangles.  The default terminal predicate is singleton
+// majorization.  The generic command also supports the stronger predicates
+// "embedded" (coordinatewise fit in distinct G_k slots) and "canonical-exact"
+// (an exact sub-multiset of G_k).  With depth == k the default mode is exact
+// solvability: an R_0 state at k == 0 has <= 1 edge.  The search is specialized
+// to the fixed-small-m, near-2^k regime: full-star majorization bounds every
+// wide-side cut to a short interval.
 
 namespace {
 
@@ -36,6 +39,12 @@ struct Part {
 };
 
 using State = std::vector<Part>;
+
+enum class TerminalMode {
+    Majorized,
+    Embedded,
+    CanonicalExact,
+};
 
 struct Children {
     // Printed/checker order: both defectives selected, mixed, neither selected.
@@ -112,6 +121,7 @@ std::vector<std::vector<int>> bases;
 std::unordered_map<Key, bool, KeyHash> memo;
 std::unordered_map<Key, std::vector<Split>, KeyHash> witnesses;
 Counters counters;
+TerminalMode terminal_mode = TerminalMode::Majorized;
 
 void normalize(State &state) {
     State out;
@@ -187,6 +197,54 @@ bool r0(const State &state, int k) {
 
 bool singleton(const State &state) {
     return std::all_of(state.begin(), state.end(), [](Part part) { return part.m == 1; });
+}
+
+bool canonical_exact(const State &state, int k) {
+    if (!singleton(state)) return false;
+    std::map<int, int> available;
+    for (int width : bases[k]) ++available[width];
+    for (Part part : state) {
+        auto found = available.find(part.n);
+        if (found == available.end() || found->second == 0) return false;
+        --found->second;
+    }
+    return true;
+}
+
+bool embedded(const State &state, int k) {
+    if (!singleton(state) || state.size() > bases[k].size()) return false;
+    // Both sequences are in nonincreasing order.  This is the greedy criterion
+    // for an injection into distinct G_k slots with slot width >= part width.
+    for (std::size_t i = 0; i < state.size(); ++i)
+        if (state[i].n > bases[k][i]) return false;
+    return true;
+}
+
+bool terminal(const State &state, int k) {
+    if (state.empty()) return true;
+    switch (terminal_mode) {
+        case TerminalMode::Majorized:
+            // construct() has already checked r0(), which is precisely the
+            // terminal theorem for a singleton state.
+            return singleton(state);
+        case TerminalMode::Embedded:
+            return embedded(state, k);
+        case TerminalMode::CanonicalExact:
+            return canonical_exact(state, k);
+    }
+    throw std::logic_error("unknown terminal mode");
+}
+
+const char *terminal_mode_name() {
+    switch (terminal_mode) {
+        case TerminalMode::Majorized:
+            return "majorized";
+        case TerminalMode::Embedded:
+            return "embedded";
+        case TerminalMode::CanonicalExact:
+            return "canonical-exact";
+    }
+    throw std::logic_error("unknown terminal mode");
 }
 
 Children split_part(Part part, int a, int b) {
@@ -267,7 +325,7 @@ bool construct(const State &state, int k, int depth) {
         memo.emplace(key, false);
         return false;
     }
-    if (state.empty() || singleton(state)) {
+    if (terminal(state, k)) {
         memo.emplace(key, true);
         return true;
     }
@@ -382,8 +440,13 @@ void print_tree(const State &state, int k, int depth, int indent = 0) {
     std::cout << std::string(indent, ' ');
     print_state(state);
     std::cout << " @" << k;
-    if (state.empty() || singleton(state)) {
-        std::cout << " [majorized G_" << k << "]\n";
+    if (terminal(state, k)) {
+        if (terminal_mode == TerminalMode::CanonicalExact)
+            std::cout << " [canonical U_" << k << "]\n";
+        else if (terminal_mode == TerminalMode::Embedded)
+            std::cout << " [embedded G_" << k << "]\n";
+        else
+            std::cout << " [majorized G_" << k << "]\n";
         return;
     }
     const Key key = make_key(state, k, depth);
@@ -1196,8 +1259,17 @@ int main(int argc, char **argv) {
             return 3;
         }
     }
-    if (argc < 5 || ((argc - 3) % 2) != 0) {
-        std::cerr << "usage: " << argv[0] << " k depth n1 m1 [n2 m2 ...]\n"
+    int generic_first = 1;
+    if (argc >= 2 && std::string(argv[1]) == "canonical-exact") {
+        terminal_mode = TerminalMode::CanonicalExact;
+        generic_first = 2;
+    } else if (argc >= 2 && std::string(argv[1]) == "embedded") {
+        terminal_mode = TerminalMode::Embedded;
+        generic_first = 2;
+    }
+    if (argc < generic_first + 4 || ((argc - generic_first - 2) % 2) != 0) {
+        std::cerr << "usage: " << argv[0]
+                  << " [canonical-exact|embedded] k depth n1 m1 [n2 m2 ...]\n"
                   << "       " << argv[0] << " forced k depth n m a b\n"
                   << "       " << argv[0] << " frontier k m start_n minimum_n\n"
                   << "       " << argv[0]
@@ -1215,14 +1287,15 @@ int main(int argc, char **argv) {
                      " [fixed_n1 fixed_m1 ...]\n";
         return 2;
     }
-    const int k = std::atoi(argv[1]);
-    const int depth = std::atoi(argv[2]);
+    const int k = std::atoi(argv[generic_first]);
+    const int depth = std::atoi(argv[generic_first + 1]);
     if (k < 0 || depth < 0 || depth > k) {
         std::cerr << "require 0 <= depth <= k\n";
         return 2;
     }
     State state;
-    for (int i = 3; i < argc; i += 2) state.push_back({std::atoi(argv[i]), std::atoi(argv[i + 1])});
+    for (int i = generic_first + 2; i < argc; i += 2)
+        state.push_back({std::atoi(argv[i]), std::atoi(argv[i + 1])});
     normalize(state);
     make_bases(k);
 
@@ -1230,8 +1303,8 @@ int main(int argc, char **argv) {
     try {
         const bool answer = construct(state, k, depth);
         const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        std::cout << "singletonize_" << depth << '=' << (answer ? "YES" : "NO") << " k=" << k
-                  << " state=";
+        std::cout << "singletonize_" << depth << '=' << (answer ? "YES" : "NO")
+                  << " terminal=" << terminal_mode_name() << " k=" << k << " state=";
         print_state(state);
         std::cout << " wall=" << seconds << "s calls=" << counters.calls
                   << " memo_hits=" << counters.memo_hits << " memo=" << memo.size()

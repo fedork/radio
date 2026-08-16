@@ -110,6 +110,9 @@ This is the decisive source for the correction in this repository.
 - The construction changes type at precisely the solver-observed break.  Theorem 1 starts
   with a `3+2` test for `k=3..8`; Theorem 2 starts with `4+1` for `k=9,10`; Theorem 3
   retains the first two tests but adds another recursive stage from `k=11`.
+- Theorem 3 is quantified for every `k>=11`, so it excludes any later change in the numerical
+  frontier.  It supplies a uniform construction and matching bound, not uniqueness of the optimal
+  strategy or an aligned per-coin `AABD` profile.
 - Publication caution: the theorem statements and final piecewise result are internally
   consistent and independently confirmed at `k=9` here, but displayed intermediate equations
   (69)–(70) contain apparent index/off-by-one inconsistencies.  Equation (69), for example,

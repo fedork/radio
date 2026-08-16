@@ -46,6 +46,84 @@ grep -F 'slice delta=6 variable_width=10 YES k=4 depth=4 state=11:2,10:2,9:2,3:2
     "$tmp/slice.out" >/dev/null
 tools/check_witness.py "$tmp/slice.out" >/dev/null
 
+# The decisive five-part singleton-majorized leaf in the eventual m=5 construction first occurs
+# at parent k=11 (r=7).  It cannot be fitted into distinct G-slots, even with slack, in at most two
+# further synchronized tests; three tests give an exact atom sub-multiset.  The exact predicate is
+# stronger than the embedded predicate, so these controls establish a sharp minimum of three under
+# either terminal convention.
+atom_state=(127 1 119 1 119 1 118 1 111 1)
+for depth in 0 1 2; do
+    set +e
+    "$tmp/search_singletonization" canonical-exact 7 "$depth" "${atom_state[@]}" \
+        >"$tmp/m5-atom-exact-$depth.out"
+    result=$?
+    set -e
+    if [[ "$result" != 1 ]]; then
+        echo "m=5 atom exact depth $depth exited $result, expected exhaustive NO" >&2
+        exit 1
+    fi
+    grep -F "singletonize_$depth=NO terminal=canonical-exact k=7 " \
+        "$tmp/m5-atom-exact-$depth.out" >/dev/null
+done
+
+"$tmp/search_singletonization" canonical-exact 7 3 "${atom_state[@]}" \
+    >"$tmp/m5-atom-exact-3.out"
+grep -F 'singletonize_3=YES terminal=canonical-exact k=7 ' \
+    "$tmp/m5-atom-exact-3.out" >/dev/null
+tools/check_witness.py "$tmp/m5-atom-exact-3.out" >/dev/null
+sed -n '/^127:1/,$p' "$tmp/m5-atom-exact-3.out" >"$tmp/m5-atom-exact-3.tree"
+cmp witnesses/canonical_m5_leaf_p7_at7.tree "$tmp/m5-atom-exact-3.tree"
+
+set +e
+"$tmp/search_singletonization" embedded 7 2 "${atom_state[@]}" \
+    >"$tmp/m5-atom-embedded-2.out"
+result=$?
+set -e
+if [[ "$result" != 1 ]]; then
+    echo "m=5 atom embedded depth 2 exited $result, expected exhaustive NO" >&2
+    exit 1
+fi
+grep -F 'singletonize_2=NO terminal=embedded k=7 ' \
+    "$tmp/m5-atom-embedded-2.out" >/dev/null
+"$tmp/search_singletonization" embedded 7 3 "${atom_state[@]}" \
+    >"$tmp/m5-atom-embedded-3.out"
+grep -F 'singletonize_3=YES terminal=embedded k=7 ' \
+    "$tmp/m5-atom-embedded-3.out" >/dev/null
+tools/check_witness.py "$tmp/m5-atom-embedded-3.out" >/dev/null
+
+# Finite continuation only: the same exact depth-three construction exists at r=8,9, but the
+# elementary Y_10 deficit obstruction makes r=10 negative at depth three; depth four succeeds.
+# These controls are not an eventual-depth theorem.
+"$tmp/search_singletonization" canonical-exact 8 3 \
+    255 1 246 1 246 1 240 1 237 1 >"$tmp/m5-atom-r8-d3.out"
+grep -F 'singletonize_3=YES terminal=canonical-exact k=8 ' \
+    "$tmp/m5-atom-r8-d3.out" >/dev/null
+tools/check_witness.py "$tmp/m5-atom-r8-d3.out" >/dev/null
+
+"$tmp/search_singletonization" canonical-exact 9 3 \
+    511 1 501 1 501 1 491 1 489 1 >"$tmp/m5-atom-r9-d3.out"
+grep -F 'singletonize_3=YES terminal=canonical-exact k=9 ' \
+    "$tmp/m5-atom-r9-d3.out" >/dev/null
+tools/check_witness.py "$tmp/m5-atom-r9-d3.out" >/dev/null
+
+set +e
+"$tmp/search_singletonization" canonical-exact 10 3 \
+    1023 1 1012 1 1012 1 1001 1 993 1 >"$tmp/m5-atom-r10-d3.out"
+result=$?
+set -e
+if [[ "$result" != 1 ]]; then
+    echo "m=5 r=10 atom exact depth 3 exited $result, expected exhaustive NO" >&2
+    exit 1
+fi
+grep -F 'singletonize_3=NO terminal=canonical-exact k=10 ' \
+    "$tmp/m5-atom-r10-d3.out" >/dev/null
+
+"$tmp/search_singletonization" canonical-exact 10 4 \
+    1023 1 1012 1 1012 1 1001 1 993 1 >"$tmp/m5-atom-r10-d4.out"
+grep -F 'singletonize_4=YES terminal=canonical-exact k=10 ' \
+    "$tmp/m5-atom-r10-d4.out" >/dev/null
+tools/check_witness.py "$tmp/m5-atom-r10-d4.out" >/dev/null
+
 # m=5 is the exact calibration for the corrected Pareto assembly.  Complete enumeration over
 # proven A/B/C frontiers finds the old (3,2,2) family through k=7, a tie at k=8, and the forced
 # (4,3,1) family at k=9.  This is the finite counterpart of the Li--Wu--Triesch regime switch.

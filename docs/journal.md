@@ -6405,3 +6405,95 @@ all-depth construction/obstruction that connects successive normalizations.  Ano
 bounded-depth negative, fitted word, or larger rank scan does not close the missing global link.
 This closure launched no solver and changed no source-of-truth datum; the table, witness, and
 documentation checks all passed.
+
+## 2026-08-16 — exact atomization of the eventual m=5 leaf
+
+The discussion after parking the broader assembly track separated three questions that had been
+conflated: the published numerical frontier, singleton majorization, and literal base-atom packing.
+Li--Wu--Triesch's Theorem 3 is quantified over every `k>=11`, so its last formula is genuinely final:
+there can be no later transition in the numerical value of `n(k,5)`.  The theorem gives one uniform
+`4+1` construction and a matching upper bound.  It does **not** prove that all optimal strategies
+have the same root, that the strategy is unique, or that the arithmetic mass word `AABD` is an
+aligned per-coin profile.
+
+The decisive five-part leaf in the self-contained eventual construction was isolated exactly.  With
+`r=t-2=k-4` and `A_r=2^r`, define
+
+```text
+B_r=A_r-1,
+X_r=A_r-r-2,
+E_r=A_r+r+4-binomial(r,2),
+Y_r=A_r-2r-3,
+P_r=sort(B_r,X_r,X_r,E_r,Y_r)@r.
+```
+
+The first eventual case is `P_7=(127,119,119,118,111)@7`.  Two stronger terminal predicates were
+added to `tools/search_singletonization.cpp`: `embedded` requires a coordinatewise injection into
+distinct `G_s` slots, while `canonical-exact` requires a literal sub-multiset of `G_s`.  Exact
+implies embedded, and each property survives deleting parts, so the existing recursive partial-state
+pruning remains sound.
+
+Complete searches give the sharp concrete boundary:
+
+```text
+P_7 exact:     depth 0 NO, depth 1 NO, depth 2 NO, depth 3 YES
+P_7 embedded:  depth 0 NO, depth 1 NO, depth 2 NO, depth 3 YES
+```
+
+The exact positive is committed as `witnesses/canonical_m5_leaf_p7_at7.tree`; the independent
+checker derives 19 nodes, six splits and 13 canonical leaves.  The regression reruns both depth-two
+negatives and both depth-three positives.  Finite continuation gives exact depth-three trees for
+`P_8` and `P_9`; `P_10` is exactly negative at depth three and positive at depth four.  These are
+bounded construction facts, not a formula for later exactification depths.
+
+The uniform arithmetic explains why the concrete answer three cannot stay fixed.  For a proposed
+fixed depth `d`, put `s=r-d`, `N=2^d`, and measure each root component from `N A_s`.  The deficits are
+
+```text
+Delta(B_r)=1,
+Delta(X_r)=r+2,
+Delta(Y_r)=2r+3,
+Delta(E_r)=binomial(r,2)-r-4.
+```
+
+The corresponding first atom values are `A_s=2^s`, `B_s=A_s-1`, `C_s=A_s-s-1`, and
+`D_s=A_s-1-s(s+1)/2`.  For fixed `d` and all sufficiently large `r`, every component exceeds
+`(N-1)A_s`, so an exact inventory needs exactly `N` positive pieces.  Its `E_r` inventory must
+contain exactly one `D_s`, no atom below `D_s`, and then `q` copies of `C_s` and `p` of `B_s`.
+Comparing coefficients forces
+
+```text
+q=d-2,                 p=(d-6)(d+1)/2.
+```
+
+Thus no fixed exact depth `d<=5` works uniformly for all sufficiently large `r`.  At `d=6`, the
+first nonnegative case, the individual 64-piece identities are
+
+```text
+B_r = A_s^63 B_s
+X_r = A_s^56 B_s^7 C_s
+Y_r = A_s^49 B_s^13 C_s^2
+E_r = A_s^59 C_s^4 D_s
+```
+
+The first elementary finite obstruction is already `r=10`: eight `G_7` atoms for `Y_10=1001`
+would need deficit 23, but the only available deficits below that are 0, 1 and 8, and
+`p+8q=23`, `p+q<=8`, has no solution.  `tools/m5_assembly.py` now checks this obstruction, the
+forced coefficient formula, and every covered positive depth-six component identity.
+
+This establishes a lower bound and a candidate, not sufficiency.  The four depth-six identities do
+not assign their atoms to common outcome columns; a synchronized six-test tree could still fail to
+exist.  The minimum uniform embedded depth is also open.  The safe summary is therefore: the
+concrete first leaf needs exactly three tests; six is the first arithmetically possible uniform
+**exact** depth; neither the paper nor the current work proves a six-level uniform packing.
+
+Two exploratory packing scripts did not close that synchronized problem.  One stdin Python search
+outlived the tool cell that launched it and was noticed as PID 56006; it consumed about 65 CPU
+minutes at one core and roughly 7 MB RSS before being terminated.  It emitted no retained result,
+so this is an inconclusive dead end, not negative evidence.  A final process inventory confirmed
+that no related search remained.  This incident reinforces the existing rule that every spawned
+process must be inventoried even when its launching tool call appears to have completed.
+
+No Pareto value changes.  The new durable evidence is the canonical leaf tree, the exact/embedded
+terminal implementation and regression, the independently checked symbolic inventories, and the
+scope corrections in the theorem, status and research-plan notes.

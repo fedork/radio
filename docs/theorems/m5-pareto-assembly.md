@@ -23,6 +23,10 @@ In these coordinates the published theorem is
              4P-3t-Q,      9 <= k <= 10,
              4P-3t-Q+1,    k >= 11.                         (1)
 
+The last line is a single proved range quantified over every `k>=11`.  It excludes any later
+transition in the **numerical frontier**.  It does not assert uniqueness of an optimal strategy,
+continued identity of every internal partition, or an aligned per-coin `AABD` profile.
+
 The `k=3` theorem value is correct in the paper's symmetric graph notation, but `K_(5,3)` is
 stored here after swapping its shores, so the normalized one-part calibration starts at `k=4`.
 
@@ -170,6 +174,93 @@ the Singleton Majorization Theorem completes the construction.
 The same test dimensions are legal at `t=7,8`, but the three-entry `S` leaf already fails there:
 `J-Q+t+2 > J-t+1`.  Thus this one template exposes the real threshold.  The two earlier values need
 their separate finite constructions rather than a fictitious uniform continuation.
+
+### Exactifying the decisive majorized leaf
+
+The five-part leaf on the last line of (9) can be written independently of the outer construction.
+Put `r=t-2`, `A_r=2^r`, and
+
+    B_r = A_r-1,
+    X_r = A_r-r-2,
+    E_r = A_r+r+4-binomial(r,2),
+    Y_r = A_r-2r-3.
+
+Then the leaf is
+
+    P_r = sort(B_r,X_r,X_r,E_r,Y_r) @r.
+
+At the first eventual case, parent `k=11`, this is
+
+    P_7 = (127,119,119,118,111) @7.
+
+There are three distinct terminal notions here.  Singleton majorization merely certifies `P_7`
+itself.  An **embedded** terminal requires its sorted widths to fit coordinatewise into distinct
+slots of `G_s`.  An **exact** terminal requires the widths to be a literal sub-multiset of `G_s`.
+Exact implies embedded, and both properties are hereditary on deleting parts, so the recursive
+partial-state exclusions remain sound.
+
+The complete specialized recurrence gives a sharp answer for `P_7`:
+
+| terminal required | at most 2 further tests | 3 further tests |
+|---|---:|---:|
+| embedded in distinct `G_s` slots | no | yes |
+| exact sub-multiset of `G_s` | no | yes |
+
+The positive exact tree is
+[`canonical_m5_leaf_p7_at7.tree`](../../witnesses/canonical_m5_leaf_p7_at7.tree); its 19 nodes,
+six splits, and 13 canonical leaves are re-derived by `tools/check_witness.py`.  The two negative
+depth-two searches and both positive depth-three searches are locked by
+`tools/singletonization_regression.sh`.  Thus **three is the minimum for this concrete leaf**.  It
+does not mean that the whole `m=5` strategy uses three levels, nor that one depth works uniformly
+for every `r`.
+
+As finite construction data, the same regression exactifies `P_8` and `P_9` in three tests.  At
+`P_10` it exhaustively rejects depth three and verifies a depth-four exact tree.  This is the first
+observed change in the exactification depth, not a new transition in the already settled parent
+frontier and not an eventual depth formula.
+
+The uniform exact question has a different answer.  Fix an extra depth `d`, put `s=r-d` and
+`N=2^d`, and measure each component from `N A_s`.  The component deficits are
+
+    Delta(B_r)=1,
+    Delta(X_r)=r+2,
+    Delta(Y_r)=2r+3,
+    Delta(E_r)=binomial(r,2)-r-4.
+
+The first four distinct atom values of `G_s` are
+
+    A_s=2^s,
+    B_s=A_s-1,
+    C_s=A_s-s-1,
+    D_s=A_s-1-s(s+1)/2.
+
+For fixed `d` and sufficiently large `r`, every component of `P_r` exceeds `(N-1)A_s`, so an
+exact inventory has exactly `N` positive pieces.  An exact `E_r` inventory must use exactly one
+`D_s`; lower atoms have cubic-or-larger deficit and two `D_s` atoms already have too large a
+quadratic coefficient.  If it
+also uses `q` copies of `C_s` and `p` copies of `B_s`, coefficient comparison forces
+
+    q=d-2,        p=(d-6)(d+1)/2.
+
+Hence every fixed `d<=5` eventually requires a negative number of B atoms and cannot give a uniform
+exact fit.  The first arithmetically possible depth is `d=6`.  At that depth the four individual
+component inventories are, with exponents denoting multiplicity,
+
+    B_r = A_s^63 B_s,
+    X_r = A_s^56 B_s^7 C_s,
+    Y_r = A_s^49 B_s^13 C_s^2,
+    E_r = A_s^59 C_s^4 D_s.
+
+`tools/m5_assembly.py` checks these 64-piece identities at every covered symbolic level where
+`A_s,B_s,C_s,D_s` are positive atoms.  It also locks the first elementary failure of depth three:
+for `r=10`, `Y_10=1001` would need eight `G_7` atoms with total deficit 23, but the available small
+deficits are `0,1,8` and `p+8q=23`, `p+q<=8`, has no solution.
+
+The depth-six identities are only **per-component inventories**.  They do not assign those atoms to
+common outcome columns and therefore do not prove a synchronized six-test tree.  The correct current
+statement is: six is the candidate minimum uniform **exact** depth; exact sufficiency and the minimum
+uniform embedded depth are open.  In particular, the paper neither needs nor proves this stronger
+atomization.
 
 ### Recomputed indices
 

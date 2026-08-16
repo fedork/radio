@@ -163,6 +163,11 @@ concurrent runs reached 28+21+12 GB and pushed the machine into heavy swap, beca
 were leftovers I had stopped tracking. **Before launching anything, list what is already
 running; before finishing a turn, account for every process you started.**
 
+A yielded tool cell is not proof that every child it launched has exited.  On macOS, stdin Python
+searches can appear as `Python -`, not `python3 -`; one such orphan consumed about 65 CPU minutes on
+2026-08-16 before it was noticed.  Include the actual utility name and both Python spellings in the
+final process inventory whenever a one-off search script was used.
+
 ## Artifacts
 
 Solver output is large and is **never committed**. The store is the private repo

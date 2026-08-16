@@ -380,9 +380,9 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_suffix_profile_regression.sh` | lock actual per-suffix call/prune accounting and the opt-in exact cutoff |
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
-| `tools/search_singletonization.cpp` | exact small-m synchronized search with arbitrary singleton-majorized terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
+| `tools/search_singletonization.cpp` | exact small-m synchronized search with selectable majorized, distinct-slot embedded, or exact-atom terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
-| `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, exact variable-width synchronization, and memo-exhaustion abort semantics |
+| `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, the sharp m=5 leaf atomization depth, exact variable-width synchronization, and memo-exhaustion abort semantics |
 | `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8, 16 or 32 atoms, with all-depth D-lineage, finite-depth mixed-supply pruning, and finite `(D,C+D)` coinductive obstructions |
 | `tools/check_atom_profile_certificate.py` | independently exhaust the local algebra behind a D-lineage closed losing-set certificate |
 | `tools/check_atom_profile_tree.py` | independently re-derive every split, leaf inequality and threshold in a symbolic positive tree |
@@ -582,6 +582,10 @@ CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
     tools/search_singletonization.cpp -o /tmp/search_singletonization
 
 tools/run_with_provenance.py /tmp/search_singletonization 9 9 488 3 488 3
+tools/run_with_provenance.py /tmp/search_singletonization \
+    canonical-exact 7 3 127 1 119 1 119 1 118 1 111 1
+tools/run_with_provenance.py /tmp/search_singletonization \
+    embedded 7 2 127 1 119 1 119 1 118 1 111 1
 tools/run_with_provenance.py /tmp/search_singletonization forced 10 10 973 6 477 2
 tools/run_with_provenance.py /tmp/search_singletonization frontier 10 6 974 973
 tools/run_with_provenance.py /tmp/search_singletonization \
@@ -596,10 +600,18 @@ tools/run_with_provenance.py /tmp/search_singletonization \
 tools/optimize_mixed_frontier.py 5 5 /tmp/mixed-frontier.out
 ```
 
-The first form checks one state with a bounded number of synchronized levels.  `forced` verifies a
-specified one-part root split and prints its tree.  `frontier` walks downward, retains the exact memo
-between adjacent `n`, stops at the first positive, and prints its tree.  Cap frontier runs with
-`tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never a negative verdict.
+The first form checks one state with a bounded number of synchronized levels.  Its default terminal
+is an arbitrary singleton sequence weakly majorized by `G_s`.  Prefix it with `embedded` to require
+a coordinatewise injection into distinct `G_s` slots, or `canonical-exact` to require a literal
+sub-multiset of `G_s`; exact implies embedded implies majorized.  A negative in either stronger mode
+is exhaustive for that terminal predicate, not a nonsolvability verdict under the weaker theorem.
+The `m=5` examples bracket the first eventual five-part leaf: embedded and exact both fail through
+depth two, while a committed exact tree succeeds at depth three.
+
+`forced` verifies a specified one-part root split and prints its tree.  `frontier` walks downward,
+retains the exact memo between adjacent `n`, stops at the first positive, and prints its tree.  Cap
+frontier runs with `tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never
+a negative verdict.
 The retained `k=10,m=6` replay and independently checked tree are
 `evidence/sb_m6_k10_frontier.txt` and `witnesses/majorized_973_6_at10.tree`.
 
@@ -654,8 +666,10 @@ tools/m5_assembly.py --check-through 64
 `tools/check_tables.py` invokes the same identities and compares every recorded exact `m=5` row
 with the theorem.  `tools/singletonization_regression.sh` performs complete exact assembly
 enumeration for `m=5`, parent levels 4 through 9, then independently constructs the theorem's
-hard branches at parent levels 10 and 11 and verifies their emitted trees.  The symbolic proof and
-the distinction between atom masses and atom-profile realizations are in
+hard branches at parent levels 10 and 11 and verifies their emitted trees.  It also proves the
+three-level exact/embedded minimum for the first eventual majorized leaf and compares the emitted
+exact tree with `witnesses/canonical_m5_leaf_p7_at7.tree`.  The symbolic proof and the distinction
+between atom masses and atom-profile realizations are in
 [the m=5 calibration](theorems/m5-pareto-assembly.md).
 
 `slice` adds one variable part `(2^k-delta : variable_m)` to the listed fixed parts, scans `delta`

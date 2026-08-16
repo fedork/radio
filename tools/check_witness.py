@@ -9,8 +9,10 @@ Two input formats are auto-detected:
 
   canonical  - output of radio_canon_search_generic or search_singletonization
                `<state> @k --[split]-->` with three indented children, terminating in
-               `<state> @k [canonical U_k]` leaves (atom sub-multisets) or
-               `<state> @k [majorized G_k]` leaves (arbitrary singleton sequences).
+               `<state> @k [canonical U_k]` leaves (atom sub-multisets),
+               `<state> @k [embedded G_k]` leaves (coordinatewise fits in distinct
+               slots), or `<state> @k [majorized G_k]` leaves (arbitrary singleton
+               sequences).
 
   numbered   - output of radio_print.c
                `N. (in k) (used r) <state> take[...]:` followed by three
@@ -163,7 +165,7 @@ def parse_split(text: str) -> List[Part]:
 # ------------------------------------------------------------------- canonical format
 
 CANON = re.compile(
-    r"^\s*(.*?)\s+@(\d+)\s+(?:\[(canonical U|majorized G)_(\d+)\]|--\[(.*?)\]-->)\s*$"
+    r"^\s*(.*?)\s+@(\d+)\s+(?:\[(canonical U|embedded G|majorized G)_(\d+)\]|--\[(.*?)\]-->)\s*$"
 )
 
 
@@ -240,6 +242,17 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
                     if not all(base[v] >= c for v, c in need.items()):
                         errs.append(f"{n.text} @{n.k}: not a sub-multiset of G_{n.k}, "
                                     f"so its canonical label is false")
+                elif n.terminal == "embedded G":
+                    if len(widths) > len(base_values):
+                        errs.append(f"{n.text} @{n.k}: {len(widths)} singleton parts cannot "
+                                    f"fit in {len(base_values)} distinct G_{n.k} slots")
+                    else:
+                        for i, width in enumerate(widths):
+                            if width > base_values[i]:
+                                errs.append(f"{n.text} @{n.k}: singleton width {width} at "
+                                            f"position {i + 1} exceeds G_{n.k} slot "
+                                            f"{base_values[i]}")
+                                break
                 else:
                     left = right = 0
                     for i, width in enumerate(widths[:len(base_values)]):

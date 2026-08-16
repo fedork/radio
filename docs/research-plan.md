@@ -59,8 +59,13 @@ piecewise theorem changes the root from `3+2` to `4+1`.  That theorem is now rec
 the corrected Pareto assembly: complete finite enumeration finds the crossing, and the winning
 `4+1` family reduces to a sharp piecewise D slice.  This is the known-answer standard for every
 proposed generalization: retain competing outer triples, solve each D problem, and take their
-guarded envelope.  The old `m=6` closed form and `BBCD` profile are refuted by the exact
-`n(10,6)=973` frontier.  A checked
+guarded envelope.  Its first eventual decisive singleton-majorized leaf has sharp exact and
+distinct-slot-embedded depth three.  No fixed exact depth at most five can work uniformly at every
+sufficiently large level; depth six is the first compatible per-component inventory, but its
+synchronized packing and the uniform embedded minimum are open.  This is deliberately separate
+from the published formula, whose quantified `k>=11` range excludes later numerical transitions
+without asserting a unique or aligned `AABD` strategy.  The old `m=6` closed form and `BBCD`
+profile are refuted by the exact `n(10,6)=973` frontier.  A checked
 sixteen-atom aligned tree now gives the different conditional continuation
 `2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  Inside the
 fixed `(4,3,2)` aligned height-6 slice, the unresolved excessive-`q` question narrowed sharply: a
@@ -282,6 +287,11 @@ reduction to singleton-majorized leaves, whose decisive prefix inequality first 
 This proves that a scalable state must
 store a guarded family envelope, not one atom word or one preferred height triple.  See
 [the exact calibration](theorems/m5-pareto-assembly.md).
+For the stronger atom interpretation, the first eventual decisive leaf
+`(127,119,119,118,111)@7` has a committed exact tree at depth three and exhaustive exact/embedded
+failure through depth two.  A uniform exact depth needs at least six tests asymptotically, but the
+depth-six identities are only scalar inventories, not a common synchronized packing.  Do not reopen
+the parked track merely to search larger finite instances of that packing.
 The direct finite mode recovers the proven `m=10` widths at parent levels 5 through 7 and shows why
 all Pareto triples must be retained: the repeated `(6,4,3)` height choice falls one short at level 7,
 while B-height 5 reaches the frontier.  That complete enumerator now exists: at each requested `m`
