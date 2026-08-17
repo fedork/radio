@@ -574,9 +574,23 @@ embedded provenance and used the contraction-safe build. This avoids both defect
 
 `radio_verify.c` remains an independent strengthening path, not a prerequisite for the current
 `proven-exhaustive` classification. It shares no solver search code and has already verified the
-whole `Sa(113)` k=9 ladder—304,105 negative facts across k=2..8—with zero unverified. A complete
-end-to-end verifier replay of the new 3.17-million-fact run9 DAG would reduce the trusted code base
-further, but it is expected to cost substantial enumeration time and is not needed to decide H3.
+whole `Sa(113)` k=9 ladder—304,105 negative facts across k=2..8—with zero unverified. It now also
+has a pthread verifier, parallel pre-color antichain reduction, explicit root records and a strict
+human-readable `radio-negative-certificate-v1` format. Ordinary verification mixes all levels in
+one queue; only coloring has a level barrier. On the retained 62,366-fact `out_k7.txt` corpus,
+one through sixteen workers returned the identical 97,483,464-node proof, with wall time falling
+from 14.13 to 2.79 seconds. A one-root colored test shrank to 373 support facts and replayed cleanly;
+full measurements and hashes are in
+[`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
+Run9 itself has passed the parse/format gate: both verifier parsers extract 3,126,190 canonical
+negative records, and the 106 MB readable certificate round-trips byte-identically (7.19 MB at
+`zstd -19`). A bounded top-layer pass verified all sixteen `k=9` roots and cited all 2,545
+canonical `k=8` facts; it stopped before checking any of those facts. This is not a proof replay.
+
+A complete end-to-end verifier replay of the new 3.17-million-fact run9 DAG has still not been
+performed. The next gate is to minimalize the run9 support levels and verify/color its 2,545 `k=8`
+targets, measuring the actual reachable `k=7` set before committing to the full replay. That would
+reduce the trusted code base further, but is not needed to decide H3.
 
 The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a
 way to rehabilitate a resumed, non-closed log. The new cold log is closed by construction.

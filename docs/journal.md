@@ -6557,3 +6557,87 @@ Process inventory at handoff: no Sa solver remains; the remote census above is t
 research binary. The pre-existing local watcher PID 73027 (`tools/sa193_status.sh --prefix run9
 --watch`) belongs to the user and was not touched. No one-off Python search or locally launched
 solver remains.
+
+## 2026-08-16 — parallel verifier prototype: readable certificates, minimalize then color
+
+The verifier/solver design discussion produced four concrete decisions. Use the existing
+independent C verifier as the coloring engine; minimalize each support level before coloring; keep
+the durable certificate human-readable; and distinguish logical verification order from coloring
+order. Verification has no runtime level dependency as long as every local obligation passes,
+because every edge decreases `k`. Coloring alone needs the top-down barrier, because citations at
+`k` define the target set at `k-1`.
+
+`radio_verify.c` now implements that design. All search-mutating globals—recursion state, direct
+memo, live/pair caches, counters and derivation state—are worker-local. Frozen `Level` indexes are
+shared. Ordinary parallel verification mixes every eligible fact from every level in one dynamic
+queue. Coloring runs the same batches one level at a time and atomically ORs citations into the
+lower level. Each batch destroys its worker-local caches, which also fixes the existing multi-pass
+hazard where a reused live table issued no queries and therefore repainted nothing. Aggregate memo
+capacity stays near the original `2^24` entries by shrinking the default per-worker memo as width
+grows.
+
+The first corpus gate was the clean retained
+[`fullsolve-2026`](https://github.com/fedork/radio-data/releases/tag/fullsolve-2026)
+`out_k7.txt`, SHA-256 `9bfcdd134fd16d1e1dc1f4a34154eaadc16a988f6e065517e62eece6e69c2cde`.
+The preserved serial path and every parallel width verified all 62,366 canonical negatives with
+zero gaps and exactly 97,483,464 split-recursion nodes. One-shot real times on the same O3 build
+were 14.13, 8.24, 5.22, 3.24 and 2.79 seconds at 1, 2, 4, 8 and 16 workers. Scaling is useful but
+not free: the 8-to-16 step saved only 14% wall while user CPU rose from 25.43 to 35.79 seconds,
+because worker-local memo/live/pair construction duplicates work. Eight is the measured economical
+width here; this is not yet a run9 prediction.
+
+The new strict text form is:
+
+```text
+radio-negative-certificate-v1
+root 6 Sb(17:17,16:15)
+fact 5 Sb(12:11)
+```
+
+It accepts comments and inert `meta` lines, derives masses, canonicalizes states, and rejects
+unknown records. `CERT_ONLY` reduced the 6,910,223-byte raw log to 1,908,729 readable bytes; at
+`zstd -19` it is 194,131 bytes. A binary durable format would save little and make inspection and
+independent parsers harder, so binary packing remains an in-memory index choice. The text parser
+currently inherits the C verifier's 255-per-coordinate implementation bound; the grammar does not
+need to.
+
+A parse-only run9 gate then exercised the actual scale without starting proof enumeration. Both the
+old parser and the new one extracted exactly 3,126,190 canonical negative records. Normalization
+took 2.74 wall seconds and 457 MB peak RSS, producing 106,011,566 readable bytes and 7,194,721 bytes
+under `zstd -19`. Parsing and rewriting that certificate was byte-identical at SHA-256
+`3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`. This validates the format and
+full-corpus ingestion; it is not an independent proof replay.
+
+One bounded top-layer measurement followed, still without beginning the expensive descent. Eight
+workers verified all sixteen explicit run9 `k=9` roots in 0.23 seconds of batch wall time and cited
+all 2,545 canonical `k=8` facts; the whole capped process, including parse/index construction,
+finished in five wall seconds. It stopped at `k=9`, so none of those 2,545 facts or any lower fact
+was verified. The normalized level counts are dominated by 2,576,885 facts at `k=7`; proper next
+work is therefore pre-color minimalization followed by the `k=8` pass, not an unbounded descent.
+Run9 happens to contain exactly sixteen canonical `k=9` facts, so implicit all-top seeding would
+coincide with the roots in this one file. That coincidence does not alter the format decision.
+
+Pre-color antichain reduction is real rather than decorative on this corpus: levels k=2..5 fell
+from 13/637/19,527/41,409 facts to 9/529/11,767/28,632. Starting from the one nontrivial k=6 root
+above then painted 37, 92, 234, 9 and 1 targets down the levels, producing one root plus 373 support
+facts. The result is 9,897 bytes, 1,410 under zstd, and replays with zero gaps. One- and four-worker
+coloring produced byte-identical SHA-256
+`45ff9191881b56de73f296c37c0339d34ac8342a40de58fede0882da62bda0be`.
+
+This also settled the explicit-root question empirically. Without root records, `TOPDOWN=6` must
+treat all 779 facts at that level as requested roots; it then retains 38,275 support facts. Coloring
+can remove unused descendants, but it cannot infer that a supplied top-level claim was incidental.
+The root/support distinction is therefore part of the readable format, not optional metadata.
+
+`tools/test_radio_verify.sh` now locks serial/parallel agreement, same-level redundancy removal,
+byte-identical coloring and replay on a tiny closed fixture. Four-worker ThreadSanitizer and
+Address/UndefinedBehaviorSanitizer runs passed for both verification and coloring. Compiler
+`-Wall -Wextra -Wpedantic` is clean. Full commands, sizes and the complete table are retained in
+`evidence/radio_verify_parallel_2026-08-16.txt`.
+
+Run9 has not been replayed. The next measured step is normalization plus minimalize/color from the
+sixteen explicit roots; only its actual reachable k=7 count can size the full independent replay.
+For a later parallel solver, the current direction is limited-width coarse prefix batches for the
+exhaustive tail while retaining heuristic depth-first search for early witnesses. Per-k frozen
+cache epochs are promising; read/write locks across recursion and a language rewrite are not the
+first prototype. No parallel solver change was made in this session.

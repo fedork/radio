@@ -1,8 +1,8 @@
 // An independent checker for negative certificates.
 //
-// Reads a solver log, extracts the `can't solve Sb(...)` facts, and verifies every one of them
-// from first principles. It does NOT include radiobase.c and shares no code with the solver -
-// that independence is the whole point. It knows exactly four things:
+// Reads either a solver log or the human-readable `radio-negative-certificate-v1` format and
+// verifies every negative fact from first principles. It does NOT include radiobase.c and shares
+// no code with the solver - that independence is the whole point. It knows exactly four things:
 //
 //   * the split semantics of docs/problem.md: a test on (n:m) taking (a,b) yields children
 //     (a:b), (n-a:m-b) and the mixed pair {(a:m-b), (n-a:b)}
@@ -17,10 +17,10 @@
 //
 // Design notes in docs/certificate.md. Architecture, per the level-specialisation idea:
 //
-//   * facts are grouped by k and checked level by level. A level-k check consults only the
-//     k-1 facts, so resident memory is ONE level, not the certificate. Verification order does
-//     not matter - soundness is well-founded induction on k over the conjunction of all checks
-//     - so levels could equally be farmed out to separate machines.
+//   * a level-k check consults only the frozen k-1 fact set. Verification order does not matter:
+//     the multicore path mixes every level in one dynamic queue, and soundness is well-founded
+//     induction on k over the conjunction of all checks. Top-down coloring alone has a per-level
+//     barrier because citations from k define the target set at k-1.
 //   * each level's fact set is frozen: sorted, bucketed by part count, with an open-addressed
 //     hash for exact membership. Read-only structures are both faster and far easier to reason
 //     about than the mutable trie the solver needs.
@@ -40,8 +40,11 @@
 //   | pairwise narrowing with forward checking | complement symmetry
 //   | identical-part permutation skip
 //
-//   tools/build_radio.py -O3 radio_verify.c -o radio_verify
+//   tools/build_radio.py -O3 -pthread radio_verify.c -o radio_verify
 //   tools/run_with_provenance.py ./radio_verify <log> [maxk [group_order [pairwise [pairwise_min_parts]]]]
+//   VERIFY_THREADS=8 tools/run_with_provenance.py ./radio_verify <log> <maxk>
+//   TOPDOWN=6 ROOTS=roots.cert MINIMIZE_BEFORE_COLOR=1 CERT_OUT=proof.cert \
+//       tools/run_with_provenance.py ./radio_verify <log> 6
 //
 // Group order 0 (canonical descending) is the best of the three tried: ascending is 3.8x more
 // nodes, fewest-options-first 1.09x. Option order WITHIN a group is provably irrelevant for a
@@ -53,6 +56,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <pthread.h>
+#include <stdatomic.h>
+
+#define TLS _Thread_local
 
 #define MAXK 12
 #define MAXP 40                 /* parts per state */
@@ -379,6 +386,78 @@ static int dominates(const Fact *a, const Fact *b) {
     return dom_rec(a, b, 0, 0);
 }
 
+/* Is fact q redundant because another logged fact at the same k is a componentwise substate? */
+static int level_redundant(const Level *L, int q) {
+    const Fact *f = &L->f[q];
+    int lim = f->np < MAXP ? f->np : MAXP, np, i;
+    uint64_t qn, qm;
+    int maxn = f->np ? f->p[0].n : 0;
+    prof_of(f->p, f->np, &qn, &qm);
+    for (np = 1; np <= lim; np++) {
+        int end = L->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+        for (i = L->bstart[np]; i < end; i++) {
+            if (i == q) continue;
+            if (L->f[i].mass > f->mass) {
+                int an = L->f[i].p[0].n;
+                int nxt = L->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+                if (nxt <= i) break;
+                i = nxt - 1; continue;
+            }
+            if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) continue;
+            if (dominates(&L->f[i], f)) return 1;
+        }
+    }
+    return 0;
+}
+
+typedef struct {
+    const Level *level;
+    unsigned char *keep;
+    atomic_int next;
+} MinBatch;
+
+static void *minimize_worker(void *vp) {
+    MinBatch *b = vp;
+    int q;
+    while ((q = atomic_fetch_add_explicit(&b->next, 1, memory_order_relaxed)) < b->level->n)
+        b->keep[q] = (unsigned char)!level_redundant(b->level, q);
+    return NULL;
+}
+
+static void level_drop_indexes(Level *L) {
+    free(L->hslot); free(L->hkey); free(L->sdom); free(L->sdom_i);
+    free(L->cited); free(L->pn); free(L->pm); free(L->b2);
+    L->hslot = NULL; L->hkey = NULL; L->sdom = NULL; L->sdom_i = NULL;
+    L->cited = NULL; L->pn = NULL; L->pm = NULL; L->b2 = NULL;
+}
+
+static int level_minimize(Level *L, int threads) {
+    int i, w = 0;
+    if (L->n < 2) return 0;
+    unsigned char *keep = malloc((size_t)L->n);
+    if (!keep) { fprintf(stderr, "no memory for minimalization marks\n"); exit(1); }
+    if (threads < 1) threads = 1;
+    if (threads > L->n) threads = L->n;
+    MinBatch b = { .level = L, .keep = keep };
+    atomic_init(&b.next, 0);
+    pthread_t *ids = threads > 1 ? malloc((size_t)(threads - 1) * sizeof *ids) : NULL;
+    if (threads > 1 && !ids) { fprintf(stderr, "no memory for minimalization workers\n"); exit(1); }
+    for (i = 0; i < threads - 1; i++)
+        if (pthread_create(&ids[i], NULL, minimize_worker, &b)) {
+            fprintf(stderr, "cannot create minimalization worker %d\n", i); exit(1);
+        }
+    minimize_worker(&b);
+    for (i = 0; i < threads - 1; i++) pthread_join(ids[i], NULL);
+    free(ids);
+    for (i = 0; i < L->n; i++) if (keep[i]) L->f[w++] = L->f[i];
+    free(keep);
+    i = L->n - w;
+    level_drop_indexes(L);
+    L->n = w;
+    level_freeze(L);
+    return i;
+}
+
 /* Singleton Majorization applied to the full star expansion.  Replace each oriented part
    (n:m), n >= m, by m disjoint copies of (n:1).  This lift has one edge for every original edge:
    map every cloned n-side vertex back to its source and pull each original test back to all clones.
@@ -414,36 +493,40 @@ static int maj_refutes(const Fact *s, int k) {
    carries most of the load; Python's equivalent was Index.memo. It is SOUND because a hit is
    confirmed by comparing the full state - a hash collision costs a miss, never a wrong answer.
    States with more than MEMOP parts are simply not memoised. */
+#ifndef MEMOBITS
 #define MEMOBITS 24
-#define MEMOSZ (1 << MEMOBITS)
+#endif
 #define MEMOP 16
 /* `wit` is the index of the fact that answered this query, or -1 for a rule (COUNT, MAJ) or a
    derivation. Carrying it through the memo is what makes top-down painting possible: 99.996% of
    queries at k=4 are memo hits, so without it almost every citation would go unrecorded. */
 typedef struct { uint64_t h; int32_t wit; unsigned char np, k; signed char res; Part p[MEMOP]; } MemoEnt;
-static int g_wit = -1;
+static TLS int g_wit = -1;
 static int g_paint = 0;
-static long long paint_hits = 0, pref_hits = 0, pref_miss = 0;
-static MemoEnt *memo;
+static TLS long long paint_hits = 0, pref_hits = 0, pref_miss = 0;
+static TLS MemoEnt *memo;
+static TLS size_t memo_mask;
 #define C_REF
 #define MEMO_HIT memo_hit++
 #define MEMO_MISS memo_miss++
-static long long memo_hit = 0, memo_miss = 0;
+static TLS long long memo_hit = 0, memo_miss = 0;
 
 static int refuted_raw(const Level *L, const Fact *s, int k);
 static int derive(const Fact *s, int k);      /* prove, rather than cite */
 static const void *g_levels;                  /* the Level[] array, for derive() */
 static int g_derive = 0;          /* derive missing facts at k <= this */
-static long long derived_ok = 0, derived_no = 0;
+static TLS long long derived_ok = 0, derived_no = 0;
 
 static int refuted(const Level *L, const Fact *s, int k) {
     if (s->np > MEMOP) return refuted_raw(L, s, k);
     uint64_t h = fhash(s) + 0x51ULL * (uint64_t)k;
-    MemoEnt *e = &memo[h & (MEMOSZ - 1)];
+    MemoEnt *e = &memo[h & memo_mask];
     if (e->res >= 0 && e->h == h && e->k == (unsigned char)k && e->np == s->np
             && memcmp(e->p, s->p, s->np * sizeof(Part)) == 0) {
         memo_hit++;
-        if (g_paint && e->res && e->wit >= 0) { L->cited[e->wit] = 1; paint_hits++; }
+        if (g_paint && e->res && e->wit >= 0) {
+            __atomic_store_n(&L->cited[e->wit], 1, __ATOMIC_RELAXED); paint_hits++;
+        }
         return e->res;
     }
     memo_miss++;
@@ -451,7 +534,9 @@ static int refuted(const Level *L, const Fact *s, int k) {
     e->h = h; e->k = (unsigned char)k; e->np = s->np; e->res = (signed char)r;
     e->wit = (int32_t)(r ? g_wit : -1);
     memcpy(e->p, s->p, s->np * sizeof(Part));
-    if (g_paint && r && g_wit >= 0) { L->cited[g_wit] = 1; paint_hits++; }
+    if (g_paint && r && g_wit >= 0) {
+        __atomic_store_n(&L->cited[g_wit], 1, __ATOMIC_RELAXED); paint_hits++;
+    }
     return r;
 }
 
@@ -526,11 +611,13 @@ static int chi_refuted(const Level *L, const Chi *c, int k) {
     if (c->np == 0) return 0;
     if (c->np <= MEMOP) {
         uint64_t h = c->h + 0x51ULL * (uint64_t)k;
-        MemoEnt *e = &memo[h & (MEMOSZ - 1)];
+        MemoEnt *e = &memo[h & memo_mask];
         if (e->res >= 0 && e->h == h && e->k == (unsigned char)k && e->np == c->np
                 && memcmp(e->p, c->p, c->np * sizeof(Part)) == 0) {
             MEMO_HIT;
-            if (g_paint && e->res && e->wit >= 0) { L->cited[e->wit] = 1; paint_hits++; }
+            if (g_paint && e->res && e->wit >= 0) {
+                __atomic_store_n(&L->cited[e->wit], 1, __ATOMIC_RELAXED); paint_hits++;
+            }
             return e->res;
         }
         MEMO_MISS;
@@ -540,7 +627,9 @@ static int chi_refuted(const Level *L, const Chi *c, int k) {
         int r = refuted_raw(L, &t, k);
         e->h = h; e->k = (unsigned char)k; e->np = c->np; e->res = (signed char)r;
         e->wit = (int32_t)(r ? g_wit : -1);
-        if (g_paint && r && g_wit >= 0) { L->cited[g_wit] = 1; paint_hits++; }
+        if (g_paint && r && g_wit >= 0) {
+            __atomic_store_n(&L->cited[g_wit], 1, __ATOMIC_RELAXED); paint_hits++;
+        }
         memcpy(e->p, c->p, c->np * sizeof(Part));
         return r;
     }
@@ -554,11 +643,20 @@ static int chi_refuted(const Level *L, const Chi *c, int k) {
 
 typedef struct { unsigned char a, b; int k2, k0, k1; } Split;
 typedef struct { int n; Split *s; } LiveTab;
-static LiveTab *live_tab[MAXK + 1][2];
-static long long live_built = 0, live_reused = 0;
+static TLS LiveTab *live_tab[MAXK + 1][2];
+static TLS long long live_built = 0, live_reused = 0;
 
 static const Split *live_get(const Level *below, int k, Part p, int restrict_, int *cnt) {
     int idx = (p.n << 8) | p.m;
+    if (!live_tab[k][restrict_]) {
+        int z;
+        live_tab[k][restrict_] = malloc(NPART * sizeof(LiveTab));
+        if (!live_tab[k][restrict_]) { fprintf(stderr, "no memory for live tables\n"); exit(1); }
+        for (z = 0; z < NPART; z++) {
+            live_tab[k][restrict_][z].n = -1;
+            live_tab[k][restrict_][z].s = NULL;
+        }
+    }
     LiveTab *T = live_tab[k][restrict_];
     if (T[idx].n >= 0) { live_reused++; *cnt = T[idx].n; return T[idx].s; }
     live_built++;
@@ -610,12 +708,16 @@ static const Split *live_get(const Level *below, int k, Part p, int restrict_, i
 #define PAIRSZ (1 << 17)
 
 typedef struct { uint64_t key; uint64_t *rows; int li, wj; } PairEnt;
-static PairEnt pairtab[PAIRSZ];
-static long long pair_built = 0, pair_reused = 0, fc_prunes = 0, fc_dom_skips = 0;
-static long long pair_bits_set = 0, pair_bits_tot = 0;
+static TLS PairEnt *pairtab;
+static TLS long long pair_built = 0, pair_reused = 0, fc_prunes = 0, fc_dom_skips = 0;
+static TLS long long pair_bits_set = 0, pair_bits_tot = 0;
 
 static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part pj, int rj,
                                 int *wjp) {
+    if (!pairtab) {
+        pairtab = calloc(PAIRSZ, sizeof(PairEnt));
+        if (!pairtab) { fprintf(stderr, "no memory for pair tables\n"); exit(1); }
+    }
     int ii = (pi.n << 8) | pi.m, ij = (pj.n << 8) | pj.m;
     uint64_t key = ((uint64_t)k << 34) | ((uint64_t)ri << 33) | ((uint64_t)rj << 32)
                  | ((uint64_t)ii << 16) | (uint64_t)ij;
@@ -689,9 +791,10 @@ static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part
 static int g_dpen = 0;
 static long long g_nodecap = 0;
 static double g_timecap = 0;
-static clock_t g_fact_t0;
-static int g_budget_hit = 0;      /* measured a net 2.4x loss - see the journal; off by default */
-static int g_diag = 0, g_diag_left, g_srcmask = 0;
+static TLS clock_t g_fact_t0;
+static TLS int g_budget_hit = 0;      /* measured a net 2.4x loss - see the journal; off by default */
+static int g_diag = 0, g_srcmask = 0;
+static TLS int g_diag_left;
 
 #define DPBITS 20
 #define DPSZ   (1 << DPBITS)
@@ -704,9 +807,9 @@ typedef struct {
     Part c2[DPC], c0[DPC], c1[2 * DPC];
 } DpEnt;
 
-static DpEnt *dp;
-static uint32_t dp_gen = 0;
-static long long dp_hit = 0, dp_miss = 0, dp_skip = 0;
+static TLS DpEnt *dp;
+static TLS uint32_t dp_gen = 0;
+static TLS long long dp_hit = 0, dp_miss = 0, dp_skip = 0;
 
 static inline int dp_probe(int i, int lo, int s2, int s0,
                            const Chi *c2, const Chi *c0, const Chi *c1, DpEnt **slot) {
@@ -739,18 +842,18 @@ static inline void dp_store(DpEnt *e, int i, int lo, int s2, int s0,
 
 /* ---------------------------------------------------------------- SPLITS check */
 
-static const Level *g_below;
-static int g_k, g_cap;
-static const Fact *g_s;
-static const Split *g_live[MAXP];
-static int g_ln[MAXP], g_last[MAXP + 1];
-static long long g_nodes, g_fact_nodes, g_max_fact_nodes;
+static TLS const Level *g_below;
+static TLS int g_k, g_cap;
+static TLS const Fact *g_s;
+static TLS const Split *g_live[MAXP];
+static TLS int g_ln[MAXP], g_last[MAXP + 1];
+static TLS long long g_nodes, g_fact_nodes, g_max_fact_nodes;
 /* one slot per depth: the child states for the prefix of that length */
-static Chi st2[MAXP + 1], st0[MAXP + 1], st1[MAXP + 1];
-static int g_fc;                                   /* forward checking enabled for this fact */
-static const uint64_t *g_row[MAXP][MAXP];          /* g_row[i][j], i<j: rows of pair (i,j) */
-static int g_wj[MAXP];                             /* words in group j's domain */
-static uint64_t g_dom[MAXP + 1][MAXP][FCW];        /* live domain of each group, per depth */
+static TLS Chi st2[MAXP + 1], st0[MAXP + 1], st1[MAXP + 1];
+static TLS int g_fc;                                   /* forward checking enabled for this fact */
+static TLS const uint64_t *g_row[MAXP][MAXP];          /* g_row[i][j], i<j: rows of pair (i,j) */
+static TLS int g_wj[MAXP];                             /* words in group j's domain */
+static TLS uint64_t g_dom[MAXP + 1][MAXP][FCW];        /* live domain of each group, per depth */
 
 static int splits_rec(int i, int s2, int s0, int s1) {
     g_nodes++; g_fact_nodes++;
@@ -844,12 +947,12 @@ static int splits_rec(int i, int s2, int s0, int s1) {
 
 static int g_fcen = 1, g_fcmin = 3;
 static int g_minp = 0, g_maxp = 999, g_stride = 1, g_mink = 1;
-static long long sel = 0;
+static long long sel = 0;                 /* serial compatibility path; parallel selects centrally */
 static int g_bench = 0;
 static int g_order = 0;                  /* 0 desc (canonical) 1 asc 2 fewest-options-first */
-static long long np_nodes[MAXP + 1], np_facts[MAXP + 1];
-static long long cost_hist[24], cost_sum, budget_out;
-static Fact g_perm;
+static TLS long long np_nodes[MAXP + 1], np_facts[MAXP + 1];
+static TLS long long cost_hist[24], cost_sum, budget_out;
+static TLS Fact g_perm;
 
 static int verify(const Level *below, const Fact *s, int k) {
     if (s->mass > pow3[k]) return 1;
@@ -926,7 +1029,7 @@ typedef struct {
     clock_t fact_t0;              /* a nested derive must not reset the enclosing fact's budget */
 } SaveCtx;
 
-static int g_dderive = 0;                 /* recursion depth, for a sanity bound */
+static TLS int g_dderive = 0;                 /* recursion depth, for a sanity bound */
 
 static int derive(const Fact *s, int k) {
     if (g_dderive >= MAXK || !g_levels) return 0;
@@ -958,10 +1061,170 @@ static int derive(const Fact *s, int k) {
     return r;
 }
 
+/* -------------------------------------------------------- parallel fact batches
+
+   A fact at k reads only the frozen level k-1.  All mutable search machinery above is therefore
+   worker-local, while Level is shared.  Ordinary verification may mix every k in one work queue;
+   top-down painting invokes one batch per level because the citations produced at k define the
+   targets at k-1. */
+
+typedef struct {
+    long long nodes, memo_hit, memo_miss;
+    long long live_built, live_reused;
+    long long pair_built, pair_reused, fc_prunes, fc_dom_skips;
+    long long pair_bits_set, pair_bits_tot;
+    long long paint_hits, pref_hits, pref_miss;
+    long long derived_ok, derived_no;
+    long long dp_hit, dp_miss, dp_skip;
+    long long max_fact_nodes;
+} BatchStats;
+
+typedef struct {
+    int k;
+    const Fact *fact;
+    unsigned char status;             /* 0 unverified, 1 verified, 2 budget exhausted */
+    long long nodes;
+} VerifyTask;
+
+typedef struct {
+    VerifyTask *tasks;
+    size_t ntasks;
+    atomic_size_t next;
+    int memo_bits;
+} Batch;
+
+typedef struct {
+    Batch *batch;
+    BatchStats stats;
+} WorkerArg;
+
+static void worker_state_init(int memo_bits) {
+    size_t slots;
+    int k, r;
+    if (memo || pairtab || dp) { fprintf(stderr, "worker state initialized twice\n"); exit(2); }
+    if (memo_bits < 12 || memo_bits > MEMOBITS) {
+        fprintf(stderr, "VERIFY_MEMO_BITS must be in 12..%d\n", MEMOBITS); exit(2);
+    }
+    slots = (size_t)1 << memo_bits;
+    memo = malloc(slots * sizeof(MemoEnt));
+    if (!memo) { fprintf(stderr, "no memory for verifier memo (%zu slots)\n", slots); exit(1); }
+    memset(memo, 0xff, slots * sizeof(MemoEnt));
+    memo_mask = slots - 1;
+    if (g_dpen) {
+        dp = calloc(DPSZ, sizeof(DpEnt));
+        if (!dp) { fprintf(stderr, "no memory for subtree memo\n"); exit(1); }
+    }
+    for (k = 0; k <= MAXK; k++) for (r = 0; r < 2; r++) live_tab[k][r] = NULL;
+    g_wit = -1; g_nodes = g_fact_nodes = g_max_fact_nodes = 0;
+    memo_hit = memo_miss = paint_hits = pref_hits = pref_miss = 0;
+    derived_ok = derived_no = live_built = live_reused = 0;
+    pair_built = pair_reused = fc_prunes = fc_dom_skips = 0;
+    pair_bits_set = pair_bits_tot = 0;
+    dp_gen = 0; dp_hit = dp_miss = dp_skip = 0;
+    cost_sum = budget_out = 0;
+    memset(np_nodes, 0, sizeof np_nodes); memset(np_facts, 0, sizeof np_facts);
+    memset(cost_hist, 0, sizeof cost_hist);
+}
+
+static void worker_state_finish(BatchStats *s) {
+    int k, r, i;
+    memset(s, 0, sizeof *s);
+    s->nodes = g_nodes; s->memo_hit = memo_hit; s->memo_miss = memo_miss;
+    s->live_built = live_built; s->live_reused = live_reused;
+    s->pair_built = pair_built; s->pair_reused = pair_reused;
+    s->fc_prunes = fc_prunes; s->fc_dom_skips = fc_dom_skips;
+    s->pair_bits_set = pair_bits_set; s->pair_bits_tot = pair_bits_tot;
+    s->paint_hits = paint_hits; s->pref_hits = pref_hits; s->pref_miss = pref_miss;
+    s->derived_ok = derived_ok; s->derived_no = derived_no;
+    s->dp_hit = dp_hit; s->dp_miss = dp_miss; s->dp_skip = dp_skip;
+    s->max_fact_nodes = g_max_fact_nodes;
+    for (k = 0; k <= MAXK; k++) for (r = 0; r < 2; r++) if (live_tab[k][r]) {
+        for (i = 0; i < NPART; i++) if (live_tab[k][r][i].n >= 0)
+            free(live_tab[k][r][i].s);
+        free(live_tab[k][r]); live_tab[k][r] = NULL;
+    }
+    if (pairtab) {
+        for (i = 0; i < PAIRSZ; i++) free(pairtab[i].rows);
+        free(pairtab); pairtab = NULL;
+    }
+    free(memo); memo = NULL; memo_mask = 0;
+    free(dp); dp = NULL;
+}
+
+static void add_batch_stats(BatchStats *a, const BatchStats *b) {
+#define ADD_STAT(name) a->name += b->name
+    ADD_STAT(nodes); ADD_STAT(memo_hit); ADD_STAT(memo_miss);
+    ADD_STAT(live_built); ADD_STAT(live_reused);
+    ADD_STAT(pair_built); ADD_STAT(pair_reused); ADD_STAT(fc_prunes); ADD_STAT(fc_dom_skips);
+    ADD_STAT(pair_bits_set); ADD_STAT(pair_bits_tot);
+    ADD_STAT(paint_hits); ADD_STAT(pref_hits); ADD_STAT(pref_miss);
+    ADD_STAT(derived_ok); ADD_STAT(derived_no);
+    ADD_STAT(dp_hit); ADD_STAT(dp_miss); ADD_STAT(dp_skip);
+    if (b->max_fact_nodes > a->max_fact_nodes) a->max_fact_nodes = b->max_fact_nodes;
+#undef ADD_STAT
+}
+
+static void *batch_worker(void *vp) {
+    WorkerArg *a = vp;
+    Batch *b = a->batch;
+    size_t q;
+    worker_state_init(b->memo_bits);
+    while ((q = atomic_fetch_add_explicit(&b->next, 1, memory_order_relaxed)) < b->ntasks) {
+        VerifyTask *t = &b->tasks[q];
+        /* verify() returns before its ordinary per-fact setup for direct COUNT/MAJ proofs. */
+        g_fact_nodes = 0; g_budget_hit = 0;
+        int ok = verify(&((const Level *)g_levels)[t->k - 1], t->fact, t->k);
+        t->nodes = g_fact_nodes;
+        t->status = g_budget_hit ? 2 : (unsigned char)(ok ? 1 : 0);
+        if (g_budget_hit) budget_out++;
+    }
+    worker_state_finish(&a->stats);
+    return NULL;
+}
+
+static int default_memo_bits(int threads) {
+    int bits = MEMOBITS;
+    while (threads > 1 && bits > 18) { threads = (threads + 1) / 2; bits--; }
+    return bits;
+}
+
+static double monotonic_seconds(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+
+static double run_batch(VerifyTask *tasks, size_t ntasks, int threads, int memo_bits,
+                        BatchStats *total) {
+    double t0 = monotonic_seconds();
+    int i;
+    memset(total, 0, sizeof *total);
+    if (!ntasks) return 0;
+    if (threads < 1) threads = 1;
+    if ((size_t)threads > ntasks) threads = (int)ntasks;
+    Batch b = { .tasks = tasks, .ntasks = ntasks, .memo_bits = memo_bits };
+    atomic_init(&b.next, 0);
+    WorkerArg *args = calloc((size_t)threads, sizeof *args);
+    pthread_t *ids = threads > 1 ? malloc((size_t)(threads - 1) * sizeof *ids) : NULL;
+    if (!args || (threads > 1 && !ids)) { fprintf(stderr, "no memory for worker pool\n"); exit(1); }
+    for (i = 0; i < threads; i++) args[i].batch = &b;
+    for (i = 0; i < threads - 1; i++)
+        if (pthread_create(&ids[i], NULL, batch_worker, &args[i])) {
+            fprintf(stderr, "cannot create verifier worker %d\n", i); exit(1);
+        }
+    batch_worker(&args[threads - 1]);
+    for (i = 0; i < threads - 1; i++) pthread_join(ids[i], NULL);
+    for (i = 0; i < threads; i++) add_batch_stats(total, &args[i].stats);
+    free(ids); free(args);
+    return monotonic_seconds() - t0;
+}
+
 /* ---------------------------------------------------------------- log parsing */
 
 static Fact *lvl[MAXK + 1];
 static int lvln[MAXK + 1], lvlcap[MAXK + 1];
+static Fact *rootlvl[MAXK + 1];
+static int rootn[MAXK + 1], rootcap[MAXK + 1];
 
 static void add_fact(const Fact *f, int k) {
     if (k < 0 || k > MAXK) return;
@@ -972,9 +1235,160 @@ static void add_fact(const Fact *f, int k) {
     lvl[k][lvln[k]++] = *f;
 }
 
+static void add_root(const Fact *f, int k) {
+    if (k < 0 || k > MAXK) return;
+    if (rootn[k] == rootcap[k]) {
+        rootcap[k] = rootcap[k] ? rootcap[k] * 2 : 16;
+        rootlvl[k] = realloc(rootlvl[k], (size_t)rootcap[k] * sizeof(Fact));
+    }
+    rootlvl[k][rootn[k]++] = *f;
+}
+
+/* The durable text form is intentionally boring:
+
+       radio-negative-certificate-v1
+       # arbitrary comments
+       meta source-sha256 <hex>
+       root 9 Sb(112:81)
+       fact 8 Sb(53:52,44:44)
+
+   The same parser continues to accept raw `can't solve` lines.  Masses are derived rather than
+   stored, so a stale hand-copied annotation cannot become part of the proof. */
+#define CERT_HEADER "radio-negative-certificate-v1"
+
+static int is_cert_header(char *p) {
+    size_t n = strlen(CERT_HEADER);
+    return !strncmp(p, CERT_HEADER, n)
+        && (p[n] == 0 || p[n] == '\n' || p[n] == '\r' || p[n] == ' ' || p[n] == '\t');
+}
+
+static int parse_sb(char *p, Fact *f, char **endp) {
+    Part in[MAXP];
+    int cnt = 0;
+    p = strstr(p, "Sb(");
+    if (!p) return 0;
+    p += 3;
+    while (*p && *p != ')' && cnt < MAXP) {
+        long a = strtol(p, &p, 10);
+        if (*p != ':') return 0;
+        p++;
+        long b = strtol(p, &p, 10);
+        if (a < 0 || b < 0 || a > 255 || b > 255) return 0;
+        in[cnt].n = (unsigned char)a; in[cnt].m = (unsigned char)b; cnt++;
+        if (*p == ',') p++;
+        else if (*p != ')') return 0;
+    }
+    if (*p != ')' || cnt <= 0) return 0;
+    if (endp) *endp = p + 1;
+    return canon(in, cnt, f);
+}
+
+/* 0 ignore, 1 fact, 2 root, -1 malformed certificate record. */
+static int parse_input_line(char *line, int cert_mode, Fact *f, int *k) {
+    char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+    if (!*p || *p == '\n' || *p == '#') return 0;
+    if (is_cert_header(p) || !strncmp(p, "meta ", 5)) return 0;
+    if (!strncmp(p, "fact ", 5) || !strncmp(p, "root ", 5)) {
+        int root = *p == 'r';
+        char *q = p + 5, *end;
+        char *num;
+        while (*q == ' ' || *q == '\t') q++;
+        num = q;
+        long kk = strtol(q, &q, 10);
+        if (q == num || kk < 1 || kk > MAXK || !parse_sb(q, f, &end)) return -1;
+        while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') end++;
+        if (*end && *end != '#') return -1;
+        *k = (int)kk;
+        return root ? 2 : 1;
+    }
+    if (!strncmp(p, "can't solve", 11)) {
+        char *q = strstr(p, "] in ");
+        if (!q || !parse_sb(p, f, NULL)) return cert_mode ? -1 : 0;
+        *k = atoi(q + 5);
+        if (*k < 1 || *k > MAXK) return cert_mode ? -1 : 0;
+        return 1;
+    }
+    return cert_mode ? -1 : 0;
+}
+
+static long long read_input_file(const char *fname, int fidx, int facts_as_roots) {
+    static char line[1 << 16];
+    FILE *fp = fopen(fname, "r");
+    long long nread = 0;
+    int lineno = 0, cert_mode = 0;
+    if (!fp) { fprintf(stderr, "cannot open %s\n", fname); exit(2); }
+    while (fgets(line, sizeof line, fp)) {
+        Fact f;
+        int k, kind;
+        lineno++;
+        { char *p = line; while (*p == ' ' || *p == '\t') p++;
+          if (is_cert_header(p)) cert_mode = 1; }
+        kind = parse_input_line(line, cert_mode, &f, &k);
+        if (kind < 0) {
+            fprintf(stderr, "%s:%d: malformed or unknown certificate record\n", fname, lineno);
+            exit(2);
+        }
+        if (!kind) continue;
+        f.src = (unsigned char)(fidx < 8 ? 1u << fidx : 0x80);
+        if (facts_as_roots || kind == 2) add_root(&f, k); else add_fact(&f, k);
+        nread++;
+    }
+    fclose(fp);
+    return nread;
+}
+
+static void dedup_facts(Fact *f, int *np) {
+    int i, w = 0;
+    if (!*np) return;
+    qsort(f, *np, sizeof(Fact), fact_cmp);
+    for (i = 0; i < *np; i++)
+        if (!i || !feq(&f[i], &f[w - 1])) f[w++] = f[i];
+        else f[w - 1].src |= f[i].src;
+    *np = w;
+}
+
+static void write_state(FILE *fp, const char *kind, int k, const Fact *f) {
+    int i;
+    fprintf(fp, "%s %d Sb(", kind, k);
+    for (i = 0; i < f->np; i++)
+        fprintf(fp, "%s%d:%d", i ? "," : "", f->p[i].n, f->p[i].m);
+    fprintf(fp, ")\n");
+}
+
+static void write_certificate(const char *path, const Level *L, int maxk, int colored, int topk) {
+    FILE *fp = fopen(path, "w");
+    int k, i, nr = 0;
+    long long nf = 0;
+    if (!fp) { fprintf(stderr, "cannot write %s\n", path); exit(2); }
+    fprintf(fp, "radio-negative-certificate-v1\n");
+    fprintf(fp, "# Canonical facts; masses are derived by the checker.\n");
+    for (k = 0; k <= maxk && k <= MAXK; k++) nr += rootn[k];
+    if (nr) {
+        for (k = maxk; k >= 0; k--)
+            for (i = 0; i < rootn[k]; i++) write_state(fp, "root", k, &rootlvl[k][i]);
+    } else if (colored) {
+        for (i = 0; i < L[topk].n; i++) write_state(fp, "root", topk, &L[topk].f[i]);
+    }
+    for (k = maxk; k >= 0; k--)
+        for (i = 0; i < L[k].n; i++) {
+            if (colored && (k >= topk || !L[k].cited[i])) continue;
+            write_state(fp, "fact", k, &L[k].f[i]);
+            nf++;
+        }
+    if (fclose(fp)) { fprintf(stderr, "cannot finish %s\n", path); exit(2); }
+    printf("certificate %s: %d roots, %lld facts%s\n", path,
+           nr ? nr : (colored ? L[topk].n : 0), nf, colored ? " (colored)" : "");
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) { printf("usage: %s <log>[,<log>...] [maxk]\n", argv[0]); return 2; }
     int maxk = argc > 2 ? atoi(argv[2]) : MAXK;
+    int threads = 1, memo_bits;
+    { char *e = getenv("VERIFY_THREADS"); if (e) threads = atoi(e); }
+    if (threads < 1) { fprintf(stderr, "VERIFY_THREADS must be positive\n"); return 2; }
+    memo_bits = default_memo_bits(threads);
+    { char *e = getenv("VERIFY_MEMO_BITS"); if (e) memo_bits = atoi(e); }
     if (argc > 3) g_order = atoi(argv[3]);
     { char *e = getenv("BENCH_K"); if (e) g_bench = atoi(e); }
     { char *e = getenv("NODECAP"); if (e) g_nodecap = atoll(e); }
@@ -990,75 +1404,57 @@ int main(int argc, char **argv) {
     if (argc > 12) g_srcmask = atoi(argv[12]);
     if (argc > 13) g_derive = atoi(argv[13]);   /* bitmask of log indices to VERIFY;
                                                     all logs always serve as the database */
-    dp = calloc(DPSZ, sizeof(DpEnt));
-    if (!dp) { fprintf(stderr, "no memory for subtree memo\n"); return 1; }
+    if (threads > 1 && g_dpen) {
+        fprintf(stderr, "parallel prototype does not duplicate the disabled 0.29 GB subtree memo\n");
+        return 2;
+    }
+    if (threads > 1 && (g_timecap || g_diag)) {
+        fprintf(stderr, "TIMECAP and diagnostic split printing are single-thread-only\n");
+        return 2;
+    }
     int i, k;
     for (i = 0, pow3[0] = 1; i < MAXK; i++) pow3[i + 1] = pow3[i] * 3;
     build_G();
     build_zob();
-    for (k = 0; k <= MAXK; k++)
-        for (i = 0; i < 2; i++) {
-            live_tab[k][i] = malloc(NPART * sizeof(LiveTab));
-            int j; for (j = 0; j < NPART; j++) { live_tab[k][i][j].n = -1; live_tab[k][i][j].s = NULL; }
-        }
-
-    memo = calloc(MEMOSZ, sizeof(MemoEnt));
-    { int j; for (j = 0; j < MEMOSZ; j++) memo[j].res = -1; }
 
     /* a comma-separated list of logs. The union of fact sets is itself a fact set: every fact
        is a claim about one state at one k, and each is checked on its own merits. Merging logs
        from different runs and different eras is therefore sound - an unsound fact cannot be
        laundered by the company it keeps, it just fails to verify. */
-    static char line[1 << 16];
     long long nread = 0;
     char *logs = strdup(argv[1]), *fname, *save = NULL;
     int fidx = 0;
-    for (fname = strtok_r(logs, ",", &save); fname; fname = strtok_r(NULL, ",", &save), fidx++) {
-    FILE *fp = fopen(fname, "r");
-    if (!fp) { printf("cannot open %s\n", fname); return 2; }
-    while (fgets(line, sizeof line, fp)) {
-        if (strncmp(line, "can't solve", 11)) continue;
-        char *p = strstr(line, "Sb(");
-        if (!p) continue;
-        p += 3;
-        Part in[MAXP]; int cnt = 0;
-        while (*p && *p != ')' && cnt < MAXP) {
-            int a = strtol(p, &p, 10);
-            if (*p != ':') break;
-            p++;
-            int b = strtol(p, &p, 10);
-            in[cnt].n = (unsigned char)(a > 255 ? 255 : a);
-            in[cnt].m = (unsigned char)(b > 255 ? 255 : b);
-            if (a > 255 || b > 255) { cnt = -1; break; }
-            cnt++;
-            if (*p == ',') p++;
-        }
-        if (cnt <= 0) continue;
-        char *q = strstr(p, "] in ");
-        if (!q) continue;
-        int kk = atoi(q + 5);
-        Fact f;
-        if (!canon(in, cnt, &f)) continue;
-        f.src = (unsigned char)(fidx < 8 ? 1u << fidx : 0x80);
-        add_fact(&f, kk);
-        nread++;
-    }
-    fclose(fp);
-    }
-    printf("logs %s: %lld negative facts parsed\n", argv[1], nread); fflush(stdout);
+    for (fname = strtok_r(logs, ",", &save); fname; fname = strtok_r(NULL, ",", &save), fidx++)
+        nread += read_input_file(fname, fidx, 0);
+    free(logs);
+    if (getenv("ROOTS")) nread += read_input_file(getenv("ROOTS"), fidx, 1);
+    { int nr = 0;
+      for (k = 0; k <= MAXK; k++) nr += rootn[k];
+      printf("inputs %s: %lld records parsed (%d explicit roots), threads=%d memo=2^%d/worker\n",
+             argv[1], nread, nr, threads, memo_bits); }
+    fflush(stdout);
 
     /* dedup each level, then freeze */
     static Level L[MAXK + 1];
     g_levels = L;
     for (k = 0; k <= MAXK; k++) {
-        if (!lvln[k]) { L[k].n = 0; L[k].f = NULL; level_freeze(&L[k]); continue; }
-        qsort(lvl[k], lvln[k], sizeof(Fact), fact_cmp);
-        int w = 0;
-        for (i = 0; i < lvln[k]; i++)
-            if (!i || !feq(&lvl[k][i], &lvl[k][w - 1])) lvl[k][w++] = lvl[k][i];
-            else lvl[k][w - 1].src |= lvl[k][i].src;
-        L[k].n = w; L[k].f = lvl[k];
+        dedup_facts(lvl[k], &lvln[k]);
+        dedup_facts(rootlvl[k], &rootn[k]);
+        L[k].n = lvln[k]; L[k].f = lvl[k];
         level_freeze(&L[k]);
+    }
+    for (k = 1; k <= MAXK; k++) if (rootn[k] && (k < g_mink || k > maxk)) {
+        fprintf(stderr, "explicit root at k=%d is outside the requested verification range %d..%d\n",
+                k, g_mink, maxk);
+        return 2;
+    }
+
+    if (getenv("CERT_ONLY")) {
+        if (!getenv("CERT_OUT")) {
+            fprintf(stderr, "CERT_ONLY requires CERT_OUT=<path>\n"); return 2;
+        }
+        write_certificate(getenv("CERT_OUT"), L, maxk < MAXK ? maxk : MAXK, 0, 0);
+        return 0;
     }
 
     if (getenv("MINIMAL_K")) {
@@ -1112,6 +1508,8 @@ int main(int argc, char **argv) {
            those are genuine misses - the states are split children, not logged facts. This is
            exactly the work a per-(part,k) hint file would replace. */
         int bk = g_bench, q, j;
+        BatchStats ignored;
+        worker_state_init(memo_bits);
         static unsigned char seen[NPART];
         long long nparts = 0, nopts = 0;
         clock_t t0 = clock();
@@ -1127,6 +1525,7 @@ int main(int argc, char **argv) {
         printf("BENCH k=%d: %lld distinct parts, %lld live options, %.3f s (%.1f ms/part)\n",
                bk, nparts, nopts, (double)(clock() - t0) / CLOCKS_PER_SEC,
                1e3 * (clock() - t0) / CLOCKS_PER_SEC / (nparts ? nparts : 1));
+        worker_state_finish(&ignored);
         return 0;
     }
     if (getenv("TOPDOWN")) {
@@ -1138,73 +1537,168 @@ int main(int argc, char **argv) {
            Still well-founded induction on k, so soundness is untouched - every cited fact is
            itself verified before the certificate closes. What changes is that both the artifact
            and the verification work shrink to what the proof needs. */
-        int topk = atoi(getenv("TOPDOWN")), kk, pass;
+        int topk = atoi(getenv("TOPDOWN")), kk, pass, final_bad = 0, nr = 0;
         int npass = getenv("PASSES") ? atoi(getenv("PASSES")) : 1;
+        if (topk < 2 || topk > MAXK) { fprintf(stderr, "TOPDOWN must be in 2..%d\n", MAXK); return 2; }
+        for (kk = 0; kk <= MAXK; kk++) nr += rootn[kk];
+        if (nr) for (kk = 0; kk <= MAXK; kk++) if (kk != topk && rootn[kk]) {
+            fprintf(stderr, "top-down coloring requires every explicit root at k=%d\n", topk);
+            return 2;
+        }
+        if (getenv("MINIMIZE_BEFORE_COLOR")) {
+            printf("subsumption-minimalizing support levels before coloring\n");
+            for (kk = 1; kk < topk; kk++) if (L[kk].n > 1) {
+                int before = L[kk].n;
+                double t0 = monotonic_seconds();
+                int removed = level_minimize(&L[kk], threads);
+                printf("  k=%d: %d -> %d facts, removed %d (%.2f s)\n",
+                       kk, before, L[kk].n, removed, monotonic_seconds() - t0);
+            }
+        }
         g_paint = 1;
         for (pass = 1; pass <= npass; pass++) {
+            int pass_bad = 0;
             printf("--- pass %d%s ---\n", pass,
                    pass > 1 ? " (preferring witnesses already in the artifact)" : "");
-            printf("%3s %10s %10s %10s %8s %10s %12s\n",
-                   "k", "in level", "targets", "verified", "unver", "sec", "cited k-1");
-            for (kk = topk; kk >= (g_mink > 2 ? g_mink : 2); kk--) {
-                if (!L[kk].n) continue;
-                { int z; for (z = 0; z < MEMOSZ; z++) memo[z].res = -1; }
-                clock_t t0 = clock();
-                int tgt = 0, ver = 0, un = 0, budg = 0, q;
-                /* target list: everything at the top, otherwise what the level above painted.
-                   On a later pass that list is the previous pass's painting, held in `sub`. */
-                int use_sub = (kk != topk && pass > 1 && L[kk].sub);
-                int nt = use_sub ? L[kk].sub->n : L[kk].n;
+            printf("%3s %10s %10s %10s %8s %8s %10s %12s\n",
+                   "k", "in level", "targets", "verified", "unver", "budget", "wall", "cited k-1");
+            for (kk = topk; kk >= (g_mink > 1 ? g_mink : 1); kk--) {
+                int use_roots = kk == topk && nr;
+                int use_sub = kk != topk && pass > 1 && L[kk].sub;
+                int nt = 0, q, w = 0, ver = 0, un = 0, budg = 0, cited = 0;
+                BatchStats bs;
+                VerifyTask *tasks;
+                if (use_roots) nt = rootn[kk];
+                else if (kk == topk) nt = L[kk].n;
+                else if (use_sub) nt = L[kk].sub->n;
+                else for (q = 0; q < L[kk].n; q++) nt += L[kk].cited[q] ? 1 : 0;
+                tasks = nt ? malloc((size_t)nt * sizeof *tasks) : NULL;
+                if (nt && !tasks) { fprintf(stderr, "no memory for coloring tasks\n"); return 1; }
                 for (q = 0; q < nt; q++) {
-                    int fi = use_sub ? L[kk].sub->orig[q] : q;
-                    if (!use_sub && kk != topk && !L[kk].cited[fi]) continue;
-                    tgt++;
-                    if (verify(&L[kk - 1], &L[kk].f[fi], kk)) {
-                        if (g_budget_hit) budg++; else ver++;
-                    } else un++;
+                    const Fact *f;
+                    if (use_roots) f = &rootlvl[kk][q];
+                    else if (kk == topk) f = &L[kk].f[q];
+                    else if (use_sub) f = &L[kk].f[L[kk].sub->orig[q]];
+                    else {
+                        while (w < L[kk].n && !L[kk].cited[w]) w++;
+                        f = &L[kk].f[w++];
+                    }
+                    tasks[q].k = kk; tasks[q].fact = f;
+                    tasks[q].status = 0; tasks[q].nodes = 0;
                 }
-                int cited = 0;
-                for (q = 0; q < L[kk - 1].n; q++) cited += L[kk - 1].cited[q];
-                printf("%3d %10d %10d %10d %8d %10.1f %12d  (budget %d, prefer hit %lld/%lld)\n",
-                       kk, L[kk].n, tgt, ver, un, (double)(clock() - t0) / CLOCKS_PER_SEC, cited,
-                       budg, pref_hits, pref_hits + pref_miss);
+                double sec = run_batch(tasks, (size_t)nt, threads, memo_bits, &bs);
+                for (q = 0; q < nt; q++) {
+                    if (tasks[q].status == 1) ver++;
+                    else if (tasks[q].status == 2) budg++;
+                    else un++;
+                }
+                for (q = 0; q < L[kk - 1].n; q++) cited += L[kk - 1].cited[q] ? 1 : 0;
+                printf("%3d %10d %10d %10d %8d %8d %10.2f %12d  (prefer %lld/%lld)\n",
+                       kk, L[kk].n, nt, ver, un, budg, sec, cited,
+                       bs.pref_hits, bs.pref_hits + bs.pref_miss);
                 fflush(stdout);
+                pass_bad += un + budg;
+                free(tasks);
             }
+            final_bad = pass_bad;
             if (pass == npass) break;
-            /* Drop the live-split tables. They are memoised on (part, k) and were built during
-               the previous pass, so replaying a level would reuse them and issue no refutation
-               queries at all - and painting only happens where a query happens. Rebuilding costs
-               0.24 s for a whole level, against silently painting nothing. */
-            { int a, b;
-              for (a = 0; a <= MAXK; a++)
-                  for (b = 0; b < 2; b++)
-                      if (live_tab[a][b]) {
-                          int z;
-                          for (z = 0; z < NPART; z++)
-                              if (live_tab[a][b][z].n >= 0) {
-                                  free(live_tab[a][b][z].s);
-                                  live_tab[a][b][z].n = -1; live_tab[a][b][z].s = NULL;
-                              }
-                      }
-            }
-            /* freeze this pass's painting as the next pass's preference set, then repaint */
+            /* Freeze this pass's painting as the next pass's preference set, then repaint.
+               Worker-local live/pair tables have already been destroyed, so pass 2 cannot reuse
+               a memo that would silently suppress its citations. */
             for (kk = topk; kk >= 1; kk--) {
                 if (!L[kk].n) continue;
                 Level *ns = level_sub_cited(&L[kk]);
                 if (ns) L[kk].sub = ns;
-                memset(L[kk].cited, 0, L[kk].n);
+                memset(L[kk].cited, 0, (size_t)L[kk].n);
             }
-            pref_hits = pref_miss = 0;
         }
-        return 0;
+        if (getenv("CERT_OUT") && g_mink > 1) {
+            fprintf(stderr, "not writing a partial colored certificate stopped at k=%d\n", g_mink);
+            return 2;
+        } else if (getenv("CERT_OUT") && !final_bad)
+            write_certificate(getenv("CERT_OUT"), L, topk, 1, topk);
+        else if (getenv("CERT_OUT"))
+            fprintf(stderr, "not writing an incomplete colored certificate (%d unresolved targets)\n",
+                    final_bad);
+        return final_bad ? 1 : 0;
     }
+    if (getenv("CERT_OUT") &&
+            (g_mink != 1 || g_minp > 0 || g_maxp < MAXP || g_stride != 1 || g_srcmask)) {
+        fprintf(stderr, "CERT_OUT requires full unfiltered verification; use CERT_ONLY to normalize\n");
+        return 2;
+    }
+    { int nr = 0;
+      for (k = 0; k <= MAXK; k++) nr += rootn[k];
+      if (threads > 1 || nr) {
+        long long selected[MAXK + 1] = {0}, ver[MAXK + 1] = {0};
+        long long un[MAXK + 1] = {0}, budg[MAXK + 1] = {0}, nodes[MAXK + 1] = {0};
+        long long pick = 0, total_tasks = 0, q;
+        BatchStats bs;
+        for (k = g_mink; k <= maxk && k <= MAXK; k++) {
+            for (i = 0; i < L[k].n; i++) {
+                if (L[k].f[i].np < g_minp || L[k].f[i].np > g_maxp) continue;
+                if (g_srcmask && !(L[k].f[i].src & g_srcmask)) continue;
+                if (g_stride > 1 && (pick++ % g_stride)) continue;
+                selected[k]++; total_tasks++;
+            }
+            for (i = 0; i < rootn[k]; i++) { selected[k]++; total_tasks++; }
+        }
+        VerifyTask *tasks = total_tasks ? malloc((size_t)total_tasks * sizeof *tasks) : NULL;
+        if (total_tasks && !tasks) { fprintf(stderr, "no memory for verification tasks\n"); return 1; }
+        pick = q = 0;
+        for (k = g_mink; k <= maxk && k <= MAXK; k++) {
+            for (i = 0; i < L[k].n; i++) {
+                if (L[k].f[i].np < g_minp || L[k].f[i].np > g_maxp) continue;
+                if (g_srcmask && !(L[k].f[i].src & g_srcmask)) continue;
+                if (g_stride > 1 && (pick++ % g_stride)) continue;
+                tasks[q].k = k; tasks[q].fact = &L[k].f[i]; tasks[q++].status = 0;
+            }
+            for (i = 0; i < rootn[k]; i++) {
+                tasks[q].k = k; tasks[q].fact = &rootlvl[k][i]; tasks[q++].status = 0;
+            }
+        }
+        double wall = run_batch(tasks, (size_t)total_tasks, threads, memo_bits, &bs);
+        for (q = 0; q < total_tasks; q++) {
+            k = tasks[q].k; nodes[k] += tasks[q].nodes;
+            if (tasks[q].status == 1) ver[k]++;
+            else if (tasks[q].status == 2) budg[k]++;
+            else {
+                un[k]++;
+                if (un[k] <= 3) write_state(stdout, "UNVERIFIED", k, tasks[q].fact);
+            }
+        }
+        printf("%3s %10s %10s %8s %8s %14s\n",
+               "k", "targets", "verified", "unver", "budget", "nodes");
+        for (k = g_mink; k <= maxk && k <= MAXK; k++) if (selected[k])
+            printf("%3d %10lld %10lld %8lld %8lld %14lld\n",
+                   k, selected[k], ver[k], un[k], budg[k], nodes[k]);
+        { long long tv = 0, tu = 0, tb = 0;
+          for (k = 0; k <= MAXK; k++) { tv += ver[k]; tu += un[k]; tb += budg[k]; }
+          printf("\nTOTAL verified %lld, unverified %lld, budget %lld, nodes %lld, %.2f s wall on %d thread%s\n",
+                 tv, tu, tb, bs.nodes, wall, threads, threads == 1 ? "" : "s");
+          printf("memo: %lld hits, %lld misses (%.1f%%); live tables %lld built/%lld reused; "
+                 "pair tables %lld built/%lld reused\n",
+                 bs.memo_hit, bs.memo_miss,
+                 100.0 * bs.memo_hit / (bs.memo_hit + bs.memo_miss ? bs.memo_hit + bs.memo_miss : 1),
+                 bs.live_built, bs.live_reused, bs.pair_built, bs.pair_reused);
+          if (getenv("CERT_OUT") && !tu && !tb)
+              write_certificate(getenv("CERT_OUT"), L, maxk < MAXK ? maxk : MAXK, 0, 0);
+          else if (getenv("CERT_OUT"))
+              fprintf(stderr, "not writing a certificate with unresolved facts\n");
+          free(tasks);
+          return tu || tb ? 1 : 0; }
+      }
+    }
+
+    /* Preserve the detailed single-thread instrumentation as the reference execution path. */
+    worker_state_init(memo_bits);
     printf("%3s %10s %10s %8s %9s %14s %8s\n",
            "k", "facts", "verified", "unver", "sec", "nodes", "live");
     long long tot_ver = 0, tot_un = 0, tot_nodes = 0;
     double tot_s = 0;
     for (k = g_mink; k <= maxk && k <= MAXK; k++) {
         if (!L[k].n) continue;
-        { int j; for (j = 0; j < MEMOSZ; j++) memo[j].res = -1; }   /* level set changed */
+        memset(memo, 0xff, (memo_mask + 1) * sizeof(MemoEnt));   /* level set changed */
         clock_t t0 = clock();
         long long n0 = g_nodes;
         int ver = 0, un = 0;
@@ -1273,5 +1767,10 @@ int main(int argc, char **argv) {
           printf("   <=2^%-2d nodes: %lld\n", q, cost_hist[q]); }
     printf("live-split tables: %lld built, %lld reused (%.0fx)\n",
            live_built, live_reused, live_reused / (double)(live_built ? live_built : 1));
-    return tot_un ? 1 : 0;
+    if (getenv("CERT_OUT") && !tot_un && !budget_out)
+        write_certificate(getenv("CERT_OUT"), L, maxk < MAXK ? maxk : MAXK, 0, 0);
+    else if (getenv("CERT_OUT"))
+        fprintf(stderr, "not writing a certificate with unresolved facts\n");
+    { BatchStats ignored; worker_state_finish(&ignored); }
+    return tot_un || budget_out ? 1 : 0;
 }

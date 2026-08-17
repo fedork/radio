@@ -326,6 +326,36 @@ complete outer-family theorem, a refinement-stable exact description of the sync
 antichain, or an all-depth construction/obstruction that connects successive normalizations.  A
 new finite winner, another bounded-depth exclusion, or a fitted atom word is not enough.
 
+### P7 - Compile and independently replay the `Sa(193)` certificate
+
+The small-corpus gate is delivered. `radio_verify.c` now accepts and emits a strict readable text
+certificate, distinguishes roots from support facts, minimalizes support levels before coloring,
+and verifies all levels concurrently with pthread workers. On `fullsolve-2026:out_k7.txt`, one
+through sixteen workers produced the identical 62,366 verdicts and 97,483,464-node enumeration;
+wall time fell from 14.13 to 2.79 seconds. A one-root colored certificate retained 373 support facts
+and replayed cleanly. Details and hashes:
+[`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
+
+Next, in order:
+
+1. **Delivered:** normalize run9 to `radio-negative-certificate-v1` and round-trip it byte-for-byte;
+   a bounded top pass also verifies the sixteen explicit roots and shows that they cite all 2,545
+   canonical `k=8` facts, but deliberately verifies nothing below `k=9`;
+2. minimalize the support levels, verify/color those `k=8` targets and record the actual reachable
+   counts—the
+   earlier 190x `k=7` reduction came from the superseded 2023 corpus and is only a prior;
+3. replay the colored bundle at one and several worker widths and require identical record sets,
+   zero unresolved targets and sanitizer-clean small regressions;
+4. only if dominance reconstruction still dominates cost, add optional checkable citation hints;
+   do not make a binary or opaque format the durable source merely to accelerate indexing.
+
+The parallel-solver follow-up should reuse the scheduling lesson without forcing the solver into
+level-synchronous breadth first search. Keep the cheap heuristic pass depth first; replace the
+deadline-driven exhaustive tail with a limited-width queue of coarse split-prefix batches. Use
+per-`k` immutable cache epochs plus short exact-result publication, not read/write locks held across
+recursion. First refactor the current globals into explicit worker/search contexts and reproduce
+the serial regressions; a language rewrite is not the first experiment.
+
 ## Ordering
 
 P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed

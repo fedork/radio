@@ -134,6 +134,8 @@ def emit(meta: dict[str, str], command: Iterable[str]) -> None:
         "RADIO_LIMIT_WALL_SECONDS", "RADIO_LIMIT_RSS_GIB",
         "RADIO_LIMIT_PHYSICAL_FOOTPRINT_GIB", "RADIO_RUN_CONTEXT", "TWO_SIDED_ONLY",
         "TRACE_INDEX", "BENCH_K", "NODECAP", "TIMECAP", "MINIMAL_K", "TOPDOWN", "PASSES",
+        "VERIFY_THREADS", "VERIFY_MEMO_BITS", "ROOTS", "MINIMIZE_BEFORE_COLOR", "CERT_ONLY",
+        "CERT_OUT",
         "RADIO_PROBE_INIT",
     )
     for name in safe_env:

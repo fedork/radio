@@ -1,0 +1,106 @@
+# MEASURED PROTOTYPE: parallel independent verifier and readable certificate format.
+# Date: 2026-08-16 (America/Los_Angeles)
+# Corpus: fullsolve-2026/fullsolve_2026.tar:out_k7.txt
+# Archive: https://github.com/fedork/radio-data/releases/tag/fullsolve-2026
+# Corpus SHA-256: 9bfcdd134fd16d1e1dc1f4a34154eaadc16a988f6e065517e62eece6e69c2cde
+# Corpus size: 6,910,223 bytes; 68,447 lines; 62,366 canonical negative facts parsed.
+#
+# These are one-shot development measurements, not a statistically controlled benchmark. Every
+# run used the same O3 pthread build, build ID
+# 6a2be1f9548af328a8c58085f7038574a461b60680a9cd92e9ab01800defec8d, on the same machine.
+# Command shape:
+#
+#   VERIFY_THREADS=N /usr/bin/time -p /tmp/radio_verify_final out_k7.txt \
+#       6 0 1 3 0 999 1 0 1
+#
+# All thread counts independently returned 62,366 verified, 0 unverified and exactly 97,483,464
+# split-recursion nodes. The runtime verifier mixes all k-level tasks in one dynamic queue; there
+# is no verification barrier between levels.
+
+threads  real_s  user_s  sys_s  speedup_vs_1
+1        14.13   13.41   0.18   1.00
+2         8.24   16.26   0.15   1.71
+4         5.22   20.58   0.17   2.71
+8         3.24   25.43   0.21   4.36
+16        2.79   35.79   0.39   5.06
+
+# The default aggregate direct-memo capacity is held near 2^24 entries by reducing the per-worker
+# memo as the worker count rises. Separate /usr/bin/time -l observations ranged from 0.84 GB peak
+# footprint at one worker to 1.03 GB at sixteen; worker-local live/pair tables account for the rise.
+# The 8->16 step bought only 14% more wall speed for 41% more user CPU, so eight was the economical
+# width on this corpus and machine.
+
+# Text certificate experiment. CERT_ONLY rewrote the raw log as the documented
+# radio-negative-certificate-v1 format: one `fact k Sb(...)` per canonical state.
+
+artifact                 bytes_raw  bytes_zstd19  sha256
+normalized_all_facts       1908729        194131  a5a14fa37215cd6ee46b2ccb06f83c7493b6723edd079ad5191c44d495eb36f1
+one_root_colored              9897          1410  45ff9191881b56de73f296c37c0339d34ac8342a40de58fede0882da62bda0be
+
+# The colored root was the nontrivial corpus fact Sb(17:17,16:15) in 6. Before coloring, parallel
+# same-level subsumption reduced the support database as follows:
+
+k  before  minimal  removed
+2      13        9        4
+3     637      529      108
+4   19527    11767     7760
+5   41409    28632    12777
+
+# Reachable targets/citations from that one explicit root:
+
+k  targets_verified  cited_at_k_minus_1
+6                 1                    37
+5                37                    92
+4                92                   234
+3               234                     9
+2                 9                     1
+1                 1                     0
+
+# The output therefore contains 1 root plus 373 support facts. One- and four-thread coloring
+# produced byte-identical output with the SHA-256 above; replay verified all 374 records with zero
+# gaps and 14,000 split-recursion nodes.
+#
+# Explicit roots are semantically necessary. With no root records, TOPDOWN=6 treats every one of
+# the 779 k=6 facts as a root. On the same minimalized database that produced 38,275 support facts,
+# rather than 373. Coloring removes unused descendants; it cannot decide that a supplied top-level
+# target was not intended to be a root.
+#
+# Regression and safety checks:
+#   tools/test_radio_verify.sh
+#     serial and two-thread replay; pre-color minimalization; byte-identical 1/2-thread coloring;
+#     replay of the emitted text certificate.
+#   -fsanitize=thread, four workers: fixture verification and coloring clean.
+#   -fsanitize=address,undefined, four workers: fixture verification and coloring clean.
+
+# Full run9 format gate, parse/normalize only -- this command performed no proof replay or coloring.
+# The new parser returned exactly the old verifier parser's 3,126,190 canonical negative records.
+# Build ID: ad3be8d40749c0642e36a6ede5210d71153fb45031c3fd472f1a8f756d92e74d.
+#
+#   CERT_ONLY=1 CERT_OUT=/tmp/run9_negative_facts.cert radio_verify run9_out_sa193.txt 10
+#
+# completed in 2.74 real seconds with 456,966,144 bytes maximum RSS. The output parsed and rewrote
+# byte-identically on a second pass.
+
+run9_normalized_records=3126190
+run9_normalized_lines=3126192
+run9_normalized_bytes=106011566
+run9_normalized_zstd19_bytes=7194721
+run9_normalized_sha256=3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+
+# Canonical fact counts in the normalized run9 database:
+k  facts
+9  16
+8  2545
+7  2576885
+6  388317
+5  125246
+4  33042
+3  137
+2  2
+
+# Bounded top-level coloring measurement only. Build ID
+# 033f8f8879ade2aa45a7cf66c9b1b8918959160e28454f3a561b1f8673c93863; eight workers; support
+# levels were not yet minimalized; descent stopped after k=9. All 16 explicit Sa(193) roots verified
+# in 0.23 seconds of batch wall time and cited every one of the 2,545 canonical k=8 facts. The
+# capped process completed in 5 wall seconds including parse/index construction. No k=8 or lower
+# fact was verified by this measurement.

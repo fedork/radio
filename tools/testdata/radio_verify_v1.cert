@@ -1,0 +1,14 @@
+radio-negative-certificate-v1
+# Tiny closed certificate distilled from fullsolve-2026/out_k7.txt.
+# Sb(4:1) is deliberately redundant with Sb(3:1), exercising pre-color minimalization.
+root 2 Sb(3:3)
+root 2 Sb(4:2)
+root 2 Sb(5:1)
+root 2 Sb(2:2,2:2)
+root 2 Sb(3:2,3:1)
+root 2 Sb(4:1,2:2)
+root 2 Sb(4:1,4:1)
+root 2 Sb(3:1,3:1,3:1)
+root 2 Sb(4:1,3:1,2:1)
+fact 1 Sb(3:1)
+fact 1 Sb(4:1)

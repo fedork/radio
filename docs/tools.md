@@ -40,6 +40,65 @@ checkpoints, and `parse_file` ignores and re-echoes it while replaying facts. `t
 new solver log which lacks a complete block; `RADIO_ALLOW_LEGACY_PROVENANCE=1` exists only for a
 pre-banner historical file whose limitation is explicitly recorded in `docs/data.md`.
 
+## Independent negative verifier
+
+`radio_verify.c` shares no search code with `radiobase.c`. Build it with pthread support:
+
+```
+tools/build_radio.py -O3 -pthread radio_verify.c -o radio_verify
+VERIFY_THREADS=8 tools/run_with_provenance.py ./radio_verify LOG [MAX_K]
+```
+
+Ordinary verification puts eligible facts from every `k` in one dynamic worker queue. A fact at
+`k` reads only the frozen fact index at `k-1`, so runtime order is irrelevant: acceptance still
+means that every local obligation passed, and well-founded induction supplies the proof. Each
+worker owns its recursion state, memo and lazy live/pair tables. The default per-worker memo shrinks
+with worker count so aggregate direct-memo capacity stays near the single-thread `2^24` entries;
+override it with `VERIFY_MEMO_BITS` only for a measured comparison.
+
+The durable input/output format is text, and is deliberately simpler than a raw log:
+
+```
+radio-negative-certificate-v1
+# comments are allowed
+meta source-sha256 ba63...
+root 9 Sb(112:81)
+fact 8 Sb(53:52,44:44)
+```
+
+`root` records are claims to prove; `fact` records are their support database. Parts are
+canonicalized and mass is recomputed, never trusted from an annotation. Unknown records are fatal
+after the header. `CERT_ONLY=1 CERT_OUT=FILE` normalizes a raw log without verifying it. The current
+in-memory representation still limits each coordinate to 255; that is an implementation limit,
+not part of the text grammar.
+
+Top-down coloring alone has a level barrier, because citations made while verifying `k` become the
+targets at `k-1`:
+
+```
+TOPDOWN=9 ROOTS=roots.cert MINIMIZE_BEFORE_COLOR=1 CERT_OUT=colored.cert \
+  VERIFY_THREADS=8 tools/run_with_provenance.py ./radio_verify LOG 9
+```
+
+`MINIMIZE_BEFORE_COLOR` first replaces each support level below the roots by its same-level minimal
+antichain under Subgraph Monotonicity. `ROOTS` may be either a text certificate or raw solver lines;
+all records in that file are treated as roots. Without explicit roots, every fact at `TOPDOWN` is a
+root and therefore cannot be colored away. Worker-local caches are discarded between coloring
+passes, preserving the citation accounting that shared cached live tables previously suppressed.
+The checker refuses `CERT_OUT` after a partial or filtered verification; use `CERT_ONLY` when the
+intent is normalization rather than a proof replay.
+
+`tools/test_radio_verify.sh` covers serial/parallel agreement, text parsing, minimalization,
+deterministic coloring and replay. The first corpus measurement used
+[`fullsolve-2026`](https://github.com/fedork/radio-data/releases/tag/fullsolve-2026): all 62,366
+facts and 97,483,464 recursion nodes were identical from one through sixteen workers; measured
+wall scaling and certificate sizes are retained in
+[`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
+
+The parallel prototype deliberately rejects `TIMECAP`, diagnostic split printing and the disabled
+subtree-DP experiment. Their current process-global reporting/bulk allocation is not safe or useful
+to duplicate per worker.
+
 ## Engine internals worth knowing
 
 | what | where |

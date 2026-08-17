@@ -100,6 +100,57 @@ expected to require substantial enumeration and is not a prerequisite for the re
 `proven-exhaustive` classification. The current result rests on a retained, fully provenanced,
 current proof-safe exhaustive run plus the independently checked positive witness.
 
+### Parallel checker and durable certificate prototype (2026-08-16)
+
+The checker now has a pthread path whose workers share only frozen fact levels. Ordinary verification
+puts facts from every level in one dynamic queue: there is no computational level barrier, because
+the final result accepts only if every local check succeeds and the dependency relation always
+decreases `k`. Top-down coloring retains the necessary barrier from `k` to `k-1`, since one level's
+citations define the next level's targets.
+
+The durable format is human-readable text, not binary:
+
+```text
+radio-negative-certificate-v1
+root 9 Sb(112:81)
+fact 8 Sb(53:52,44:44)
+```
+
+Mass is derived, records are canonicalized, and unknown lines are rejected. Binary packing remains
+an internal indexing choice. On the retained `fullsolve-2026:out_k7.txt` corpus, normalization
+reduced 6,910,223 raw bytes to 1,908,729 text bytes and 194,131 bytes under `zstd -19`; the readable
+representation is therefore not a meaningful storage penalty.
+
+The format also passed a parse-only run9 gate: the old and new parsers both extracted 3,126,190
+canonical negative records; normalization took 2.74 wall seconds and 457 MB peak RSS. The readable
+file is 106,011,566 bytes, 7,194,721 under `zstd -19`, and a read/write round trip was byte-identical
+with SHA-256 `3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`.
+This establishes the transport format, not the still-pending proof replay.
+
+A separately bounded top-layer coloring then verified the sixteen run9 `k=9` roots in 0.23 seconds
+on eight workers and cited all 2,545 canonical `k=8` facts. It intentionally stopped there: no
+`k=8` or lower fact was checked, and the support levels had not yet been minimalized. For this
+particular log the sixteen roots happen to be exactly all canonical `k=9` facts, but the explicit
+root records remain necessary format semantics—the small corpus demonstrates that top-level logs
+are not generally root-only.
+
+That corpus supplies 62,366 independently verified facts. The same O3 build returned zero gaps and
+exactly 97,483,464 recursion nodes at every tested width; wall time was 14.13 seconds at one worker,
+5.22 at four, 3.24 at eight and 2.79 at sixteen. Eight is the economical width on this small
+workload: sixteen buys only another 14% wall reduction while materially increasing duplicate memo
+and lazy-table work.
+
+Pre-color same-level minimalization and explicit roots are both implemented. For one nontrivial
+`k=6` root from that corpus, minimalization followed by coloring produced 373 support facts and a
+9,897-byte certificate; one- and four-worker outputs were byte-identical and replayed with zero
+gaps. Treating all 779 logged `k=6` facts as roots instead produced 38,275 support facts. Coloring
+can discard unused descendants, but a supplied top-level target is a root by definition, so the
+format must distinguish roots from incidental top-level facts.
+
+Commands, hashes, the complete scaling table and sanitizer results are retained in
+[`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
+This is a successful prototype on the small corpus, not yet the run9 end-to-end replay.
+
 ## Superseded 2023 route
 
 The 2023 run reached the same conclusion after 4,079,185 solve seconds and roughly 90 GB of virtual
