@@ -150,8 +150,12 @@ for root in "${roots[@]}"; do
 done
 
 binary=$output_dir/radio_verify
-(cd "$repo_dir" && tools/build_radio.py -O3 -pthread radio_verify.c -o "$binary") \
-    >"$output_dir/build.log" 2>"$output_dir/build.stderr"
+if ! (cd "$repo_dir" && tools/build_radio.py -O3 -pthread radio_verify.c -o "$binary") \
+        >"$output_dir/build.log" 2>"$output_dir/build.stderr"; then
+    echo 'benchmark_verifier_pipeline.sh: verifier build failed' >&2
+    tail -40 "$output_dir/build.stderr" >&2 || true
+    exit 1
+fi
 
 run_context="verifier_pipeline_label=$label"
 if [[ -n "$cpus" ]]; then

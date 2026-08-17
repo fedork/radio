@@ -119,6 +119,7 @@ an all-depth exclusion.
 | `bounded-probe-rejected-2026-08-11` | universal two-second probe experiments: the enclosing k=8 pass timed out and the cold control re-entered an unbounded pass-2 dive | 57.0 M | rejected performance experiments; no negative claim |
 | `sa193-local-chain-2026-08-11` | four interrupted local `Sa(193)` segments, their closed recovery checkpoint, and a metadata tar containing each `run.meta`, frozen binary, monitor/completion/stderr and recovery guard | 157 M | 0 contradictions in each raw segment; **pre-banner logs archived with the explicit legacy-provenance override**; sidecars supply commits, source/binary hashes, commands and limits; no `Sa(193)` verdict |
 | `pareto-lift-2026-08-12` | ordinary four-part control, two lower-template solutions, two recursive-lift successes and their capped-run sidecars | 12.9 M | fully provenanced positive-path/performance evidence; no negative or maximality claim |
+| [`verifier-pipeline-2026-08-17`](https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17) | complete Sa(66) 1/2/4/8/14/16-worker sweep; Sa(113) normalized and colored certificates; independent 8/14/16-worker replays; exact source, scripts, logs, hashes and host topology | 83.0 M | every verifier log has complete provenance and zero replay gaps; the contained pre-banner solver corpus is explicitly legacy input, not a verdict source |
 
 ### Not archived
 

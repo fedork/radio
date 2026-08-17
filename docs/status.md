@@ -302,9 +302,10 @@ track is independently checked by `tools/check_atom_profile_certificate.py` and
 `tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
 searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.
 
-Artifact store `fedork/radio-data` (private): 15 tags, 46 assets plus a manifest per tag,
-about 460 MB stored. The new `sa193-cold-2026-08-16` release contains the proof log, matched
-comparator and final reproduction metadata; `check-index` is green.
+Artifact store `fedork/radio-data` (private): 16 tags, 47 assets plus a manifest per tag,
+about 471 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+reproduction metadata; `verifier-pipeline-2026-08-17` contains the complete Sa(66)/Sa(113)
+benchmark and certificates. `check-index` is green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -583,6 +584,20 @@ one through sixteen workers returned the identical 97,483,464-node proof, with w
 from 14.13 to 2.79 seconds. A one-root colored test shrank to 373 support facts and replayed cleanly;
 full measurements and hashes are in
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
+
+The full explicit-root `Sa(113)` pipeline is now a stronger completed benchmark. On an isolated
+same-type AWS host using the exact live-run9 verifier binary, 304,105 normalized facts became a
+3,953,000-byte readable certificate with 9 roots and 120,528 support facts. Independent replay
+verified all 120,537 records and exactly 2,491,817,467 recursion nodes with zero gaps. The 14-worker
+sanitize/round-trip/color/replay stages took 0.30/0.24/375.04/369.57 seconds and peaked at
+1,043,216 KiB, just under 1 GiB.
+Replay at 8/14/16 workers took 434.86/369.57/347.91 seconds: sixteen minimizes wall, eight uses CPU
+most economically, and fourteen is the measured shared-host compromise. The dominant k=6 batch
+retained 60,738 of 65,371 minimal facts and consumed 99.10% of coloring's per-level verification
+wall, so text parsing and further artifact coloring are not optimization priorities. Full evidence
+and the private release URL are in
+[`../evidence/verifier_pipeline_benchmark_2026-08-17.txt`](../evidence/verifier_pipeline_benchmark_2026-08-17.txt).
+
 Run9 itself has passed the parse/format gate: both verifier parsers extract 3,126,190 canonical
 negative records, and the 106 MB readable certificate round-trips byte-identically (7.19 MB at
 `zstd -19`). A bounded top-layer pass verified all sixteen `k=9` roots and cited all 2,545

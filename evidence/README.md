@@ -34,6 +34,7 @@ certify a frontier cell:
 | `rb_pliability_2026-08-13.txt` | exact hereditary suffix pliability and the first absolute-slack/tail-length certificates |
 | `rb_slack_profile_2026-08-14.txt` | full-slack q/D refinement, actual suffix call/prune census, real controls and rejected exact cutoff |
 | `sa193_run_comparison_2026-08-16.txt` | final run3/run8/run9 costs, hashes, classifications and the exact run8/run9 fact-set comparison |
+| `verifier_pipeline_benchmark_2026-08-17.txt` | complete Sa(66) thread/affinity sweep and Sa(113) sanitize, minimalize/color, replay and 8/14/16-worker comparison on the AWS run9 hardware class |
 
 ## Regenerating and auditing
 

@@ -336,6 +336,17 @@ wall time fell from 14.13 to 2.79 seconds. A one-root colored certificate retain
 and replayed cleanly. Details and hashes:
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
 
+The intermediate full-pipeline benchmark is also delivered. Explicit Sa(66) roots produced a
+2,037-record colored proof at every tested width. Explicit Sa(113) roots reduced 304,105 normalized
+facts to 9 roots plus 120,528 support facts, and independent replay closed all 120,537 records and
+2,491,817,467 recursion nodes with zero gaps. On the same `r7iz.4xlarge` hardware and exact run9
+verifier binary, 8/14/16 workers replayed in 434.86/369.57/347.91 seconds. This establishes the
+policy before run9 finishes: sixteen is minimum wall on an idle host, eight is CPU-efficient, and
+fourteen is a sound shared-host compromise. The dominant Sa(113) k=6 batch retained 92.91% of its
+minimal level, so coloring is valuable for artifact size but not a substitute for optimizing the
+hot verification level. Full evidence:
+[`../evidence/verifier_pipeline_benchmark_2026-08-17.txt`](../evidence/verifier_pipeline_benchmark_2026-08-17.txt).
+
 Next, in order:
 
 1. **Delivered:** normalize run9 to `radio-negative-certificate-v1` and round-trip it byte-for-byte;
@@ -347,8 +358,8 @@ Next, in order:
    targets and cited 2,506,515 `k=7` facts—99.97% of its minimal level. The earlier 190x `k=7`
    reduction from the superseded 2023 corpus does not transfer; the fourteen workers are now
    processing this full-scale batch, with no intra-level cursor or defensible ETA;
-4. the same supervisor will replay the colored bundle and require zero unresolved targets; after
-   completion, compare its record set with a second worker width if the measured cost justifies it;
+4. the same supervisor will replay the colored bundle and require zero unresolved targets; use the
+   measured Sa(113) width policy above rather than restarting the live run merely to change width;
 5. only if dominance reconstruction still dominates cost, add optional checkable citation hints;
    do not make a binary or opaque format the durable source merely to accelerate indexing.
 

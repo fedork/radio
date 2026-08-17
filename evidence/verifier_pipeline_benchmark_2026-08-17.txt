@@ -1,0 +1,204 @@
+# COMPLETED: end-to-end negative-certificate pipeline benchmark, 2026-08-17.
+#
+# Durable bundle (private; full URL deliberately recorded):
+# https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17
+# Asset: verifier-pipeline-2026-08-17.tar.zst
+# Raw tar: 86,970,368 bytes
+# Raw tar SHA-256: b8e4c5e4fd469488c63205d04c3739154c5d62402aab39a70c5a0a5d0068c9a0
+# Compressed asset: 11,319,563 bytes
+# Original staging prefix:
+# s3://radio-sa193-393287594714/verifier-bench/20260817T181300Z/
+#
+# The tar contains all staged inputs, runner scripts, 24 result summaries, complete stage logs,
+# time/RSS records, binaries and sidecars, certificates, phase markers and SHA256SUMS. It also
+# contains the exact pre-banner solver input, explicitly classified as legacy input rather than
+# evidence. Every retained verifier log has complete provenance and passes check_provenance.py.
+
+## Platform and identity
+
+Temporary instance: i-0dca43cb2bb3d9f04
+Type: r7iz.4xlarge, us-west-2b
+CPU: Intel Xeon Gold 6455B, 8 physical cores / 16 hardware threads, one NUMA node
+RAM: 132,923,990,016 bytes reported by the provenance wrapper
+OS: Amazon Linux 2023, kernel 6.1.177-224.371.amzn2023.x86_64
+Compiler: clang 15.0.7 (AWS 15.0.7-3.amzn2023.0.4), -O3 -pthread
+Commit: fc48e39a44d41d8c8179c5fcda3a12ece2c1e55b
+Build ID: 46407f360c0b75da14125a3d5d7acd8854e3c765b6a19acb6e799d9ed70b2695
+radio_verify.c SHA-256: 895e5a7f7d11bf700a230a8370e2bb7d8363360dc32c71bedda700ed028db941
+Binary SHA-256: 6de550a1fc26f0c8333cc9a0d67e591314d0599c20750897d6e95a5c8296c67c
+
+The binary SHA-256 is identical to the live run9 verifier. The commit differs only because the
+benchmark wrapper was added/fixed after that launch; the compiled verifier and compiler are exact.
+The benchmark host was otherwise idle. It launched at 18:13:37 UTC and was intentionally
+terminated at 18:49:04 UTC after all three uploaded phase statuses reported exit 0. Its root volume
+was disposable; the S3 and GitHub copies were checked before termination. The separate live run9
+instance i-0005d74f985c52ae1 remained running and was not altered.
+
+CPU numbering is topology-significant:
+
+    physical cores:  CPU 0 1 2 3 4 5 6 7
+    sibling threads: CPU 8 9 10 11 12 13 14 15
+    core:               0 1 2 3 4 5 6 7
+
+Thus mask 0-13 reaches all eight physical cores and adds six siblings. Mask 0-6,8-14 instead uses
+both threads of seven cores and leaves core 7 completely free.
+
+## Pipeline and gates
+
+The committed tools/benchmark_verifier_pipeline.sh performs:
+
+1. exact prefix extraction and explicit-root presence checks;
+2. provenance build of radio_verify.c;
+3. raw-log normalization with CERT_ONLY;
+4. a second parse/write pass, required to be byte-identical;
+5. same-level minimalization plus top-down coloring from explicit roots;
+6. independent replay of the emitted colored certificate;
+7. provenance validation, zero-unverified/zero-budget assertions and record-count checks.
+
+Input was the clean, single-session cold bench_sa113_k9.txt:
+
+    SHA-256 85f6a4fb1fd05ccd16a74b1d394c2fcd4c804db6b1a459885af5f94b133f96c6
+    315,278 lines; 33,998,104 bytes
+
+It predates embedded provenance and therefore is not trusted as a verdict source. The verifier
+independently checks every retained negative fact. The same Sa ladder is also available in the
+archived clean 2026 corpus at:
+https://github.com/fedork/radio-data/releases/tag/sa-2026-04-27
+
+## Sa(66) in 8: correctness and scaling benchmark
+
+The first-test reduction uses the six k=7 roots
+Sb(38:28), Sb(37:29), Sb(36:30), Sb(35:31), Sb(34:32), Sb(33:33). With Sa(38) maximal in seven
+tests, these exhaust the possible smaller first-test shore 28..33. The selected input is lines
+1..3,637:
+
+    prefix SHA-256       a783c6279f6ace37650ecfdb0f88c2c3457cee9384f0b418106f4f3cafc0f5e1
+    normalized facts     2,854
+    normalized SHA-256  16b21698c3a9d1b90c27e102e7588ad30f3d70cc720d431e1a9eaafcec887070
+    colored certificate  6 roots + 2,031 support facts; 56,842 bytes
+    colored SHA-256      6fde697ba138738a4bf35bd4ecd445fee6c8c465e3b25cf6cf19344caf57cb00
+    replay               2,037 verified, 0 unverified, 0 budget; 1,942,412 nodes
+
+Three complete repetitions were run at every configuration. Times below are medians of GNU time
+around the color and replay stages. Every one of the 21 colored certificates is byte-identical.
+
+workers  CPU mask       color wall s  replay wall s
+      1  0                       2.12           0.89
+      2  0-1                     1.21           0.52
+      4  0-3                     0.72           0.30
+      8  0-7 physical            0.46           0.19
+     14  0-13                    0.36           0.16
+     14  0-6,8-14                0.36           0.17
+     16  0-15                    0.38           0.17
+
+This small workload gives 5.89x color and 5.56x replay speedup from one to fourteen workers. The
+sixteen-thread regression is short-batch overhead, not a correctness difference. The 14-thread
+0-13 and topology-isolating masks are effectively tied here; the latter is the appropriate layout
+when another process must own physical core 7.
+
+## Sa(113) in 9: representative end-to-end result
+
+The first-test reduction uses the nine k=8 roots Sb(65:48) through Sb(57:56). With Sa(65) maximal
+in eight tests, these exhaust the possible smaller shore 48..56. The selected input is lines
+1..315,276:
+
+    prefix bytes         33,998,038
+    prefix SHA-256       d423d166dd08e877b5658b8c5b9979db374d665af8624af36a4e67cc1c931e85
+    normalized facts     304,105
+    normalized bytes     10,523,303
+    normalized SHA-256  41e64f81233d19aa4acd2141fb24ba28e0276c59c497aa19134c7e3562609dba
+
+The second parse/write pass matched the normalized certificate byte for byte. Pre-color
+minimalization cost 3.87 seconds total:
+
+k   before    minimal   removed   wall s
+2        5          5         0     0.00
+3      487        424        63     0.00
+4  216,580    137,457    79,123     3.56
+5   16,980      9,341     7,639     0.02
+6   69,480     65,371     4,109     0.29
+7      564        431       133     0.00
+
+It removed 91,067 of 304,096 support records below the roots (29.95%). Coloring at 14 workers then
+verified and painted:
+
+k   minimal level  targets  verified  unresolved  wall s  cited k-1
+8               9        9         9           0    0.03        431
+7             431      431       431           0    0.07     60,738
+6          65,371   60,738    60,738           0  367.66      9,311
+5           9,341    9,311     9,311           0    2.78     49,619
+4         137,457   49,619    49,619           0    0.39        424
+3             424      424       424           0    0.05          5
+2               5        5         5           0    0.02          0
+
+The emitted human-readable certificate has 9 roots plus 120,528 support facts, 3,953,000 bytes,
+and SHA-256 89782c213bc459ccb32fe325e82207867a50a96c1049481668434b01bb4a4755.
+It retains 39.63% as many support facts as the normalized corpus. Independent replay verified all
+120,537 records with zero unverified and zero budget-limited facts:
+
+k  verified          nodes
+2         5              6
+3       424          4,352
+4    49,619     28,074,559
+5     9,311     23,252,864
+6    60,738  2,439,913,556
+7       431        572,121
+8         9              9
+TOTAL 120,537  2,491,817,467
+
+External stage measurements for the complete 14-thread pipeline:
+
+stage       wall s   user s  system s  peak RSS KiB
+sanitize      0.30     0.25      0.05        48,456
+round-trip    0.24     0.22      0.01        48,384
+color       375.04  5242.75      2.58       934,376
+replay      369.57  5171.72      0.87     1,043,216
+
+The complete remote phase took 12m28.574s including extraction/build/assertions/upload. The k=6
+color batch alone was 99.10% of reported per-level verification wall and retained 60,738 of 65,371
+minimal k=6 facts (92.91%). Top-down coloring therefore cuts artifact size substantially, but not
+the dominant computation on this corpus.
+
+## Representative replay width comparison
+
+The exact colored certificate was replayed again at 8 and 16 workers. All widths verified the
+same 120,537 records and exactly 2,491,817,467 recursion nodes.
+
+workers  CPU mask     wall s  user+system s  peak RSS KiB  memo hit+miss
+      8  0-7          434.86        3478.17     1,037,268   8,931,882,315
+     14  0-13         369.57        5172.59     1,043,216   9,491,845,978
+     16  0-15         347.91        5563.51     1,185,968   9,648,002,282
+
+Fourteen workers save 15.01% wall over eight but consume 48.72% more CPU and issue 6.27% more memo
+queries because memo/live/pair caches are worker-local. Sixteen save a further 5.86% wall over
+fourteen for 7.56% more CPU. Relative to eight, sixteen save 19.99% wall for 59.96% more CPU.
+
+Measured policy:
+
+- use 16 workers for minimum wall time on an otherwise idle 8-core/16-thread host;
+- use 14 when two logical CPUs must remain available; on the shared run9 host, use
+  0-6,8-14 if the other workload must have an isolated physical core;
+- use 8 one-per-physical-core workers when CPU efficiency matters more than the last 15-20% wall;
+- do not optimize the durable text format: sanitize plus round-trip was 0.54 seconds versus more
+  than twelve minutes of proof work;
+- pre-color minimalization is unequivocally worthwhile, but further coloring work will not remove
+  the Sa(113) k=6 bottleneck. The next optimization target is k=6 refutation/index/cache work and
+  cross-worker duplication, not parsing or a binary certificate.
+
+## Launch diagnostics and final checks
+
+Three clean-host setup attempts failed before benchmark enumeration: unavailable `ripgrep`
+package (1.719 s), case-sensitive GNU Time banner detection (7.669 s), and absent default clang
+(3.038 s). The wrapper was made grep-only and its GNU Time detection portable; clang was installed
+because tools/build_radio.py intentionally defaults to it. The successful Sa(66) smoke then ran in
+10.669 s including package install/build/upload. These are setup diagnostics, not measurements in
+the tables.
+
+Downloaded-bundle validation after instance termination checked:
+
+- all phase exit statuses and completion markers;
+- exactly 24 summaries (21 Sa(66), one full Sa(113), two replay controls);
+- normalized byte round-trip and every certificate count/hash;
+- every stored provenance check and a fresh check_provenance.py pass over all stage logs;
+- all 623 files against the bundle's SHA256SUMS;
+- GitHub release compression/decompression against the raw tar hash.

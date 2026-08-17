@@ -95,6 +95,19 @@ facts and 97,483,464 recursion nodes were identical from one through sixteen wor
 wall scaling and certificate sizes are retained in
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
 
+`tools/benchmark_verifier_pipeline.sh` exercises the complete raw-prefix -> normalized text ->
+byte-identical round-trip -> minimalized/colored certificate -> independent replay path. It records
+per-stage GNU Time wall/CPU/RSS data, exact hashes and provenance, and refuses completion on a
+missing root, changed round-trip, unresolved fact or count mismatch. The 2026-08-17 AWS benchmark
+used it for 21 Sa(66) runs and a full Sa(113) pipeline. On the representative Sa(113) certificate,
+8/14/16 workers replayed the identical 2,491,817,467-node proof in 434.86/369.57/347.91 seconds:
+sixteen minimizes wall, eight minimizes CPU, and fourteen is a reasonable shared-host compromise.
+The full record is
+[`../evidence/verifier_pipeline_benchmark_2026-08-17.txt`](../evidence/verifier_pipeline_benchmark_2026-08-17.txt)
+and its durable bundle is the private
+[`verifier-pipeline-2026-08-17`](https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17)
+release.
+
 The parallel prototype deliberately rejects `TIMECAP`, diagnostic split printing and the disabled
 subtree-DP experiment. Their current process-global reporting/bulk allocation is not safe or useful
 to duplicate per worker.

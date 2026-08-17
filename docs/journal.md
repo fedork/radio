@@ -6698,3 +6698,98 @@ reduction from the superseded 2023 corpus emphatically does not transfer to the 
 the current `k=7` batch has 2.5 million targets. The status summary now prints both current target
 count and level fraction, while still distinguishing batch size from completed work. No process
 was restarted.
+
+## 2026-08-17 — end-to-end verifier benchmark: Sa(66), then Sa(113)
+
+The verifier now has a reproducible raw-log-to-proof benchmark rather than timings from isolated
+internal modes. `tools/benchmark_verifier_pipeline.sh` extracts an exact prefix, checks that every
+explicit root is present, builds with provenance, normalizes to the readable certificate, requires
+a byte-identical parse/write round-trip, minimalizes and colors from the roots, independently
+replays the emitted certificate, checks provenance and refuses completion unless every record
+verifies with zero budget outcomes. The wrapper was committed before the measured AWS runs.
+
+To avoid disturbing or contaminating the live run9 verifier and k=8 census, the benchmark used a
+temporary second `r7iz.4xlarge` (`i-0dca43cb2bb3d9f04`) in the same availability zone and AMI. It
+had eight physical Xeon Gold 6455B cores / sixteen sibling threads, 128 GiB nominal RAM and no
+other workload. The O3 clang-15 verifier binary SHA-256 was
+`6de550a1fc26f0c8333cc9a0d67e591314d0599c20750897d6e95a5c8296c67c`—byte-identical to the live
+run9 verifier. Thus compiler and code, not merely the instance type, match the large live run.
+
+Sa(66) used the six k=7 roots `Sb(38:28)` through `Sb(33:33)`. Its 2,854 normalized facts colored
+to 6 roots plus 2,031 support facts, and replay closed all 2,037 records / 1,942,412 nodes. Three
+complete runs at every width produced the same colored SHA-256
+`6fde697ba138738a4bf35bd4ecd445fee6c8c465e3b25cf6cf19344caf57cb00`:
+
+| workers / affinity | median color | median replay |
+|---|---:|---:|
+| 1 / CPU 0 | 2.12 s | 0.89 s |
+| 2 / 0--1 | 1.21 s | 0.52 s |
+| 4 / 0--3 | 0.72 s | 0.30 s |
+| 8 / 0--7, one per core | 0.46 s | 0.19 s |
+| 14 / 0--13 | 0.36 s | 0.16 s |
+| 14 / 0--6,8--14, seven isolated cores | 0.36 s | 0.17 s |
+| 16 / 0--15 | 0.38 s | 0.17 s |
+
+The tiny workload therefore points to fourteen for wall time, but its sixteen-thread regression is
+startup/short-batch overhead. The two 14-CPU masks are effectively tied. On the shared live host,
+`0-6,8-14` is the topology-correct mask if the census is to own sibling 15 *and* an entire physical
+core; the deployed `0-13` mask reaches all eight cores and therefore shares core 7 with CPU 15.
+Changing the live affinity mid-batch was not part of this benchmark and was not attempted.
+
+Sa(113) used the nine k=8 roots `Sb(65:48)` through `Sb(57:56)`. The exact 304,105-fact normalized
+certificate round-tripped byte for byte. Same-level minimalization removed 91,067 records in 3.87
+seconds. Coloring then emitted 9 roots plus 120,528 support facts (3,953,000 bytes, SHA-256
+`89782c213bc459ccb32fe325e82207867a50a96c1049481668434b01bb4a4755`). Independent replay closed
+all 120,537 records and exactly 2,491,817,467 recursion nodes with zero unresolved or budget-limited
+facts. The 14-worker external stages were 0.30 s sanitize, 0.24 s round-trip, 375.04 s color and
+369.57 s replay; peak replay RSS was 1,043,216 KiB, just below 1 GiB. The whole remote phase,
+including build, assertions and upload, took 12m28.574s.
+
+Coloring's shape answers the design question. The k=6 minimal level had 65,371 facts and 60,738
+were reachable; that one batch took 367.66 seconds, 99.10% of summed per-level verification wall.
+Coloring reduces the durable support set to 39.63% of the raw normalized set, but it does not remove
+the computational bottleneck. Minimalization is inexpensive and worthwhile. Text parsing is
+irrelevant—sanitize plus the extra round-trip cost 0.54 seconds—so a binary durable certificate
+would optimize the wrong component.
+
+Two controls replayed the exact colored certificate and exact node count:
+
+| workers | wall | user+system CPU | memo hits+misses |
+|---:|---:|---:|---:|
+| 8 physical | 434.86 s | 3,478.17 s | 8,931,882,315 |
+| 14 | 369.57 s | 5,172.59 s | 9,491,845,978 |
+| 16 | 347.91 s | 5,563.51 s | 9,648,002,282 |
+
+Fourteen saves 15.01% wall over eight at 48.72% more CPU; sixteen saves a further 5.86% wall at
+7.56% more CPU. Worker-local memo/live/pair tables make fourteen issue 6.27% more memo queries than
+eight, while SMT reduces per-thread throughput. The measured policy is therefore sixteen for an
+idle host and minimum wall, fourteen when preserving two logical CPUs, and eight when CPU
+efficiency matters. The next optimization target is dominant-level refutation/index/cache work and
+cross-worker duplication, not language, parsing or further certificate packing.
+
+Three launch diagnostics ended before benchmark enumeration and are retained so the same setup is
+not repeated: Amazon Linux had no package named `ripgrep` (1.719 s), its GNU Time banner capitalized
+`Time` and defeated a case-sensitive check (7.669 s), and the clean AMI lacked the builder's default
+clang (3.038 s). The wrapper is now grep-only and accepts that GNU banner; clang was installed for
+the exact compiler match. The successful one-thread smoke, including clang setup/build/upload,
+took 10.669 s.
+
+All staged inputs, 24 summaries, stage logs, certificates, binaries, runner scripts and 623-file
+checksum manifest are archived at the full private URL
+[`verifier-pipeline-2026-08-17`](https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17).
+The 86,970,368-byte raw tar has SHA-256
+`b8e4c5e4fd469488c63205d04c3739154c5d62402aab39a70c5a0a5d0068c9a0` and compresses to
+11,319,563 bytes. It contains the exact pre-banner `bench_sa113_k9.txt` input, so the metadata tar
+used the explicit documented legacy-container override; that input is not a verdict source, while
+every verifier output inside has complete provenance. The release was downloaded, decompressed and
+matched to the raw tar hash.
+
+The temporary instance launched at 18:13:37 UTC and was explicitly terminated at 18:49:04 UTC
+after all phase statuses were zero, the S3 objects were present and no benchmark process remained.
+Its delete-on-termination root was disposable; the durable S3 and GitHub copies precede deletion.
+The original run9/census instance remained running and was not modified. One local Sa(66) smoke
+completed in about 1.1 wall seconds and left no process; no local solver or one-off Python process
+was launched. Only the user's pre-existing ignored `bench_sa113_k9.meta` remains in the working
+tree. A final 18:56:41 UTC query found live run9 still healthy in the same k=7 barrier after
+2h21m46s at 1399% CPU and 1,296.6 MiB RSS; the census remained at 99.9% CPU and 8,840.4 MiB RSS,
+with 112.4 GiB host memory available and no swap. No new run9 proof milestone was inferred.
