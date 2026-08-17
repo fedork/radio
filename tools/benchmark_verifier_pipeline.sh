@@ -72,7 +72,7 @@ if [[ -n "$cpus" ]] && ! command -v taskset >/dev/null; then
     echo "benchmark_verifier_pipeline.sh: --cpus requires taskset" >&2
     exit 2
 fi
-if /usr/bin/time --version 2>&1 | rg -q 'GNU time'; then
+if /usr/bin/time --version 2>&1 | grep -q 'GNU time'; then
     time_flavor=gnu
 elif [[ $(uname -s) == Darwin ]]; then
     time_flavor=bsd
@@ -143,7 +143,7 @@ roots_file=$output_dir/roots.cert
 for root in "${roots[@]}"; do
     raw=${root//[(),:]/ }
     read -r _ n1 m1 <<<"$raw"
-    if ! rg -q "^can't solve Sb\\($n1:$m1\\).* in $top_k " "$corpus"; then
+    if ! grep -Eq "^can't solve Sb\\($n1:$m1\\).* in $top_k " "$corpus"; then
         echo "benchmark_verifier_pipeline.sh: root is absent from the selected corpus: $root" >&2
         exit 2
     fi
@@ -189,13 +189,13 @@ for stage in sanitize roundtrip color replay; do
     "$repo_dir/tools/check_provenance.py" "$output_dir/$stage.log" \
         >"$output_dir/$stage.provenance-check"
 done
-if ! rg -q 'TOTAL verified [0-9]+, unverified 0, budget 0,' "$output_dir/replay.log"; then
+if ! grep -Eq 'TOTAL verified [0-9]+, unverified 0, budget 0,' "$output_dir/replay.log"; then
     echo 'benchmark_verifier_pipeline.sh: replay did not close with zero unresolved facts' >&2
     exit 1
 fi
 
-root_count=$(rg -c '^root ' "$colored")
-fact_count=$(rg -c '^fact ' "$colored")
+root_count=$(grep -c '^root ' "$colored")
+fact_count=$(grep -c '^fact ' "$colored")
 expected=$(( root_count + fact_count ))
 verified=$(sed -nE 's/^TOTAL verified ([0-9]+), unverified 0, budget 0,.*/\1/p' \
     "$output_dir/replay.log")
