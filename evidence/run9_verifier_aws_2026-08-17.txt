@@ -44,3 +44,11 @@ k  before   minimal  removed  wall_s
 
 # One-shot live query:
 #   tools/run9_verifier_status.sh
+
+# Progress-telemetry interpretation, checked at 2026-08-17 16:46:37 UTC:
+# - after 11m42s the verifier was still in k=7 minimalization at 1396% CPU with all 14 threads;
+# - 546,744 of 3,126,174 support inputs are in completed k=2..6 levels (17.5% by record count);
+# - that 17.5% is only a completed-level milestone. Per-fact cost varies and the deployed binary
+#   does not publish its intra-level atomic queue position, so it cannot support a current k=7
+#   percentage or ETA. Silence until the k=7 summary line is expected, not evidence of a stall.
+# The status script now prints this distinction in a leading PROGRESS block.

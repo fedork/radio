@@ -108,7 +108,11 @@ one-shot progress command is:
 tools/run9_verifier_status.sh
 ```
 
-The status command uses one bounded SSM request and exits; it does not leave a local watcher.
+The status command uses one bounded SSM request and exits; it does not leave a local watcher. Its
+leading `PROGRESS` block distinguishes the four pipeline steps and separates process health from
+proof progress. The deployed verifier reports only when an entire minimalization/coloring level or
+the whole replay batch finishes, so the command labels completed-level record fractions as
+milestones rather than percentages of wall time and refuses to invent an intra-level ETA.
 
 ## Engine internals worth knowing
 

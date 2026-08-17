@@ -6672,3 +6672,20 @@ grep pattern over-escaped `(`. No process or guard changed. A separate successfu
 then built the verifier and reproduced the complete normalized hash before the final launch. Exact
 SSM IDs, resource snapshot and hashes are in `evidence/run9_verifier_aws_2026-08-17.txt`.
 Use `tools/run9_verifier_status.sh` for a bounded one-shot query; do not create another watcher.
+
+### Progress telemetry correction
+
+The first status format made health easy to see but progress hard to interpret: `stage=COLOR`
+also covers pre-color minimalization, and the long `k=7` call emits no line until all 2,576,885
+facts have been classified. At 16:46:37 UTC, 11m42s into that call, the process remained healthy at
+1396% CPU on fourteen threads. The only exact progress milestone was still completion of levels
+`k=2..6`, representing 546,744 of the 3,126,174 support inputs (17.5% by record count). That is not
+17.5% of elapsed time or total work: per-fact cost is nonuniform and the deployed build does not
+expose its atomic queue cursor. No defensible intra-level percentage or ETA exists without
+restarting with new instrumentation, which is not warranted.
+
+`tools/run9_verifier_status.sh` now leads with a four-step `PROGRESS` summary, names the active
+level, labels the record fraction as a completed-level milestone, and separately reports CPU and
+elapsed time as health. It will switch automatically to level-barrier counts during coloring and
+to the final replay phase afterward. Future long verifier builds should publish their task cursor;
+the current run was left untouched.

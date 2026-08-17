@@ -39,6 +39,132 @@ echo stage=$stage
 state=running
 [[ -s "$work/exit.status" ]] && state=finished
 echo state=$state
+
+verifier_alive=0
+verifier_pid=
+if [[ -s "$work/verifier.pid" ]]; then
+    verifier_pid=$(cat "$work/verifier.pid")
+    kill -0 "$verifier_pid" 2>/dev/null && verifier_alive=1
+fi
+verifier_elapsed_s=0
+verifier_cpu='?'
+if (( verifier_alive )); then
+    verifier_elapsed_s=$(ps -p "$verifier_pid" -o etimes= | tr -d ' ')
+    verifier_cpu=$(ps -p "$verifier_pid" -o %cpu= | tr -d ' ')
+fi
+duration() {
+    local seconds=$1
+    printf '%dd%02dh%02dm%02ds' "$((seconds / 86400))" "$((seconds / 3600 % 24))" \
+        "$((seconds / 60 % 60))" "$((seconds % 60))"
+}
+
+echo
+echo PROGRESS
+case "$stage" in
+    SANITIZE)
+        echo '  step=1/4 normalize and byte-round-trip the raw log'
+        echo '  now=normalization is still running'
+        echo '  next=pre-color minimalization, top-down coloring, full replay'
+        ;;
+    COLOR)
+        if grep -q '^--- pass ' "$work/color.out" 2>/dev/null; then
+            read -r color_levels last_color_k color_targets color_verified <<<"$(
+                awk '
+                    /^--- pass / { levels=targets=verified=0; last=""; inpass=1; next }
+                    inpass && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ {
+                        levels++; last=$1; targets+=$3; verified+=$4
+                    }
+                    END { printf "%d %s %d %d\n", levels, (last=="" ? 0 : last), targets, verified }
+                ' "$work/color.out"
+            )"
+            echo '  step=3/4 top-down coloring from the 16 explicit roots'
+            echo '  done=normalization, round-trip, and all pre-color minimalization'
+            printf '  coloring_milestone=%s/9 level barriers complete; %s targets verified so far\n' \
+                "$color_levels" "$color_verified"
+            if (( color_levels < 9 )); then
+                if (( color_levels == 0 )); then current_color_k=9; else current_color_k=$((last_color_k - 1)); fi
+                printf '  now=coloring k=%s; this level reports only when its whole batch finishes\n' \
+                    "$current_color_k"
+            else
+                echo '  now=coloring complete; preparing the colored certificate'
+            fi
+            echo '  next=full independent replay of the colored bundle'
+        else
+            read -r minimized_levels last_minimized_k completed_inputs <<<"$(
+                awk '
+                    $1 ~ /^k=[0-9]+:$/ && $2 ~ /^[0-9]+$/ {
+                        k=$1; sub(/^k=/, "", k); sub(/:$/, "", k)
+                        levels++; last=k; inputs+=$2
+                    }
+                    END { printf "%d %s %d\n", levels, (last=="" ? 1 : last), inputs }
+                ' "$work/color.out" 2>/dev/null
+            )"
+            support_inputs=3126174
+            input_pct=$(awk -v done="$completed_inputs" -v total="$support_inputs" \
+                'BEGIN { printf "%.1f", 100*done/total }')
+            current_minimized_k=$((last_minimized_k + 1))
+            case "$current_minimized_k" in
+                2) current_inputs=2 ;;
+                3) current_inputs=137 ;;
+                4) current_inputs=33042 ;;
+                5) current_inputs=125246 ;;
+                6) current_inputs=388317 ;;
+                7) current_inputs=2576885 ;;
+                8) current_inputs=2545 ;;
+                *) current_inputs='?' ;;
+            esac
+            echo '  step=2/4 remove same-level redundant support facts before coloring'
+            echo '  done=normalization and byte-identical round-trip'
+            if (( minimized_levels )); then
+                printf '  completed_levels=k=2..%s (%s/%s input facts in completed levels = %s%%)\n' \
+                    "$last_minimized_k" "$completed_inputs" "$support_inputs" "$input_pct"
+            else
+                printf '  completed_levels=none (0/%s input facts)\n' "$support_inputs"
+            fi
+            if (( last_minimized_k >= 8 )); then
+                echo '  now=all support levels minimalized; transitioning to top-down coloring'
+            else
+                printf '  now=minimalizing k=%s (%s input facts)\n' \
+                    "$current_minimized_k" "$current_inputs"
+            fi
+            echo '  progress_limit=the running binary has no intra-level counter; the percentage above is'
+            echo '                 only a completed-level record fraction, not elapsed-time or total-job progress'
+            echo '  eta=unavailable until the current level finishes and prints its milestone'
+            echo '  next=finish remaining support levels, top-down coloring, full replay'
+        fi
+        ;;
+    VERIFY)
+        echo '  step=4/4 independently replay the complete colored certificate'
+        echo '  done=normalization, minimalization, and top-down coloring'
+        if [[ -s "$work/color.fact_count" && -s "$work/color.root_count" ]]; then
+            printf '  bundle=%s roots plus %s support facts\n' \
+                "$(cat "$work/color.root_count")" "$(cat "$work/color.fact_count")"
+        fi
+        echo '  now=parallel replay in one shared task queue'
+        echo '  progress_limit=the running binary reports the replay total only when the batch finishes'
+        echo '  eta=unavailable from this build'
+        ;;
+    COMPLETE)
+        echo '  step=4/4 complete'
+        [[ -s "$work/verify.total" ]] && printf '  result=%s\n' "$(cat "$work/verify.total")"
+        [[ -s "$work/exit.status" ]] && printf '  exit_status=%s\n' "$(cat "$work/exit.status")"
+        ;;
+    *)
+        echo '  step=unknown; inspect the detailed process and log output below'
+        ;;
+esac
+if [[ "$state" == finished || "$stage" == COMPLETE ]]; then
+    echo '  health=FINISHED'
+elif (( verifier_alive )); then
+    printf '  health=WORKING: verifier PID %s, CPU=%s%%, elapsed=' "$verifier_pid" "$verifier_cpu"
+    duration "$verifier_elapsed_s"
+    echo
+else
+    echo '  health=no verifier process visible (this can be a short phase transition; inspect supervisor)'
+fi
+
+echo
+echo DETAILS
 for label in supervisor wrapper verifier idle_guard; do
     file="$work/${label}.pid"
     [[ -s "$file" ]] || continue

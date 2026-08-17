@@ -596,6 +596,11 @@ vCPUs unassigned. At the first live check it had reduced levels through `k=6` an
 swap. The same supervisor will color from the sixteen explicit roots and replay the resulting
 bundle. Use `tools/run9_verifier_status.sh`; exact launch evidence is in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
+The deployed binary reports only at whole-level barriers: at the 16:46 UTC snapshot, its 17.5%
+figure meant 546,744 of 3,126,174 support inputs belonged to already completed levels, not that
+17.5% of time or total work had elapsed. There is no defensible intra-`k=7` percentage or ETA from
+this build; high CPU plus increasing elapsed time demonstrates health, while the next `k=7` line is
+the next proof milestone.
 This remains an optional trust-base strengthening, not an H3 dependency.
 
 The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a

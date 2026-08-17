@@ -94,11 +94,13 @@ down, using only the split semantics and the proved Singleton Majorization, Unit
 and Subgraph Monotonicity theorems. It has verified the full `Sa(113)` k=9 ladder—304,105 negative
 facts across k=2..8—with zero unverified.
 
-An end-to-end verifier replay of the new 3.17-million-fact run9 DAG has not been performed. It would
-further reduce the trusted implementation from the solver to the independent checker, but it is
-expected to require substantial enumeration and is not a prerequisite for the repository's
-`proven-exhaustive` classification. The current result rests on a retained, fully provenanced,
-current proof-safe exhaustive run plus the independently checked positive witness.
+An end-to-end verifier replay of the new 3.17-million-fact run9 DAG is running on AWS but has not
+yet returned a verdict. It further reduces the trusted implementation from the solver to the
+independent checker, but it is not a prerequisite for the repository's `proven-exhaustive`
+classification. The current result rests on a retained, fully provenanced, current proof-safe
+exhaustive run plus the independently checked positive witness. Launch state and the bounded
+one-shot progress command are recorded in
+[`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 
 ### Parallel checker and durable certificate prototype (2026-08-16)
 
@@ -149,7 +151,8 @@ format must distinguish roots from incidental top-level facts.
 
 Commands, hashes, the complete scaling table and sanitizer results are retained in
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
-This is a successful prototype on the small corpus, not yet the run9 end-to-end replay.
+This remains the completed small-corpus prototype; the separate full run9 coloring/replay is now
+live and incomplete on AWS.
 
 ## Superseded 2023 route
 
