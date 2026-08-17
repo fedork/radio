@@ -67,21 +67,45 @@
 
 #define MAXC (2 * MAXP)          /* a mixed child has two parts per group */
 
-/* The product index is the production default. VERIFY_LEGACY_INDEX retains the former
-   (np,largest-n,mass) layout for exact A/B reproduction; defining either implementation macro
-   explicitly also suppresses the default pair, which permits profile-only diagnostics. */
+/* The product index plus adaptive block summaries is the production default.
+   VERIFY_LEGACY_INDEX retains the former (np,largest-n,mass) layout for exact A/B reproduction;
+   defining either product implementation macro explicitly suppresses all defaults, which permits
+   product-only and profile-only diagnostics. VERIFY_NO_BLOCK_PARETO is the convenient default-
+   product control when no other implementation macro is supplied. */
 #if !defined(VERIFY_LEGACY_INDEX) && !defined(VERIFY_PRODUCT_PROFILE) && \
     !defined(VERIFY_PRODUCT_SORT)
 #define VERIFY_PRODUCT_PROFILE
 #define VERIFY_PRODUCT_SORT
+#if !defined(VERIFY_NO_BLOCK_PARETO) && !defined(VERIFY_BLOCK_PARETO)
+#define VERIFY_BLOCK_PARETO
+#endif
 #endif
 
 #if defined(VERIFY_PRODUCT_SORT) && !defined(VERIFY_PRODUCT_PROFILE)
 #error "VERIFY_PRODUCT_SORT requires VERIFY_PRODUCT_PROFILE"
 #endif
+#if defined(VERIFY_BLOCK_PARETO) && !defined(VERIFY_PRODUCT_SORT)
+#error "VERIFY_BLOCK_PARETO requires VERIFY_PRODUCT_SORT"
+#endif
+
+#ifndef VERIFY_BLOCK_SIZE
+#define VERIFY_BLOCK_SIZE 256
+#endif
+#if VERIFY_BLOCK_SIZE < 2
+#error "VERIFY_BLOCK_SIZE must be at least 2"
+#endif
+#ifndef VERIFY_BLOCK_MIN_LEVEL_FACTS
+#define VERIFY_BLOCK_MIN_LEVEL_FACTS 65536
+#endif
+#if VERIFY_BLOCK_MIN_LEVEL_FACTS < VERIFY_BLOCK_SIZE
+#error "VERIFY_BLOCK_MIN_LEVEL_FACTS must be at least VERIFY_BLOCK_SIZE"
+#endif
 
 typedef struct { unsigned char n, m; } Part;
 typedef struct { unsigned char np, src; Part p[MAXP]; int mass; } Fact;
+#ifdef VERIFY_BLOCK_PARETO
+typedef struct { uint64_t pp; int mass; } BlockProfile;
+#endif
 
 /* A partial child under construction. Built by copy-and-insert from the parent depth rather
    than re-canonicalised: measured 2026-08-04, canon() from scratch was 987M calls over 5.6
@@ -253,6 +277,13 @@ typedef struct Level_ {
     int32_t *order;           /* product-index position -> canonical f[] index */
     int *imass;               /* mass column in product-index order */
     int32_t *group_end;       /* first index after this fact's equal-max-product group */
+#ifdef VERIFY_BLOCK_PARETO
+    int nblocks, block_points;
+    int32_t *block_at;        /* block id at a summarized block start, -1 elsewhere */
+    int32_t *block_off;       /* Pareto points for block b are [off[b],off[b+1]) */
+    BlockProfile *block_min;  /* componentwise minima: cheap sound rejection first */
+    BlockProfile *block_prof; /* minimal (mass, sorted-product-profile) points */
+#endif
 #else
     int *b2;                 /* b2[np * 257 + x] = first index with np and largest-n >= x */
 #endif
@@ -357,6 +388,102 @@ static int fact_index_cmp(const void *A, const void *B) {
 }
 #endif
 
+#ifdef VERIFY_BLOCK_PARETO
+static long long g_block_build_blocks, g_block_build_points, g_block_build_facts;
+static int g_block_build_max_front;
+static double g_block_build_seconds;
+
+static inline int block_profile_le(const BlockProfile *a, const BlockProfile *b) {
+    return a->mass <= b->mass && prod_prof_le(a->pp, b->pp);
+}
+
+static inline void block_profile_take_min(BlockProfile *a, const BlockProfile *b) {
+    uint16_t aa[4], bb[4];
+    int z;
+    if (b->mass < a->mass) a->mass = b->mass;
+    memcpy(aa, &a->pp, 8); memcpy(bb, &b->pp, 8);
+    for (z = 0; z < 4; z++) if (bb[z] < aa[z]) aa[z] = bb[z];
+    memcpy(&a->pp, aa, 8);
+}
+
+/* A block can contain a useful fact only if one of its Pareto-minimal profile points fits the
+   query. If an arbitrary point x fits, repeatedly replacing a non-minimal x by a smaller point
+   terminates at a stored minimal point that also fits. The summary is therefore a sound rejection
+   filter; a positive answer merely falls back to the unchanged per-fact and exact checks. */
+static void level_build_blocks(Level *L) {
+    int np, b = 0, used = 0, maxfront = 0;
+    clock_t t0 = clock();
+    L->nblocks = L->block_points = 0;
+    L->block_at = NULL; L->block_off = NULL;
+    L->block_min = NULL; L->block_prof = NULL;
+    /* On smaller levels the block probe costs more than the candidates it avoids.  The
+       production-sized run9 k=7 level is comfortably above this cutoff, while the expensive
+       Sa(113) k=6 replay level is below it and retains the unmodified product-index hot path. */
+    if (L->n < VERIFY_BLOCK_MIN_LEVEL_FACTS) return;
+    L->block_at = malloc((size_t)(L->n ? L->n : 1) * sizeof(int32_t));
+    L->block_prof = malloc((size_t)(L->n ? L->n : 1) * sizeof(BlockProfile));
+    for (np = 0; np < L->n; np++) L->block_at[np] = -1;
+    for (np = 0; np <= MAXP; np++) {
+        int hi = L->bstart[np + 1], group = L->bstart[np];
+        while (group < hi) {
+            int gend = L->group_end[group], first;
+            for (first = group; first + VERIFY_BLOCK_SIZE <= gend;
+                 first += VERIFY_BLOCK_SIZE) b++;
+            group = gend;
+        }
+    }
+    L->nblocks = b;
+    L->block_off = malloc((size_t)(b + 1) * sizeof(int32_t));
+    L->block_min = malloc((size_t)(b ? b : 1) * sizeof(BlockProfile));
+    b = 0;
+    for (np = 0; np <= MAXP; np++) {
+        int hi = L->bstart[np + 1], group = L->bstart[np];
+        while (group < hi) {
+            int gend = L->group_end[group], first;
+            for (first = group; first + VERIFY_BLOCK_SIZE <= gend;
+                 first += VERIFY_BLOCK_SIZE) {
+                int end = first + VERIFY_BLOCK_SIZE, pos, nf = 0;
+                BlockProfile *front = L->block_prof + used;
+                L->block_at[first] = b;
+                L->block_off[b] = used;
+                for (pos = first; pos < end; pos++) {
+                    BlockProfile x;
+                    int z, redundant = 0;
+                    x.pp = L->pp[pos]; x.mass = L->imass[pos];
+                    if (pos == first) L->block_min[b] = x;
+                    else block_profile_take_min(&L->block_min[b], &x);
+                    for (z = 0; z < nf; z++) if (block_profile_le(&front[z], &x)) {
+                        redundant = 1; break;
+                    }
+                    if (redundant) continue;
+                    for (z = 0; z < nf; ) {
+                        if (block_profile_le(&x, &front[z])) front[z] = front[--nf];
+                        else z++;
+                    }
+                    front[nf++] = x;
+                }
+                used += nf;
+                if (nf > maxfront) maxfront = nf;
+                b++;
+            }
+            group = gend;
+        }
+    }
+    L->block_off[b] = used;
+    L->block_points = used;
+    if (used < L->n) {
+        BlockProfile *p = realloc(L->block_prof,
+                                  (size_t)(used ? used : 1) * sizeof(BlockProfile));
+        if (p) L->block_prof = p;
+    }
+    g_block_build_blocks += L->nblocks;
+    g_block_build_points += used;
+    g_block_build_facts += L->n;
+    if (maxfront > g_block_build_max_front) g_block_build_max_front = maxfront;
+    g_block_build_seconds += (double)(clock() - t0) / CLOCKS_PER_SEC;
+}
+#endif
+
 static void level_freeze(Level *L) {
     int i, cap = 16;
     qsort(L->f, L->n, sizeof(Fact), fact_cmp);
@@ -410,6 +537,9 @@ static void level_freeze(Level *L) {
           }
       }
     }
+#ifdef VERIFY_BLOCK_PARETO
+    level_build_blocks(L);
+#endif
 #else
     L->b2 = malloc((MAXP + 2) * 257 * sizeof(int));
     { int np, x;
@@ -492,6 +622,25 @@ static int level_next_primary_group(const Level *L, int np, int i) {
 #endif
 }
 
+#ifdef VERIFY_BLOCK_PARETO
+static int level_block_possible(const Level *L, int pos, const BlockProfile *q,
+                                int *tested, int *min_reject) {
+    int b = L->block_at[pos];
+    int z;
+    *tested = 0;
+    *min_reject = 0;
+    if (!block_profile_le(&L->block_min[b], q)) {
+        *min_reject = 1;
+        return 0;
+    }
+    for (z = L->block_off[b]; z < L->block_off[b + 1]; z++) {
+        (*tested)++;
+        if (block_profile_le(&L->block_prof[z], q)) return 1;
+    }
+    return 0;
+}
+#endif
+
 static void level_freeze(Level *L);
 
 /* the painted facts of L, as a Level of their own */
@@ -558,22 +707,36 @@ static int level_redundant(const Level *L, int q) {
 #ifdef VERIFY_PRODUCT_PROFILE
     uint64_t qp = prod_prof_of(f->p, f->np);
 #endif
+#ifdef VERIFY_BLOCK_PARETO
+    BlockProfile bq;
+    bq.pp = qp; bq.mass = f->mass;
+#endif
     prof_of(f->p, f->np, &qn, &qm);
     for (np = 1; np <= lim; np++) {
         int end = level_candidate_end(L, np, f);
-        for (i = L->bstart[np]; i < end; i++) {
+        i = L->bstart[np];
+        while (i < end) {
             int fi = level_fact_index(L, i);
-            if (fi == q) continue;
             if (level_index_mass(L, i) > f->mass) {
                 int nxt = level_next_primary_group(L, np, i);
                 if (nxt <= i) break;
-                i = nxt - 1; continue;
+                i = nxt; continue;
             }
-#ifdef VERIFY_PRODUCT_PROFILE
-            if (!prod_prof_le(L->pp[i], qp)) continue;
+#ifdef VERIFY_BLOCK_PARETO
+            if (L->block_at && L->block_at[i] >= 0 && i + VERIFY_BLOCK_SIZE <= end) {
+                int tested, min_reject;
+                if (!level_block_possible(L, i, &bq, &tested, &min_reject)) {
+                    i += VERIFY_BLOCK_SIZE; continue;
+                }
+            }
 #endif
-            if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) continue;
+            if (fi == q) { i++; continue; }
+#ifdef VERIFY_PRODUCT_PROFILE
+            if (!prod_prof_le(L->pp[i], qp)) { i++; continue; }
+#endif
+            if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) { i++; continue; }
             if (dominates(&L->f[fi], f)) return 1;
+            i++;
         }
     }
     return 0;
@@ -602,6 +765,9 @@ static void level_drop_indexes(Level *L) {
 #ifdef VERIFY_PRODUCT_SORT
     free(L->order); free(L->imass);
     free(L->group_end);
+#ifdef VERIFY_BLOCK_PARETO
+    free(L->block_at); free(L->block_off); free(L->block_min); free(L->block_prof);
+#endif
 #else
     free(L->b2);
 #endif
@@ -612,6 +778,11 @@ static void level_drop_indexes(Level *L) {
 #endif
 #ifdef VERIFY_PRODUCT_SORT
     L->order = NULL; L->imass = NULL; L->group_end = NULL;
+#ifdef VERIFY_BLOCK_PARETO
+    L->block_at = NULL; L->block_off = NULL;
+    L->block_min = NULL; L->block_prof = NULL;
+    L->nblocks = L->block_points = 0;
+#endif
 #else
     L->b2 = NULL;
 #endif
@@ -699,9 +870,15 @@ static TLS long long memo_hit = 0, memo_miss = 0;
 #ifdef VERIFY_INDEX_STATS
 static TLS long long idx_candidates = 0, idx_product_rejects = 0, idx_nm_rejects = 0;
 static TLS long long idx_match_calls = 0, idx_match_hits = 0;
+#ifdef VERIFY_BLOCK_PARETO
+static TLS long long idx_block_tests = 0, idx_block_rejects = 0, idx_block_min_rejects = 0;
+static TLS long long idx_block_skipped = 0, idx_block_front_tests = 0;
+#endif
 #define IDX_INC(x) ((x)++)
+#define IDX_ADD(x, n) ((x) += (n))
 #else
 #define IDX_INC(x) ((void)0)
+#define IDX_ADD(x, n) ((void)0)
 #endif
 
 static int refuted_raw(const Level *L, const Fact *s, int k);
@@ -733,6 +910,34 @@ static int refuted(const Level *L, const Fact *s, int k) {
     return r;
 }
 
+/* Finish the unchanged per-fact part of a dominance lookup.  Keeping this in one force-inlined
+   helper lets refuted_raw select the plain or block scan once per query, outside the candidate
+   loop, without maintaining two copies of the exact filters. */
+static inline __attribute__((always_inline)) int dominance_candidate(
+        const Level *L, const Fact *s, int i, uint64_t qn, uint64_t qm, uint64_t qp) {
+    int fi;
+    IDX_INC(idx_candidates);
+#ifdef VERIFY_PRODUCT_PROFILE
+    if (!prod_prof_le(L->pp[i], qp)) {
+        IDX_INC(idx_product_rejects);
+        return -1;
+    }
+#else
+    (void)qp;
+#endif
+    if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) {
+        IDX_INC(idx_nm_rejects);
+        return -1;
+    }
+    fi = level_fact_index(L, i);
+    IDX_INC(idx_match_calls);
+    if (dominates(&L->f[fi], s)) {
+        IDX_INC(idx_match_hits);
+        return fi;
+    }
+    return -1;
+}
+
 static int refuted_raw(const Level *L, const Fact *s, int k) {
     g_wit = -1;
     if (s->mass > pow3[k]) return 1;                 /* COUNT - a rule, no fact to paint */
@@ -756,38 +961,68 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
             if (L->sdom[ix]) { g_wit = L->sdom_i[ix]; return 1; }
         }
     }
-    { uint64_t qn, qm;
+    { uint64_t qn, qm, qp = 0;
 #ifdef VERIFY_PRODUCT_PROFILE
-      uint64_t qp = prod_prof_of(s->p, s->np);
+      qp = prod_prof_of(s->p, s->np);
+#endif
+#ifdef VERIFY_BLOCK_PARETO
+      BlockProfile bq;
+      bq.pp = qp; bq.mass = s->mass;
 #endif
       prof_of(s->p, s->np, &qn, &qm);
+#ifdef VERIFY_BLOCK_PARETO
+      if (L->block_at) {
+        for (np = 2; np <= lim; np++) {
+          int start = L->bstart[np], end = level_candidate_end(L, np, s);
+          i = start;
+          while (i < end) {
+              int hit;
+              if (level_index_mass(L, i) > s->mass) {
+                  int nxt = level_next_primary_group(L, np, i);
+                  if (nxt <= i) break;
+                  i = nxt;
+                  continue;
+              }
+              if (L->block_at[i] >= 0 && i + VERIFY_BLOCK_SIZE <= end) {
+                  int tested, min_reject;
+                  IDX_INC(idx_block_tests);
+                  if (!level_block_possible(L, i, &bq, &tested, &min_reject)) {
+                      IDX_INC(idx_block_rejects);
+                      IDX_ADD(idx_block_min_rejects, min_reject);
+                      IDX_ADD(idx_block_skipped, VERIFY_BLOCK_SIZE);
+                      IDX_ADD(idx_block_front_tests, tested);
+                      i += VERIFY_BLOCK_SIZE;
+                      continue;
+                  }
+                  IDX_ADD(idx_block_front_tests, tested);
+              }
+              hit = dominance_candidate(L, s, i, qn, qm, qp);
+              if (hit >= 0) { g_wit = hit; return 1; }
+              i++;
+          }
+        }
+      } else
+#endif
+      {
       for (np = 2; np <= lim; np++) {
           /* The primary monotone key (largest n in the baseline, largest product in the
              experiment) bounds a contiguous range. Mass is ordered inside each primary-key
              group, so an over-mass candidate skips the rest of that group. */
-          int end = level_candidate_end(L, np, s);
-          for (i = L->bstart[np]; i < end; i++) {
-              int fi = level_fact_index(L, i);
+          int start = L->bstart[np], end = level_candidate_end(L, np, s);
+          i = start;
+          while (i < end) {
+              int hit;
               if (level_index_mass(L, i) > s->mass) { /* skip to the next primary-key group */
                   int nxt = level_next_primary_group(L, np, i);
                   if (nxt <= i) break;
-                  i = nxt - 1;
+                  i = nxt;
                   continue;
               }
-              IDX_INC(idx_candidates);
-#ifdef VERIFY_PRODUCT_PROFILE
-              if (!prod_prof_le(L->pp[i], qp)) {
-                  IDX_INC(idx_product_rejects); continue;
-              }
-#endif
-              if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) {
-                  IDX_INC(idx_nm_rejects); continue;
-              }
-              IDX_INC(idx_match_calls);
-              if (dominates(&L->f[fi], s)) {
-                  IDX_INC(idx_match_hits); g_wit = fi; return 1;
-              }
+              hit = dominance_candidate(L, s, i, qn, qm, qp);
+              if (hit >= 0) { g_wit = hit; return 1; }
+              i++;
           }
+      }
       }
     }
     /* DERIVE. Nothing in the fact set refutes s, so try to PROVE it instead of citing it: run
@@ -1287,6 +1522,10 @@ typedef struct {
 #ifdef VERIFY_INDEX_STATS
     long long idx_candidates, idx_product_rejects, idx_nm_rejects;
     long long idx_match_calls, idx_match_hits;
+#ifdef VERIFY_BLOCK_PARETO
+    long long idx_block_tests, idx_block_rejects, idx_block_min_rejects;
+    long long idx_block_skipped, idx_block_front_tests;
+#endif
 #endif
 } BatchStats;
 
@@ -1335,6 +1574,10 @@ static void worker_state_init(int memo_bits) {
 #ifdef VERIFY_INDEX_STATS
     idx_candidates = idx_product_rejects = idx_nm_rejects = 0;
     idx_match_calls = idx_match_hits = 0;
+#ifdef VERIFY_BLOCK_PARETO
+    idx_block_tests = idx_block_rejects = idx_block_min_rejects = 0;
+    idx_block_skipped = idx_block_front_tests = 0;
+#endif
 #endif
     cost_sum = budget_out = 0;
     memset(np_nodes, 0, sizeof np_nodes); memset(np_facts, 0, sizeof np_facts);
@@ -1357,6 +1600,12 @@ static void worker_state_finish(BatchStats *s) {
     s->idx_candidates = idx_candidates; s->idx_product_rejects = idx_product_rejects;
     s->idx_nm_rejects = idx_nm_rejects; s->idx_match_calls = idx_match_calls;
     s->idx_match_hits = idx_match_hits;
+#ifdef VERIFY_BLOCK_PARETO
+    s->idx_block_tests = idx_block_tests; s->idx_block_rejects = idx_block_rejects;
+    s->idx_block_min_rejects = idx_block_min_rejects;
+    s->idx_block_skipped = idx_block_skipped;
+    s->idx_block_front_tests = idx_block_front_tests;
+#endif
 #endif
     for (k = 0; k <= MAXK; k++) for (r = 0; r < 2; r++) if (live_tab[k][r]) {
         for (i = 0; i < NPART; i++) if (live_tab[k][r][i].n >= 0)
@@ -1383,6 +1632,11 @@ static void add_batch_stats(BatchStats *a, const BatchStats *b) {
 #ifdef VERIFY_INDEX_STATS
     ADD_STAT(idx_candidates); ADD_STAT(idx_product_rejects); ADD_STAT(idx_nm_rejects);
     ADD_STAT(idx_match_calls); ADD_STAT(idx_match_hits);
+#ifdef VERIFY_BLOCK_PARETO
+    ADD_STAT(idx_block_tests); ADD_STAT(idx_block_rejects); ADD_STAT(idx_block_min_rejects);
+    ADD_STAT(idx_block_skipped);
+    ADD_STAT(idx_block_front_tests);
+#endif
 #endif
     if (b->max_fact_nodes > a->max_fact_nodes) a->max_fact_nodes = b->max_fact_nodes;
 #undef ADD_STAT
@@ -1667,6 +1921,22 @@ int main(int argc, char **argv) {
         L[k].n = lvln[k]; L[k].f = lvl[k];
         level_freeze(&L[k]);
     }
+#ifdef VERIFY_BLOCK_PARETO
+    printf("block Pareto index: size=%d, min level=%d facts, %lld blocks, %lld points "
+           "(%.2f/block, %.1f%% of indexed facts), "
+           "max front %d, %.2f s build, %.1f MiB summaries\n",
+           VERIFY_BLOCK_SIZE, VERIFY_BLOCK_MIN_LEVEL_FACTS,
+           g_block_build_blocks, g_block_build_points,
+           (double)g_block_build_points / (g_block_build_blocks ? g_block_build_blocks : 1),
+           100.0 * g_block_build_points / (g_block_build_facts ? g_block_build_facts : 1),
+           g_block_build_max_front, g_block_build_seconds,
+           (double)(g_block_build_points * (long long)sizeof(BlockProfile)
+                    + g_block_build_blocks * ((long long)sizeof(BlockProfile) + sizeof(int32_t))
+                    + g_block_build_facts * (long long)sizeof(int32_t)
+                    + (MAXK + 1) * (long long)sizeof(int32_t))
+                    / (1024.0 * 1024.0));
+    fflush(stdout);
+#endif
     for (k = 1; k <= MAXK; k++) if (rootn[k] && (k < g_mink || k > maxk)) {
         fprintf(stderr, "explicit root at k=%d is outside the requested verification range %d..%d\n",
                 k, g_mink, maxk);
@@ -1686,35 +1956,13 @@ int main(int argc, char **argv) {
            antichain carries information for dominance queries: if g <= f and both are present, f
            can never be the reason a query succeeds that g would not already have answered.
            Everything non-minimal is pure scan cost. */
-        int mk = atoi(getenv("MINIMAL_K")), q, np, i;
+        int mk = atoi(getenv("MINIMAL_K")), q, np;
         long long minimal[MAXP + 2] = {0}, total[MAXP + 2] = {0};
         clock_t t0 = clock();
         const Level *L2 = &L[mk];
         for (q = 0; q < L2->n; q++) {
             const Fact *f = &L2->f[q];
-            int dominated = 0, lim = f->np < MAXP ? f->np : MAXP;
-            uint64_t qn, qm;
-#ifdef VERIFY_PRODUCT_PROFILE
-            uint64_t qp = prod_prof_of(f->p, f->np);
-#endif
-            prof_of(f->p, f->np, &qn, &qm);
-            for (np = 1; np <= lim && !dominated; np++) {
-                int end = level_candidate_end(L2, np, f);
-                for (i = L2->bstart[np]; i < end; i++) {
-                    int fi = level_fact_index(L2, i);
-                    if (fi == q) continue;                       /* not itself */
-                    if (level_index_mass(L2, i) > f->mass) {
-                        int nxt = level_next_primary_group(L2, np, i);
-                        if (nxt <= i) break;
-                        i = nxt - 1; continue;
-                    }
-#ifdef VERIFY_PRODUCT_PROFILE
-                    if (!prod_prof_le(L2->pp[i], qp)) continue;
-#endif
-                    if (!prof_le(L2->pn[i], qn) || !prof_le(L2->pm[i], qm)) continue;
-                    if (dominates(&L2->f[fi], f)) { dominated = 1; break; }
-                }
-            }
+            int dominated = level_redundant(L2, q);
             total[f->np]++;
             if (!dominated) minimal[f->np]++;
         }
@@ -1916,6 +2164,14 @@ int main(int argc, char **argv) {
                  bs.idx_candidates, bs.idx_product_rejects,
                  100.0 * bs.idx_product_rejects / (bs.idx_candidates ? bs.idx_candidates : 1),
                  bs.idx_nm_rejects, bs.idx_match_calls, bs.idx_match_hits);
+#ifdef VERIFY_BLOCK_PARETO
+          printf("block filter: %lld blocks tested/%lld rejected (%.1f%%; %lld by minima); "
+                 "%lld positions skipped; %lld front points tested (%.2f/block)\n",
+                 bs.idx_block_tests, bs.idx_block_rejects,
+                 100.0 * bs.idx_block_rejects / (bs.idx_block_tests ? bs.idx_block_tests : 1),
+                 bs.idx_block_min_rejects, bs.idx_block_skipped, bs.idx_block_front_tests,
+                 (double)bs.idx_block_front_tests / (bs.idx_block_tests ? bs.idx_block_tests : 1));
+#endif
 #endif
           if (getenv("CERT_OUT") && !tu && !tb)
               write_certificate(getenv("CERT_OUT"), L, maxk < MAXK ? maxk : MAXK, 0, 0);
@@ -1983,6 +2239,14 @@ int main(int argc, char **argv) {
            idx_candidates, idx_product_rejects,
            100.0 * idx_product_rejects / (idx_candidates ? idx_candidates : 1),
            idx_nm_rejects, idx_match_calls, idx_match_hits);
+#ifdef VERIFY_BLOCK_PARETO
+    printf("block filter: %lld blocks tested/%lld rejected (%.1f%%; %lld by minima); "
+           "%lld positions skipped; %lld front points tested (%.2f/block)\n",
+           idx_block_tests, idx_block_rejects,
+           100.0 * idx_block_rejects / (idx_block_tests ? idx_block_tests : 1),
+           idx_block_min_rejects, idx_block_skipped, idx_block_front_tests,
+           (double)idx_block_front_tests / (idx_block_tests ? idx_block_tests : 1));
+#endif
 #endif
     printf("\nTOTAL verified %lld, unverified %lld, nodes %lld, %.2f s single-threaded\n",
            tot_ver, tot_un, tot_nodes, tot_s);

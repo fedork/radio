@@ -1,0 +1,8 @@
+radio-negative-certificate-v1
+# Synthetic COUNT-valid k=1 facts for block-summary minimalization regression.
+# Within the equal-(np,max-product) group, the first two facts are incomparable and each
+# dominates one of the final two. With test block size 2, low-mass queries reject block 2.
+fact 1 Sb(6:1,2:1)
+fact 1 Sb(3:2,2:2)
+fact 1 Sb(6:1,6:1)
+fact 1 Sb(3:2,3:2)
