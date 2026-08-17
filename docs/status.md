@@ -620,14 +620,20 @@ the next proof milestone. The same supervisor will replay the resulting bundle. 
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 This remains an optional trust-base strengthening, not an H3 dependency.
 
-The next index experiment is now data-sized rather than speculative. In the raw run9 `k=6` level
-that serves `k=7` verification, `(part-count,total-mass)` leaves a bucket of 9,069 facts; the sorted
-per-segment mass vector reduces the largest mass-signature bucket to 39. The vector is a sound
-necessary dominance profile, but its associated long sides are not lane-wise monotone under an
-arbitrary injection, so the existing independent n/m profiles and exact matching check remain.
-This is a proposed optimization, not a measured speedup; exact counts and the solver/verifier cache
-distinction are in
-[`../evidence/cache_key_shape_2026-08-17.txt`](../evidence/cache_key_shape_2026-08-17.txt).
+The packed product-profile verifier index is now deployed. Canonical facts remain untouched for
+stable hashes and text output; a separate immutable `(part-count,max-product,total-mass)`
+permutation scans denormalized mass plus packed sorted n, m and top-four product columns before the
+exact injection matcher. This is a sound necessary filter, not an implied-fact cache. On an exact
+hard run9 k=7 root, the production and legacy indexes returned identical 4,644,469 nodes and memo
+counts, while verifier wall fell from 209.63 to 33.24 seconds (**6.31x**); end-to-end wall was
+211 versus 36 seconds and peak RSS 0.41 versus 0.53 GB. Counters show the product column rejects
+68,964,467,550 of 69,164,074,015 candidates (99.7%) before exact matching. A provenance-complete
+eight-worker replay also verified a 120,302-record Sa(113) colored certificate with zero gaps and
+the expected 2,491,283,058 nodes in 140.28 seconds. Full commands, hashes, build IDs and sanitizer
+controls are in
+[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
+The remaining verifier-index opportunity is block-level Pareto summaries over these packed
+profiles; solver cache structure remains a separate experiment.
 
 The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a
 way to rehabilitate a resumed, non-closed log. The new cold log is closed by construction.

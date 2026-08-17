@@ -56,6 +56,16 @@ worker owns its recursion state, memo and lazy live/pair tables. The default per
 with worker count so aggregate direct-memo capacity stays near the single-thread `2^24` entries;
 override it with `VERIFY_MEMO_BITS` only for a measured comparison.
 
+The default static dominance index keeps the canonical fact array unchanged and builds a separate
+read-only `(part count,largest segment product,total mass)` permutation. Its hot structure-of-arrays
+columns contain total mass plus packed sorted n, m and top-four segment-product profiles. Those are
+sound necessary componentwise conditions; only the survivors touch the full `Fact` and run the
+exact injection matcher. `VERIFY_LEGACY_INDEX` restores the former `(part count,largest n,total
+mass)` scan for A/B tests, and `VERIFY_INDEX_STATS` prints filter counters. On the hard retained
+run9 k=7 control this changes no proof nodes or memo results and reduces single-worker verification
+from 209.63 to 33.24 seconds. Design, memory cost and full controls are in
+[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
+
 The durable input/output format is text, and is deliberately simpler than a raw log:
 
 ```
@@ -82,8 +92,10 @@ TOPDOWN=9 ROOTS=roots.cert MINIMIZE_BEFORE_COLOR=1 CERT_OUT=colored.cert \
 
 `MINIMIZE_BEFORE_COLOR` first replaces each support level below the roots by its same-level minimal
 antichain under Subgraph Monotonicity. `ROOTS` may be either a text certificate or raw solver lines;
-all records in that file are treated as roots. Without explicit roots, every fact at `TOPDOWN` is a
-root and therefore cannot be colored away. Worker-local caches are discarded between coloring
+all records in that file are treated as roots. `ROOTS` is additive: outside top-down coloring it
+does not stop facts in the main input from also becoming verification targets, so a one-root
+microbenchmark must filter the main-input source explicitly. Without explicit roots, every fact at
+`TOPDOWN` is a root and therefore cannot be colored away. Worker-local caches are discarded between coloring
 passes, preserving the citation accounting that shared cached live tables previously suppressed.
 The checker refuses `CERT_OUT` after a partial or filtered verification; use `CERT_ONLY` when the
 intent is normalization rather than a proof replay.

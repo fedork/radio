@@ -1,0 +1,148 @@
+# Packed product-profile index for the independent verifier
+
+Status: measured verifier optimization; no solver code or mathematical verdict changed.
+Measured: 2026-08-17 on the Apple M4 Pro host, from checkout commit
+`afaa59cf2cc9ea319e70baad217ceb2c2d61cddc` with the recorded dirty source below.
+
+## Inputs
+
+The hard query uses the normalized run9 certificate derived from the retained private release:
+
+https://github.com/fedork/radio-data/releases/tag/sa193-cold-2026-08-16
+
+    /tmp/run9-cache-study.cert
+    records       3,126,190 facts
+    SHA-256       3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+
+The one explicit target is:
+
+    root 7 Sb(35:10,33:13,30:26,28:18)
+
+Its two-line certificate is `/tmp/product-root-378086.cert`, SHA-256
+`279015bc7a995ca614914b3ef42b76d6b10b6d8ce53396d001f749c36344641e`.
+The full Sa(113) control comes from:
+
+https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17
+
+    /tmp/sa113.cert
+    facts          304,105
+    SHA-256        41e64f81233d19aa4acd2141fb24ba28e0276c59c497aa19134c7e3562609dba
+    roots file     9 roots, Sb(65:48) through Sb(57:56)
+    roots SHA-256  d1bc29da902520a48d2c23754765b5b7165d1df8ddd40d19e59b1c0c7a5a1ec0
+
+## Design and soundness
+
+The durable fact array remains in its canonical `(part count,largest n,total mass,fact)` order.
+That preserves exact hashing and readable certificate order. The verifier now builds a separate
+immutable permutation in `(part count,largest segment product,total mass)` order and scans
+structure-of-arrays columns in that order:
+
+    int32 canonical fact index
+    int32 total mass
+    8 x uint8 sorted n profile
+    8 x uint8 sorted m profile
+    4 x uint16 sorted segment-product profile
+    int32 end of equal-largest-product group
+
+If a fact injects componentwise into a query, every mapped segment has no larger `n`, no larger
+`m`, and no larger product. Sorting each scalar multiset therefore gives three independent
+necessary componentwise inequalities. The product profile is complete for the run9 k=6 index,
+whose facts have at most four segments; it remains a sound but weaker top-four test for longer
+states. The existing exact bipartite injection matcher is still the final decision. No implied
+fact is inserted, no certificate claim is added, and no approximate rejection is accepted.
+
+This is bounded denormalization, not closure materialization. Relative to the legacy index it adds
+20 bytes per fact (8 product-profile + 4 order + 4 mass + 4 group-end), about 62.5 MB over the
+3,126,190-record normalized run9 input before allocator effects. `VERIFY_LEGACY_INDEX` restores the
+old `(part count,largest n,total mass)` index for an exact control, and `VERIFY_INDEX_STATS` adds
+candidate counters. Neither flag changes certificate semantics.
+
+## Provenance-complete hard-root A/B
+
+Both builds used the exact source SHA-256
+`c54631980dd817e02bca2ed7d0eff7b3694276c17a03dee02554aa45299cf5a3`:
+
+    tools/build_radio.py -O3 -pthread -Wall -Wextra -Wpedantic \
+      radio_verify.c -o /tmp/radio_verify-final
+    build ID 144123aba3cffed2cdd4c81c6457c187801148e0de93d3bfcc23b7626cc73188
+
+    tools/build_radio.py -O3 -pthread -Wall -Wextra -Wpedantic \
+      -DVERIFY_LEGACY_INDEX radio_verify.c -o /tmp/radio_verify-final-legacy
+    build ID e645a42e59e6880e6c6a31c5390de495a558882185f7f283ac24765de57c5a98
+
+The final positional `2` is the input-source mask: it excludes facts from the first input as
+targets while leaving them available as the support database. Explicit `ROOTS` are additive; they
+do not otherwise suppress ordinary targets.
+
+    ROOTS=/tmp/product-root-378086.cert VERIFY_THREADS=1 VERIFY_MEMO_BITS=20 \
+      tools/capped_run.sh --seconds 600 --rss-gb 8 --label LABEL -- \
+      tools/run_with_provenance.py BINARY /tmp/run9-cache-study.cert \
+        7 0 1 3 0 999 1 0 1 0 2
+
+Result:
+
+    index       verified  nodes      memo hits  memo misses  search wall  external wall  peak RSS
+    legacy      1         4,644,469  5,583,390  5,187,272   209.63 s     211 s          0.41 GB
+    product     1         4,644,469  5,583,390  5,187,272    33.24 s      36 s          0.53 GB
+
+Thus the production index is 6.31x faster inside the verifier and 5.86x faster end to end on this
+exact hard state. The proof search, memo history and verdict are identical; only dominance lookup
+cost changes. Both output logs passed `tools/check_provenance.py`.
+
+The counter build ID is
+`5b39895a3853653e560a5b4136e3be77e1a7a80b735cbac99cdd81d77cfac283`.
+Its instrumentation adds overhead and is not a timing control. On the same state it reports:
+
+    dominance candidates       69,164,074,015
+    rejected by product        68,964,467,550 (99.7%)
+    rejected by n/m               196,011,289
+    exact injection calls           3,595,176
+    exact injection hits              965,605
+
+The remaining hot cost is therefore the flat packed-profile scan, not the exact matcher. A later
+experiment can put small Pareto summaries over fixed-size index blocks and skip a block only when
+no summary point fits the query. That is a possible second bounded level of denormalization; it is
+not part of this change.
+
+## Full Sa(113) color and replay control
+
+With eight workers, pre-color minimalization retained the same counts as the legacy implementation:
+
+    k=2 5; k=3 424; k=4 137,457; k=5 9,341; k=6 65,371; k=7 431
+
+Coloring the nine explicit roots verified every target and emitted a canonical-order certificate:
+
+    roots          9
+    support facts  120,293
+    bytes          3,946,534
+    SHA-256        5c6d986e34d2e22f53cb3327b37343687df9809085ea41341db431f18ceb4032
+
+Its fact set is byte-for-byte equal after sorting to the earlier product-reordered prototype
+certificate; only root/fact presentation order differs. The production build then
+replayed the canonical-order certificate through `tools/run_with_provenance.py` under the RSS/wall
+supervisor:
+
+    TOTAL verified 120302, unverified 0, budget 0,
+          nodes 2491283058, 140.28 s wall on 8 threads
+    external wall 141 s; peak RSS 0.88 GB
+
+The replay log passed `tools/check_provenance.py`. Per level, it verified 5/424/49,675/9,311/
+60,447/431/9 records at k=2..8 respectively. This exercises the canonical-index witness mapping,
+parallel verification and the complete colored DAG, not merely the hard one-root slice.
+
+Finally, a provenance-wrapped `CERT_ONLY` pass over run9 took five external seconds and reproduced
+the normalized certificate byte-for-byte at SHA-256
+`3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`.
+
+## Checks and discarded diagnostics
+
+`tools/test_radio_verify.sh` passes serial/parallel verification, coloring, minimalization and text
+replay. The final default build also passes AddressSanitizer + UndefinedBehaviorSanitizer (build ID
+`63df2dde105c1d7eae441ba29d99fa4c47463e4b725e83c6e6c4e881c852f130`) and ThreadSanitizer with two
+workers (build ID `0ab7bb13f2128dc079272f9358f7cb0c1ba9abf300a109b108b1a6784b8a5f3a`).
+
+Two early sparse-sample comparisons each reached their 300-second external cap and were abandoned:
+one selected fact can dominate such a sparse batch, so the exact hard-root control above is the
+reproducible comparison. A later command accidentally added the explicit root without excluding
+ordinary input facts and was terminated after about 6m20s of CPU; it produced no result. The source
+mask in the recorded command prevents that error. No solver process or solver source was changed.

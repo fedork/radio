@@ -6822,8 +6822,8 @@ lane-wise monotone, because the valid component injection can cross product-orde
 independent sorted n, m and product profiles, then run the exact matching check. The first A/B is a
 packed product column plus candidate counters on a deterministic run9 k=7 sample, comparing the
 current `(np,max n,total mass)` order with `(np,max product,total mass)` and
-`(np,total mass,max product)`. No speedup is claimed yet. Full commands, source hashes, counts and
-the counterexample are in
+`(np,total mass,max product)`. This entry made no speedup claim; the measured follow-up is the
+product-index entry below. Full shape commands, source hashes, counts and the counterexample are in
 `evidence/cache_key_shape_2026-08-17.txt`.
 
 For a parallel solver, this reinforces frozen per-k epochs plus worker-local exact/hot caches.
@@ -6841,3 +6841,50 @@ barriers, so a Spot interruption during k=7 would discard that whole barrier. `A
 A bounded 19:38:31 UTC status query found the existing verifier still healthy in that same barrier
 after 3h03m35s at 1399% CPU and 1,296.6 MiB RSS; no new proof milestone was inferred. Every local
 normalizer and streaming shape-analysis process had already exited.
+
+## 2026-08-17 — verifier product index delivered; solver cache deliberately unchanged
+
+The cache-shape proposal was tested specifically in `radio_verify.c`, not in the mutable solver.
+The sound useful part is three independent sorted dominance profiles: n sides, m sides and segment
+products. A componentwise injection implies all three scalar inequalities, but product-order long
+sides still cannot be paired lane-wise; the existing exact injection matcher remains mandatory.
+The production representation therefore leaves the canonical fact array alone and adds a separate
+immutable `(part count,max product,total mass)` permutation. Its hot scan columns denormalize mass,
+packed n/m/product profiles and the next equal-product-group boundary. Only profile survivors touch
+the 88-byte fact. This is bounded static-index denormalization, not insertion of implied facts.
+
+The exact hard control was `Sb(35:10,33:13,30:26,28:18)@7` over the full normalized run9 database.
+Provenance-complete O3 one-worker runs returned the same verdict, 4,644,469 nodes, 5,583,390 memo
+hits and 5,187,272 misses. The legacy index took 209.63 verifier seconds / 211 external seconds at
+0.41 GB peak RSS; the production index took 33.24 / 36 seconds at 0.53 GB: **6.31x** inside the
+checker and 5.86x end to end. Instrumented production scanning considered 69,164,074,015 cheap
+candidates, rejected 68,964,467,550 (99.7%) on product alone, rejected another 196,011,289 on n/m,
+and called exact injection only 3,595,176 times. The remaining index opportunity is therefore a
+small Pareto-minimal profile summary per fixed-size block, not more exact-matcher work.
+
+The full Sa(113) control also passed. Minimalization retained the same per-level antichain counts;
+coloring the nine explicit roots emitted the same 120,293 support-fact set as the earlier
+product-reordered prototype (only presentation order differed). The canonical certificate is 3,946,534
+bytes with SHA-256 `5c6d986e34d2e22f53cb3327b37343687df9809085ea41341db431f18ceb4032`.
+A provenance-complete eight-worker replay verified all 120,302 root/fact records, zero unresolved
+or budget outcomes, and exactly 2,491,283,058 nodes in 140.28 verifier / 141 external seconds at
+0.88 GB peak RSS. A full run9 `CERT_ONLY` pass also reproduced the established normalized SHA-256
+byte-for-byte in five external seconds.
+
+The implementation is now the default; `VERIFY_LEGACY_INDEX` preserves the old layout for exact
+A/Bs and `VERIFY_INDEX_STATS` exposes the filter counts. The ordinary regression suite, an
+AddressSanitizer+UndefinedBehaviorSanitizer build, and a two-worker ThreadSanitizer build all pass,
+including minimalization/coloring. Full source hashes, build IDs, commands and outputs are in
+`evidence/verifier_product_index_2026-08-17.txt`.
+
+Two diagnostics should not be repeated. Sparse stride samples each consumed their 300-second cap
+because one selected state dominated the batch, so the exact explicit-root control replaced them.
+One provenance run accidentally treated the root as additive without filtering main-input facts;
+it was stopped after about 6m20s of CPU with no result. The correct one-root command uses source
+mask 2, and `docs/tools.md` now calls out that `ROOTS` does not suppress ordinary targets.
+
+No solver source, solver cache or AWS process changed. A bounded status query at 22:46:58 UTC found
+the already-deployed run9 verifier healthy in the same k=7 coloring barrier after 6h12m03s at 1399%
+CPU and 1,296.6 MiB RSS. The Pareto census remained at 99.9% CPU and 8,855.3 MiB RSS; 112.4 GiB was
+available and swap remained zero. This supplies no new proof milestone and does not justify
+restarting the live old-index barrier.

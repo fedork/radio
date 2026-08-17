@@ -360,16 +360,18 @@ Next, in order:
    processing this full-scale batch, with no intra-level cursor or defensible ETA;
 4. the same supervisor will replay the colored bundle and require zero unresolved targets; use the
    measured Sa(113) width policy above rather than restarting the live run merely to change width;
-5. before adding citation hints, prototype a packed sorted segment-product profile on the exact
-   `k=7` bottleneck. The raw run9 `k=6` index serving that batch has 388,317 facts: its largest
-   `(part-count,total-mass)` bucket has 9,069 records, while adding the segment-mass vector reduces
-   the largest mass-signature bucket to 39. Compare the current `(np,max-n,total-mass)` order with
-   `(np,max-product,total-mass)` and `(np,total-mass,max-product)` on a deterministic sample,
-   retain the existing independent n/m profiles and final injection check, and require identical
-   proof output. Measurements and the ordering caveat are in
-   [`../evidence/cache_key_shape_2026-08-17.txt`](../evidence/cache_key_shape_2026-08-17.txt);
-6. only if dominance reconstruction still dominates after that, add optional checkable citation
-   hints; do not make a binary or opaque format the durable source merely to accelerate indexing.
+5. **Delivered:** the packed product-profile index retains canonical fact storage but scans a
+   separate `(np,max-product,total-mass)` permutation with denormalized mass and packed n/m/product
+   columns. On an exact hard run9 k=7 root it preserves the 4,644,469-node proof and memo counts
+   while reducing verifier wall from 209.63 to 33.24 seconds (6.31x). A complete 120,302-record
+   Sa(113) colored replay also closes with zero gaps. Measurements, build IDs and controls are in
+   [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt);
+6. before adding citation hints, test one further bounded static-index layer: fixed-size blocks with
+   a small Pareto-minimal set of packed profiles. Skip a block only when no summary profile fits
+   the query, retain the exact matcher and require identical proof nodes/output. The current index
+   still scans 69.16 billion cheap profile candidates on the hard control even though only 3.60
+   million reach exact matching. Do not make a binary or opaque format the durable source merely
+   to accelerate indexing.
 
 The parallel-solver follow-up should reuse the scheduling lesson without forcing the solver into
 level-synchronous breadth first search. Keep the cheap heuristic pass depth first; replace the

@@ -67,6 +67,19 @@
 
 #define MAXC (2 * MAXP)          /* a mixed child has two parts per group */
 
+/* The product index is the production default. VERIFY_LEGACY_INDEX retains the former
+   (np,largest-n,mass) layout for exact A/B reproduction; defining either implementation macro
+   explicitly also suppresses the default pair, which permits profile-only diagnostics. */
+#if !defined(VERIFY_LEGACY_INDEX) && !defined(VERIFY_PRODUCT_PROFILE) && \
+    !defined(VERIFY_PRODUCT_SORT)
+#define VERIFY_PRODUCT_PROFILE
+#define VERIFY_PRODUCT_SORT
+#endif
+
+#if defined(VERIFY_PRODUCT_SORT) && !defined(VERIFY_PRODUCT_PROFILE)
+#error "VERIFY_PRODUCT_SORT requires VERIFY_PRODUCT_PROFILE"
+#endif
+
 typedef struct { unsigned char n, m; } Part;
 typedef struct { unsigned char np, src; Part p[MAXP]; int mass; } Fact;
 
@@ -226,16 +239,29 @@ typedef struct Level_ {
        N_j(f) <= N_j(s) for every j, where N_j is the j-th largest n. The same holds independently
        for the m sides. Both are NECESSARY, cheap, and false for almost every candidate.
 
-       Layout: two uint64 columns, eight 8-bit lanes each (n and m both fit a byte - the parser
-       rejects anything above 255), so one candidate is a 16-byte read and the test is two
-       vector byte-compares instead of a backtracking match. Facts are sorted by
-       (np, largest n, mass), which turns "np <= np(s) and maxn <= maxn(s)" into a range and keeps
-       the mass break inside each group. */
-    uint64_t *pn, *pm;       /* per fact: N_1..N_8 and M_1..M_8, descending, 0-padded */
+       Layout: the canonical fact array remains sorted by (np,largest n,mass), preserving stable
+       certificate output and exact hashing. A separate read-only permutation is sorted by
+       (np,largest segment product,mass). Its hot scan columns denormalize mass plus three packed
+       necessary profiles: eight 8-bit n lanes, eight 8-bit m lanes, and four 16-bit product
+       lanes. Almost every candidate dies in those contiguous columns; only survivors touch the
+       88-byte Fact and run the exact injection matcher. */
+    uint64_t *pn, *pm;       /* per index position: N_1..N_8 and M_1..M_8, descending, 0-padded */
+#ifdef VERIFY_PRODUCT_PROFILE
+    uint64_t *pp;            /* per fact: four largest n*m products, uint16 lanes, descending */
+#endif
+#ifdef VERIFY_PRODUCT_SORT
+    int32_t *order;           /* product-index position -> canonical f[] index */
+    int *imass;               /* mass column in product-index order */
+    int32_t *group_end;       /* first index after this fact's equal-max-product group */
+#else
     int *b2;                 /* b2[np * 257 + x] = first index with np and largest-n >= x */
+#endif
 } Level;
 
 typedef unsigned char u8x8 __attribute__((vector_size(8)));
+#ifdef VERIFY_PRODUCT_PROFILE
+typedef uint16_t u16x4 __attribute__((vector_size(8)));
+#endif
 
 /* every lane of a <= corresponding lane of b */
 static inline int prof_le(uint64_t a, uint64_t b) {
@@ -246,6 +272,38 @@ static inline int prof_le(uint64_t a, uint64_t b) {
     memcpy(&r, &gt, 8);
     return r == 0;
 }
+
+#ifdef VERIFY_PRODUCT_PROFILE
+/* Four sorted segment products. A componentwise injection maps every segment to one with a
+   no-smaller product, so the sorted product vector is a necessary dominance condition. Four lanes
+   cover the entire run9 k=6 index serving the expensive k=7 verification batch; longer states get
+   a still-sound, weaker top-four filter. */
+static inline int prod_prof_le(uint64_t a, uint64_t b) {
+    u16x4 va, vb, gt;
+    uint64_t r;
+    memcpy(&va, &a, 8); memcpy(&vb, &b, 8);
+    gt = (u16x4)(va > vb);
+    memcpy(&r, &gt, 8);
+    return r == 0;
+}
+
+static uint64_t prod_prof_of(const Part *p, int np) {
+    uint16_t best[4] = {0, 0, 0, 0};
+    uint64_t out;
+    int i, j;
+    for (i = 0; i < np; i++) {
+        uint16_t v = (uint16_t)(p[i].n * p[i].m);
+        for (j = 0; j < 4; j++) if (v > best[j]) {
+            int z;
+            for (z = 3; z > j; z--) best[z] = best[z - 1];
+            best[j] = v;
+            break;
+        }
+    }
+    memcpy(&out, best, 8);
+    return out;
+}
+#endif
 
 /* N_1..N_8 and M_1..M_8, each descending and 0-padded. p[] is sorted by (n desc, m desc), so the
    n side is already ordered; the m side is not and must be sorted separately. */
@@ -263,6 +321,17 @@ static void prof_of(const Part *p, int np, uint64_t *pn, uint64_t *pm) {
     memcpy(pn, bn, 8); memcpy(pm, bm, 8);
 }
 
+#ifdef VERIFY_PRODUCT_SORT
+static int fact_max_product(const Fact *f) {
+    int i, out = 0;
+    for (i = 0; i < f->np; i++) {
+        int v = f->p[i].n * f->p[i].m;
+        if (v > out) out = v;
+    }
+    return out;
+}
+#endif
+
 static int fact_cmp(const void *A, const void *B) {
     const Fact *a = A, *b = B;
     if (a->np != b->np) return a->np - b->np;
@@ -271,6 +340,22 @@ static int fact_cmp(const void *A, const void *B) {
     if (a->mass != b->mass) return a->mass - b->mass;
     return memcmp(a->p, b->p, (a->np < b->np ? a->np : b->np) * sizeof(Part));
 }
+
+#ifdef VERIFY_PRODUCT_SORT
+static const Fact *g_index_sort_facts;
+
+static int fact_index_cmp(const void *A, const void *B) {
+    int32_t ai, bi;
+    const Fact *a, *b;
+    memcpy(&ai, A, sizeof ai); memcpy(&bi, B, sizeof bi);
+    a = &g_index_sort_facts[ai]; b = &g_index_sort_facts[bi];
+    if (a->np != b->np) return a->np - b->np;
+    { int ap = fact_max_product(a), bp = fact_max_product(b);
+      if (ap != bp) return ap - bp; }
+    if (a->mass != b->mass) return a->mass - b->mass;
+    return fact_cmp(a, b);
+}
+#endif
 
 static void level_freeze(Level *L) {
     int i, cap = 16;
@@ -291,7 +376,41 @@ static void level_freeze(Level *L) {
     }
     L->pn = malloc((L->n ? L->n : 1) * sizeof(uint64_t));
     L->pm = malloc((L->n ? L->n : 1) * sizeof(uint64_t));
-    for (i = 0; i < L->n; i++) prof_of(L->f[i].p, L->f[i].np, &L->pn[i], &L->pm[i]);
+#ifdef VERIFY_PRODUCT_PROFILE
+    L->pp = malloc((L->n ? L->n : 1) * sizeof(uint64_t));
+#endif
+#ifdef VERIFY_PRODUCT_SORT
+    L->order = malloc((L->n ? L->n : 1) * sizeof(int32_t));
+    L->imass = malloc((L->n ? L->n : 1) * sizeof(int));
+    for (i = 0; i < L->n; i++) L->order[i] = i;
+    g_index_sort_facts = L->f;
+    qsort(L->order, L->n, sizeof(int32_t), fact_index_cmp);
+    g_index_sort_facts = NULL;
+#endif
+    for (i = 0; i < L->n; i++) {
+        int fi = i;
+#ifdef VERIFY_PRODUCT_SORT
+        fi = L->order[i]; L->imass[i] = L->f[fi].mass;
+#endif
+        prof_of(L->f[fi].p, L->f[fi].np, &L->pn[i], &L->pm[i]);
+#ifdef VERIFY_PRODUCT_PROFILE
+        L->pp[i] = prod_prof_of(L->f[fi].p, L->f[fi].np);
+#endif
+    }
+#ifdef VERIFY_PRODUCT_SORT
+    L->group_end = malloc((L->n ? L->n : 1) * sizeof(int32_t));
+    { int np;
+      for (np = 0; np <= MAXP; np++) {
+          int lo = L->bstart[np], hi = L->bstart[np + 1], a = lo;
+          while (a < hi) {
+              int b = a + 1, z, prod = fact_max_product(&L->f[L->order[a]]);
+              while (b < hi && fact_max_product(&L->f[L->order[b]]) == prod) b++;
+              for (z = a; z < b; z++) L->group_end[z] = b;
+              a = b;
+          }
+      }
+    }
+#else
     L->b2 = malloc((MAXP + 2) * 257 * sizeof(int));
     { int np, x;
       for (np = 0; np <= MAXP + 1; np++)
@@ -308,6 +427,7 @@ static void level_freeze(Level *L) {
                   L->b2[np * 257 + x] = L->b2[np * 257 + x + 1];
       }
     }
+#endif
     L->sdom = calloc(NPART, 1);
     L->sdom_i = malloc(NPART * sizeof(int32_t));
     L->cited = calloc(L->n ? L->n : 1, 1);
@@ -326,6 +446,50 @@ static void level_freeze(Level *L) {
                   L->sdom[ix] = 1; L->sdom_i[ix] = L->sdom_i[(n << 8) | (m - 1)]; }
           }
     }
+}
+
+/* Candidate range and equal-primary-key skip for the production and legacy static orders. */
+static int level_candidate_end(const Level *L, int np, const Fact *q) {
+#ifdef VERIFY_PRODUCT_SORT
+    int lo = L->bstart[np], hi = L->bstart[np + 1];
+    int maxprod = fact_max_product(q);
+    while (lo < hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (fact_max_product(&L->f[L->order[mid]]) <= maxprod) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo;
+#else
+    int maxn = q->np ? q->p[0].n : 0;
+    return L->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+#endif
+}
+
+static inline int level_fact_index(const Level *L, int pos) {
+#ifdef VERIFY_PRODUCT_SORT
+    return L->order[pos];
+#else
+    (void)L;
+    return pos;
+#endif
+}
+
+static inline int level_index_mass(const Level *L, int pos) {
+#ifdef VERIFY_PRODUCT_SORT
+    return L->imass[pos];
+#else
+    return L->f[pos].mass;
+#endif
+}
+
+static int level_next_primary_group(const Level *L, int np, int i) {
+#ifdef VERIFY_PRODUCT_SORT
+    (void)np;
+    return L->group_end[i];
+#else
+    int an = L->f[i].p[0].n;
+    return L->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+#endif
 }
 
 static void level_freeze(Level *L);
@@ -391,20 +555,25 @@ static int level_redundant(const Level *L, int q) {
     const Fact *f = &L->f[q];
     int lim = f->np < MAXP ? f->np : MAXP, np, i;
     uint64_t qn, qm;
-    int maxn = f->np ? f->p[0].n : 0;
+#ifdef VERIFY_PRODUCT_PROFILE
+    uint64_t qp = prod_prof_of(f->p, f->np);
+#endif
     prof_of(f->p, f->np, &qn, &qm);
     for (np = 1; np <= lim; np++) {
-        int end = L->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+        int end = level_candidate_end(L, np, f);
         for (i = L->bstart[np]; i < end; i++) {
-            if (i == q) continue;
-            if (L->f[i].mass > f->mass) {
-                int an = L->f[i].p[0].n;
-                int nxt = L->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+            int fi = level_fact_index(L, i);
+            if (fi == q) continue;
+            if (level_index_mass(L, i) > f->mass) {
+                int nxt = level_next_primary_group(L, np, i);
                 if (nxt <= i) break;
                 i = nxt - 1; continue;
             }
+#ifdef VERIFY_PRODUCT_PROFILE
+            if (!prod_prof_le(L->pp[i], qp)) continue;
+#endif
             if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) continue;
-            if (dominates(&L->f[i], f)) return 1;
+            if (dominates(&L->f[fi], f)) return 1;
         }
     }
     return 0;
@@ -426,9 +595,26 @@ static void *minimize_worker(void *vp) {
 
 static void level_drop_indexes(Level *L) {
     free(L->hslot); free(L->hkey); free(L->sdom); free(L->sdom_i);
-    free(L->cited); free(L->pn); free(L->pm); free(L->b2);
+    free(L->cited); free(L->pn); free(L->pm);
+#ifdef VERIFY_PRODUCT_PROFILE
+    free(L->pp);
+#endif
+#ifdef VERIFY_PRODUCT_SORT
+    free(L->order); free(L->imass);
+    free(L->group_end);
+#else
+    free(L->b2);
+#endif
     L->hslot = NULL; L->hkey = NULL; L->sdom = NULL; L->sdom_i = NULL;
-    L->cited = NULL; L->pn = NULL; L->pm = NULL; L->b2 = NULL;
+    L->cited = NULL; L->pn = NULL; L->pm = NULL;
+#ifdef VERIFY_PRODUCT_PROFILE
+    L->pp = NULL;
+#endif
+#ifdef VERIFY_PRODUCT_SORT
+    L->order = NULL; L->imass = NULL; L->group_end = NULL;
+#else
+    L->b2 = NULL;
+#endif
 }
 
 static int level_minimize(Level *L, int threads) {
@@ -510,6 +696,13 @@ static TLS size_t memo_mask;
 #define MEMO_HIT memo_hit++
 #define MEMO_MISS memo_miss++
 static TLS long long memo_hit = 0, memo_miss = 0;
+#ifdef VERIFY_INDEX_STATS
+static TLS long long idx_candidates = 0, idx_product_rejects = 0, idx_nm_rejects = 0;
+static TLS long long idx_match_calls = 0, idx_match_hits = 0;
+#define IDX_INC(x) ((x)++)
+#else
+#define IDX_INC(x) ((void)0)
+#endif
 
 static int refuted_raw(const Level *L, const Fact *s, int k);
 static int derive(const Fact *s, int k);      /* prove, rather than cite */
@@ -564,22 +757,36 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
         }
     }
     { uint64_t qn, qm;
-      int maxn = s->np ? s->p[0].n : 0;
+#ifdef VERIFY_PRODUCT_PROFILE
+      uint64_t qp = prod_prof_of(s->p, s->np);
+#endif
       prof_of(s->p, s->np, &qn, &qm);
       for (np = 2; np <= lim; np++) {
-          /* only facts with largest n <= maxn can inject, so the candidates are the range below
-             b2[np][maxn+1]; mass is ordered inside each largest-n group, so break per group */
-          int end = L->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+          /* The primary monotone key (largest n in the baseline, largest product in the
+             experiment) bounds a contiguous range. Mass is ordered inside each primary-key
+             group, so an over-mass candidate skips the rest of that group. */
+          int end = level_candidate_end(L, np, s);
           for (i = L->bstart[np]; i < end; i++) {
-              if (L->f[i].mass > s->mass) {          /* skip to the next largest-n group */
-                  int an = L->f[i].p[0].n;
-                  int nxt = L->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+              int fi = level_fact_index(L, i);
+              if (level_index_mass(L, i) > s->mass) { /* skip to the next primary-key group */
+                  int nxt = level_next_primary_group(L, np, i);
                   if (nxt <= i) break;
                   i = nxt - 1;
                   continue;
               }
-              if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) continue;
-              if (dominates(&L->f[i], s)) { g_wit = i; return 1; }
+              IDX_INC(idx_candidates);
+#ifdef VERIFY_PRODUCT_PROFILE
+              if (!prod_prof_le(L->pp[i], qp)) {
+                  IDX_INC(idx_product_rejects); continue;
+              }
+#endif
+              if (!prof_le(L->pn[i], qn) || !prof_le(L->pm[i], qm)) {
+                  IDX_INC(idx_nm_rejects); continue;
+              }
+              IDX_INC(idx_match_calls);
+              if (dominates(&L->f[fi], s)) {
+                  IDX_INC(idx_match_hits); g_wit = fi; return 1;
+              }
           }
       }
     }
@@ -1077,6 +1284,10 @@ typedef struct {
     long long derived_ok, derived_no;
     long long dp_hit, dp_miss, dp_skip;
     long long max_fact_nodes;
+#ifdef VERIFY_INDEX_STATS
+    long long idx_candidates, idx_product_rejects, idx_nm_rejects;
+    long long idx_match_calls, idx_match_hits;
+#endif
 } BatchStats;
 
 typedef struct {
@@ -1121,6 +1332,10 @@ static void worker_state_init(int memo_bits) {
     pair_built = pair_reused = fc_prunes = fc_dom_skips = 0;
     pair_bits_set = pair_bits_tot = 0;
     dp_gen = 0; dp_hit = dp_miss = dp_skip = 0;
+#ifdef VERIFY_INDEX_STATS
+    idx_candidates = idx_product_rejects = idx_nm_rejects = 0;
+    idx_match_calls = idx_match_hits = 0;
+#endif
     cost_sum = budget_out = 0;
     memset(np_nodes, 0, sizeof np_nodes); memset(np_facts, 0, sizeof np_facts);
     memset(cost_hist, 0, sizeof cost_hist);
@@ -1138,6 +1353,11 @@ static void worker_state_finish(BatchStats *s) {
     s->derived_ok = derived_ok; s->derived_no = derived_no;
     s->dp_hit = dp_hit; s->dp_miss = dp_miss; s->dp_skip = dp_skip;
     s->max_fact_nodes = g_max_fact_nodes;
+#ifdef VERIFY_INDEX_STATS
+    s->idx_candidates = idx_candidates; s->idx_product_rejects = idx_product_rejects;
+    s->idx_nm_rejects = idx_nm_rejects; s->idx_match_calls = idx_match_calls;
+    s->idx_match_hits = idx_match_hits;
+#endif
     for (k = 0; k <= MAXK; k++) for (r = 0; r < 2; r++) if (live_tab[k][r]) {
         for (i = 0; i < NPART; i++) if (live_tab[k][r][i].n >= 0)
             free(live_tab[k][r][i].s);
@@ -1160,6 +1380,10 @@ static void add_batch_stats(BatchStats *a, const BatchStats *b) {
     ADD_STAT(paint_hits); ADD_STAT(pref_hits); ADD_STAT(pref_miss);
     ADD_STAT(derived_ok); ADD_STAT(derived_no);
     ADD_STAT(dp_hit); ADD_STAT(dp_miss); ADD_STAT(dp_skip);
+#ifdef VERIFY_INDEX_STATS
+    ADD_STAT(idx_candidates); ADD_STAT(idx_product_rejects); ADD_STAT(idx_nm_rejects);
+    ADD_STAT(idx_match_calls); ADD_STAT(idx_match_hits);
+#endif
     if (b->max_fact_nodes > a->max_fact_nodes) a->max_fact_nodes = b->max_fact_nodes;
 #undef ADD_STAT
 }
@@ -1470,20 +1694,25 @@ int main(int argc, char **argv) {
             const Fact *f = &L2->f[q];
             int dominated = 0, lim = f->np < MAXP ? f->np : MAXP;
             uint64_t qn, qm;
-            int maxn = f->np ? f->p[0].n : 0;
+#ifdef VERIFY_PRODUCT_PROFILE
+            uint64_t qp = prod_prof_of(f->p, f->np);
+#endif
             prof_of(f->p, f->np, &qn, &qm);
             for (np = 1; np <= lim && !dominated; np++) {
-                int end = L2->b2[np * 257 + (maxn < 256 ? maxn + 1 : 256)];
+                int end = level_candidate_end(L2, np, f);
                 for (i = L2->bstart[np]; i < end; i++) {
-                    if (i == q) continue;                       /* not itself */
-                    if (L2->f[i].mass > f->mass) {
-                        int an = L2->f[i].p[0].n;
-                        int nxt = L2->b2[np * 257 + (an < 256 ? an + 1 : 256)];
+                    int fi = level_fact_index(L2, i);
+                    if (fi == q) continue;                       /* not itself */
+                    if (level_index_mass(L2, i) > f->mass) {
+                        int nxt = level_next_primary_group(L2, np, i);
                         if (nxt <= i) break;
                         i = nxt - 1; continue;
                     }
+#ifdef VERIFY_PRODUCT_PROFILE
+                    if (!prod_prof_le(L2->pp[i], qp)) continue;
+#endif
                     if (!prof_le(L2->pn[i], qn) || !prof_le(L2->pm[i], qm)) continue;
-                    if (dominates(&L2->f[i], f)) { dominated = 1; break; }
+                    if (dominates(&L2->f[fi], f)) { dominated = 1; break; }
                 }
             }
             total[f->np]++;
@@ -1681,6 +1910,13 @@ int main(int argc, char **argv) {
                  bs.memo_hit, bs.memo_miss,
                  100.0 * bs.memo_hit / (bs.memo_hit + bs.memo_miss ? bs.memo_hit + bs.memo_miss : 1),
                  bs.live_built, bs.live_reused, bs.pair_built, bs.pair_reused);
+#ifdef VERIFY_INDEX_STATS
+          printf("dominance index: %lld candidates; product rejected %lld (%.1f%%); "
+                 "n/m rejected %lld; exact matching %lld calls/%lld hits\n",
+                 bs.idx_candidates, bs.idx_product_rejects,
+                 100.0 * bs.idx_product_rejects / (bs.idx_candidates ? bs.idx_candidates : 1),
+                 bs.idx_nm_rejects, bs.idx_match_calls, bs.idx_match_hits);
+#endif
           if (getenv("CERT_OUT") && !tu && !tb)
               write_certificate(getenv("CERT_OUT"), L, maxk < MAXK ? maxk : MAXK, 0, 0);
           else if (getenv("CERT_OUT"))
@@ -1741,6 +1977,13 @@ int main(int argc, char **argv) {
     }
     printf("memo: %lld hits, %lld misses (%.1f%% hit rate)\n",
            memo_hit, memo_miss, 100.0 * memo_hit / (memo_hit + memo_miss ? memo_hit + memo_miss : 1));
+#ifdef VERIFY_INDEX_STATS
+    printf("dominance index: %lld candidates; product rejected %lld (%.1f%%); "
+           "n/m rejected %lld; exact matching %lld calls/%lld hits\n",
+           idx_candidates, idx_product_rejects,
+           100.0 * idx_product_rejects / (idx_candidates ? idx_candidates : 1),
+           idx_nm_rejects, idx_match_calls, idx_match_hits);
+#endif
     printf("\nTOTAL verified %lld, unverified %lld, nodes %lld, %.2f s single-threaded\n",
            tot_ver, tot_un, tot_nodes, tot_s);
     { int q; printf("nodes by part count:\n");

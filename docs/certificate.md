@@ -154,6 +154,21 @@ Commands, hashes, the complete scaling table and sanitizer results are retained 
 This remains the completed small-corpus prototype; the separate full run9 coloring/replay is now
 live and incomplete on AWS.
 
+### Packed dominance index (2026-08-17)
+
+The verifier's static support lookup now uses a separate product-ordered columnar index while
+leaving canonical facts and the readable certificate format unchanged. Sorted n, m and segment
+products are necessary filters only; exact component injection still decides every citation. On a
+provenance-complete hard run9 k=7 control, the legacy and production paths returned identical
+4,644,469-node proofs and memo counts, while verifier wall fell from 209.63 to 33.24 seconds. The
+extra columns raised measured peak RSS from 0.41 to 0.53 GB on the full 3.126-million-record input.
+
+A newly colored Sa(113) certificate with 9 roots and 120,293 support facts then replayed under the
+production build: all 120,302 records verified, with zero unresolved/budget outcomes and exactly
+2,491,283,058 nodes in 140.28 seconds on eight workers. A full run9 parse/write pass remained
+byte-identical, so this is strictly an internal representation change. See
+[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
+
 ## Superseded 2023 route
 
 The 2023 run reached the same conclusion after 4,079,185 solve seconds and roughly 90 GB of virtual
