@@ -6859,8 +6859,9 @@ hits and 5,187,272 misses. The legacy index took 209.63 verifier seconds / 211 e
 0.41 GB peak RSS; the production index took 33.24 / 36 seconds at 0.53 GB: **6.31x** inside the
 checker and 5.86x end to end. Instrumented production scanning considered 69,164,074,015 cheap
 candidates, rejected 68,964,467,550 (99.7%) on product alone, rejected another 196,011,289 on n/m,
-and called exact injection only 3,595,176 times. The remaining index opportunity is therefore a
-small Pareto-minimal profile summary per fixed-size block, not more exact-matcher work.
+and called exact injection only 3,595,176 times. This identified a small Pareto-minimal profile
+summary per fixed-size block as the next bounded experiment; the follow-up entry below records its
+delivered adaptive form.
 
 The full Sa(113) control also passed. Minimalization retained the same per-level antichain counts;
 coloring the nine explicit roots emitted the same 120,293 support-fact set as the earlier
@@ -6871,8 +6872,9 @@ or budget outcomes, and exactly 2,491,283,058 nodes in 140.28 verifier / 141 ext
 0.88 GB peak RSS. A full run9 `CERT_ONLY` pass also reproduced the established normalized SHA-256
 byte-for-byte in five external seconds.
 
-The implementation is now the default; `VERIFY_LEGACY_INDEX` preserves the old layout for exact
-A/Bs and `VERIFY_INDEX_STATS` exposes the filter counts. The ordinary regression suite, an
+This product index became the default at this stage; the adaptive block follow-up below is now
+layered over it. `VERIFY_LEGACY_INDEX` preserves the old layout for exact A/Bs and
+`VERIFY_INDEX_STATS` exposes the filter counts. The ordinary regression suite, an
 AddressSanitizer+UndefinedBehaviorSanitizer build, and a two-worker ThreadSanitizer build all pass,
 including minimalization/coloring. Full source hashes, build IDs, commands and outputs are in
 `evidence/verifier_product_index_2026-08-17.txt`.
@@ -6888,3 +6890,60 @@ the already-deployed run9 verifier healthy in the same k=7 coloring barrier afte
 CPU and 1,296.6 MiB RSS. The Pareto census remained at 99.9% CPU and 8,855.3 MiB RSS; 112.4 GiB was
 available and swap remained zero. This supplies no new proof milestone and does not justify
 restarting the live old-index barrier.
+
+## 2026-08-17 — adaptive block-Pareto verifier index delivered
+
+The proposed second static-index layer works on the large verifier level, but only after two
+negative controls changed its shape. The sound summary is attached to full 256-fact blocks wholly
+inside one equal `(part count,largest product)` group. Each block stores componentwise minima and
+the Pareto-minimal set of `(total mass,top-four sorted products)`. If no stored point fits a query,
+no fact in the block can pass even that necessary test; a positive summary still falls through to
+the existing product/n/m filters and exact injection matcher. The same filter now accelerates
+same-level minimalization. It never inserts an implied fact or changes certificate text.
+
+The first prototype aligned blocks only by part count and probed them before the existing mass-group
+skip. It kept the exact verdict, 4,644,469 nodes and memo counts, but took 45.94 verifier seconds
+against the then-current 33.24-second product index. Its 1,762,914,075 block probes performed
+101,332,817,879 front-point tests, much of it over positions the old mass skip would not scan. That
+layout was removed. Moving the mass skip first and confining blocks to one primary-key group made
+every tested size faster; 32/64/128/192/256/384/512-fact blocks took respectively
+14.88/13.48/12.89/13.01/12.74/13.57/13.68 seconds on the same logical hard control, selecting 256.
+
+Applying those blocks indiscriminately was also wrong. A full eight-worker Sa(113) colored replay
+still returned all 120,302 records and the exact expected 2,491,283,058 nodes, but took 143.41
+verifier / 146 external seconds at 0.89 GB, slightly behind the product-only 140.28 / 141-second
+control. It built only 377 useful blocks. The production form therefore builds summaries only for
+levels with at least 65,536 facts and chooses the plain versus block scan outside the hot candidate
+loop. The 388,317-fact run9 k=6 support level is eligible; the 9,311-fact support level dominating
+Sa(113) k=6 verification is not.
+
+Clean-commit O3 runs at `4e58ac2` give the final comparison. The explicit product-only and default
+block builds verified the hard `Sb(35:10,33:13,30:26,28:18)@7` root with identical 4,644,469 nodes,
+5,583,390 memo hits and 5,187,272 misses. Product-only took 39.16 verifier / 46 external seconds at
+0.53 GB; adaptive blocks took 11.70 / 15 seconds at 0.57 GB: **3.35x** inside the verifier and
+3.07x end to end. Relative to the separately retained 209.63-second legacy layout, the final time
+is 17.92x faster. Building 11,659 blocks and 2,166,848 front points took 0.19 seconds and 45.1 MiB.
+Instrumentation rejected 266,179,545 of 271,663,392 block probes (98.0%), skipping
+68,141,963,520 positions; exact matching remained exactly 3,595,176 calls and 965,605 hits.
+
+The final small-level guard selected every tenth k=6 fact from the canonical Sa(113) certificate.
+Both eight-worker builds verified 6,045 targets and exactly 251,437,448 nodes at 0.84 GB;
+product-only took 15.95 seconds and the adaptive default 15.88. This is a no-regression sample, not
+an extrapolated complete-runtime claim. `tools/test_radio_verify.sh` now forces two-fact blocks on
+a synthetic level and requires the same two-of-four minimal antichain as the plain index. The
+ordinary serial/parallel, coloring and replay checks pass. Clean ASan+UBSan and two-worker TSan
+builds also passed forced-block minimalization and emitted a byte-identical one-root colored
+certificate.
+
+The adaptive block layer is now the verifier default. `VERIFY_LEGACY_INDEX` retains the oldest
+control; explicit product-profile/sort macros or `VERIFY_NO_BLOCK_PARETO` retain the product-only
+control; `VERIFY_INDEX_STATS` reports both layers. Full hashes, build IDs, commands and discarded
+measurements are in `evidence/verifier_block_pareto_2026-08-17.txt`. No solver source, mutable solver
+cache, certificate fact or Pareto datum changed.
+
+The already-running AWS verifier was deliberately not restarted. At the final bounded 23:38:44 UTC
+query it remained healthy in the old-index k=7 coloring barrier after 7h03m49s at 1399% CPU and
+1,296.6 MiB RSS; the separate census used one core, 112.4 GiB remained available and swap was zero.
+No local verifier, canonical search, wrapper or one-off analysis process remained. The next default
+work is still to let that replay finish and archive it; parallel-solver batching remains a separate
+design track.

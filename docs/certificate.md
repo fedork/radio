@@ -154,7 +154,7 @@ Commands, hashes, the complete scaling table and sanitizer results are retained 
 This remains the completed small-corpus prototype; the separate full run9 coloring/replay is now
 live and incomplete on AWS.
 
-### Packed dominance index (2026-08-17)
+### Packed dominance and adaptive block index (2026-08-17)
 
 The verifier's static support lookup now uses a separate product-ordered columnar index while
 leaving canonical facts and the readable certificate format unchanged. Sorted n, m and segment
@@ -163,11 +163,20 @@ provenance-complete hard run9 k=7 control, the legacy and production paths retur
 4,644,469-node proofs and memo counts, while verifier wall fell from 209.63 to 33.24 seconds. The
 extra columns raised measured peak RSS from 0.41 to 0.53 GB on the full 3.126-million-record input.
 
+The default now adds a second bounded layer only on levels with at least 65,536 facts. Full
+256-fact primary-key blocks retain Pareto-minimal mass/product profiles and are skipped only when no
+summary point fits; every positive summary still reaches the original exact checks. On the same
+hard root, a clean contemporaneous product-only/block A/B preserved all proof and memo counts while
+reducing 39.16 to 11.70 seconds, at 0.53 versus 0.57 GB peak RSS. An ungated version slightly slowed
+the complete Sa(113) replay, which is why smaller levels retain the product-only loop.
+
 A newly colored Sa(113) certificate with 9 roots and 120,293 support facts then replayed under the
 production build: all 120,302 records verified, with zero unresolved/budget outcomes and exactly
 2,491,283,058 nodes in 140.28 seconds on eight workers. A full run9 parse/write pass remained
 byte-identical, so this is strictly an internal representation change. See
 [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
+Block design, failed layouts and final controls are in
+[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
 
 ## Superseded 2023 route
 

@@ -60,11 +60,23 @@ The default static dominance index keeps the canonical fact array unchanged and 
 read-only `(part count,largest segment product,total mass)` permutation. Its hot structure-of-arrays
 columns contain total mass plus packed sorted n, m and top-four segment-product profiles. Those are
 sound necessary componentwise conditions; only the survivors touch the full `Fact` and run the
-exact injection matcher. `VERIFY_LEGACY_INDEX` restores the former `(part count,largest n,total
-mass)` scan for A/B tests, and `VERIFY_INDEX_STATS` prints filter counters. On the hard retained
-run9 k=7 control this changes no proof nodes or memo results and reduces single-worker verification
-from 209.63 to 33.24 seconds. Design, memory cost and full controls are in
-[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
+exact injection matcher.
+
+Large levels add one bounded index layer: full 256-fact blocks inside an equal
+`(part count,largest product)` group store the Pareto-minimal `(mass,top-four products)` profiles.
+A block is skipped only if no summary point fits, so a positive summary still falls through to the
+unchanged per-fact and exact checks. Levels below 65,536 facts use the product-only loop; this avoids
+a regression on the smaller level that dominates Sa(113). The hard retained run9 k=7 control keeps
+the same 4,644,469 nodes and memo counts while falling from a contemporaneous 39.16 to 11.70
+single-worker seconds; the older legacy layout took 209.63 seconds. The block layer adds 45.1 MiB on
+that 3.1-million-fact input. `VERIFY_LEGACY_INDEX` restores the old
+`(part count,largest n,total mass)` scan. Explicit `VERIFY_PRODUCT_PROFILE` plus
+`VERIFY_PRODUCT_SORT`, or `VERIFY_NO_BLOCK_PARETO` on an otherwise default build, gives the
+product-only control; `VERIFY_INDEX_STATS` prints both block and per-fact filter counters. Design,
+failed layouts, tuning and controls are in
+[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt)
+and
+[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
 
 The durable input/output format is text, and is deliberately simpler than a raw log:
 
@@ -101,7 +113,8 @@ The checker refuses `CERT_OUT` after a partial or filtered verification; use `CE
 intent is normalization rather than a proof replay.
 
 `tools/test_radio_verify.sh` covers serial/parallel agreement, text parsing, minimalization,
-deterministic coloring and replay. The first corpus measurement used
+deterministic coloring and replay, plus a forced-small-block antichain comparison. The first corpus
+measurement used
 [`fullsolve-2026`](https://github.com/fedork/radio-data/releases/tag/fullsolve-2026): all 62,366
 facts and 97,483,464 recursion nodes were identical from one through sixteen workers; measured
 wall scaling and certificate sizes are retained in

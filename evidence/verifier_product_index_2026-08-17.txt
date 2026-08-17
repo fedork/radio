@@ -99,10 +99,10 @@ Its instrumentation adds overhead and is not a timing control. On the same state
     exact injection calls           3,595,176
     exact injection hits              965,605
 
-The remaining hot cost is therefore the flat packed-profile scan, not the exact matcher. A later
-experiment can put small Pareto summaries over fixed-size index blocks and skip a block only when
-no summary point fits the query. That is a possible second bounded level of denormalization; it is
-not part of this change.
+The remaining hot cost at this stage was therefore the flat packed-profile scan, not the exact
+matcher. The follow-up fixed-block experiment is now delivered in
+`verifier_block_pareto_2026-08-17.txt`; it is a separate second bounded level of denormalization and
+does not alter the measurements in this file.
 
 ## Full Sa(113) color and replay control
 

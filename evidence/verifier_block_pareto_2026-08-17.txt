@@ -1,0 +1,152 @@
+# Adaptive block-Pareto summaries for the independent verifier
+
+Status: measured verifier optimization; no solver code, certificate claim or mathematical verdict
+changed. The implementation was committed as `4e58ac2ff2541f746b884097d355c6229b6c1eef`.
+The measured `radio_verify.c` SHA-256 is
+`1d212cfc28d52e6de20b9a4c4b30636b23b0d7a4d4a2e77b4ea39b9fc8dab57d`.
+
+## Inputs
+
+The hard query and support database are the exact controls from
+`verifier_product_index_2026-08-17.txt`:
+
+    https://github.com/fedork/radio-data/releases/tag/sa193-cold-2026-08-16
+    normalized run9 facts  /tmp/run9-cache-study.cert
+    records                3,126,190
+    SHA-256                3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+
+    root 7 Sb(35:10,33:13,30:26,28:18)
+    root file SHA-256      279015bc7a995ca614914b3ef42b76d6b10b6d8ce53396d001f749c36344641e
+
+The small-level control is derived from the canonical Sa(113) colored certificate in:
+
+    https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17
+    colored SHA-256        5c6d986e34d2e22f53cb3327b37343687df9809085ea41341db431f18ceb4032
+    roots-removed SHA-256  55619eba92a7bf6e6cd2df73796dcfeb2b7a4e8cc699ea93f5d856bc955354d4
+
+The roots-removed file has the same 120,293 support facts. The control selects every tenth k=6
+target, 6,045 facts, while retaining the complete lower-level support indexes.
+
+## Design and soundness
+
+The existing immutable product index remains sorted by `(part count,largest product,total mass)`.
+Within each equal `(part count,largest product)` group, full blocks of 256 consecutive facts receive:
+
+    componentwise minima of (total mass, four sorted product lanes)
+    the Pareto-minimal set under those same five necessary coordinates
+
+Mass overflow is checked before a block probe. A component-minimum failure rejects the block
+immediately. Otherwise the verifier scans the Pareto front. If any fact in the block could pass the
+mass/product necessary test, descending through dominated profile points terminates at a stored
+minimal point that also passes. Therefore absence of a fitting front point proves that no fact in
+the block can dominate the query. A fitting point proves nothing: the verifier falls back to the
+unchanged per-fact product, n-side, m-side and exact injection checks.
+
+Only full blocks inside one primary-key group are summarized, so a candidate-range endpoint never
+cuts a skipped block. The same sound rejection filter is used by pre-color same-level
+minimalization. No implied fact is materialized and certificate output remains canonical text.
+
+The summaries are adaptive. Levels below 65,536 facts use the product-only loop with the dispatch
+outside the hot candidate scan. This avoids paying block-front costs on the 9,311-fact level that
+dominates the Sa(113) k=6 replay. The production defaults are block size 256 and cutoff 65,536;
+explicit `VERIFY_PRODUCT_PROFILE` plus `VERIFY_PRODUCT_SORT` builds the exact product-only control,
+while `VERIFY_NO_BLOCK_PARETO` suppresses blocks on an otherwise default build.
+
+## Rejected first layout and tuning
+
+The first prototype aligned blocks only by part count and tested them before the existing
+over-mass group skip. It preserved the verdict and proof counts but regressed the hard query to
+45.94 verifier seconds, versus 33.24 for the then-current product index. Instrumentation explained
+the failure: 1,762,914,075 block probes performed 101,332,817,879 front-point tests, much of it on
+positions the mass-group skip would never have visited. That layout was removed.
+
+Aligning blocks inside equal-largest-product groups and doing the mass skip first produced the
+following one-worker size sweep. All rows verified the same target with exactly 4,644,469 nodes,
+5,583,390 memo hits and 5,187,272 misses. These are tuning runs across successive but logically
+equivalent prototype sources, so their fine differences are not cross-build speedup claims.
+
+    block size   verifier wall s
+            32             14.88
+            64             13.48
+           128             12.89
+           192             13.01
+           256             12.74
+           384             13.57
+           512             13.68
+
+An ungated size-256 prototype also replayed all 120,302 records of the Sa(113) colored certificate
+with the expected 2,491,283,058 nodes, but took 143.41 verifier / 146 external seconds at 0.89 GB,
+slightly worse than the 140.28 / 141-second product-only control. It built only 377 blocks and
+21,080 front points. This negative result motivated the level-size cutoff rather than applying a
+run9-specific win globally. An intermediate cutoff build still tested a null block pointer inside
+the candidate loop and took 155.46 seconds in one noisy full parallel replay; that placement was
+removed. The final dispatch chooses the plain or block loop once per dominance query.
+
+## Clean-commit hard-root A/B
+
+Both final O3 builds came from commit `4e58ac2` with `git_source_dirty=no`. The unrelated untracked
+`bench_sa113_k9.meta` made the whole-worktree flag dirty but is not a source input.
+
+    build                                  build ID
+    default adaptive block                 c0120907b5ef73cfe033f317aa899eb185823d603e93cc33e1497f1a065854b7
+    explicit product-only control          44411ea53a603f8db4ae0f0b2bf2dbf5a1c0b581a01a15ec16b57fcc8c8f8483
+    default plus VERIFY_INDEX_STATS        2dfe5781e1b236f36e01e998070987f5603e5fff87253777a34f488d0496a1de
+
+The command was the same except for `BINARY`:
+
+    ROOTS=/tmp/product-root-378086.cert VERIFY_THREADS=1 VERIFY_MEMO_BITS=20 \
+      tools/capped_run.sh --seconds 180 --rss-gb 2 --label LABEL -- \
+      tools/run_with_provenance.py BINARY /tmp/run9-cache-study.cert \
+        7 0 1 3 0 999 1 0 1 0 2
+
+The final positional 2 excludes main-input facts as targets while retaining them as support.
+
+    index          verified  nodes      memo hits  memo misses  verifier wall  external  peak RSS
+    product-only   1         4,644,469  5,583,390  5,187,272       39.16 s       46 s     0.53 GB
+    block default  1         4,644,469  5,583,390  5,187,272       11.70 s       15 s     0.57 GB
+
+This is a contemporaneous 3.35x verifier speedup and 3.07x end-to-end speedup over the delivered
+product index. Against the separately retained 209.63-second legacy-index result it is 17.92x, but
+that ratio is cross-session. Summary construction took 0.19 seconds and added 45.1 MiB: 11,659
+blocks, 2,166,848 Pareto points, 185.85 points per block and maximum front 252.
+
+The stats build is instrumentation, not the timing control. It preserved all logical counts and
+reported:
+
+    block probes                 271,663,392
+    blocks rejected              266,179,545 (98.0%)
+    rejected by component minima 220,222,166
+    fact positions skipped        68,141,963,520
+    front points tested            4,894,904,555 (18.02/probe)
+    per-fact candidates             5,509,150,342
+    rejected by product             5,309,543,877 (96.4%)
+    rejected by n/m                  196,011,289
+    exact injection calls              3,595,176
+    exact injection hits                 965,605
+
+## Small-level guard and correctness
+
+With eight workers, the clean product-only and adaptive builds verified the same every-tenth k=6
+Sa(113) sample: 6,045/6,045 targets, zero unresolved, exactly 251,437,448 nodes and 0.84 GB peak RSS.
+The product-only build took 15.95 seconds and the adaptive build 15.88 seconds; the latter built no
+summaries because every relevant level is below the cutoff. This is a no-regression guard, not an
+estimate of complete Sa(113) wall time. Both logs and every hard-root log above pass
+`tools/check_provenance.py`.
+
+`tools/test_radio_verify.sh` now compiles a forced two-fact-block build. Its synthetic same-key
+level builds two blocks and returns the same two-of-four minimal antichain as the plain index. The
+ordinary serial/parallel verification, byte-identical coloring and replay checks also pass.
+
+Clean-commit sanitizer builds used the same forced-small-block path:
+
+    ASan + UBSan build ID  e83d60f9cfef08cd525b6066de2b5e7c4e546b6149365f260ce45e75c205e146
+    TSan build ID          20e69a0f760c0077ac2becab882efde2848df507d0467ed211e7c6e7fdaffe0a
+
+Both returned the expected two-of-four block-minimality result. Two-worker pre-color
+minimalization removed the same 10 of 137 k=3 facts, and both sanitizer builds emitted a
+byte-identical one-root/five-support-fact colored certificate. No sanitizer finding occurred.
+
+No solver source, mutable solver cache or AWS process changed. At the final bounded status query
+(2026-08-17 23:38:44 UTC), the already-launched old-index run9 verifier remained healthy in its
+k=7 coloring barrier after 7h03m49s at 1399% CPU and 1,296.6 MiB RSS. It was not restarted merely
+to pick up this optimization.

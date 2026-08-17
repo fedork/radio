@@ -366,12 +366,17 @@ Next, in order:
    while reducing verifier wall from 209.63 to 33.24 seconds (6.31x). A complete 120,302-record
    Sa(113) colored replay also closes with zero gaps. Measurements, build IDs and controls are in
    [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt);
-6. before adding citation hints, test one further bounded static-index layer: fixed-size blocks with
-   a small Pareto-minimal set of packed profiles. Skip a block only when no summary profile fits
-   the query, retain the exact matcher and require identical proof nodes/output. The current index
-   still scans 69.16 billion cheap profile candidates on the hard control even though only 3.60
-   million reach exact matching. Do not make a binary or opaque format the durable source merely
-   to accelerate indexing.
+6. **Delivered:** adaptive fixed-size block summaries over the packed index. Full 256-fact blocks
+   inside an equal primary-key group retain the Pareto-minimal `(mass,top-four products)` profiles;
+   levels below 65,536 facts take the product-only loop. The exact hard root keeps all proof/memo
+   counts while falling from a contemporaneous 39.16 to 11.70 seconds (3.35x), and the small-level
+   Sa(113) guard is neutral. The failed ungated layout, size sweep and sanitizer controls are in
+   [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
+7. Let the already-running old-index AWS replay finish and archive it; do not restart the k=7
+   barrier merely to pick up this speedup. A further verifier layer is optional, not the next
+   default task: the hard control still tests 4.89 billion block-front points and 5.51 billion
+   per-fact candidates, so a two-level summary is measurable if verifier wall remains important.
+   Keep readable text as the durable source and retain the exact matcher.
 
 The parallel-solver follow-up should reuse the scheduling lesson without forcing the solver into
 level-synchronous breadth first search. Keep the cheap heuristic pass depth first; replace the

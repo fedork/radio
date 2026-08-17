@@ -611,6 +611,9 @@ seconds. Coloring verified the sixteen `k=9` roots and all 2,151 minimal `k=8` t
 2,506,515 `k=7` facts, or 99.97% of its minimal level. The earlier 190x painting reduction from the
 superseded 2023 corpus therefore does not transfer to run9. The verifier is now coloring that
 full-scale `k=7` batch; the existing census still holds its own full core and the host has no swap.
+At the bounded 2026-08-17 23:38:44 UTC query it remained healthy after 7h03m49s at 1399% CPU and
+1,296.6 MiB RSS, with 112.4 GiB host memory available. This is process health, not intra-level
+proof progress.
 
 The deployed binary reports only at whole-level barriers. There is no defensible intra-`k=7`
 percentage or ETA from this build: the target count is the batch size, not a processed counter.
@@ -620,20 +623,27 @@ the next proof milestone. The same supervisor will replay the resulting bundle. 
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 This remains an optional trust-base strengthening, not an H3 dependency.
 
-The packed product-profile verifier index is now deployed. Canonical facts remain untouched for
-stable hashes and text output; a separate immutable `(part-count,max-product,total-mass)`
-permutation scans denormalized mass plus packed sorted n, m and top-four product columns before the
-exact injection matcher. This is a sound necessary filter, not an implied-fact cache. On an exact
-hard run9 k=7 root, the production and legacy indexes returned identical 4,644,469 nodes and memo
-counts, while verifier wall fell from 209.63 to 33.24 seconds (**6.31x**); end-to-end wall was
-211 versus 36 seconds and peak RSS 0.41 versus 0.53 GB. Counters show the product column rejects
-68,964,467,550 of 69,164,074,015 candidates (99.7%) before exact matching. A provenance-complete
-eight-worker replay also verified a 120,302-record Sa(113) colored certificate with zero gaps and
-the expected 2,491,283,058 nodes in 140.28 seconds. Full commands, hashes, build IDs and sanitizer
-controls are in
-[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
-The remaining verifier-index opportunity is block-level Pareto summaries over these packed
-profiles; solver cache structure remains a separate experiment.
+The packed product-profile verifier index and its adaptive block summaries are now deployed.
+Canonical facts remain untouched for stable hashes and text output; a separate immutable
+`(part-count,max-product,total-mass)` permutation scans denormalized mass plus packed sorted n, m and
+top-four product columns before the exact injection matcher. On levels with at least 65,536 facts,
+full 256-fact blocks inside one primary-key group add a Pareto-minimal `(mass,products)` rejection
+summary. A missing summary fit soundly skips the block; a fit still runs every original exact check.
+No implied facts are inserted.
+
+On the exact hard run9 k=7 root, the final product-only and block builds returned identical
+4,644,469 nodes, 5,583,390 memo hits and 5,187,272 misses. Verifier wall fell from a contemporaneous
+39.16 to 11.70 seconds (**3.35x**), after the earlier product index had reduced the retained legacy
+209.63-second control to 33.24 seconds. The summaries add 45.1 MiB and rejected 98.0% of 271,663,392
+block probes, skipping 68,141,963,520 positions. The cutoff matters: an ungated block build slightly
+regressed the full Sa(113) replay, while the final small-level control preserved exactly
+251,437,448 nodes and took 15.88 versus 15.95 seconds. Full Sa(113) replay had already closed all
+120,302 records and 2,491,283,058 nodes. Source hashes, failed layouts, tuning and sanitizer controls
+are in
+[`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt)
+and
+[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
+Solver cache structure remains a separate experiment.
 
 The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a
 way to rehabilitate a resumed, non-closed log. The new cold log is closed by construction.

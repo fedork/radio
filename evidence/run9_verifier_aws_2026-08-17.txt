@@ -64,3 +64,10 @@ k  in_level  targets  verified  unverified  budget  wall_s  cited_k_minus_1
 # Therefore the active k=7 batch contains 2,506,515 targets: all but 755 of the 2,507,270
 # minimal facts (99.97%). This refutes the planning prior that coloring would substantially shrink
 # k=7 on run9. It remains a target count, not an intra-batch completed counter or ETA.
+
+# Bounded health observation at 2026-08-17 23:38:44 UTC, after the local block-index experiment:
+# verifier PID 484457 remained in the same k=7 barrier after 7h03m49s, at 1399% CPU,
+# 1,296.6 MiB RSS and affinity 0-13. The census remained at 99.9% CPU and 8,860.1 MiB RSS;
+# host available memory was 112.4 GiB and swap remained zero. No new coloring line appeared, so
+# this is process health only. The old-index verifier was not restarted to pick up the new local
+# optimization.
