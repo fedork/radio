@@ -6793,3 +6793,51 @@ was launched. Only the user's pre-existing ignored `bench_sa113_k9.meta` remains
 tree. A final 18:56:41 UTC query found live run9 still healthy in the same k=7 barrier after
 2h21m46s at 1399% CPU and 1,296.6 MiB RSS; the census remained at 99.9% CPU and 8,840.4 MiB RSS,
 with 112.4 GiB host memory available and no swap. No new run9 proof milestone was inferred.
+
+## 2026-08-17 — cache-key shape: product profiles are promising; implied-fact expansion is not
+
+The proposed hierarchy was state length, total mass, each segment mass, then each segment's long
+side. The tail is not new in the solver: `radiobase.c` assigns segment IDs in product order and,
+within a product, factorization order; descending canonical states are therefore already ordered
+by segment mass and then long side. The current mutable cache is rooted by k and consumes those
+segment IDs. What is new is putting length and total mass in front.
+
+That distinction matters. Exact lookup loves the full key—product plus long side determines the
+short side—but dominance is a range problem. A negative supporting fact may have fewer parts and
+less mass, while a positive supporting fact runs in the opposite direction. A length/mass-first
+mutable trie must either search ranges or materialize the same implied result into many buckets.
+The latter is the cache blowup already measured on 2026-08-10. The deployed last-part Pareto fronts
+are a deliberate partial denormalization: preserve hot prefix closure, retain only an antichain in
+the last dimension, and put repeated exact queries in the 2 MiB L1.
+
+The static negative-only verifier index is the better first experiment. A fresh shape pass over the
+retained, hash-checked run9 log found 388,317 raw k=6 facts in the level queried while k=7 facts are
+verified. `(np,total mass)` has only 557 distinct keys and a largest bucket of 9,069. Adding the
+sorted vector of segment products yields 275,020 signatures and a largest bucket of 39. The raw
+k=7 level shows the same pattern at larger scale: 2,576,885 facts, a 25,379-record largest
+`(np,total mass)` bucket, but no segment-product bucket larger than 22.
+
+A sorted product vector is a sound necessary dominance condition. Associated long sides are not
+lane-wise monotone, because the valid component injection can cross product-order lanes; keep
+independent sorted n, m and product profiles, then run the exact matching check. The first A/B is a
+packed product column plus candidate counters on a deterministic run9 k=7 sample, comparing the
+current `(np,max n,total mass)` order with `(np,max product,total mass)` and
+`(np,total mass,max product)`. No speedup is claimed yet. Full commands, source hashes, counts and
+the counterexample are in
+`evidence/cache_key_shape_2026-08-17.txt`.
+
+For a parallel solver, this reinforces frozen per-k epochs plus worker-local exact/hot caches.
+Publish a normalized antichain at a coarse batch boundary, rebuild immutable range indexes once,
+and let each worker demand-materialize exact hot answers. Do not put read/write locks across
+recursion, and do not denormalize the full implied closure into the durable fact set.
+
+AWS policy was also corrected from a one-run choice to a workload rule. The 128 GB r7iz host was
+selected against the old 90 GB risk; the compact solver actually peaked at 1.32 GB and the Sa(113)
+replay just below 1 GiB. Future launches are right-sized from the closest measured phase. Short,
+fully restartable diagnostics default to Spot when capacity exists; unique cold proofs and stages
+without an intra-stage checkpoint remain On-Demand. The present run9 colorer has only level
+barriers, so a Spot interruption during k=7 would discard that whole barrier. `AGENTS.md` and
+`docs/aws-run.md` now make the distinction durable and link the current AWS interruption guidance.
+A bounded 19:38:31 UTC status query found the existing verifier still healthy in that same barrier
+after 3h03m35s at 1399% CPU and 1,296.6 MiB RSS; no new proof milestone was inferred. Every local
+normalizer and streaming shape-analysis process had already exited.

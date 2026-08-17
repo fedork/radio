@@ -214,11 +214,12 @@ to warm-start from, unlike run3/run8 and `cache-2025:parsed_260.txt`; every chec
 header naming the build, state and generation time. Such a continuation is new engineering work,
 not part of the established Sa(10) proof.
 
-## Why these numbers
+## Why these numbers were chosen, and what changes next time
 
-- **r7iz.4xlarge.** The Graviton option (`x2gd`, half the price for the same 128 GB) is
-  unavailable: the ARM vCPU quota on this account is **0**. The x86 quota is 5000 with ~1372 in
-  use, so there is room to go bigger if memory demands it.
+- **r7iz.4xlarge.** At launch, the Graviton alternative was estimated at roughly half the price
+  for the same 128 GB but was unavailable because the account's ARM vCPU quota was 0. The recorded
+  x86 quota snapshot was 5000 with about 1372 in use. Those are historical launch inputs, not
+  current sizing guidance.
 - **128 GB.** The pre-compact engine measured 2.32 KB of trie per insert at this geometry; the 2023 run
   reached ~90 GB. Note this also bounds how large a warm cache can be loaded: the filtered
   `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, which at that
@@ -227,7 +228,29 @@ not part of the established Sa(10) proof.
   guards did not form a safe sum, so a separate 108 GiB combined guard watched all solver RSS and
   would have terminated only the newest run9 wrapper at the ceiling. In practice run8/run9 each
   peaked at 1.32 GB; the guard never fired.
-- **On-demand, not spot.** Spot is ~$0.54/hr against $1.49, but the run is single-threaded and
-  we are paying for RAM; the saving is not worth interruption handling on an unattended run.
+- **On-Demand for the cold proof source.** That remains the correct choice for run9: interruption
+  would split the one-session derivation and make every retained segment part of the proof source.
+  The old point-in-time price comparison is deliberately not retained as policy.
 - **AWS is slower than the laptop.** The k=9 ladder takes 391 s on r7iz against 261 s on the
   M4 Pro. We are here for the 128 GB, not the cores.
+
+The compact solver subsequently peaked at only 1.32 GB, and the complete Sa(113) verifier replay
+peaked just below 1 GiB. Future instances must therefore be selected from the measured phase rather
+than copied from the original 90 GB risk estimate: budget memory for the jobs that will actually
+coexist, add explicit guard headroom, then choose cores from the measured scaling curve and inspect
+physical-core/SMT topology. A representative small-corpus gate precedes a full launch.
+
+Short, deterministic and fully restartable verifier benchmarks or engineering probes should use
+Spot when suitable capacity is available. Durable inputs must already be outside the instance, and
+each completed stage must upload its output. The current coloring build has no intra-level
+checkpoint, so interruption during its 2.5-million-target `k=7` barrier loses the whole barrier;
+that full run remains an On-Demand workload. The same is true of a unique cold proof run.
+
+AWS currently documents that Spot capacity can be interrupted with a best-effort two-minute notice
+and that neither immediate capacity nor uninterrupted completion is guaranteed. For automated
+multi-type launches, use EC2 Fleet's recommended `price-capacity-optimized` strategy rather than
+choosing the lowest-price pool. See the official
+[Spot best practices](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html)
+and [interruption notice](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html)
+documentation. A missing Spot allocation or an interruption is an ordinary retry/rescheduling
+event, never evidence about the computation.

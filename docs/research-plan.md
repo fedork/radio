@@ -360,15 +360,28 @@ Next, in order:
    processing this full-scale batch, with no intra-level cursor or defensible ETA;
 4. the same supervisor will replay the colored bundle and require zero unresolved targets; use the
    measured Sa(113) width policy above rather than restarting the live run merely to change width;
-5. only if dominance reconstruction still dominates cost, add optional checkable citation hints;
-   do not make a binary or opaque format the durable source merely to accelerate indexing.
+5. before adding citation hints, prototype a packed sorted segment-product profile on the exact
+   `k=7` bottleneck. The raw run9 `k=6` index serving that batch has 388,317 facts: its largest
+   `(part-count,total-mass)` bucket has 9,069 records, while adding the segment-mass vector reduces
+   the largest mass-signature bucket to 39. Compare the current `(np,max-n,total-mass)` order with
+   `(np,max-product,total-mass)` and `(np,total-mass,max-product)` on a deterministic sample,
+   retain the existing independent n/m profiles and final injection check, and require identical
+   proof output. Measurements and the ordering caveat are in
+   [`../evidence/cache_key_shape_2026-08-17.txt`](../evidence/cache_key_shape_2026-08-17.txt);
+6. only if dominance reconstruction still dominates after that, add optional checkable citation
+   hints; do not make a binary or opaque format the durable source merely to accelerate indexing.
 
 The parallel-solver follow-up should reuse the scheduling lesson without forcing the solver into
 level-synchronous breadth first search. Keep the cheap heuristic pass depth first; replace the
 deadline-driven exhaustive tail with a limited-width queue of coarse split-prefix batches. Use
 per-`k` immutable cache epochs plus short exact-result publication, not read/write locks held across
 recursion. First refactor the current globals into explicit worker/search contexts and reproduce
-the serial regressions; a language rewrite is not the first experiment.
+the serial regressions; a language rewrite is not the first experiment. The mutable solver already
+canonicalizes each segment by mass then long side. Putting length and total mass ahead of that is
+most credible in the frozen epoch: otherwise positive and negative monotonicity require opposite
+range searches or eager duplication across buckets. Keep the deployed last-segment Pareto fronts
+as the mutable baseline, and denormalize hot exact answers or read-only indexes rather than a full
+implied-fact closure.
 
 ## Ordering
 

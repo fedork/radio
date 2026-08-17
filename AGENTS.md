@@ -123,6 +123,15 @@ what happened, including cost and where it stalled. Anything longer, check in fi
 search that finds nothing is a result worth recording in
 [docs/journal.md](docs/journal.md) along with its cost - otherwise it gets attempted again.
 
+**Right-size AWS and use Spot only where interruption is cheap.** Before launching, use the closest
+measured corpus to choose vCPU count and memory with explicit headroom; the historical 128 GB
+`r7iz.4xlarge` was selected for a pre-compaction 90 GB risk and is not a default. A short (normally
+at most one hour), fully restartable benchmark or diagnostic should use Spot when capacity is
+available. A unique proof run, cold single-session derivation, or stage without an intra-stage
+checkpoint stays On-Demand. Spot jobs must start from durable inputs, upload completed stages, and
+handle an interruption as an abort/retry rather than a result. Current details and the reason are
+in [docs/aws-run.md](docs/aws-run.md).
+
 **Cap memory, not just time, and keep a live inventory.** `radio_canon_search_generic`
 allocates 1.26 GB per pool chunk and never frees one (see [docs/tools.md](docs/tools.md)); an
 exhausting search grows without bound. Run it as

@@ -1,0 +1,109 @@
+# Cache-key shape audit for the run9 verifier bottleneck
+
+Status: diagnostic layout measurement, not a solver or verifier verdict.
+Measured: 2026-08-17 on commit b8add00a37e78f4b8c76e7e0eae0c6abfcf00fc8.
+
+## Inputs and normalization
+
+The proof-source input is the retained run9 raw log from the private release
+
+https://github.com/fedork/radio-data/releases/tag/sa193-cold-2026-08-16
+
+Local retained path:
+
+    /Users/fedor/radio-runs/sa193-cold-2026-08-16/raw/run9_out_sa193.txt
+
+Raw SHA-256:
+
+    ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4
+
+The current independent checker was built with:
+
+    tools/build_radio.py -O3 -pthread radio_verify.c -o /tmp/radio_verify-cache-study
+
+Build ID:
+
+    732a4f00bb1f7016ee8d10c4f3c6109ab1e588d486e4a2fb4c1276f361ba00e1
+
+It normalized the raw log with:
+
+    CERT_ONLY=1 CERT_OUT=/tmp/run9-cache-study.cert \
+      /tmp/radio_verify-cache-study \
+      /Users/fedor/radio-runs/sa193-cold-2026-08-16/raw/run9_out_sa193.txt 9
+
+Output:
+
+    inputs ...: 3126190 records parsed (0 explicit roots), threads=1 memo=2^24/worker
+    certificate /tmp/run9-cache-study.cert: 0 roots, 3126190 facts
+
+The normalized SHA-256 is the previously established value:
+
+    3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+
+## Shape counts
+
+For every fact, `np` is the number of nontrivial segments, total mass is the sum of `n*m`, and the
+segment-mass vector is the multiset of individual `n*m` values sorted descending. Counts below are
+over the raw deduplicated level, before the live run's same-level minimalization.
+
+Run9 k=7 target level:
+
+    facts=2576885
+    np: 1=84  2=7965  3=170037  4=2398799
+    distinct (np,total-mass) keys=1021
+    largest (np,total-mass) bucket=25379 at (4,2100)
+    distinct (np,total-mass,segment-mass-vector) keys=2316668
+    largest segment-mass-vector bucket=22 at (3,1800,[720,660,420])
+
+Run9 k=6 fact index, which is the lower level queried while k=7 facts are verified:
+
+    facts=388317
+    np: 1=26  2=2361  3=80091  4=305839
+    distinct (np,total-mass) keys=557
+    largest (np,total-mass) bucket=9069 at (4,696)
+    distinct (np,total-mass,segment-mass-vector) keys=275020
+    largest segment-mass-vector bucket=39 at (3,612,[252,240,120])
+
+For comparison, the Sa(113) raw k=6 proxy from
+
+https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17
+
+has 69,480 facts. Its largest `(np,total-mass)` bucket has 1,818 facts, while adding the
+segment-mass vector reduces the largest bucket to 12. Adding the corresponding long side makes all
+69,480 exact keys unique.
+
+The run9 counts were produced by streaming the normalized `fact k Sb(...)` records. The largest
+segment-profile bucket was computed by emitting the keys, `LC_ALL=C sort`, and a one-pass `awk`
+run-length count. No inferred or solver-generated fact was added.
+
+## What the measurement supports
+
+`radiobase.c` already numbers a segment by product first and factorization second; descending
+canonical state order is therefore segment mass followed by long side. The mutable solver trie is
+rooted by k and then consumes those segment IDs. It does not currently put state length or total
+mass before them.
+
+For exact identity, `(segment mass,long side)` determines the complete oriented segment because
+the short side is `mass/long`. The user's complete hierarchy is therefore an exact key, although
+length and total mass are derived fields rather than additional information.
+
+For dominance, it is not a simple lexicographic-prefix key. A supporting fact may have fewer
+segments and lower total mass, so a query needs ranges rather than one exact bucket. The sorted
+segment-mass vector is a sound independent necessary-condition profile: an injective
+componentwise mapping also maps every segment product to a no-smaller product. The associated long
+sides cannot safely be compared lane-by-lane in product order, because the valid injection may
+cross those lanes. Example: `(12:1,5:2)` injects into `(7:2,12:1)`, although product-order long
+sides `[12,5]` and `[7,12]` fail an associated lane comparison. Independent sorted n, m and product
+profiles followed by the existing exact matching test are sound.
+
+The first verifier experiment should therefore add a packed product profile and compare static
+orders such as `(np,max-product,total-mass)` and `(np,total-mass,max-product)` on a deterministic
+k=7 sample. It should not replace the final injection test. Measure candidates admitted at every
+filter, wall time, CPU time and bytes read; require identical statuses, nodes and colored output.
+
+For the mutable solver, current eager dominance closure is already denormalization of implied
+facts. The measured last-segment Pareto fronts are the deployed compromise: preserve hot prefix
+closure but represent the final dimension as an antichain. A new length/mass outer index should be
+tested first as a frozen per-k epoch underneath worker-local exact caches. Materializing the same
+implied fact into every compatible length/mass bucket would repeat the memory failure that the
+front representation fixed.
