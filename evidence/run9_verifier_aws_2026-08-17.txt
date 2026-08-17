@@ -1,0 +1,46 @@
+# RUNNING: independent run9 coloring and verifier replay on AWS.
+# Snapshot date: 2026-08-17 16:35:12 UTC.
+# Instance: i-0005d74f985c52ae1, r7iz.4xlarge, 16 vCPU / 128 GiB.
+# Work: /root/run9-verifier-20260817T163700Z
+# S3: s3://radio-sa193-393287594714/run9-verifier/20260817T163700Z/
+# Successful launch SSM command: 88072f64-1b98-428a-9744-316b6c26c999
+# Build commit: 88565098b149654213c2a47eb9c966a0078d09dd
+# Build ID: 655d7f22ecec9db347b1bb62f44a5597532671ce20cf0a4e56b05ebbbf647c50
+# Binary SHA-256: 6de550a1fc26f0c8333cc9a0d67e591314d0599c20750897d6e95a5c8296c67c
+# Source archive SHA-256: 5ba147a41d23ed9140705fd58d7cde407e8c2a90676cf33bcea370608ce6af44
+# Raw run9 SHA-256: ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4
+# Roots SHA-256: 925cdfaecc86959c8b00b68f5c24654fb8a24635d9a0e24f0251cd94440ef4b3
+# Expected and reproduced sanitized SHA-256:
+#   3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+# Sanitized certificate: 3,126,190 facts, 16 explicit roots and two header lines;
+# 106,011,566 bytes total.
+# Start: 2026-08-17T16:34:44Z; COLOR stage: 2026-08-17T16:34:55Z.
+# Policy: VERIFY_THREADS=14, taskset CPUs 0-13, nice=10, individual verifier RSS cap=80 GiB,
+# 30-day wall backstop. The existing census retains its independent 20 GiB cap and one full core.
+# A replacement idle guard tracks both pareto_k8_aws and run9_verify.
+
+# First live status after 17 seconds of coloring:
+# verifier PID 484457, 14 threads, 1311% CPU, 422.4 MiB RSS, affinity 0-13.
+# existing census PID 1926155, 99.9% CPU, 8,823.1 MiB RSS.
+# host available memory 113.3 GiB, swap used 0, disk available 193.1 GiB.
+# Pre-color same-level minimalization had completed:
+k  before   minimal  removed  wall_s
+2        2         2        0    0.00
+3      137       127       10    0.00
+4    33042     24816     8226    0.08
+5   125246     82674    42572    1.01
+6   388317    229341   158976   10.17
+# It was then using all fourteen workers on the 2,576,885-fact k=7 level. No coloring verdict
+# below the previously measured top-only gate has yet been produced; this is a progress record,
+# not a completed independent certificate.
+
+# Launch preflight history, retained so the same shell mistake is not repeated:
+# - three staging attempts stopped before compilation/detachment after 5-6 seconds each. The first
+#   two assumed every raw Sb line literally began "can't solve Sb"; many include "size=...". The
+#   third over-escaped a literal parenthesis in grep. No guard or running process changed.
+# - SSM 0ac65ecb-91d4-4d07-a71a-f1b48c3f92bb then compiled the exact source and independently
+#   normalized the raw log: 3,126,190 facts, the expected 106,011,566 bytes and exact SHA-256.
+# - only after that successful build/runtime preflight was the detached pipeline launched.
+
+# One-shot live query:
+#   tools/run9_verifier_status.sh

@@ -1,6 +1,6 @@
-# The `Sa(193)` AWS runs — final record and remaining census
+# The `Sa(193)` AWS runs — final solver record and remaining follow-ups
 
-This page is the operational record for the completed cold runs and the one remaining census on
+This page is the operational record for the completed cold runs and the remaining follow-ups on
 the dedicated instance; the findings go to [journal.md](journal.md) as usual.
 
 ## What is running
@@ -9,12 +9,12 @@ the dedicated instance; the findings go to [journal.md](journal.md) as usual.
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
-| active job | `pareto_k8_aws`, the separate k=8 Pareto-prefix census |
+| active jobs | `pareto_k8_aws`, the separate k=8 Pareto-prefix census; `run9_verify`, the independent run9 certificate coloring/replay |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| active memory guard | 20 GiB for the census; host had 113 GiB available and no swap at the final Sa review |
-| completion | census supervisor finalizes its S3 artifacts; the idle guard may stop the instance only after `pareto_k8_aws` is gone |
+| active memory guards | 20 GiB for the census; 80 GiB for the verifier; neither process may consume the other's allowance |
+| completion | both supervisors finalize their S3 artifacts; the idle guard may stop the instance only after `pareto_k8_aws` and `run9_verify` are gone |
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
@@ -38,6 +38,16 @@ an endpoint or full-state record, so the upgrade/full-state phase remains unfini
 113 GiB available, no swap and 194 GB free disk. Do not stop the instance. The S3 `STATUS` object
 for this census is still the launch snapshot; inspect the live output or final artifact rather than
 using that stale object as a health signal.
+
+At **2026-08-17 16:34:44 UTC**, the independent run9 verifier launched from commit `8856509`.
+It first reproduced the 3,126,190-record sanitized certificate byte-for-byte, then entered
+pre-color antichain reduction. Fourteen nice-level-10 workers are pinned to CPUs 0--13, leaving two
+vCPUs for the one-core census and the host. The first live query showed 13.11 CPUs in use, 422 MiB
+RSS, no swap, and completed reductions through `k=6`; the census simultaneously retained its full
+core. The verifier will color from the sixteen explicit roots, replay the resulting closed bundle,
+and upload compressed results under `run9-verifier/20260817T163700Z/`. Follow it with
+`tools/run9_verifier_status.sh`; launch hashes and the first snapshot are in
+[`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 
 Final Sa sidecars that existed only on EBS were copied to immutable `run3/final/`, `run8/final/`
 and `run9/final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; the shared
@@ -181,17 +191,18 @@ aws-vault exec default -- aws ec2 describe-instances \
 
 ## Stopping it
 
-**Do not stop it yet:** `pareto_k8_aws` is still running. After that census exits, its final raw
-output and sidecars must appear under `pareto-census-k8/20260814T0132Z/` and be hash-checked. Only
-then stop the instance while preserving the EBS volume and all run directories:
+**Do not stop it yet:** `pareto_k8_aws` and `run9_verify` are still running. After both exit, their
+final raw output, certificates and sidecars must appear under `pareto-census-k8/20260814T0132Z/`
+and `run9-verifier/20260817T163700Z/` and be hash-checked. Only then stop the instance while
+preserving the EBS volume and all run directories:
 
 ```
 aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52ae1
 ```
 
-The active idle guard includes `pareto_k8_aws` and can stop the host only after it too has gone. A
-manual stop before the census finishes is an interruption, not a negative result. The Sa artifacts
-are already final; the census artifact is not.
+The active idle guard includes both job names and can stop the host only after both have gone. A
+manual stop before either finishes is an interruption, not a result. The Sa artifacts are already
+final; the census and independent replay artifacts are not.
 
 ## Resuming historical Sa work
 

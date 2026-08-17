@@ -99,6 +99,17 @@ The parallel prototype deliberately rejects `TIMECAP`, diagnostic split printing
 subtree-DP experiment. Their current process-global reporting/bulk allocation is not safe or useful
 to duplicate per worker.
 
+The detached full-run9 AWS pipeline is staged by `tools/run9_verifier_aws_remote.sh`. It validates
+the raw log and source archive hashes, normalizes and byte-round-trips the text input, minimalizes
+and colors it, replays the colored bundle, then compresses and uploads the result. Its current
+one-shot progress command is:
+
+```
+tools/run9_verifier_status.sh
+```
+
+The status command uses one bounded SSM request and exits; it does not leave a local watcher.
+
 ## Engine internals worth knowing
 
 | what | where |

@@ -341,11 +341,12 @@ Next, in order:
 1. **Delivered:** normalize run9 to `radio-negative-certificate-v1` and round-trip it byte-for-byte;
    a bounded top pass also verifies the sixteen explicit roots and shows that they cite all 2,545
    canonical `k=8` facts, but deliberately verifies nothing below `k=9`;
-2. minimalize the support levels, verify/color those `k=8` targets and record the actual reachable
-   counts—the
-   earlier 190x `k=7` reduction came from the superseded 2023 corpus and is only a prior;
-3. replay the colored bundle at one and several worker widths and require identical record sets,
-   zero unresolved targets and sanitizer-clean small regressions;
+2. **Running on AWS:** minimalize the support levels, verify/color from the sixteen roots and record
+   the actual reachable counts—the earlier 190x `k=7` reduction came from the superseded 2023
+   corpus and is only a prior. Fourteen pinned workers had completed levels through `k=6` at the
+   first live check and were processing the 2,576,885-fact `k=7` level;
+3. the same supervisor will replay the colored bundle and require zero unresolved targets; after
+   completion, compare its record set with a second worker width if the measured cost justifies it;
 4. only if dominance reconstruction still dominates cost, add optional checkable citation hints;
    do not make a binary or opaque format the durable source merely to accelerate indexing.
 

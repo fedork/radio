@@ -6641,3 +6641,34 @@ For a later parallel solver, the current direction is limited-width coarse prefi
 exhaustive tail while retaining heuristic depth-first search for early witnesses. Per-k frozen
 cache epochs are promising; read/write locks across recursion and a language rewrite are not the
 first prototype. No parallel solver change was made in this session.
+
+## 2026-08-17 — full run9 independent coloring/replay launched on AWS
+
+The full follow-up is now detached on the existing `r7iz.4xlarge`. The source archive is exact
+commit `88565098b149654213c2a47eb9c966a0078d09dd`; the raw 365,340,502-byte run9 log matched SHA-256
+`ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4`. Before any expensive work,
+the remote build normalized all 3,126,190 facts and reproduced the known 106,011,566-byte text file
+byte-for-byte at SHA-256
+`3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`; its second parse/write pass
+also matched. Build ID is `655d7f22ecec9db347b1bb62f44a5597532671ce20cf0a4e56b05ebbbf647c50`.
+
+Coloring uses fourteen worker threads pinned to CPUs 0--13 at nice level 10, leaving two of the
+sixteen vCPUs outside its affinity mask. The verifier has an 80 GiB RSS ceiling and 30-day wall
+backstop; the pre-existing census retains its own 20 GiB ceiling. The idle guard was safely replaced
+only after `run9_verify` was live and now tracks both jobs. At the first status query the verifier
+used 1311% CPU and 422 MiB RSS, while the census still used 99.9% of a core and 8.62 GiB RSS. The
+host had 113.3 GiB available and no swap.
+
+The run had already minimalized `k=2..6`: `2->2`, `137->127`, `33,042->24,816`,
+`125,246->82,674`, and `388,317->229,341`, then entered the 2,576,885-fact `k=7` level. These are
+support-antichain counts, not yet reachable colored counts. When coloring finishes, the same
+supervisor will replay the emitted bundle with fourteen workers, require zero unresolved targets,
+compress both certificates and logs, and upload them to
+`s3://radio-sa193-393287594714/run9-verifier/20260817T163700Z/`.
+
+Three launch preflights failed harmlessly in 5--6 seconds each before compilation or detachment:
+two literal grep assumptions missed raw lines with `size=...` between "solve" and `Sb`, and one
+grep pattern over-escaped `(`. No process or guard changed. A separate successful runtime preflight
+then built the verifier and reproduced the complete normalized hash before the final launch. Exact
+SSM IDs, resource snapshot and hashes are in `evidence/run9_verifier_aws_2026-08-17.txt`.
+Use `tools/run9_verifier_status.sh` for a bounded one-shot query; do not create another watcher.
