@@ -44,7 +44,7 @@ Every row carries a **bound** and a **status**:
 
 `bound` is `max` (proven maximal), `lower` (a solution exists, maximality open) or `upper`
 (exhaustively refuted above this value). The distinction matters and is easy to lose in prose:
-"473 is solvable in 9" and "473 is the maximum" are different claims.
+"457 is solvable in 9" and "457 is the maximum" are different claims.
 
 | status | meaning |
 |---|---|
@@ -63,8 +63,8 @@ Anything claiming evidence must name a `source`; `tools/check_tables.py` enforce
 1. **Never copy a table.** Reference `data/*.csv`. Where a table needs to be readable in
    prose, wrap it in `<!-- generated:NAME -->` / `<!-- /generated -->` and produce it with
    `tools/check_tables.py --render`. The checker fails if a generated block drifts.
-2. **Never state a number without a status.** "n(9,6) = 473" is wrong; "473 is a verified
-   lower bound, maximality open" is right.
+2. **Never state a number without a status.** "n(9,7) = 457" is not established; "457 is a
+   conjectured value with no witness yet" is accurate.
 3. **Verify before recording.** `tools/check_witness.py` on any new tree.
 4. **Update in place.** When something is superseded, replace it. Do not stack a
    contradicting note beside the old one - that is how four copies of the K=8 column came to

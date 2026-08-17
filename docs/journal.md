@@ -6497,3 +6497,63 @@ process must be inventoried even when its launching tool call appears to have co
 No Pareto value changes.  The new durable evidence is the canonical leaf tree, the exact/embedded
 terminal implementation and regression, the independently checked symbolic inventories, and the
 scope corrections in the theorem, status and research-plan notes.
+
+## 2026-08-16 — proof-safe cold run9 closes H3: `Sa(10)=192`
+
+All three retained cold AWS runs have concluded. Each independently returned `Sa(193)`
+UNSOLVABLE after completing all sixteen roots, but their classifications differ:
+
+| run | status | Sa(193) CPU | wrapper wall | peak RSS |
+|---|---|---:|---:|---:|
+| run3 (`3cf1406` era) | performance only; incomplete embedded provenance and pre-fix cache | 479020.9 s | 479580 s | 25.57 GB |
+| run8 (`9395218d...`) | performance only; fully provenanced but pre-contraction-fix | 412561.4 s | 413045 s | 1.32 GB |
+| run9 (`e7fa7472...`) | **proof source** | 419353.1 s | 419849 s | 1.32 GB |
+
+Run9 began cold with no cache, stayed in one session, and first passed the independently known
+positive control `Sa(192)` in 479.2 CPU seconds. It then printed exhaustive negatives for
+`Sb(n1:193-n1)@9` for every `n1=97..112` and the final UNSOLVABLE result. Its source commit is
+`e7fa747264476461a234bf78e49762ee77ad8d8d`; build ID
+`219a8753a3caf79cf7a160cb220a7305b8d914d1bfd8989d52861d1cc1407de4`. The raw log has
+3,174,576 lines, 365,340,502 bytes and SHA-256
+`ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4`. Embedded provenance checks,
+the positive control and the audit all passed; the audit found zero contradictions. The final log
+contains zero `rb-suppressed` markers. The proof-safe fix was present, but the affected contraction
+shortcut was never invoked.
+
+This settles H3. The verified `Sa(192)` tree proves achievability, and the sixteen run9 refutations
+exhaust the possible first-test sizes for 193 because `Sa(112)` is the k=9 maximum. The
+source-of-truth `Sa` row is now `max,proven-exhaustive`; the sixteen K=9 ceilings at `m=81..96` are
+now `upper,proven-exhaustive`. Legacy lower rows were deliberately left unchanged, so the latter
+remain brackets/upper bounds rather than invented exact frontiers. The 2023 verdict reached the same
+answer but remains only historical cost evidence: its 37 known false negatives and non-closed
+resume chain are not rehabilitated by agreement.
+
+The matched run8/run9 parsed fact sets contain 3,166,649 and 3,167,184 distinct signed facts, with
+3,160,113 in common, 6,536 run8-only, 7,071 run9-only and zero state keys carrying opposite signs.
+Run9 emitted 535 more facts (+0.016895%), cost 6791.7 more CPU seconds than run8 (+1.646%), and was
+12.456% faster than run3. The complete comparison, including all raw hashes, is committed in
+`evidence/sa193_run_comparison_2026-08-16.txt`.
+
+Durability work preceded promotion. EBS-only final sidecars for run3/run8/run9 were copied to their
+S3 `final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; every file matches
+`final/sa193-cold-sidecars.sha256`. The private release `sa193-cold-2026-08-16` now contains the
+run8 raw comparator, the run9 raw proof log and a 13,894,656-byte metadata tar with source bundles,
+binaries, provenance, profiles, status, stderr and watchdog logs. Raw manifest hashes and sizes
+round-trip through `tools/artifacts.sh`; the store now has 15 tags and 46 indexed assets.
+
+While checking the global artifact index, `check-index` intermittently named a different existing
+asset as missing. Nothing was absent: its `gh ... | grep -q` pipeline ran under `pipefail`, so an
+early match could SIGPIPE `gh` and turn success into failure. The checker now fetches each release's
+asset list once into a file before matching; the full index is green.
+
+The EC2 instance was intentionally left running for the separate k=8 Pareto-prefix census. At
+2026-08-17 00:52 UTC, PID 1926155 (`pareto_k8_aws`) was at one full core and 8,892,056 KiB RSS with
+113 GiB available, no swap and 194 GB disk free. Its 44,833,189-byte output had closed all 815
+second-cut blocks and emitted the prefix summary plus 1,688 targets, but no endpoint or full-state
+record. The S3 census `STATUS` object is still the launch snapshot and must not be mistaken for a
+live progress report. Do not stop the host until the census exits and its final output is archived.
+
+Process inventory at handoff: no Sa solver remains; the remote census above is the only active
+research binary. The pre-existing local watcher PID 73027 (`tools/sa193_status.sh --prefix run9
+--watch`) belongs to the user and was not touched. No one-off Python search or locally launched
+solver remains.

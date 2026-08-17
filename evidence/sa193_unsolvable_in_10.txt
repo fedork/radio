@@ -1,45 +1,42 @@
-# WARNING: the verdicts below are NOT established. The 2023 build that produced them is now
-# known to emit false negatives - 37 of them, including from multi-day exhaustive passes.
-# See evidence/refuted_2023_negatives.txt. Sa(192) achievability is separately PROVEN by
-# verified witness trees; only Sa(193) unsolvability, and hence maximality, is in doubt.
+# ESTABLISHED: Sa(193) is unsolvable in 10 tests, so Sa(10)=192 is maximal.
 #
-# Certification: Sa(193) is NOT solvable in 10 tests, hence Sa(10) = 192 is maximal.
+# Proof source: proof-safe cold AWS run9, one uninterrupted solver session from an empty cache.
+# Archive: sa193-cold-2026-08-16:run9_out_sa193.txt
+# Source commit: e7fa747264476461a234bf78e49762ee77ad8d8d
+# Build ID: 219a8753a3caf79cf7a160cb220a7305b8d914d1bfd8989d52861d1cc1407de4
+# Raw SHA-256: ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4
+# Raw size: 365340502 bytes, 3174576 lines
 #
-# Sa(n) in k splits into a taken group of n1 and the rest, requiring Sa(n1) solvable in
-# k-1 and Sb(n1 : n-n1) solvable in k-1 (canSolveA, radiobase.c:1041). Sa(n1) in 9 forces
-# n1 <= 112, so Sa(193) in 10 requires Sb(n1 : 193-n1) solvable in 9 for some
-# n1 in 97..112 -- sixteen states. All sixteen were exhaustively refuted.
+# The run carried complete embedded provenance and passed tools/check_provenance.py. Its positive
+# control returned `result CONTROL Sa(192) in 10 = SOLVABLE  (479.2 s)`. The audit interpreted
+# 857 comparable states and found zero contradictions. The run printed zero rb-tainted contraction
+# suppressions: the proof-safe fix was present, but the affected shortcut was never used.
 #
-# Provenance, recovered 2026-08-02 from ~/radio_old/radio/radio.zip (Oct 2023):
-#   radio/out26_2.txt   Sb(112:81)  -- cached into out_26_1_2_parsed.txt and so not
-#                       reprinted by the later run
-#   radio/out26_3.txt   the other fifteen, plus the Sa(193) verdict
+# Sa(n) in k splits into a taken group of n1 and the rest, requiring Sa(n1) in k-1 and
+# Sb(n1 : n-n1) in k-1. Since the proven k=9 maximum is Sa(112), Sa(193) in 10 can use only
+# n1=97..112. Run9 exhaustively refuted every one of those sixteen states:
+
+can't solve Sb(112:81)[9072,193] in 9 took 140577 totalsplits=974 pass=6 fast_solve=0 probe=shared
+can't solve Sb(111:82)[9102,193] in 9 took 92970 totalsplits=887 pass=6 fast_solve=0 probe=shared
+can't solve Sb(110:83)[9130,193] in 9 took 57657 totalsplits=860 pass=5 fast_solve=0 probe=shared
+can't solve Sb(109:84)[9156,193] in 9 took 38415 totalsplits=779 pass=5 fast_solve=0 probe=shared
+can't solve Sb(108:85)[9180,193] in 9 took 26034 totalsplits=693 pass=5 fast_solve=0 probe=shared
+can't solve Sb(107:86)[9202,193] in 9 took 18200 totalsplits=681 pass=4 fast_solve=0 probe=shared
+can't solve Sb(106:87)[9222,193] in 9 took 13114 totalsplits=619 pass=4 fast_solve=0 probe=shared
+can't solve Sb(105:88)[9240,193] in 9 took 9640 totalsplits=560 pass=4 fast_solve=0 probe=shared
+can't solve Sb(104:89)[9256,193] in 9 took 7182 totalsplits=536 pass=3 fast_solve=0 probe=shared
+can't solve Sb(103:90)[9270,193] in 9 took 5349 totalsplits=494 pass=3 fast_solve=0 probe=shared
+can't solve Sb(102:91)[9282,193] in 9 took 3915 totalsplits=457 pass=3 fast_solve=0 probe=shared
+can't solve Sb(101:92)[9292,193] in 9 took 2732 totalsplits=425 pass=3 fast_solve=0 probe=shared
+can't solve Sb(100:93)[9300,193] in 9 took 1805 totalsplits=436 pass=2 fast_solve=0 probe=shared
+can't solve Sb(99:94)[9306,193] in 9 took 1075 totalsplits=409 pass=2 fast_solve=0 probe=shared
+can't solve Sb(98:95)[9310,193] in 9 took 530 totalsplits=429 pass=1 fast_solve=0 probe=shared
+can't solve Sb(97:96)[9312,193] in 9 took 148 totalsplits=412 pass=1 fast_solve=0 probe=shared
+result Sa(193) in 10 = UNSOLVABLE  (419353.1 s)
+
+# Wrapper totals: 419849 wall seconds, 1.32 GB peak RSS, expected exit code 1 for a definitive
+# UNSOLVABLE driver result. Sa(192) achievability is independently proved by verified witness trees.
 #
-# Solve time: 1,725,456 s for Sb(112:81) alone (12 passes) plus 2,353,729 s for the
-# remainder = 4,079,185 s, about 47 days of compute.
-#
-# Reproduction is impractical: the original run needed roughly 90 GB of virtual memory
-# and months of wall clock. These lines are the record.
-#
-# --- radio/out26_2.txt ---
-can't solve Sb(112:81)[9072,193] in 9 took 1725456 totalsplits=1439 pass=12 fast_solve=0
-#
-# --- radio/out26_3.txt ---
-result can solve Sa(192) in 10
-can't solve Sb(111:82)[9102,193] in 9 took 460861 totalsplits=1413 pass=2 fast_solve=0
-can't solve Sb(110:83)[9130,193] in 9 took 588724 totalsplits=1387 pass=2 fast_solve=0
-can't solve Sb(109:84)[9156,193] in 9 took 409269 totalsplits=1570 pass=1 fast_solve=0
-can't solve Sb(108:85)[9180,193] in 9 took 268936 totalsplits=1530 pass=1 fast_solve=0
-can't solve Sb(107:86)[9202,193] in 9 took 182921 totalsplits=1492 pass=1 fast_solve=0
-can't solve Sb(106:87)[9222,193] in 9 took 128533 totalsplits=1456 pass=1 fast_solve=0
-can't solve Sb(105:88)[9240,193] in 9 took 93113 totalsplits=1424 pass=1 fast_solve=0
-can't solve Sb(104:89)[9256,193] in 9 took 70244 totalsplits=1393 pass=1 fast_solve=0
-can't solve Sb(103:90)[9270,193] in 9 took 53633 totalsplits=1366 pass=1 fast_solve=0
-can't solve Sb(102:91)[9282,193] in 9 took 35556 totalsplits=1339 pass=1 fast_solve=0
-can't solve Sb(101:92)[9292,193] in 9 took 28977 totalsplits=1315 pass=1 fast_solve=0
-can't solve Sb(100:93)[9300,193] in 9 took 17241 totalsplits=1293 pass=1 fast_solve=0
-can't solve Sb(99:94)[9306,193] in 9 took 9768 totalsplits=1273 pass=1 fast_solve=0
-can't solve Sb(98:95)[9310,193] in 9 took 4656 totalsplits=1254 pass=1 fast_solve=0
-can't solve Sb(97:96)[9312,193] in 9 took 1290 totalsplits=1237 pass=1 fast_solve=0
-can't solve Sa(193) in 10 took 2353729
-result can't solve Sa(193) in 10
+# Historical note: the 2023 run reached the same conclusion in 4079185 solve seconds, but its build
+# produced 37 known false negatives and therefore remained `legacy`. Its excerpt has been superseded
+# here; the old raw logs remain archived only as a historical/performance record.

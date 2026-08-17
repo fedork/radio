@@ -223,7 +223,8 @@ down, or the work is half-done.
 4. **Run both checks**, plus `tools/check_docs.py`, and commit.
 
 Cost figures worth having to hand, because they set the scale of what is worth proposing:
-`Sa(193)` took ~47 days of solve time in ~90 GB of virtual memory; the K=9 near-diagonal walk
+the suspect 2023 `Sa(193)` run took ~47 solve-days in ~90 GB of virtual memory; the proof-safe
+2026 cold run took 419,353.1 CPU seconds (4.85 days) and 1.32 GB peak RSS. The K=9 near-diagonal walk
 took 14 months of wall clock to move from `m=96` to `m≈81`; a single wrong verdict,
 `Sb(143:17)`, consumed 4 days. Canonical searches, by contrast, run in minutes.
 

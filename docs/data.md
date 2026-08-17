@@ -11,10 +11,11 @@ Compression is `zstd -19`, lossless, about **10%** of raw.
 
 Not everything was kept, and the reason is the audit rather than the size.
 
-**Archived** — the 2026 artifacts, the accumulated cache, the `pareto9` chain, and from the
-2023 snapshot only `out26_2`/`out26_3` (the `Sa(193)` record) plus the `print*` and `full*`
-files that the committed witness trees and exhaustive results were extracted from. About
-3.4 GB raw, ~393 MB stored.
+**Archived** — the 2026 artifacts, including the proof-safe cold `Sa(193)` run and its matched
+performance comparator; the accumulated cache; the `pareto9` chain; and from the 2023 snapshot
+only `out26_2`/`out26_3` (the historical `Sa(193)` record) plus the `print*` and `full*` files
+that the committed witness trees and exhaustive results were extracted from. About 4.1 GB raw,
+roughly 460 MB stored.
 
 **Not archived** — `radio.zip` as a whole (3.56 GB). Two reasons:
 
@@ -24,7 +25,7 @@ files that the committed witness trees and exhaustive results were extracted fro
    logs does not apply to them.
 2. It exceeds GitHub's 2 GB per-asset limit and would need splitting.
 
-Everything of value has been extracted from it — the `Sa(193)` lines, 13 verified witness
+Everything of value has been extracted from it — the historical `Sa(193)` lines, 13 verified witness
 trees, 16 exhaustive enumerations. Keep the zip on local or external storage as a cold
 backstop; it is a record of what has been *attempted*, which is worth something when deciding
 what to re-run, but it is not evidence.
@@ -89,13 +90,14 @@ Sizes are raw. Divide by roughly 10 for the stored size.
 | `pareto9-2026-03` | `pareto9_short{,_2,_3}.txt` — 19 frontier points `Sb(320..338 : 17)` in 9; `Sb(339:17)` left undecided after 11+ h | 328 M | clean |
 | `fullsolve-2026` | `out_k7.txt` (K=7 frontier) and 15 smaller full-solve / probe outputs, tarred | 37 M | clean |
 | `cache-2025` | `parsed_260.txt` (19.5 M entries) + the unbroken `pareto9_36..116` chain, tarred | 822 M | clean |
-| `sa193-2023` | `out26_2.txt`, `out26_3.txt` — the only record of the `Sa(193)` refutation | 350 M | **suspect era** |
+| `sa193-2023` | `out26_2.txt`, `out26_3.txt` — historical `Sa(193)` run, superseded as a verdict source by the cold 2026 proof | 350 M | **suspect era; performance/history only** |
 | `trees-2023` | `print*` (26 files, source of 13 verified trees) + `full_*` (18 files, source of the 16 exhaustive results), tarred | 246 M | positives only |
 | `small-m-frontier-2026-08-15` | 46 raw frontier logs for every normalized `m<=6`, `k<=9` case, plus 44 forced-root logs classifying the `m=5`, `k=9` transition | 762 K | complete embedded provenance in every solver log; every boundary has `n+1 NO` and `n YES`; all positive trees rechecked; forced-root outcome ranges validated |
+| `sa193-cold-2026-08-16` | proof-safe cold run9 log, matched pre-fix run8 comparator, and a metadata tar with run3/run8/run9 source, binaries, provenance, profiles and final sidecars | 710 M | run9 has complete provenance, a passed positive control and all 16 exhaustive root rejections; run8/run3 are performance-only |
 
 "Clean" means `tools/extract_evidence.py audit` found no contradictions. `sa193-2023` comes
-from the build with known false negatives — the lines are kept as a record, and the claim they
-support is recorded as `legacy`, not accepted. `trees-2023` holds witness trees, which
+from the build with known false negatives — the lines are kept as a historical record and no
+longer source the claim. `trees-2023` holds witness trees, which
 re-verify from first principles, so its era does not matter.
 
 ### Archived — exact bounded structural verdicts
@@ -127,11 +129,12 @@ an all-depth exclusion.
 ### Extracted into git, so the bulk is no longer load-bearing
 
 - `evidence/pareto_certification_k1_8.txt` — all 276 obligations behind the K≤8 table, 30 KB
-- `evidence/sa193_unsolvable_in_10.txt` — the `Sa(193)` lines, 40 lines, `legacy`
+- `evidence/sa193_unsolvable_in_10.txt` — the 16 proof-safe cold root refutations, plus exact provenance and hashes
+- `evidence/sa193_run_comparison_2026-08-16.txt` — final run3/run8/run9 classification and measurements
 - `evidence/refuted_2023_negatives.txt` — the 31 verdicts that corpus got wrong
-- `witnesses/*.tree` — 17 verified trees, including the new singleton-majorized proof of `Sb(481:5)@9`
+- `witnesses/*.tree` — 18 verified trees, including the singleton-majorized proof of `Sb(481:5)@9`
 - `data/exhaustive_multipart.csv` — the 16 `full*` enumerations
-- `data/pareto_sb.csv` — 52 K=9 rows: six exact small-`m` maxima and 46 `legacy` bounds
+- `data/pareto_sb.csv` — 52 K=9 rows: six exact small-`m` maxima, 16 proof-safe upper bounds and retained legacy lower bounds
 
 ### Warm-starting from `parsed_260.txt`: two traps
 
@@ -140,9 +143,9 @@ mismatches across 19,507,378 entries, and it carries **none** of the 31 known-ba
 [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). So a warm
 start will not reintroduce any *identified* error. But:
 
-1. **It contains the 16 suspect `Sa(193)` verdicts.** Re-running those states with this cache
-   loaded would read the old answers straight back and "confirm" them. Any attempt to settle
-   H3 must strip those 16 lines first, or it is circular.
+1. **It contains the 16 historical `Sa(193)` verdicts.** Re-running those states with this cache
+   loaded would read the old answers straight back and "confirm" them. This is why the successful
+   H3 run started cold; the cache still cannot be used to independently reproduce that negative.
 
 2. **Absence of known errors is not absence of errors.** Only 1,023 of 19.5 M entries are
    checkable against the proven tables at all; the rest are multi-part states or `k = 9`,
@@ -153,7 +156,7 @@ start will not reintroduce any *identified* error. But:
 The practical consequence: `parsed_260.txt` is excellent for *finding* solutions — a positive
 result can always be re-verified as a witness tree, so a poisoned negative can only slow the
 search, never corrupt the answer. It is **not** a safe basis for a new negative result. Cold
-runs are the only sound route to those, which is why H3 is expensive.
+runs are the only sound route to new negatives. The completed run9 result followed that rule.
 
 ### Elsewhere
 
@@ -165,7 +168,7 @@ row here.
 
 Small enough to live in git, and too valuable to risk:
 
-- `witnesses/*.tree` - the 17 verified proof trees.
+- `witnesses/*.tree` - the 18 verified proof trees.
 - `data/pareto_*.csv`, `data/conjectures.csv` - the source-of-truth tables.
 - `data/sheets/` - 46 tabs from the three research spreadsheets, values and formulas, with
   the `.xlsx` originals. Imported 2026-08-02; note that the tab named `INCORRECT pareto` in

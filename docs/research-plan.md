@@ -6,49 +6,28 @@ entries. Last revised 2026-08-16.
 ## High-level goals
 
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
-proven optimal for `k <= 9` with `Sa(192)` in 10 as a verified construction, the `Sb` Pareto
-frontier proven for `k <= 8`, and the two theorems. The draft in `paper/` is close. Its claim
-of optimality through `k <= 9` is exactly right - do not "upgrade" it to 10 without redoing
-the `Sa(193)` computation.
+proven optimal through `k=10`, the `Sb` Pareto frontier proven for `k<=8`, and the foundational
+theorems. The draft in `paper/` can now state the exact `Sa(10)=192` boundary; its remaining
+work is the P5 cleanup and theorem integration.
 
 **H2 - The K=9 Sb column.** Published theorems now make `m=1..5` exact, including the
-corrected `n(9,5)=481`; a retained exact replay makes `n(9,6)=473` exact as well.  There are also `legacy`
-bounds at `m = 65..96` recovered from the Sa work. The band `m = 7..64` is entirely blank.
+corrected `n(9,5)=481`; a retained exact replay makes `n(9,6)=473` exact as well. Run9 adds
+proven upper bounds at `m=81..96`; legacy lower bounds remain in parts of `m=65..94`. The band
+`m=7..64` is entirely blank.
 This is the main open front.
 
-**H3 - Is `Sa = 192` maximal at k=10?** Still open, and now better understood. A 2023 run
-refuted all 16 states `Sb(n1 : 193-n1)` in 9 over ~47 days, and that log was recovered on
-2026-08-02 - but the same corpus contains 37 provably false negatives with no syntactic
-marker distinguishing them, so the verdict cannot be accepted. See
-[results.md](results.md#sa10-192-achievable-maximality-not-established). Settling it means
-re-running those 16 states on a current build — and note that a warm start from
-`parsed_260.txt` is **not** a shortcut: the cache contains the 16 verdicts under suspicion, so
-loading it would confirm them circularly, and it cannot be filtered by build era. See the
-warm-start warning in [data.md](data.md#warm-starting-from-parsed_260txt-two-traps). A sound
-negative needs a cold run, which is why this stays expensive.
+**H3 - Is `Sa = 192` maximal at k=10? Done 2026-08-16.** Proof-safe cold run9 began from an
+empty cache, passed the independently known `Sa(192)` control, and exhaustively refuted all sixteen
+states `Sb(n1:193-n1)@9`, `n1=97..112`, in one uninterrupted session. It returned UNSOLVABLE in
+419353.1 CPU seconds, used 419849 wall seconds and peaked at 1.32 GB RSS. A verified witness proves
+192 achievable, so `Sa(10)=192` is exact.
 
-Cold `run9` is the current proof attempt. Run3 and run8 remain useful performance baselines but
-cannot settle H3: before `75814a7`, suffix reachability could promote a full-state obstruction to a
-false implicit shorter negative and poison the cache. Run9 began from an empty cache with that
-interaction disabled and reports every suppressed contraction.
-
-Run9 is a frozen process-CPU-budget binary and remains untouched. New builds preserve its shared
-finite-bound/geometric-deepening policy but schedule finite probes by deterministic accepted-prefix
-work, calibrated at 20,000,000 units per nominal second. This removes hardware/load timing from the
-stopping point for a fixed binary, query and cache history; it does not make a warm and cold search
-equivalent or change what constitutes a proof. The root `rb_dead(0,0,0,0)` relaxation was tested
-separately and was too weak to enable eagerly, so the existing measured-cost trigger remains. See
-[`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt).
-The follow-up hereditary-pliability test now gives an exact suffix cutoff after the DP is built and
-a cheap sufficient cutoff from absolute slack, tail excess and retained pure corners.  The cheap
-bound is sound but captures only 29 of 65 complete no-call cases in the 243 parent-theorem survivors
-of the small census; it does not justify an a-priori length trigger.  The per-depth measurement is
-complete: full absolute slack strengthens the q/D theorem for 11 partial tails, and actual rejection
-rates fall sharply with both slack and `slack-D`, but an exact cutoff that removed 77.89% of lookups
-on the hard positive produced no stable CPU speedup.  Keep the measured-cost trigger and the cutoff
-diagnostic-only. See
-[`../evidence/rb_pliability_2026-08-13.txt`](../evidence/rb_pliability_2026-08-13.txt) and
-[`../evidence/rb_slack_profile_2026-08-14.txt`](../evidence/rb_slack_profile_2026-08-14.txt).
+The raw proof log and reproduction metadata are archived under `sa193-cold-2026-08-16`; the compact
+root evidence is in
+[`../evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt). Run3 and run8
+also concluded UNSOLVABLE but remain performance-only because their builds predate the contraction
+fix. An independent full-DAG `radio_verify` replay would strengthen the trust-base separation, but
+it is optional follow-up rather than unfinished H3 work.
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 conditional excess-`q` Pareto-assembly programme is **parked as of 2026-08-16**: retain its proved
@@ -136,8 +115,8 @@ mentions but never wrote down, and which would let `n(9,11)` be predicted at all
 
 ### P4 - Fill the K=9 band m = 7..64
 
-Superseded in part: the 16 `Sa(193)` states are decided, and `parsed_260.txt` has been
-recovered, so `run_pareto9.sh` can restart. What remains is the blank band.
+Superseded in part: proof-safe run9 now decides the 16 `Sa(193)` upper bounds, and
+`parsed_260.txt` has been recovered, so `run_pareto9.sh` can restart. What remains is the blank band.
 
 Note what the recovered data shows about cost: the near-diagonal walk moved from `m = 96`
 down to about `m = 81` over 14 months of wall clock across 81 chained runs, and single states
@@ -157,8 +136,9 @@ pursue it at all.
   [theorems/unit-group-elimination.md](theorems/unit-group-elimination.md)), Insights,
   Refuted lemmas.
 - Add lemma (12) for `m = 8`, and the `G_k = sum of binomials` closed form.
-- Present `Sa(192)` in 10 as a construction with a verified witness tree, and say plainly that
-  maximality at k=10 is open. Do not repeat the 2023 `Sa(193)` verdict as established.
+- Present `Sa(10)=192` as an exact maximum: a verified witness proves achievability and the
+  proof-safe cold run9 log rejects all sixteen first-test states for 193. Keep the suspect 2023
+  result only as historical cost context.
 - Fix the numbering collision: `(7)` is currently a duplicate of `(5)`, and the sentence
   "(7) holds true k up to 8" plainly refers to `(u1)`.
 - Replace proposed lemma (8) by the published exact `m=4` theorem and proposed lemma (9) by
@@ -168,7 +148,8 @@ pursue it at all.
   model and exact `m=2,3`, Li--Wu--Triesch for `m=4,5`, and Hao/Gargano et al. for scalable
   product constructions.  Do not copy Li et al.'s apparently inconsistent intermediate
   equations (69)–(70) without recomputing their indices.
-- State the `k <= 9` / `k = 10` distinction in the `Sa` table itself, not only in prose.
+- State that every `Sa` table entry through `k=10` is proven maximal, and cite the distinct
+  witness/exhaustive sources for the new last cell.
 
 **Done when** the draft passes `tools/check_tables.py` with no stale generated blocks and
 contains no number absent from `data/*.csv`.
@@ -348,21 +329,18 @@ new finite winner, another bounded-depth exclusion, or a fitted atom word is not
 ## Ordering
 
 P1 first and quickly. The 2023 corpus spent months of compute and, until 2026-08-02, existed
-in exactly one place: a zip on one disk. It is unreliable but not worthless - it is the only
-record of what has been attempted, and re-deriving from scratch is what costs months.
+in exactly one place: a zip on one disk. It is unreliable but not worthless—it records what
+was attempted and provides historical cost context. New claims use the retained 2026 artifacts.
 
 Then P5 and P2 in parallel - P5 is writing, P2 is compute, so they do not contend. P3 follows
 P2, reusing the same tooling and the same feel for which `target_k` values work. P4 is now
 more a costing exercise than a plan.
 
-P6's solver work continues while proof-safe cold `run9` and the retained run3/run8 baselines
-run remotely. The bounded ordering approximation is deployed in run8/run9:
-long candidates receive a geometric local probe while the one/two-segment constructive spine keeps
-the shared parent budget.
-It reproduced the cold `Sa(192)` path locally in 376.293 CPU seconds, and the remote control has now
-passed in 471.6 CPU seconds in run8 and 479.2 in proof-safe run9. Use run8 as the
-matched baseline for run9's natural `Sa(193)` progress, visible-attempt cost and memory, but use only
-run9 for a new negative claim. Do not add split history before that comparison matures.
+The proof-safe cold run9 and retained run3/run8 baselines have all completed. Run8 is the matched
+performance comparator; only run9 is the negative proof source. Run9 cost 419353.1 CPU seconds and
+1.32 GB peak RSS, 1.646% more CPU than run8 and 12.456% less than run3. The bounded ordering
+approximation is therefore measured end to end; no further split-history experiment is needed for
+H3.
 The separate recursive Pareto-lift corpus may still be analyzed as a bounded solver-ordering
 question after its k=8 remainder finishes.  The excess-`q` profile branch—including rank 1180,
 larger normalizations, and attempts to extract a global formula from the A/B/C/D assembly—is parked.
@@ -370,15 +348,13 @@ Its positive trees, all-depth kernels, depth-four cover, and exact `m=5` calibra
 evidence; they are not an instruction to continue the scan.  The reopening criteria are recorded
 in the parked-track section above.
 
-The result-cache prerequisite for H3 is now delivered.  Last-segment positive/negative Pareto fronts
+The result-cache prerequisite for H3 was delivered. Last-segment positive/negative Pareto fronts
 reduce the measured k=5..7 checkpoint storage 11.2x; with the exact-state L1, the full `Sa(192)`
 control passes at 0.35 GB peak RSS and 711.7 CPU seconds, with no remaining measured premium over the
 734.5-second pre-compaction control. AWS `run7` and the same-chain local continuation used the
 now-obsolete `e648e83` progress-gated pass-2 scheduler and were retired on 2026-08-11 after their raw
-segments and closed checkpoints were preserved. Run3 remains the untouched live incumbent; run8 is
-the cold `9395218` bounded-probe baseline, and run9 is the cold `e7fa747` proof run. Run9 has a
-60 GiB individual cap and is stopped first if all live solvers reach 108 GiB combined RSS. Neither
-`c13b5d3` nor `e648e83` is a valid performance baseline for the new scheduler. H3 still sits
-awkwardly—the answer is probably 192, the evidence is probably right, and neither "probably" belongs
-in a paper. Resume only from a run's own output and retain every raw segment; compact does not mean
-bounded.
+segments and closed checkpoints were preserved. Run3 finished as the untouched historical
+incumbent, run8 as the cold `9395218` bounded-probe baseline, and run9 as the cold `e7fa747`
+proof run. Neither `c13b5d3` nor `e648e83` is a valid performance baseline for the new scheduler.
+The durable operational rule remains: resume only from a run's own output and retain every raw
+segment; compact does not mean bounded.

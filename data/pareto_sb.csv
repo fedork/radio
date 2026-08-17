@@ -152,34 +152,34 @@ k,m,n1,bound,status,source,note
 9,79,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
 9,80,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
 9,81,82,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,81,111,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(112:81) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,81,111,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(112:81) exhaustively refuted in the proof-safe cold run9 session
 9,82,83,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,82,110,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(111:82) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,82,110,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(111:82) exhaustively refuted in the proof-safe cold run9 session
 9,83,84,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,83,109,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(110:83) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,83,109,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(110:83) exhaustively refuted in the proof-safe cold run9 session
 9,84,85,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,84,108,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(109:84) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,84,108,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(109:84) exhaustively refuted in the proof-safe cold run9 session
 9,85,86,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,85,107,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(108:85) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,85,107,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(108:85) exhaustively refuted in the proof-safe cold run9 session
 9,86,87,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,86,106,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(107:86) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,86,106,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(107:86) exhaustively refuted in the proof-safe cold run9 session
 9,87,88,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,87,105,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(106:87) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,87,105,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(106:87) exhaustively refuted in the proof-safe cold run9 session
 9,88,89,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,88,104,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(105:88) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,88,104,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(105:88) exhaustively refuted in the proof-safe cold run9 session
 9,89,90,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,89,103,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(104:89) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,89,103,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(104:89) exhaustively refuted in the proof-safe cold run9 session
 9,90,91,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,90,102,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(103:90) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,90,102,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(103:90) exhaustively refuted in the proof-safe cold run9 session
 9,91,92,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,91,101,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(102:91) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,91,101,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(102:91) exhaustively refuted in the proof-safe cold run9 session
 9,92,93,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,92,100,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(101:92) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,92,100,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(101:92) exhaustively refuted in the proof-safe cold run9 session
 9,93,94,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,93,99,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(100:93) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,93,99,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(100:93) exhaustively refuted in the proof-safe cold run9 session
 9,94,95,lower,legacy,cache-2025:parsed_260.txt,near-diagonal Sb(m+1:m) logged solvable in 9; source log not located
-9,94,98,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(99:94) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
-9,95,97,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(98:95) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
-9,96,96,upper,legacy,evidence/sa193_unsolvable_in_10.txt,"Sb(97:96) exhaustively unsolvable in 9; 2023 build, unverified - that build produced 37 known false negatives, see evidence/refuted_2023_negatives.txt"
+9,94,98,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(99:94) exhaustively refuted in the proof-safe cold run9 session
+9,95,97,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(98:95) exhaustively refuted in the proof-safe cold run9 session
+9,96,96,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(97:96) exhaustively refuted in the proof-safe cold run9 session
 10,5,985,max,proven-theorem,docs/literature.md#li-wu-triesch-2018,Theorem 2 exact formula
 10,6,973,max,proven-exhaustive,witnesses/majorized_973_6_at10.tree+evidence/sb_m6_k10_frontier.txt,"verified singleton-majorized witness at 973; exact synchronized search refutes 974"

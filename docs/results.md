@@ -15,20 +15,21 @@ Largest `n` such that `Sa(n)` is solvable in `k` tests.
 <!-- generated:pareto_sa -->
 | k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | (192) |
+| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
 
 Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
 <!-- /generated -->
 
-`k = 1..9` are proven maximal: `out_radio_1.txt` contains both a `can solve Sa(n)` line and a
-`can't solve Sa(n+1)` line for each, re-confirmed mechanically rather than taken from the
-older write-up. `k = 10` is a **lower bound** — see below.
+`k = 1..10` are proven maximal. For `k=1..9`, `out_radio_1.txt` contains both a
+`can solve Sa(n)` line and a `can't solve Sa(n+1)` line for each, re-confirmed mechanically
+rather than taken from the older write-up. The `k=10` boundary combines an independently
+verified witness at 192 with the proof-safe cold rejection of 193 described below.
 
 Achievability has verified witness trees at every k from 7 up: `witnesses/sa38_k7.tree`,
 `sa65_k8_{a,b,c}`, `sa112_k9_{a,b,c}`, `sa192_k10_{a,b}`. These are proofs independent of the
 solver, so `Sa(192)` in 10 is not in doubt.
 
-### Sa(10): 192 achievable, maximality NOT established
+### Sa(10) = 192, proven maximal
 
 `Sa(n)` in `k` splits into a taken group of `n1` and the rest, requiring `Sa(n1)` solvable
 in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA` in `radiobase.c`). Since
@@ -38,28 +39,21 @@ in `k-1` and `Sb(n1 : n-n1)` solvable in `k-1` (see `canSolveA` in `radiobase.c`
 Sb(n1 : 193 - n1)  in 9,   for n1 = 97 .. 112
 ```
 
-A 2023 run refuted all sixteen and concluded `can't solve Sa(193) in 10` after ~47 days of
-solve time in about 90 GB of virtual memory. The log lines are preserved in
-[`evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt), and the
-sixteen `Sb` verdicts appear as `bound=upper`, `status=legacy` rows in `data/pareto_sb.csv`.
+Cold AWS `run9` refuted all sixteen in one uninterrupted session from an empty cache and then
+printed `result Sa(193) in 10 = UNSOLVABLE (419353.1 s)`. Its positive `Sa(192)` control
+passed first in 479.2 CPU seconds. The run used the contraction-safe build at commit
+`e7fa747264476461a234bf78e49762ee77ad8d8d`, carried complete embedded provenance, completed
+in 419849 wall seconds with 1.32 GB peak RSS, and produced no contradictory audited verdict.
 
-**That evidence is not sufficient.** Auditing the 2023 corpus turned up **37 single-part
-negatives that are provably false** — about 0.27% of its negatives — recorded in
-[`evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). Among them
-are the `K=8, m=10..17` verdicts that the 2026-05-12 recomputation had already corrected, so
-the failure is real and independently rediscovered. Crucially it has **no reliable syntactic
-marker**: `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days of exhaustive
-search, and is wrong.
+The raw proof log is archived as
+`sa193-cold-2026-08-16:run9_out_sa193.txt`; the sixteen root lines and exact hashes are
+committed in
+[`evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt). Together
+with the checked `Sa(192)` witness tree, this proves the boundary.
 
-The `Sa(193)` verdicts carry exactly that profile — long, multi-pass, `fast_solve=0` — so
-they cannot be distinguished from the known-bad ones on their face. By contrast the same
-audit over the 2026 artifacts finds **0 contradictions in 2,723** single-part verdicts.
-
-What would settle it: re-running the 16 states on a current build, warm-started from
-`parsed_260.txt`. That is expensive but far cheaper than the original 47 days, and it is the
-only route — the original claim cannot be rehabilitated by inspection.
-
-Recovered 2026-08-02 from `radio.zip` in `~/radio_old` (2023-10-18 snapshot).
+The 2023 run reached the same answer after roughly 47 days, but its build produced 37 known
+false negatives. That historical evidence remains useful for cost comparison only and is
+superseded as the source of the claim.
 
 ## Sb: the Pareto frontier
 
@@ -172,13 +166,14 @@ The `k=8` column for `m = 10..17` was corrected in the 2026-05-12 recomputation
 circulate with the superseded values `182, 176, 170, 165, 159, 153, 148, 142`; they are
 wrong. `data/pareto_sb.csv` is the only copy that should be consulted.
 
-The K=9 column has three kinds of entry.  For `m=1..5`, published theorems give exact
+The K=9 column has three kinds of entry. For `m=1..5`, published theorems give exact
 maxima; the new `m=5` boundary was also replayed independently with a verified witness at
 481 and an exact rejection at 482.  At `m=6`, a retained exact replay rejects 474 and a
-verified tree proves 473.  Values at
-`m = 65..96` were recovered from the `Sa(192)` / `Sa(193)` computations, but those come from
-the 2023 build and are `status=legacy`, including all sixteen ceilings; treat the `≤` values
-as unconfirmed. The whole band `m = 7..64` is blank.
+verified tree proves 473. Values at `m=65..80` remain legacy lower bounds recovered from the
+old cache. At `m=81..94`, those legacy lower bounds are paired with proof-safe run9 upper
+bounds; `m=95,96` have proof-safe upper bounds only. Thus all sixteen ceilings used in the
+`Sa(193)` proof are established, but none of these rows is an exact K=9 maximum. The whole
+band `m=7..64` is blank.
 
 There are now two exact `k=10` Sb cells.  Li--Wu--Triesch's theorem gives
 **`n(10,5)=985`**.  Independently, **`n(10,6)=973`** follows from the exhaustive rejection of

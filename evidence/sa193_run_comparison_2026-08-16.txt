@@ -1,0 +1,66 @@
+# Cold Sa(193) run comparison, finalized 2026-08-16
+
+Purpose
+-------
+
+Classify the three completed cold runs and retain the exact measurements used when promoting
+Sa(10)=192. Only run9 is a proof source. Run3 and run8 predate the implicit-contraction fix and are
+retained solely to compare performance. All three independently reached UNSOLVABLE.
+
+Run totals
+----------
+
+run   classification       build/source   control Sa(192)   Sa(193) CPU   wrapper wall   peak RSS
+run3  performance only     3cf1406 era         540.7 s       479020.9 s      479580 s       25.57 GB
+run8  performance only     9395218d...         471.6 s       412561.4 s      413045 s        1.32 GB
+run9  proof source         e7fa7472...         479.2 s       419353.1 s      419849 s        1.32 GB
+
+Run8 is 13.874% faster than run3. Run9 is 12.456% faster than run3 and 1.646% slower than
+run8 (6791.7 CPU seconds). Run9's proof-safety fix therefore carried no material memory cost and a
+small matched-time cost. Run3 lacks complete embedded provenance; its numbers remain diagnostic.
+
+Raw logs
+--------
+
+run3: 3319030 lines, 352518570 bytes
+      SHA-256 922cf6b56e6e9f05273c8b4aa3a42f898d5dc8aa57e1af61b0cd360d33054569
+run8: 3173928 lines, 365256946 bytes
+      SHA-256 4cbac8e4e3c5ff7e282262c203080531a36590473492141897a76d3271d74f2d
+run9: 3174576 lines, 365340502 bytes
+      SHA-256 ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4
+
+Run8 and run9 are archived under `sa193-cold-2026-08-16`. Run3 is not promoted as a raw release
+asset because it lacks complete embedded provenance; its source, binary and final sidecars are in
+the release metadata and in the original S3 run prefix.
+
+Fact-set comparison
+-------------------
+
+`parse_out.sh` was applied to each raw log; comments were excluded and exact signed facts were
+deduplicated before set comparison.
+
+                                      run8       run9
+distinct signed facts              3166649    3167184
+duplicates                               0          0
+
+exact signed intersection          3160113
+run8 only                              6536
+run9 only                              7071
+same normalized state key,
+opposite verdict                          0
+
+Run9 emitted 535 more distinct facts than run8, a 0.016895% increase. The two logs disagree on no
+state verdict. This comparison is a consistency check, not the proof argument: run8 cannot validate
+a negative because its build predates the contraction fix.
+
+Validation and disposition
+--------------------------
+
+- `tools/check_provenance.py` passes run8 and run9.
+- `tools/extract_evidence.py audit run9_out_sa193.txt` reports 857 interpreted lines, 848 distinct
+  comparable states and zero contradictions.
+- Run9 was cold (`cache=(none, cold)`), completed all sixteen roots in one session, passed the
+  positive Sa(192) control, and emitted zero `rb-suppressed` markers.
+- Exit code 1 is the driver's expected code for a definitive UNSOLVABLE result; it is not an abort.
+- The separate k=8 Pareto-prefix census on the instance is not part of these measurements and was
+  left running.

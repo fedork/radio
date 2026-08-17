@@ -163,12 +163,12 @@ two natural proof routes are now **refuted**, and what is left is a single crisp
 
 ### Why it is worth proving
 
-`Sa(193)` in 10 reduces to sixteen states `Sb(n1 : 193-n1)`, `n1 = 97..112`
-([results.md](results.md#sa10-192-achievable-maximality-not-established)). They are pairwise
-incomparable under subgraph monotonicity, so all sixteen need refuting - about 47 days of
-2023 compute, of which the fifteen easier ones were 58%. Under (u1) they chain: refuting the
-most lopsided `Sb(112:81)` refutes the other fifteen, and the negative certificate shrinks
-16-fold.
+`Sa(193)` in 10 reduces to sixteen states `Sb(n1 : 193-n1)`, `n1=97..112`
+([results.md](results.md#sa10--192-proven-maximal)). They are pairwise incomparable under
+subgraph monotonicity, so the completed cold proof had to refute all sixteen. Under (u1) they
+would chain: refuting the most lopsided `Sb(112:81)` would refute the other fifteen and shrink
+this class of negative certificate 16-fold. H3 is now settled without the conjecture, but the
+reduction remains valuable for future antidiagonal frontiers.
 
 ### Evidence
 

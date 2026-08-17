@@ -13,7 +13,7 @@ files are the exception: they are finite symbolic proof objects replayed by inde
 | file | certifies |
 |---|---|
 | `pareto_certification_k1_8.txt` | every `proven-exhaustive` cell of the Sb frontier for K=1..8, and the Sa sequence for k=1..9. 276 obligations, 276 located. |
-| `sa193_unsolvable_in_10.txt` | `Sa(193)` is not solvable in 10, hence `Sa(10) = 192` is maximal |
+| `sa193_unsolvable_in_10.txt` | the sixteen proof-safe cold run9 root refutations, establishing that `Sa(193)` is not solvable in 10 and hence `Sa(10)=192` is maximal |
 
 Symbolic aligned-profile proof objects:
 
@@ -33,6 +33,7 @@ certify a frontier cell:
 | `work_budget_rb_root_2026-08-13.txt` | calibration and regression of deterministic accepted-prefix budgets; exact meaning, measured power, and rejected eager use of `rb_dead(0,0,0,0)` |
 | `rb_pliability_2026-08-13.txt` | exact hereditary suffix pliability and the first absolute-slack/tail-length certificates |
 | `rb_slack_profile_2026-08-14.txt` | full-slack q/D refinement, actual suffix call/prune census, real controls and rejected exact cutoff |
+| `sa193_run_comparison_2026-08-16.txt` | final run3/run8/run9 costs, hashes, classifications and the exact run8/run9 fact-set comparison |
 
 ## Regenerating and auditing
 
@@ -50,21 +51,20 @@ violations.
 
 ## Why `Sa(193)` gets its own file
 
-It is the most expensive single fact in the project and the least reproducible.
+It is the most expensive current proof artifact in the project and closes the `Sa` sequence
+through `k=10`.
 
 `Sa(n)` in `k` splits into a taken group of `n1` and the rest, needing `Sa(n1)` in `k-1` and
 `Sb(n1 : n-n1)` in `k-1`. Since `Sa(n1)` in 9 forces `n1 <= 112`, deciding `Sa(193)` in 10
-comes down to sixteen states — `Sb(n1 : 193-n1)` for `n1 = 97..112`. All sixteen were
-exhaustively refuted:
+comes down to sixteen states — `Sb(n1 : 193-n1)` for `n1=97..112`. Proof-safe cold run9
+exhaustively refuted all sixteen in **419353.1 CPU seconds** and **419849 wall seconds**, with
+**1.32 GB peak RSS**. Its `Sa(192)` positive control passed first, and the whole run stayed in
+one session from an empty cache.
 
-- `Sb(112:81)` alone took **1,725,456 s** (~20 days, 12 passes), in `radio/out26_2.txt`
-- the remaining fifteen plus the `Sa(193)` verdict took **2,353,729 s** (~27 days), in
-  `radio/out26_3.txt`, which had `Sb(112:81)` already warm in its loaded cache
+The raw log is archived as `sa193-cold-2026-08-16:run9_out_sa193.txt`. Its committed excerpt
+records all sixteen root lines, full source/build identity, raw hash and size. The corresponding
+`bound=upper`, `status=proven-exhaustive` rows constrain the K=9 frontier for `m=81..96`.
 
-That is roughly 47 days of solve time, and the original run needed about 90 GB of virtual
-memory. Recomputation is not a realistic check. These lines are the record, and the sixteen
-`Sb` verdicts are also recorded as `bound=upper` rows in `data/pareto_sb.csv`, where they
-constrain the K=9 frontier for `m = 81..96`.
-
-Both source files were recovered on 2026-08-02 from `radio.zip` in `~/radio_old`, a
-2023-10-18 snapshot. Archive them before that disk is reused — see [../docs/data.md](../docs/data.md).
+The recovered 2023 run needed roughly 47 solve-days and about 90 GB of virtual memory, but its
+build produced known false negatives. It remains archived as historical cost evidence and no
+longer carries the mathematical claim. See [../docs/data.md](../docs/data.md).

@@ -1,35 +1,48 @@
-# The `Sa(193)` AWS run — how to check on it, and how to stop it
+# The `Sa(193)` AWS runs — final record and remaining census
 
-This page is the operational handle for the cold runs hosted on the dedicated instance; the
-findings go to [journal.md](journal.md) as usual.
+This page is the operational record for the completed cold runs and the one remaining census on
+the dedicated instance; the findings go to [journal.md](journal.md) as usual.
 
 ## What is running
 
 | | |
 |---|---|
 | instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| active solvers | `run3`, `run8`, and proof-safe cold `run9`; all `MAX_K=10 MAX_N=193` |
+| active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
+| active job | `pareto_k8_aws`, the separate k=8 Pareto-prefix census |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| memory guards | 40 GiB run3; 60 GiB each run8/run9; 108 GiB combined guard sacrifices run9 first |
-| completion | a 20-minute final-upload grace period, then instance-initiated stop once all three solvers are gone |
+| active memory guard | 20 GiB for the census; host had 113 GiB available and no swap at the final Sa review |
+| completion | census supervisor finalizes its S3 artifacts; the idle guard may stop the instance only after `pareto_k8_aws` is gone |
 
-Each run is internally serialized: one process and cache handle all sixteen top-level states in
-sequence. Every run is isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
-Monitoring reads peer logs with bounded state; no solver loads another run's cache. Run3/run8 are
-now performance baselines only: their builds predate the suffix-reachability/contraction fix, so a
-negative derived from their caches is not proof evidence. Run9 is the current cold proof attempt.
+Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
+sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
+Run3/run8 are performance baselines only: their builds predate the suffix-reachability/contraction
+fix. Run9 is the proof source.
 
 | prefix | build | started UTC | state / binary |
 |---|---|---|---|
-| `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | active; `/root/run3/radio_sa193_v3` |
+| `run3/` | A+B + full-star majorization (`3cf1406`) | 2026-08-10 00:00:04 | completed; performance only; 479020.9 CPU s, 25.57 GB peak RSS |
 | `run4/` | level-lazy tables + compact last-segment Pareto cache (`6af384e`) | 2026-08-11 01:37:20 | stopped; old scheduler; `/root/run4/radio_sa193_v4` |
 | `run5/` | compact cache + bounded exact-state L1 (`290a892`) | 2026-08-11 05:05:13 | stopped; old scheduler; `/root/run5/radio_sa193_v5` |
 | `run6/` | broken zero-progress deadline/prefix-poll experiment (`c13b5d3`) | 2026-08-11 05:45:09 | stopped and archived; `/root/run6/radio_sa193_v6` |
 | `run7/` | progress-gated pass-2 `NO_DEADLINE` handoff (`e648e83`) | 2026-08-11 15:45:30 | stopped 2026-08-11 22:13:30; archived; `/root/run7/radio_sa193_v7` |
-| `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | active; `/root/run8/radio_sa193_v8` |
-| `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | active; `/root/run9/radio_sa193_v9` |
+| `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | completed; performance only; 412561.4 CPU s, 1.32 GB peak RSS |
+| `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
+
+At **2026-08-17 00:52 UTC**, the remaining `pareto_k8_aws` process had run for 2d23h at one
+full core and 8,892,056 KiB RSS. Its 44,833,189-byte output contained all 815
+`CENSUS SECOND_SUMMARY` blocks, the closed prefix summary and 1,688 targets. It had not yet emitted
+an endpoint or full-state record, so the upgrade/full-state phase remains unfinished. The host had
+113 GiB available, no swap and 194 GB free disk. Do not stop the instance. The S3 `STATUS` object
+for this census is still the launch snapshot; inspect the live output or final artifact rather than
+using that stale object as a health signal.
+
+Final Sa sidecars that existed only on EBS were copied to immutable `run3/final/`, `run8/final/`
+and `run9/final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; the shared
+checksum manifest is `final/sa193-cold-sidecars.sha256`. The public index points at the durable
+private release `sa193-cold-2026-08-16`.
 
 All rows name frozen binaries, not aliases for current `main`. The original run4/run5 snapshots did
 not by themselves prove a livelock, but run7 later reproduced the same information-tight 14-part
@@ -60,8 +73,9 @@ the enabled `Sa(192)` control. The binary SHA-256 is
 binary, provenance sidecar and `run.meta` were streamed back from S3 and hash-checked immediately
 after launch. Launch and independent survival checks are SSM commands
 `0d7a7f49-1033-4429-844f-df87860cbe4f` and `40e28f6c-397b-422b-bb20-55463cdc347c`.
-Its mandatory cold control returned `SOLVABLE` in 471.6 CPU seconds and the process continued into
-`Sa(193)`; run3's same-host control was 540.7 seconds.
+Its mandatory cold control returned `SOLVABLE` in 471.6 CPU seconds; the run then completed all
+sixteen roots and returned UNSOLVABLE in 412561.4 CPU seconds. Run3's same-host control was
+540.7 seconds. Run8 remains performance-only because its build predates the contraction fix.
 
 Run9 is the proof-safe replacement, built from full commit
 `e7fa747264476461a234bf78e49762ee77ad8d8d`. Commit `75814a7` within it records an invocation as
@@ -79,12 +93,13 @@ sidecar, archive, `run.meta`, and hash manifest were all streamed back from S3 a
 matched. Launch, survival, and preservation SSM commands are
 `f766ce6b-1a8b-45a1-b929-2a65420899ee`, `78883034-52fd-42c7-a83d-3b5eae9eff46`, and
 `7f9f7920-854e-4148-80d3-57c2588dce7a`.
-Its mandatory cold control returned `SOLVABLE` in 479.2 CPU seconds and the process continued into
-`Sa(193)`. Direct post-control checks under SSM commands
-`aa6e5298-9dea-44dc-82b7-28d78a3fbff2`, `451831b4-5e8c-4c5f-8621-0a3cd4095a6d`, and
-`b28ec8dc-8156-464a-b50e-7a828866e45b` found zero suppression markers, all three solvers, and
-run9's wrapper, watchdog, combined-RSS guard and three-name idle guard alive. The host had 95 GiB
-available, no swap and 196 GiB disk free.
+Its mandatory cold control returned `SOLVABLE` in 479.2 CPU seconds. The run then completed all
+sixteen roots and returned `UNSOLVABLE (419353.1 s)` with zero suppression markers. The finalized
+raw log has 3,174,576 lines, 365,340,502 bytes and SHA-256
+`ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4`; it is archived as
+`sa193-cold-2026-08-16:run9_out_sa193.txt`. Run8's paired raw log is in the same release. Exact
+fact-set and performance comparisons are in
+[`../evidence/sa193_run_comparison_2026-08-16.txt`](../evidence/sa193_run_comparison_2026-08-16.txt).
 
 Run8's solver remains exactly that frozen build. Its comparison helper alone was updated after launch,
 first to `4cd002e` for estimated self time and then to `58e3457` for visible-attempt aggregation.
@@ -99,14 +114,14 @@ was changed; the frozen binary remains
 The predecessor run (2026-08-03, `i-0b8ca7169585b7cc1`) failed — deadlines had been removed and it
 sank 43 minutes into one 13-part k=5 node — and was terminated.
 
-### Following it without logging in
+### How the Sa runs were followed
 
-`tools/sa193_watchdog.sh` emails on every milestone plus a 6-hour heartbeat. The progress metric is
-the only one that means anything here: `Sa(193)` in 10 is unsolvable **iff all sixteen**
+`tools/sa193_watchdog.sh` emailed on every milestone plus a 6-hour heartbeat. The progress metric
+was the only one that meant anything: `Sa(193)` in 10 is unsolvable **iff all sixteen**
 `Sb(n1:193-n1)` fail in 9, for `n1 = 97..112`, so each is 1/16 of the job and each prints a line.
 Verdict counts and elapsed time are not progress; "3 of 16" is.
 
-Emails fire on: run started, another of the sixteen done, the control reporting, the first/new
+Emails fired on: run started, another of the sixteen done, the control reporting, the first/new
 rb-tainted contraction suppression, the final answer, the solver process dying, and every 6 hours
 otherwise. Every AWS call in the watchdog is
 failure-tolerant — a broken report must never kill the run.
@@ -119,15 +134,15 @@ is produced — which is not a formality, given the 2023 corpus holds 37 provabl
 no syntactic marker, and given an engine change trapped the last run. It is also not wasted work:
 `Sa(192)` and `Sa(193)` share almost everything, so the control warms the cache for the real query.
 
-## Checking on it
+## Checking the retained runs and live census
 
 ```
-tools/sa193_status.sh --compare --baseline run8 --candidate run9 --watch
+tools/sa193_status.sh --compare --baseline run8 --candidate run9
 ```
 
-This prints compact live rows for run8 and run9, followed by their latest exact-call comparison.
-Without overrides the historical default remains run3/run8; `--all` prints the verbose history.
-Run8/run9 refresh every five minutes; run3's older watchdog refreshes every ten. The comparison chooses
+This now prints final rows for run8 and run9, followed by their exact-call comparison. Without
+overrides the historical default remains run3/run8; `--all` prints the verbose history. During the
+runs, the comparison chose
 the run with fewer completed roots (then fewer verdicts), takes its six slowest completed exact
 states and joins them to the selected peer by printed `(state,k)`. It groups a state's progress lines into
 attempts whenever `elapsed` resets or another same-level verdict proves that the activation
@@ -136,7 +151,7 @@ contributes its last observed elapsed value. Because historical logs do not prin
 a `MAYBE` return, `≥` marks the resulting attempt-sum floor, `(2a)` is the number of visible attempts,
 and its ratio is prefixed `~`. Short abandoned attempts with no progress line remain unknowable.
 
-Under each compact run row, the current recursive stack is shown from the k=9 root down to the active
+Under each compact run row, the recursive stack was shown from the k=9 root down to the active
 level, followed by that run's compact per-level `inclusive/self` profile. Visible
 `still solving ... elapsed` time is added to the corresponding level before the self differences
 are taken. Per-call `~self-final` subtracts all k-1 verdict time since the previous k verdict; it is
@@ -145,18 +160,18 @@ missing peer call is printed as `-`, never inferred.
 
 | key | what |
 |---|---|
-| `run3/STATUS` | latest active status snapshot |
-| `run8/STATUS` | latest bounded-probe status snapshot |
-| `run8/COMPARE` | latest streaming exact-state comparison against run3 |
-| `run9/STATUS` | latest proof-safe status, including contraction suppressions |
-| `run9/COMPARE` | latest streaming exact-state comparison against run8 |
+| `run3/STATUS` | final performance-run snapshot |
+| `run8/STATUS` | final bounded-probe snapshot |
+| `run8/COMPARE` | finalized exact-state comparison against run3 |
+| `run9/STATUS` | final proof-source snapshot, including zero contraction suppressions |
+| `run9/COMPARE` | finalized exact-state comparison against run8 |
 | `run7/STATUS` | final snapshot, explicitly reporting `solver process GONE` |
 | `runN/sa193.checkpoint` | same-run restart checkpoint, refreshed hourly |
 | `runN/seg-*/out_sa193.txt.zst` | immutable per-segment raw log, refreshed hourly and finalized at exit |
 | `runN/seg-*/memprofile.csv` | time/RSS/verdict profile used for the comparison |
 | `bench/r7iz.4xlarge.txt` | the k=9 ladder benchmark used to size this |
 
-Is it alive?
+Is the instance alive?
 
 ```
 aws-vault exec default -- aws ec2 describe-instances \
@@ -166,24 +181,25 @@ aws-vault exec default -- aws ec2 describe-instances \
 
 ## Stopping it
 
-Do not terminate the instance while any cold session is valuable.  To stop it while preserving
-the EBS volume and all run directories:
+**Do not stop it yet:** `pareto_k8_aws` is still running. After that census exits, its final raw
+output and sidecars must appear under `pareto-census-k8/20260814T0132Z/` and be hash-checked. Only
+then stop the instance while preserving the EBS volume and all run directories:
 
 ```
 aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52ae1
 ```
 
-The active idle guard does this automatically only after all three named solvers have gone, then
-waits 20 minutes so their watchdogs can finalize S3 artifacts.  A manual stop is an interruption,
-not a proof; S3 checkpoints are at most about one hour stale and the full EBS logs remain intact.
+The active idle guard includes `pareto_k8_aws` and can stop the host only after it too has gone. A
+manual stop before the census finishes is an interruption, not a negative result. The Sa artifacts
+are already final; the census artifact is not.
 
-## Resuming
+## Resuming historical Sa work
 
-Relaunch a proof-safe build and pass **that prefix's own** checkpoint as the driver's leading
-argument. Run9's checkpoint is sound to warm-start a negative from, unlike run3/run8 and
-`cache-2025:parsed_260.txt` — see the trap in [status.md](status.md). Every checkpoint carries a header naming the build,
-the state and the generation time, and `parse_file` skips `#` lines, so the two can never be
-confused. Only warm-start from a file that has that header.
+No Sa resume is needed: H3 is complete. If a diagnostic continuation is ever deliberately run,
+pass **that prefix's own** checkpoint as the driver's leading argument. Run9's checkpoint is sound
+to warm-start from, unlike run3/run8 and `cache-2025:parsed_260.txt`; every checkpoint carries a
+header naming the build, state and generation time. Such a continuation is new engineering work,
+not part of the established Sa(10) proof.
 
 ## Why these numbers
 
@@ -194,10 +210,10 @@ confused. Only warm-start from a file that has that header.
   reached ~90 GB. Note this also bounds how large a warm cache can be loaded: the filtered
   `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, which at that
   rate is ~25 GB of trie before the search starts. Filter harder, or size the instance for it.
-  The current engine visits about half as many states, so the estimate is 40–60 GB with 90 GB
-  pessimistic. The three individual guards do not form a safe sum, so a separate 108 GiB combined
-  guard watches all solver RSS and terminates only the newest run9 wrapper at the ceiling. This
-  preserves the older performance histories and roughly 15 GiB for the OS and file cache.
+  Before the compact runs, the estimate was 40–60 GB with 90 GB pessimistic. The three individual
+  guards did not form a safe sum, so a separate 108 GiB combined guard watched all solver RSS and
+  would have terminated only the newest run9 wrapper at the ceiling. In practice run8/run9 each
+  peaked at 1.32 GB; the guard never fired.
 - **On-demand, not spot.** Spot is ~$0.54/hr against $1.49, but the run is single-threaded and
   we are paying for RAM; the saving is not worth interruption handling on an unattended run.
 - **AWS is slower than the laptop.** The k=9 ladder takes 391 s on r7iz against 261 s on the

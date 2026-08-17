@@ -14,8 +14,8 @@ at all depths in that parked slice; exact loss-sliced cover excludes rank 1180 t
 depth five and eventual constructibility remain open;
 the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correct the old
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
-proof-safe cold AWS `run9` and the resumed k=8 Pareto-prefix census are running beside the retained
-`run3`/`run8` performance baselines).
+proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`, while the
+separate resumed k=8 Pareto-prefix census remains live on the instance).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -30,7 +30,6 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
 | **Do not use a negative derived by `run3` or `run8` as proof.** | Joint suffix reachability (`rb_dead`) was sound for rejecting the full state but incompatible with the older implicit-prefix contraction: it could cache a shorter negative that was actually solvable, then contaminate later searches. Forced counterexample: `Sb(5:3,2:2,2:2,2:2)@3` is unsolvable while its inferred `Sb(5:3)@3` negative is false. Builds containing `efadab0` but predating fix `75814a7` have no marker distinguishing affected contractions; this includes frozen run3 and run8. Cold `run9` suppresses contraction after an actual reachability rejection. Older exact lines independently rechecked without contraction may still be valid, and positive witnesses remain independently checkable. |
-| **Do not "upgrade" the paper's `k ≤ 9` optimality claim to `k = 10`.** | The claim as written is exactly right. `Sa(10) = 192` maximality rests on the suspect 2023 run. |
 | **`out26_1.txt` / `out26_2.txt` exist twice under the same names.** | ~130-byte stubs in `fullsolve-2026`; the 905 MB / 51 MB originals in `sa193-2023`. Only the latter are evidence. Pulling the wrong tag yields nothing, silently. |
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a finite budget, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when budgets were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. In a proof-safe cache, a printed `can't solve` is exhaustive because it is emitted only when `!skipped_some`; the separate `rb_dead` trap explains why run3/run8 caches are not proof-safe.) |
 | **Do not restore either old budget extreme.** | `c13b5d3` could return before trying a complete child; `e648e83` required a new negative cache fact and then handed pass 2 an unbounded child. Run7 demonstrated the latter failure for 20,460 CPU seconds in a finite-parent k=5 state after 280,116,882,707 prefixes. Current policy permits zero-progress `MAYBE`, never refills an exhausted parent, keeps the reliable one/two-segment spine on the shared allowance, and probes longer states with a geometrically increasing local slice. New builds count accepted split prefixes deterministically at 20,000,000 units per nominal second; `-DRADIO_CPU_BUDGET` is the historical fallback. See [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt) and [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt). |
@@ -50,9 +49,9 @@ Each of these has already caused, or was one step from causing, a wrong result.
 
 | | goal | state |
 |---|---|---|
-| **H1** | Publish | Draft in `paper/`. K≤8 table and both theorems are solid; `<TODO>` sections and the stale K=8 column remain. See P5. |
-| **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`, `legacy` bounds remain at `m=65..96`, and the band **m = 7..64 is entirely blank**. |
-| **H3** | Is `Sa = 192` maximal at k=10? | **Open.** A 2023 run says yes over ~47 days, but that corpus is unreliable. Needs a cold re-run of **all 16** states — conjecture (u1) would collapse them to one, but it is unproved and 2026-08-03 closed the two obvious routes to it. |
+| **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
+| **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
+| **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
 | **H4** | Structural theory | Active, but the excess-`q` Pareto-assembly avenue is parked — see below. |
 
 ## What is established
@@ -65,7 +64,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   30 KB of certifying lines is committed at
   [`../evidence/pareto_certification_k1_8.txt`](../evidence/pareto_certification_k1_8.txt),
   so the provenance survives the 1.8 GB of logs.
-- **Sa sequence, k = 1..9** — proven maximal. `Sa(192)` in 10 is a verified construction.
+- **Sa sequence, k = 1..10** — proven maximal. `Sa(192)` has independently verified witness
+  trees; proof-safe cold run9 exhaustively rejects all sixteen first-test possibilities for
+  `Sa(193)`.
 - **Three theorems plus the lift-box lemma** — Singleton Majorization, Unit-Group Elimination and
   Subgraph Monotonicity are proved; so is the new geometric core of recursive Pareto lifting. The
   latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
@@ -300,8 +301,9 @@ track is independently checked by `tools/check_atom_profile_certificate.py` and
 `tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
 searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.
 
-Artifact store `fedork/radio-data` (private): 14 tags, 43 assets plus a manifest per tag,
-about 394 MB stored, `check-index` green.
+Artifact store `fedork/radio-data` (private): 15 tags, 46 assets plus a manifest per tag,
+about 460 MB stored. The new `sa193-cold-2026-08-16` release contains the proof log, matched
+comparator and final reproduction metadata; `check-index` is green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -310,26 +312,33 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-Three AWS solvers are on `i-0005d74f985c52ae1` (`r7iz.4xlarge`, 16 vCPU, 123 GB). Snapshot from
-**2026-08-12 03:32 UTC**:
+No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
+reported UNSOLVABLE. The AWS instance `i-0005d74f985c52ae1` remains up only because the separate
+k=8 Pareto-prefix census is still running; do not stop it until that census and its final upload
+finish.
+
+At 2026-08-17 00:52 UTC the census had closed all 815 second-cut blocks and emitted 1,688 targets,
+but no endpoint or full-state record. It was healthy at one core and 8,892,056 KiB RSS with no
+swap. Its S3 `STATUS` object is still the launch snapshot; use the live output or final artifact,
+not that stale object, for progress. Exact operational paths are in [aws-run.md](aws-run.md).
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
 | `run/` — original | stale; solver gone | 2,568,394 verdicts, 0 of 16 |
 | `run2/` — A+B | stale; solver gone | 1,897,635 verdicts, 5.72 GB, 0 of 16 |
-| `run3/` — A+B + full-star majorization | **alive; performance only** | 1.71 M verdicts, **25.51 GB**, 1 of 16 |
+| `run3/` — A+B + full-star majorization | completed; performance only | 3,319,030 raw lines; 16 of 16; 479020.9 CPU s; 25.57 GB peak RSS |
 | `run4/` — compact cache at frozen commit `6af384e` | stopped, archived; old scheduler | 103,773 verdicts, **0.29 GB**, control never returned |
 | `run5/` — compact cache + exact L1 at frozen commit `290a892` | stopped, archived; old scheduler | 103,769 verdicts, **0.29 GB**, control never returned |
 | `run6/` — broken deadline experiment at `c13b5d3` | stopped, archived | control SOLVABLE in 922.0 s; 618,816 raw lines, 1.37 GB peak RSS |
 | `run7/` — progress-gated pass-2 dive at `e648e83` | stopped and archived; obsolete scheduler | 104,931 verdicts; control never returned; **0.29 GB** peak RSS |
-| `run8/` — compact cache + bounded probes at `9395218` | **alive; performance only** | 639.6 K verdicts, **1.15 GB**, 0 of 16 |
-| `run9/` — rb-safe contraction at `e7fa747` | **fresh and alive; proof run** | control SOLVABLE in **479.2 s**; 165.7 K verdicts, **0.60 GB**, 0 of 16 |
+| `run8/` — compact cache + bounded probes at `9395218` | completed; performance only | 3,173,928 raw lines; 16 of 16; 412561.4 CPU s; 1.32 GB peak RSS |
+| `run9/` — rb-safe contraction at `e7fa747` | **completed; proof source** | control SOLVABLE in 479.2 s; 16 of 16; 419353.1 CPU s; 1.32 GB peak RSS |
 
-Use `tools/sa193_status.sh --compare --baseline run8 --candidate run9 [--watch]` for the matched
-run8/run9 comparison. The default remains the longer run3/run8 comparison; `--all` prints the stopped
-historical sessions and must not be read as proof that those processes remain alive.
-`run3`'s `Sa(192)` control took 540.7 s.  It has completed one of the 16 top-level states and remains
-dominated by k=7 while exploring `Sb(111:82)@9`.
+The finalized comparison and raw hashes are in
+[`../evidence/sa193_run_comparison_2026-08-16.txt`](../evidence/sa193_run_comparison_2026-08-16.txt).
+Run9 was 1.646% slower than the matched run8 comparator and 12.456% faster than run3, with no
+run8/run9 sign disagreement across their 3,160,113 common parsed facts. `tools/sa193_status.sh`
+now reads final snapshots; `--watch` is no longer needed for these solvers.
 
 Every run in this table is a frozen process-CPU-budget binary. The 2026-08-13 deterministic-budget
 default does not alter or restart any of them. New work-clock verdicts append `work=<units>` and
@@ -339,7 +348,7 @@ budget bases.
 
 Run8 started cold at 2026-08-11 22:46:06 UTC with the `Sa(192)` control enabled. Its full embedded
 commit is `9395218dcbdd90d8f6a208b15da1878ff75f6ee1`. Its 60 GiB wrapper and run3's 40 GiB wrapper
-formed the original two-run envelope; run9's combined guard now caps all three solvers at 108 GiB.
+formed the original two-run envelope; run9's combined guard capped all three solvers at 108 GiB.
 The source archive, frozen binary, sidecar and `run.meta` are retained under `run8/`; hashes and SSM
 command IDs are in [aws-run.md](aws-run.md).
 
@@ -348,22 +357,21 @@ It changes only the unsound interaction: once `rb_dead` actually rejects a parti
 invocation retains an exact full negative but cannot materialize an implicit shorter negative. Each
 such event prints `contraction=rb-suppressed:<size>`; its five-minute status reports the count and
 latest state. The exact source archive, binary, build sidecar and launch metadata were hash-verified
-through S3. Run9 has a 60 GiB individual guard; a separate **108 GiB combined-solver guard stops
-run9 first**, preserving run3/run8 and about 15 GiB of host headroom. The idle guard now names all
-three solvers.
+through S3. During execution, run9 had a 60 GiB individual guard and a separate **108 GiB
+combined-solver guard** would have stopped it first, preserving run3/run8 and about 15 GiB of host
+headroom. Neither guard fired.
 
 Run8's mandatory remote happy-path gate passed:
 `result CONTROL Sa(192) in 10 = SOLVABLE (471.6 s)`.
-This is 0.872x run3's 540.7-second control on the same host. It validates this execution sufficiently
-to continue into `Sa(193)`; it is not evidence about the final negative yet.
+This is 0.872x run3's 540.7-second control on the same host. Run8 subsequently completed all roots,
+but its pre-fix negative cache leaves it classified as a performance comparator only.
 
 Run9's independent cold control also passed:
-`result CONTROL Sa(192) in 10 = SOLVABLE (479.2 s)`. At 03:32 UTC the solver had continued into
-`Sa(193)`, all three solver processes and run9's wrapper/watchdog/joint/idle guards were alive, and
-95 GiB remained available with no swap. No tainted contraction had yet been suppressed. This gates
-the execution, not the final maximality claim.
+`result CONTROL Sa(192) in 10 = SOLVABLE (479.2 s)`. It then completed every `Sa(193)` root and
+returned UNSOLVABLE in 419353.1 CPU seconds. No tainted contraction was suppressed anywhere in the
+final log. This is the proof-source execution.
 
-The run8 watchdog scans the run3 and run8 raw prefixes every five minutes with bounded state. It chooses the
+During execution, the run8 watchdog scanned the run3 and run8 raw prefixes every five minutes with bounded state. It chose the
 run that is behind by completed roots and verdict count, ranks its six slowest completed exact
 states, and joins `(state,k)` keys in the peer log. A verdict's `took` covers only its final
 activation, so the ranking and first timing column now add the last visible `elapsed` value from
@@ -376,8 +384,7 @@ profile, but no side-by-side level comparison. The profile adds the visible elap
 `still solving` frames before taking level differences. In new work-budget logs, `elapsed` is nominal
 work effort and the line separately appends `cpu=`; the level profile uses that actual CPU field.
 
-The memory profile is no longer the benign one inferred from the original build: `run3` has reached
-25.50 GB with 1.64 M verdicts.  The stale `run2` snapshot is not a matched-time comparison,
+Run3 ultimately reached 25.57 GB peak RSS and 3,319,030 raw lines. The stale `run2` snapshot is not a matched-time comparison,
 so it does not by itself identify the cause; it does show that memory per verdict cannot be assumed
 stable across the changed search shape.  `run3` still has the old unbounded dense result trie; the
 current compact representation remains unbounded but is over an order of magnitude smaller on the
@@ -442,7 +449,7 @@ is enabled; the profiler and rejected exact switch are reproducible research mod
 Raw validation and rejected-experiment logs are archived as `bounded-probe-2026-08-11` and
 `bounded-probe-rejected-2026-08-11`.  Full control flow, build IDs and the two-stage correction are
 in [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt).
-Run3 remains untouched. Run7 and the local `e648e83` continuation predate embedded
+Run3 remained untouched through completion. Run7 and the local `e648e83` continuation predate embedded
 `radio-provenance-v1`; both were stopped only after their source/launch metadata and raw segments
 were preserved. Run7's finalized S3 raw stream matches the retained EBS file exactly: 104,936 lines,
 11,065,274 bytes and SHA-256
@@ -506,8 +513,8 @@ the process peaks at 0.60 GB RSS.  Across 4,164,958 exact, mutated and determini
 every old verdict is preserved and 4,622 `MAYBE` answers become sound positive-front hits.  The full
 `Sa(192)` control now remains SOLVABLE in 711.7 CPU seconds after adding the 2 MiB exact-state L1,
 versus 819.9 for the first compact build and 734.5 before compaction; peak RSS is **0.35 GB**.  This
-makes a bounded local `Sa(193)` continuation credible without retaining the earlier CPU premium; it
-does not bound future cache growth or prove that the full refutation fits.
+made a bounded local `Sa(193)` continuation credible without retaining the earlier CPU premium;
+the later AWS run9 completion supplied the actual full refutation and measured peak.
 Implementation measurements and commands are in
 [`../evidence/cache_last_front_2026-08-10.txt`](../evidence/cache_last_front_2026-08-10.txt).
 
@@ -555,71 +562,24 @@ only the old k=6 monsters is therefore no longer a complete plan for the current
 
 ## The Sa(193) certificate
 
-Design in [certificate.md](certificate.md). The object is sixteen k=9 refutations; the certificate
-is the set of refuted negative facts in the existing `parse_out.sh` format plus a provenance
-header, verified level by level in `k`.
+The primary computational certificate is complete. A verified witness proves `Sa(192)` solvable;
+the cold run9 log exhaustively rejects every `Sb(n1:193-n1)@9`, `n1=97..112`, in the only possible
+first-test range. The raw source is
+`sa193-cold-2026-08-16:run9_out_sa193.txt`, and the compact root excerpt with hashes is
+[`../evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt).
 
-**Built and working: `radio_verify.c`.** An independent checker sharing no code with the solver.
-It verifies the whole `Sa(113)` k=9 ladder — 304,105 negative facts across k=2..8 — with **0
-unverified**, single-threaded. Trust base is three theorems plus the split semantics; ~700 lines.
+Run9 began from an empty cache, stayed in one session, passed its positive control, carried complete
+embedded provenance and used the contraction-safe build. This avoids both defects that made the
+2023 result unusable: inherited unarchived facts and false implicit shorter negatives.
 
-**The 2023 corpus is nearly a certificate already, and the gap is localised.** `sa193-2023`
-contains all sixteen `can't solve Sb(n1:193-n1) in 9`. Checked top-down against itself plus the
-2026 `out_k8.txt`:
+`radio_verify.c` remains an independent strengthening path, not a prerequisite for the current
+`proven-exhaustive` classification. It shares no solver search code and has already verified the
+whole `Sa(113)` k=9 ladder—304,105 negative facts across k=2..8—with zero unverified. A complete
+end-to-end verifier replay of the new 3.17-million-fact run9 DAG would reduce the trusted code base
+further, but it is expected to cost substantial enumeration time and is not needed to decide H3.
 
-- **k=9: each of the sixteen fails on exactly ONE split** — 32 recursion nodes total. The survivor
-  is always the near-balanced one, and it needs a single two-part k=8 fact: for `Sb(112:81)` that is
-  **`Sb(74:40, 41:38)` at k=8**, which nothing among the 1,879 logged 2023 k=8 facts dominates.
-- **k=4: 940 facts, 0 unverified. k=5: 4,859 of 4,859 sampled, 0 unverified.**
-- k=7 — 3.1 M facts, P=4, ~558 options per part — is the term that decides feasibility. Not yet
-  measured to completion.
-
-So the question is no longer "re-run 47 days"; it is "prove sixteen k=8 two-part states and check
-the rest". See the 2026-08-04 journal entry.
-
-Two design claims that stood here are **withdrawn**:
-
-- *"The log is not closed."* Qualified, not withdrawn: **a cold single-session run is closed; a
-  resumed run is not.** The k=9 ladder (one cold session) verifies at 0 unverified. The 2023
-  `Sa(193)` run was resumed for months from warm caches whose logs were not archived, so ~5% of its
-  k=5 facts and all sixteen of its k=9 facts cite children that were never logged. **Constraint on
-  the re-run: keep every session's output, or start cold and never resume.** The fix is not
-  breadcrumbs but **on-demand derivation** — the checker proves cheap missing facts itself, which
-  closed the k=5 gap completely and shrinks the artifact to facts that are expensive to re-derive.
-- *"Verification is cheaper than the proof."* It is not — removing search removes constant
-  factors, not the enumeration. k=4's 216,580 facts cost 91 s against 1,521 s for the whole
-  `Sa(113)` solve. The value is the trust base, arbitrary parallelism, one-level memory
-  residency, and spot-checkability.
-
-### What the certificate needs next, in order
-
-1. **Prove the sixteen k=8 facts with the solver** — `./radio_one <cache> 8 74 40 41 38` and its
-   fifteen siblings. The only genuinely new compute, sixteen independent jobs, **still unsized**.
-   Cold is hopeless: even the single part `Sb(74:41)` at k=8 does not resolve in 10 minutes.
-   Warm-start from `k8-2026-05-12:out_k8.txt`, 2026-era and audited clean — the prohibition is
-   specific to `cache-2025:parsed_260.txt` and its sixteen suspect verdicts. Beware the cache size:
-   the `out_k8.txt` facts that could inject into `Sb(74:40, 41:38)` number 11,375,981, about 25 GB
-   of trie before the search begins.
-
-   **Deriving them in the verifier does not work (tested 2026-08-05).** `Sb(74:40, 41:38)` fails on
-   its first split in 227 nodes: all three children are k=7 states absent from the corpus and
-   dominated by nothing in it. Deriving it needs k=7 facts that must themselves be derived, and
-   the recursion is the original search.
-2. **Verify the painted k=7 sub-DAG** — 16,347 facts, order 100-300 core-hours, hours on 24 cores.
-   Parallelise here: facts are independent and levels are independent, and the resident set is one
-   level rather than the certificate.
-3. **Re-ask whether painting shrinks at k=7 -> k=6.** Preferring already-painted witnesses gave
-   2.07x in speed and **no** size reduction at k=9 -> k=8, because 1,910 of 1,932 k=8 facts are
-   cited and there is nothing to trade against. At k=7 -> k=6, 16,347 facts fan out into a 2.5 M
-   level, where slack is far likelier.
-4. **Minimalize each level** — measured at only **1.84x** (46.4% of the k=6 level is redundant, 45.6%
-   of the `np=4` bucket that dominates). Deprioritised accordingly; it is not the lever the
-   upward-closure argument suggested.
-
-Ranked by measured effect at k=7: **top-down painting 190x**, columnar dominance index >=8.1x,
-minimalization 1.84x. Cost scales with **part count**, not fact count, but the realised part count
-on the actual `Sa(193)` logs never exceeds 10 — so the binding constraint was never the exponent,
-it was how many facts the proof actually reaches.
+The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a
+way to rehabilitate a resumed, non-closed log. The new cold log is closed by construction.
 
 ## Where P6 stands — full star expansion is the structural rule
 
@@ -767,17 +727,13 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Keep watching proof-safe cold `run9` beside run8.** Its positive `Sa(192)` control passed in
-   479.2 CPU seconds; it should now run to a verdict unless its individual/combined memory guard or another
-   concrete health signal fails. Use `tools/sa193_status.sh --compare --baseline run8 --candidate
-   run9 --watch`. Run3/run8 remain valuable matched performance histories, but their negative caches
-   predate the contraction fix and cannot establish H3.
+0. **Let the separate k=8 Pareto-prefix census finish and archive its final output before stopping
+   the AWS instance.** The Sa solver artifacts and final sidecars are already preserved; the census
+   is the only remaining live process in scope.
 
-1. **Evaluate run9 by scheduler progress, suppression telemetry and memory, not raw verdict count
-   alone.** Compare completed roots, active stacks, matched attempt floors, `~self-final`, RSS, and
-   `rb-tainted contractions`. A `≥` attempt sum is only a visible-work floor; missing
-   verdicts remain `MAYBE`, not negatives, and no obsolete checkpoint should be used as a
-   cross-build proof source.
+1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
+   maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
+   editorial/theorem integration work, not an H3 compute dependency.
 
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the

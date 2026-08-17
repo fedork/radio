@@ -2,20 +2,18 @@
 Imported 2026-08-02 from the Google Docs export, punctuation unescaped.
 
 KNOWN WORK REMAINING - see docs/research-plan.md item P5:
-  - the K=8 table below is STALE at m=10..17; correct values are in data/pareto_sb.csv
   - lemma numbering: (7) duplicates (5); "(7) holds true k up to 8" refers to (u1)
   - <TODO> sections: Terminology, Unit Group Triviality Lemma, Insights, Refuted lemmas
   - lemma (10)'s transcription is corrected, but the corrected conjecture is now refuted at k=10
   - lemma (8) and the exact piecewise replacement for lemma (9) are now known from
     Li--Wu--Triesch (2018); integrate the citation style with the final bibliography
   - add lemma (12) for m=8 and the G_k = sum-of-binomials closed form
-  - the Sa table should mark k<=9 proven vs k=10 constructed
 Do not treat any number in this file as authoritative; data/*.csv is.
 -->
 
 **Introduction**
 
-A specific case of quantity group testing is considered: given a group on *n* coins, two of which are known to be defective, and a test procedure that reports the number of defective coins in a tested subset (0, 1 or 2), determine the largest *n* for which both coins can be detected with at most *k* adaptive tests.  The computation proves the `Sa` sequence through *k*=9, supplies a verified construction at *k*=10, and extends the exact and constructive record for the two-set `Sb` problem.  Every computational claim is separated into a verified lower witness and, where available, an exhaustive or published upper bound.
+A specific case of quantity group testing is considered: given a group on *n* coins, two of which are known to be defective, and a test procedure that reports the number of defective coins in a tested subset (0, 1 or 2), determine the largest *n* for which both coins can be detected with at most *k* adaptive tests. The computation proves the `Sa` sequence through *k*=10 and extends the exact and constructive record for the two-set `Sb` problem. Every computational claim is separated into a verified lower witness and, where available, an exhaustive or published upper bound.
 
 **Relation to prior work**
 
@@ -39,11 +37,26 @@ Sa, Sb, Sbb, k, zero group, unit group, etc\<TODO>
 
 **Maximum solvable Sa states**
 
-The following are maximum values of *n* for a given *k* such that Sa(*n*) can be solved in *k* tests. Results for k up to 9 are proven to be the best possible results by exhaustive search using the provided Program. Best results for k up to 7 have been previously published (without proof of them being best), so results for k>=8 are new as well as proof for non-trivial values of k are new.
+The following are maximum values of *n* for a given *k* such that Sa(*n*) can be solved in *k*
+tests. Every entry through *k*=10 is proven maximal. For *k*=1 through 9, retained exhaustive logs
+contain the positive boundary and the rejection immediately above it. For *k*=10, an independently
+checked witness proves Sa(192) achievable and a proof-safe cold exhaustive run rejects Sa(193).
 
+<!-- generated:pareto_sa -->
 | k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-| :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- | :---- |
-| Max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
+
+Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
+<!-- /generated -->
+
+For the last upper bound, the proven *k*=9 maximum Sa(112) reduces Sa(193) to the sixteen states
+`Sb(n1:193-n1)` with `97<=n1<=112`. Cold run9 rejected all sixteen in one uninterrupted session,
+after its Sa(192) positive control passed. It returned UNSOLVABLE in 419353.1 CPU seconds with
+1.32 GB peak RSS. The raw, fully provenanced source is archived as
+`sa193-cold-2026-08-16:run9_out_sa193.txt`; the sixteen root lines and hashes are committed in
+`../evidence/sa193_unsolvable_in_10.txt`. The matching 2023 result is not used because that build
+produced known false negatives.
 
 **Maximum solvable Sb states with size 1**
 
@@ -60,14 +73,14 @@ The following table enumerates all *max* values of single-group Sb states for k 
 | **7** |  |  |  |  | 17 | 42 | 97 | 214 |
 | **8** |  |  |  |  | 15 | 38 | 91 | 206 |
 | **9** |  |  |  |  | 14 | 36 | 87 | 198 |
-| **10** |  |  |  |  | 12 | 33 | 82 | 182 |
-| **11** |  |  |  |  | 11 | 31 | 77 | 176 |
-| **12** |  |  |  |  |  | 29 | 73 | 170 |
-| **13** |  |  |  |  |  | 27 | 69 | 165 |
-| **14** |  |  |  |  |  | 25 | 66 | 159 |
-| **15** |  |  |  |  |  | 24 | 63 | 153 |
-| **16** |  |  |  |  |  | 22 | 60 | 148 |
-| **17** |  |  |  |  |  | 21 | 58 | 142 |
+| **10** |  |  |  |  | 12 | 33 | 82 | 189 |
+| **11** |  |  |  |  | 11 | 31 | 77 | 182 |
+| **12** |  |  |  |  |  | 29 | 73 | 174 |
+| **13** |  |  |  |  |  | 27 | 69 | 168 |
+| **14** |  |  |  |  |  | 25 | 66 | 161 |
+| **15** |  |  |  |  |  | 24 | 63 | 155 |
+| **16** |  |  |  |  |  | 22 | 60 | 150 |
+| **17** |  |  |  |  |  | 21 | 58 | 144 |
 | **18** |  |  |  |  |  | 20 | 55 | 139 |
 | **19** |  |  |  |  |  | 19 | 53 | 135 |
 | **20** |  |  |  |  |  |  | 51 | 130 |
@@ -191,4 +204,5 @@ The full witness tree is `witnesses/sa192_k10_a.tree` in the repository, with a 
 slightly smaller witness in `witnesses/sa192_k10_b.tree`. Both are verified by
 `tools/check_witness.py`: every split is re-derived from the recorded test, every reference
 is checked to dominate its child after unit-group stripping, and the information bound is
-checked at every node. Reproduced in an appendix for the final version.
+checked at every node. Maximality is supplied separately by the cold `Sa(193)` refutation above.
+The witness should be reproduced in an appendix for the final version.

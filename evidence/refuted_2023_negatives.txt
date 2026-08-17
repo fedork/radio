@@ -20,8 +20,9 @@
 #     Sb(154:15) in 8  pass=8  fast_solve=0  took  52230   <- 14 hours, and wrong
 #
 # CONSEQUENCE: no negative result from the 2023 corpus can be trusted on its own, however
-# expensive it looks. This is why Sa(193) is recorded as `legacy` rather than
-# `proven-exhaustive` - see evidence/sa193_unsolvable_in_10.txt.
+# expensive it looks. The historical Sa(193) verdict therefore stayed `legacy` until the
+# proof-safe cold 2026 run independently re-derived it; the current source is recorded in
+# evidence/sa193_unsolvable_in_10.txt.
 #
 can't solve Sb(29:1)[29,30] in 5 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451924/43640018(-46/-2582)
 can't solve Sb(63:2)[126,65] in 6 took 0.000 totalsplits=0 pass=1 fast_solve=1 cache=451473/43606822(-5/-3245)
