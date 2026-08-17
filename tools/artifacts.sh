@@ -196,17 +196,31 @@ cmd_check_index() {
     # This confirms it still matches the store.
     local idx="$REPO_ROOT/data/artifacts.csv"
     [ -f "$idx" ] || die "no $idx"
+    local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
     local have rc=0
     have="$(gh release list -R "$REPO" --limit 100 --json tagName --jq '.[].tagName' | sort -u)"
-    local tag asset rest prev=""
+    local tag asset rest prev="" assets_file
     while IFS=, read -r tag asset rest; do
         [ "$tag" = "tag" ] && continue
         if ! grep -qx "$tag" <<<"$have"; then
             [ "$tag" = "$prev" ] || echo "MISSING TAG   $tag"
             prev="$tag"; rc=1; continue
         fi
-        if ! gh release view "$tag" -R "$REPO" --json assets \
-                --jq '.assets[].name' 2>/dev/null | grep -qx "$asset"; then
+        [[ "$tag" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "INVALID TAG   $tag"; rc=1; continue
+        }
+        assets_file="$tmp/$tag.assets"
+        if [ ! -f "$assets_file" ]; then
+            # Do not pipe `gh` into `grep -q` under pipefail: once grep finds an early match it
+            # closes the pipe, and gh's resulting SIGPIPE is misreported as a missing asset.
+            if ! gh release view "$tag" -R "$REPO" --json assets \
+                    --jq '.assets[].name' > "$assets_file" 2>/dev/null; then
+                echo "UNREADABLE TAG $tag"
+                rc=1
+                : > "$assets_file"
+            fi
+        fi
+        if ! grep -qx "$asset" "$assets_file"; then
             echo "MISSING ASSET $tag / $asset"; rc=1
         fi
     done < "$idx"
