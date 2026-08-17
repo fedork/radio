@@ -72,7 +72,7 @@ if [[ -n "$cpus" ]] && ! command -v taskset >/dev/null; then
     echo "benchmark_verifier_pipeline.sh: --cpus requires taskset" >&2
     exit 2
 fi
-if /usr/bin/time --version 2>&1 | grep -q 'GNU time'; then
+if /usr/bin/time --version 2>&1 | grep -qi 'GNU time'; then
     time_flavor=gnu
 elif [[ $(uname -s) == Darwin ]]; then
     time_flavor=bsd
