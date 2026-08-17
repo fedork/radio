@@ -52,3 +52,15 @@ k  before   minimal  removed  wall_s
 #   does not publish its intra-level atomic queue position, so it cannot support a current k=7
 #   percentage or ETA. Silence until the k=7 summary line is expected, not evidence of a stall.
 # The status script now prints this distinction in a leading PROGRESS block.
+
+# Next milestone at 2026-08-17 16:47:44 UTC:
+k  before    minimal   removed  wall_s
+7  2576885   2507270     69615  713.01
+8     2545      2151       394    0.00
+# Coloring then completed these barriers:
+k  in_level  targets  verified  unverified  budget  wall_s  cited_k_minus_1
+9        16       16        16           0       0    0.06              2151
+8      2151     2151      2151           0       0   43.79           2506515
+# Therefore the active k=7 batch contains 2,506,515 targets: all but 755 of the 2,507,270
+# minimal facts (99.97%). This refutes the planning prior that coloring would substantially shrink
+# k=7 on run9. It remains a target count, not an intra-batch completed counter or ETA.

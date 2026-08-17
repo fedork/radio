@@ -341,13 +341,15 @@ Next, in order:
 1. **Delivered:** normalize run9 to `radio-negative-certificate-v1` and round-trip it byte-for-byte;
    a bounded top pass also verifies the sixteen explicit roots and shows that they cite all 2,545
    canonical `k=8` facts, but deliberately verifies nothing below `k=9`;
-2. **Running on AWS:** minimalize the support levels, verify/color from the sixteen roots and record
-   the actual reachable counts—the earlier 190x `k=7` reduction came from the superseded 2023
-   corpus and is only a prior. Fourteen pinned workers had completed levels through `k=6` at the
-   first live check and were processing the 2,576,885-fact `k=7` level;
-3. the same supervisor will replay the colored bundle and require zero unresolved targets; after
+2. **Delivered on AWS:** minimalize every support level. The dominant `k=7` level retained
+   2,507,270 of 2,576,885 facts (97.30%), so same-level reduction is modest on this corpus;
+3. **Running on AWS:** color from the sixteen roots. The `k=9` and `k=8` barriers verified 2,167
+   targets and cited 2,506,515 `k=7` facts—99.97% of its minimal level. The earlier 190x `k=7`
+   reduction from the superseded 2023 corpus does not transfer; the fourteen workers are now
+   processing this full-scale batch, with no intra-level cursor or defensible ETA;
+4. the same supervisor will replay the colored bundle and require zero unresolved targets; after
    completion, compare its record set with a second worker width if the measured cost justifies it;
-4. only if dominance reconstruction still dominates cost, add optional checkable citation hints;
+5. only if dominance reconstruction still dominates cost, add optional checkable citation hints;
    do not make a binary or opaque format the durable source merely to accelerate indexing.
 
 The parallel-solver follow-up should reuse the scheduling lesson without forcing the solver into

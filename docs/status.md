@@ -589,18 +589,20 @@ negative records, and the 106 MB readable certificate round-trips byte-identical
 canonical `k=8` facts; it stopped before checking any of those facts. This is not a proof replay.
 
 A complete end-to-end verifier replay of the new 3.17-million-fact run9 DAG is now running on AWS,
-but has not yet completed. The launch reproduced the 3,126,190-fact normalized input at the known
-SHA-256, then began pre-color minimalization with fourteen workers while leaving two of sixteen
-vCPUs unassigned. At the first live check it had reduced levels through `k=6` and was processing the
-2,576,885-fact `k=7` level; the existing census still held its own full core and the host had no
-swap. The same supervisor will color from the sixteen explicit roots and replay the resulting
-bundle. Use `tools/run9_verifier_status.sh`; exact launch evidence is in
+but has not yet completed. The launch reproduced the normalized input at the known SHA-256 and
+completed pre-color minimalization with fourteen workers while leaving two of sixteen vCPUs
+unassigned. The dominant `k=7` level retained 2,507,270 of 2,576,885 facts (97.30%) after 713.01
+seconds. Coloring verified the sixteen `k=9` roots and all 2,151 minimal `k=8` targets; those cited
+2,506,515 `k=7` facts, or 99.97% of its minimal level. The earlier 190x painting reduction from the
+superseded 2023 corpus therefore does not transfer to run9. The verifier is now coloring that
+full-scale `k=7` batch; the existing census still holds its own full core and the host has no swap.
+
+The deployed binary reports only at whole-level barriers. There is no defensible intra-`k=7`
+percentage or ETA from this build: the target count is the batch size, not a processed counter.
+High CPU plus increasing elapsed time demonstrates health, while `coloring_milestone=3/9` will be
+the next proof milestone. The same supervisor will replay the resulting bundle. Use
+`tools/run9_verifier_status.sh`; exact evidence is in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
-The deployed binary reports only at whole-level barriers: at the 16:46 UTC snapshot, its 17.5%
-figure meant 546,744 of 3,126,174 support inputs belonged to already completed levels, not that
-17.5% of time or total work had elapsed. There is no defensible intra-`k=7` percentage or ETA from
-this build; high CPU plus increasing elapsed time demonstrates health, while the next `k=7` line is
-the next proof milestone.
 This remains an optional trust-base strengthening, not an H3 dependency.
 
 The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a

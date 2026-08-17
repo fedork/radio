@@ -68,13 +68,14 @@ case "$stage" in
         ;;
     COLOR)
         if grep -q '^--- pass ' "$work/color.out" 2>/dev/null; then
-            read -r color_levels last_color_k color_targets color_verified <<<"$(
+            read -r color_levels last_color_k color_targets color_verified last_cited <<<"$(
                 awk '
-                    /^--- pass / { levels=targets=verified=0; last=""; inpass=1; next }
+                    /^--- pass / { levels=targets=verified=last_cited=0; last=""; inpass=1; next }
                     inpass && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ {
-                        levels++; last=$1; targets+=$3; verified+=$4
+                        levels++; last=$1; targets+=$3; verified+=$4; last_cited=$8
                     }
-                    END { printf "%d %s %d %d\n", levels, (last=="" ? 0 : last), targets, verified }
+                    END { printf "%d %s %d %d %d\n", levels, (last=="" ? 0 : last),
+                                 targets, verified, last_cited }
                 ' "$work/color.out"
             )"
             echo '  step=3/4 top-down coloring from the 16 explicit roots'
@@ -82,9 +83,28 @@ case "$stage" in
             printf '  coloring_milestone=%s/9 level barriers complete; %s targets verified so far\n' \
                 "$color_levels" "$color_verified"
             if (( color_levels < 9 )); then
-                if (( color_levels == 0 )); then current_color_k=9; else current_color_k=$((last_color_k - 1)); fi
-                printf '  now=coloring k=%s; this level reports only when its whole batch finishes\n' \
-                    "$current_color_k"
+                if (( color_levels == 0 )); then
+                    current_color_k=9
+                    current_targets=16
+                    current_level_size=16
+                else
+                    current_color_k=$((last_color_k - 1))
+                    current_targets=$last_cited
+                    current_level_size=$(awk -v want="$current_color_k" '
+                        $1 == "k=" want ":" { print $4; exit }
+                    ' "$work/color.out")
+                fi
+                if [[ "$current_level_size" =~ ^[0-9]+$ && "$current_level_size" -gt 0 ]]; then
+                    current_target_pct=$(awk -v targets="$current_targets" -v total="$current_level_size" \
+                        'BEGIN { printf "%.2f", 100*targets/total }')
+                    printf '  now=coloring k=%s: %s targets from %s minimal facts (%s%% of level)\n' \
+                        "$current_color_k" "$current_targets" "$current_level_size" "$current_target_pct"
+                else
+                    printf '  now=coloring k=%s: %s targets\n' "$current_color_k" "$current_targets"
+                fi
+                echo '  progress_limit=target count is the batch size, not the number already processed;'
+                echo '                 the running binary reports only when the whole level finishes'
+                echo '  eta=unavailable within the current level'
             else
                 echo '  now=coloring complete; preparing the colored certificate'
             fi

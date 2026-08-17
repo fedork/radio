@@ -40,12 +40,14 @@ for this census is still the launch snapshot; inspect the live output or final a
 using that stale object as a health signal.
 
 At **2026-08-17 16:34:44 UTC**, the independent run9 verifier launched from commit `8856509`.
-It first reproduced the 3,126,190-record sanitized certificate byte-for-byte, then entered
-pre-color antichain reduction. Fourteen nice-level-10 workers are pinned to CPUs 0--13, leaving two
-vCPUs for the one-core census and the host. The first live query showed 13.11 CPUs in use, 422 MiB
-RSS, no swap, and completed reductions through `k=6`; the census simultaneously retained its full
-core. The verifier will color from the sixteen explicit roots, replay the resulting closed bundle,
-and upload compressed results under `run9-verifier/20260817T163700Z/`. Follow it with
+It reproduced the 3,126,190-record sanitized certificate byte-for-byte and completed pre-color
+antichain reduction. The dominant `k=7` level fell only from 2,576,885 to 2,507,270 facts in 713.01
+seconds. Coloring then verified all sixteen `k=9` roots and all 2,151 minimal `k=8` targets, which
+cited 2,506,515 `k=7` facts—99.97% of that level. It is now coloring that full-scale `k=7` batch.
+Fourteen nice-level-10 workers are pinned to CPUs 0--13, leaving two vCPUs for the one-core census
+and the host; both jobs retain full CPU and the host has no swap. The verifier will replay the
+resulting closed bundle and upload compressed results under `run9-verifier/20260817T163700Z/`.
+Follow it with
 `tools/run9_verifier_status.sh`; launch hashes and the first snapshot are in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 

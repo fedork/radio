@@ -6689,3 +6689,12 @@ level, labels the record fraction as a completed-level milestone, and separately
 elapsed time as health. It will switch automatically to level-barrier counts during coloring and
 to the final replay phase afterward. Future long verifier builds should publish their task cursor;
 the current run was left untouched.
+
+The missing milestone arrived at 16:47:44 UTC. Minimalization retained 2,507,270 of the 2,576,885
+`k=7` facts—97.30%—after 713.01 seconds, then reduced `k=8` from 2,545 to 2,151. Coloring verified
+the sixteen roots in 0.06 seconds and all 2,151 `k=8` targets in 43.79 seconds, but the latter cited
+2,506,515 `k=7` facts: all but 755, or 99.97% of the minimal level. Thus the old 190x painting
+reduction from the superseded 2023 corpus emphatically does not transfer to the closed run9 DAG;
+the current `k=7` batch has 2.5 million targets. The status summary now prints both current target
+count and level fraction, while still distinguishing batch size from completed work. No process
+was restarted.
