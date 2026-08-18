@@ -107,6 +107,39 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #define NO_DEADLINE 2
 #define FAST_ONLY 3
 
+/* Per-search state is deliberately separate from the process-wide mathematical universe, result
+   trie and split catalog.  The latter two are still mutable and therefore still serialize solver
+   calls; this context is the first prerequisite for a later frozen-cache epoch.  In particular,
+   it makes the deterministic work clock, exact L1 and joint-reachability scratch independently
+   ownable by a worker without changing the legacy single-threaded API. */
+typedef struct cache_l1_entry cache_l1_entry;
+typedef struct radio_reachability_state radio_reachability_state;
+typedef struct radio_search_context {
+    uint64_t work_clock;
+    cache_l1_entry *cache_l1;
+    radio_reachability_state *reachability;
+#ifdef MEASURE_CACHE_L1
+    unsigned long long cache_l1_queries;
+    unsigned long long cache_l1_eligible;
+    unsigned long long cache_l1_hits;
+    unsigned long long cache_l1_stores;
+    unsigned long long cache_l1_replacements;
+#endif
+    long long cant_solve_count;
+} radio_search_context;
+
+#define RADIO_WORK_CLOCK_ORIGIN 1024ULL
+static radio_search_context radio_default_search_context = {
+    .work_clock = RADIO_WORK_CLOCK_ORIGIN,
+};
+
+void radio_search_context_init(radio_search_context *ctx) {
+    memset(ctx, 0, sizeof(*ctx));
+    ctx->work_clock = RADIO_WORK_CLOCK_ORIGIN;
+}
+
+void radio_search_context_destroy(radio_search_context *ctx);
+
 /* Deterministic accepted-prefix budgeting is the repository default.  RADIO_CPU_BUDGET retains a
    matched fallback for controlled comparisons and archaeology. */
 #if defined(RADIO_WORK_BUDGET) && defined(RADIO_CPU_BUDGET)
@@ -128,29 +161,46 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #if defined(RADIO_WORK_BUDGET) || defined(RADIO_MEASURE_WORK)
 /* Stay clear of the historical small integer sentinels CACHE_ONLY/NO_DEADLINE/FAST_ONLY when this
    counter itself is the scheduling clock.  Subtracting the origin yields the diagnostic work. */
-#define RADIO_WORK_CLOCK_ORIGIN 1024ULL
-static uint64_t radio_work_clock = RADIO_WORK_CLOCK_ORIGIN;
-static inline void radio_budget_charge_split(void) {
-    if (radio_work_clock != UINT64_MAX) radio_work_clock++;
+static inline void radio_budget_charge_split_ctx(radio_search_context *ctx) {
+    if (ctx->work_clock != UINT64_MAX) ctx->work_clock++;
 }
-static inline uint64_t radio_work_units_used(void) {
-    return radio_work_clock - RADIO_WORK_CLOCK_ORIGIN;
+static inline uint64_t radio_work_units_used_ctx(const radio_search_context *ctx) {
+    return ctx->work_clock - RADIO_WORK_CLOCK_ORIGIN;
 }
 #else
-static inline void radio_budget_charge_split(void) { }
-static inline uint64_t radio_work_units_used(void) { return 0; }
+static inline void radio_budget_charge_split_ctx(radio_search_context *ctx) { (void)ctx; }
+static inline uint64_t radio_work_units_used_ctx(const radio_search_context *ctx) {
+    (void)ctx;
+    return 0;
+}
 #endif
+
+static inline void radio_budget_charge_split(void) {
+    radio_budget_charge_split_ctx(&radio_default_search_context);
+}
+static inline uint64_t radio_work_units_used(void) {
+    return radio_work_units_used_ctx(&radio_default_search_context);
+}
 
 #ifdef RADIO_WORK_BUDGET
 #ifndef RADIO_WORK_UNITS_PER_SECOND
 #define RADIO_WORK_UNITS_PER_SECOND 20000000ULL
 #endif
 #define RADIO_BUDGET_UNITS_PER_SECOND ((uint64_t)RADIO_WORK_UNITS_PER_SECOND)
-static inline uint64_t radio_budget_now(void) { return radio_work_clock; }
+static inline uint64_t radio_budget_now_ctx(const radio_search_context *ctx) {
+    return ctx->work_clock;
+}
 #else
 #define RADIO_BUDGET_UNITS_PER_SECOND ((uint64_t)CLOCKS_PER_SEC)
-static inline uint64_t radio_budget_now(void) { return (uint64_t)clock(); }
+static inline uint64_t radio_budget_now_ctx(const radio_search_context *ctx) {
+    (void)ctx;
+    return (uint64_t)clock();
+}
 #endif
+
+static inline uint64_t radio_budget_now(void) {
+    return radio_budget_now_ctx(&radio_default_search_context);
+}
 
 static uint64_t radio_budget_add(uint64_t base, uint64_t amount) {
     return amount > UINT64_MAX - base ? UINT64_MAX : base + amount;
@@ -161,11 +211,17 @@ static uint64_t radio_budget_seconds(uint64_t seconds) {
         ? UINT64_MAX : seconds * RADIO_BUDGET_UNITS_PER_SECOND;
 }
 
-static uint64_t radio_budget_after_seconds(uint64_t seconds) {
-    return radio_budget_add(radio_budget_now(), radio_budget_seconds(seconds));
+static uint64_t radio_budget_after_seconds_ctx(const radio_search_context *ctx,
+                                               uint64_t seconds) {
+    return radio_budget_add(radio_budget_now_ctx(ctx), radio_budget_seconds(seconds));
 }
 
-static uint64_t radio_budget_after_milliseconds(uint64_t milliseconds) {
+static uint64_t radio_budget_after_seconds(uint64_t seconds) {
+    return radio_budget_after_seconds_ctx(&radio_default_search_context, seconds);
+}
+
+static uint64_t radio_budget_after_milliseconds_ctx(const radio_search_context *ctx,
+                                                    uint64_t milliseconds) {
     uint64_t seconds_part = milliseconds / 1000;
     uint64_t millis_part = milliseconds % 1000;
     uint64_t whole = radio_budget_seconds(seconds_part);
@@ -174,7 +230,11 @@ static uint64_t radio_budget_after_milliseconds(uint64_t milliseconds) {
         + (RADIO_BUDGET_UNITS_PER_SECOND % 1000) * millis_part / 1000;
     uint64_t amount = radio_budget_add(whole, fraction);
     if (amount == 0) amount = 1;
-    return radio_budget_add(radio_budget_now(), amount);
+    return radio_budget_add(radio_budget_now_ctx(ctx), amount);
+}
+
+static uint64_t radio_budget_after_milliseconds(uint64_t milliseconds) {
+    return radio_budget_after_milliseconds_ctx(&radio_default_search_context, milliseconds);
 }
 
 /* A finite child gets a fraction of the allowance still owned by its parent.  In particular, an
@@ -303,7 +363,11 @@ int fast_replay_first_depth;
 
 splits *ensure_splits(int sbb, int k);
 splits *prepare_splits(int sbb, int k, int need_fast);
+splits *prepare_splits_ctx(radio_search_context *ctx, int sbb, int k, int need_fast);
 int minK(int);
+int minK_ctx(radio_search_context *ctx, int sbb);
+int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
+                  uint64_t parent_deadline);
 void init_singleton_majorization(void);
 int singleton_majorization_can_solve(int *sb, int size, int k);
 int star_expansion_majorization_can_solve(int *sb, int size, int k);
@@ -443,26 +507,38 @@ static uint32_t front_record_live;
 #endif
 #define CACHE_L1_SIZE (1u << CACHE_L1_BITS)
 #define CACHE_L1_MAX_PARTS 12u
-typedef struct {
+struct cache_l1_entry {
     uint32_t hash;
     front_point part[CACHE_L1_MAX_PARTS];
     uint8_t size;
     uint8_t k;
     uint8_t verdict_plus_one;
     uint8_t padding;
-} cache_l1_entry;
-static cache_l1_entry cache_l1[CACHE_L1_SIZE];
+};
+static cache_l1_entry radio_default_cache_l1[CACHE_L1_SIZE];
+
+static cache_l1_entry *radio_search_context_cache_l1(radio_search_context *ctx) {
+    if (ctx->cache_l1 == NULL) {
+        if (ctx == &radio_default_search_context) {
+            ctx->cache_l1 = radio_default_cache_l1;
+        } else {
+            ctx->cache_l1 = (cache_l1_entry *)calloc(CACHE_L1_SIZE, sizeof(*ctx->cache_l1));
+            if (ctx->cache_l1 == NULL) {
+                printf("\nout of memory allocating worker exact cache\n");
+                exit(1);
+            }
+        }
+    }
+    return ctx->cache_l1;
+}
+
 #ifdef MEASURE_CACHE_L1
-static unsigned long long cache_l1_queries;
-static unsigned long long cache_l1_eligible;
-static unsigned long long cache_l1_hits;
-static unsigned long long cache_l1_stores;
-static unsigned long long cache_l1_replacements;
 static void print_cache_l1_stats(void) {
+    radio_search_context *ctx = &radio_default_search_context;
     fprintf(stderr,
             "CACHE_L1 queries=%llu eligible=%llu hits=%llu stores=%llu replacements=%llu\n",
-            cache_l1_queries, cache_l1_eligible, cache_l1_hits, cache_l1_stores,
-            cache_l1_replacements);
+            ctx->cache_l1_queries, ctx->cache_l1_eligible, ctx->cache_l1_hits,
+            ctx->cache_l1_stores, ctx->cache_l1_replacements);
 }
 #endif
 
@@ -1014,17 +1090,19 @@ static inline __attribute__((always_inline)) uint32_t cache_l1_hash(const int *s
 }
 
 static inline __attribute__((always_inline)) int cache_l1_probe(
-    const int *sb, int size, int k, cache_l1_entry **entry_out, uint32_t *hash_out) {
+    radio_search_context *ctx, const int *sb, int size, int k,
+    cache_l1_entry **entry_out, uint32_t *hash_out) {
 #ifdef MEASURE_CACHE_L1
-    cache_l1_queries++;
+    ctx->cache_l1_queries++;
 #endif
     *entry_out = NULL;
     if ((unsigned)size <= CACHE_L1_MAX_PARTS) {
 #ifdef MEASURE_CACHE_L1
-        cache_l1_eligible++;
+        ctx->cache_l1_eligible++;
 #endif
         uint32_t hash = cache_l1_hash(sb, size, k);
-        cache_l1_entry *entry = &cache_l1[hash & (CACHE_L1_SIZE - 1u)];
+        cache_l1_entry *entries = radio_search_context_cache_l1(ctx);
+        cache_l1_entry *entry = &entries[hash & (CACHE_L1_SIZE - 1u)];
         *entry_out = entry;
         *hash_out = hash;
         if (entry->verdict_plus_one != 0 && entry->hash == hash && entry->size == (uint8_t)size &&
@@ -1033,7 +1111,7 @@ static inline __attribute__((always_inline)) int cache_l1_probe(
             while (i < size && entry->part[i] == (front_point)sb[i]) i++;
             if (i == size) {
 #ifdef MEASURE_CACHE_L1
-                cache_l1_hits++;
+                ctx->cache_l1_hits++;
 #endif
                 return (int)entry->verdict_plus_one - 1;
             }
@@ -1043,11 +1121,13 @@ static inline __attribute__((always_inline)) int cache_l1_probe(
 }
 
 static inline __attribute__((always_inline)) void cache_l1_store(
-    cache_l1_entry *entry, uint32_t hash, const int *sb, int size, int k, int verdict) {
+    radio_search_context *ctx, cache_l1_entry *entry, uint32_t hash,
+    const int *sb, int size, int k, int verdict) {
+    (void)ctx;
     if (entry != NULL && verdict != MAYBE) {
 #ifdef MEASURE_CACHE_L1
-        cache_l1_stores++;
-        cache_l1_replacements += entry->verdict_plus_one != 0;
+        ctx->cache_l1_stores++;
+        ctx->cache_l1_replacements += entry->verdict_plus_one != 0;
 #endif
         entry->hash = hash;
         for (int i = 0; i < size; i++) entry->part[i] = (front_point)sb[i];
@@ -1062,9 +1142,10 @@ static inline __attribute__((always_inline)) void cache_l1_store(
 int checkCache(int *sb, int size, int k) {
     cache_l1_entry *entry;
     uint32_t hash = 0;
-    int verdict = cache_l1_probe(sb, size, k, &entry, &hash);
+    radio_search_context *ctx = &radio_default_search_context;
+    int verdict = cache_l1_probe(ctx, sb, size, k, &entry, &hash);
     if (verdict == MAYBE) verdict = checkCacheTrie(sb, size, k);
-    cache_l1_store(entry, hash, sb, size, k, verdict);
+    cache_l1_store(ctx, entry, hash, sb, size, k, verdict);
     return verdict;
 }
 
@@ -1075,7 +1156,7 @@ int checkCache(int *sb, int size, int k) {
 #endif
 
 // returns >0 if sbb1 is harder to solve than sbb2, <0 if sbb2 is harder, 0 if equal
-int compare_solvability(int sbb1, int sbb2) {
+int compare_solvability_ctx(radio_search_context *ctx, int sbb1, int sbb2) {
     if (sbb1==sbb2) return 0;
     int n11 = sbb_to_n1[sbb1];
     int n12 = sbb_to_n2[sbb1];
@@ -1088,8 +1169,8 @@ int compare_solvability(int sbb1, int sbb2) {
     } else if (sum1 <= sum2 && n12 <= n22) {
         return -1;
     } else {
-        int mink1 = minK(sbb1);
-        int mink2 = minK(sbb2);
+        int mink1 = minK_ctx(ctx, sbb1);
+        int mink2 = minK_ctx(ctx, sbb2);
         if (mink1 > mink2) {
             return 1;
         } else if (mink1 < mink2) {
@@ -1101,6 +1182,10 @@ int compare_solvability(int sbb1, int sbb2) {
 //            return sb_pairs[sbb1] - sb_pairs[sbb2];
         }
     }
+}
+
+int compare_solvability(int sbb1, int sbb2) {
+    return compare_solvability_ctx(&radio_default_search_context, sbb1, sbb2);
 }
 
 void init_singleton_majorization(void) {
@@ -1184,14 +1269,15 @@ int star_expansion_majorization_can_solve(int *sb, int size, int k) {
     return TRUE;
 }
 
-int get_max_sbb(int n1, int n2, int n3, int n4) {
+int get_max_sbb_ctx(radio_search_context *ctx, int n1, int n2, int n3, int n4) {
     int sbb1 = getSbb(n1, n2);
     int sbb2 = getSbb(n3, n4);
-    return (compare_solvability(sbb1, sbb2) > 0) ? sbb1 : sbb2;
+    return (compare_solvability_ctx(ctx, sbb1, sbb2) > 0) ? sbb1 : sbb2;
 }
 
-long long cant_solve_count=0;
-
+int get_max_sbb(int n1, int n2, int n3, int n4) {
+    return get_max_sbb_ctx(&radio_default_search_context, n1, n2, n3, n4);
+}
 
 /* ---- Joint suffix reachability -------------------------------------------------------------
    A prefix can satisfy the counting bound on all three children so far and still be impossible to
@@ -1217,44 +1303,83 @@ long long cant_solve_count=0;
 #define RADIO_RB_PLIABILITY_DIAGNOSTIC
 #endif
 #endif
-static int rb_on = 0, rb_cap = 0, rb_words = 0, rb_P = 0;
-static unsigned long long *rb_bits[17];
-static short *rb_mx[17];
-static int rb_mrem[17];
-static long long rb_tested = 0, rb_pruned = 0;
+struct radio_reachability_state {
+    int on;
+    int cap;
+    int words;
+    int parts;
+    unsigned long long *bits[17];
+    short *mx[17];
+    int remaining_mass[17];
+    long long tested;
+    long long pruned;
 #ifdef RADIO_RB_PLIABLE_CUTOFF
 /* Lab-only comparison: pay an exact post-build scan, then omit lookups that it proves vacuous.
    The default solver deliberately leaves this off; the measured lookup savings did not reduce
    CPU time on the hard positive control. */
-static unsigned char rb_pliable[17];
+    unsigned char pliable[17];
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-static long long rb_pliable_skipped = 0;
+    long long pliable_skipped;
 #endif
 #endif
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-static unsigned long long rb_suffix_tested[17], rb_suffix_pruned[17];
-static int rb_profile_parts[17];
+    unsigned long long suffix_tested[17];
+    unsigned long long suffix_pruned[17];
+    int profile_parts[17];
 #endif
+};
 
-static void rb_free(void) {
-    int i;
-    for (i = 0; i <= rb_P; i++) { free(rb_bits[i]); free(rb_mx[i]); rb_bits[i] = NULL; rb_mx[i] = NULL; }
-}
-static void rb_build(splits **sa, int *tmpp, int P, int cap) {
-    int i, c, r0, w, W = cap + 1;
-    rb_cap = cap; rb_P = P; rb_words = (W + 63) / 64;
-#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-    memset(rb_suffix_tested, 0, sizeof(rb_suffix_tested));
-    memset(rb_suffix_pruned, 0, sizeof(rb_suffix_pruned));
-    memcpy(rb_profile_parts, tmpp, (size_t)P * sizeof(*tmpp));
-#endif
-    rb_mrem[P] = 0;
-    for (i = P - 1; i >= 0; i--) rb_mrem[i] = rb_mrem[i+1] + sb_pairs[tmpp[i]];
-    for (i = 0; i <= P; i++) {
-        rb_bits[i] = (unsigned long long *)calloc((size_t)W * rb_words, sizeof(unsigned long long));
-        rb_mx[i] = (short *)malloc((size_t)W * W * sizeof(short));
+static radio_reachability_state *radio_search_context_reachability(
+    radio_search_context *ctx) {
+    if (ctx->reachability == NULL) {
+        ctx->reachability = (radio_reachability_state *)calloc(1, sizeof(*ctx->reachability));
+        if (ctx->reachability == NULL) {
+            printf("\nout of memory allocating worker reachability state\n");
+            exit(1);
+        }
     }
-    rb_bits[P][0] = 1ULL;                                  /* (0,0) reachable by the empty suffix */
+    return ctx->reachability;
+}
+
+static void rb_free(radio_reachability_state *rb) {
+    int i;
+    for (i = 0; i <= rb->parts; i++) {
+        free(rb->bits[i]);
+        free(rb->mx[i]);
+        rb->bits[i] = NULL;
+        rb->mx[i] = NULL;
+    }
+}
+
+void radio_search_context_destroy(radio_search_context *ctx) {
+    if (ctx == &radio_default_search_context) return;
+    if (ctx->reachability != NULL) {
+        rb_free(ctx->reachability);
+        free(ctx->reachability);
+    }
+    free(ctx->cache_l1);
+    radio_search_context_init(ctx);
+}
+
+static void rb_build(radio_reachability_state *rb, splits **sa, int *tmpp, int P, int cap) {
+    int i, c, r0, w, W = cap + 1;
+    rb->cap = cap;
+    rb->parts = P;
+    rb->words = (W + 63) / 64;
+#ifdef RADIO_RB_PROFILE_DIAGNOSTIC
+    memset(rb->suffix_tested, 0, sizeof(rb->suffix_tested));
+    memset(rb->suffix_pruned, 0, sizeof(rb->suffix_pruned));
+    memcpy(rb->profile_parts, tmpp, (size_t)P * sizeof(*tmpp));
+#endif
+    rb->remaining_mass[P] = 0;
+    for (i = P - 1; i >= 0; i--)
+        rb->remaining_mass[i] = rb->remaining_mass[i + 1] + sb_pairs[tmpp[i]];
+    for (i = 0; i <= P; i++) {
+        rb->bits[i] = (unsigned long long *)calloc(
+            (size_t)W * rb->words, sizeof(unsigned long long));
+        rb->mx[i] = (short *)malloc((size_t)W * W * sizeof(short));
+    }
+    rb->bits[P][0] = 1ULL;                                 /* (0,0) reachable by the empty suffix */
     for (i = P - 1; i >= 0; i--) {
         for (c = 0; c < sa[i]->size; c++) {
             int *sp = sa[i]->splitsl[c];
@@ -1262,9 +1387,9 @@ static void rb_build(splits **sa, int *tmpp, int P, int cap) {
             if (k0 > cap || k2 > cap) continue;
             int ws = k2 >> 6, bs = k2 & 63;                /* shift along r2, within each row */
             for (r0 = 0; r0 + k0 <= cap; r0++) {
-                unsigned long long *src = rb_bits[i+1] + (size_t)r0 * rb_words;
-                unsigned long long *dst = rb_bits[i]   + (size_t)(r0 + k0) * rb_words;
-                for (w = rb_words - 1; w >= 0; w--) {
+                unsigned long long *src = rb->bits[i + 1] + (size_t)r0 * rb->words;
+                unsigned long long *dst = rb->bits[i] + (size_t)(r0 + k0) * rb->words;
+                for (w = rb->words - 1; w >= 0; w--) {
                     int sw = w - ws;
                     if (sw < 0) break;
                     unsigned long long v = src[sw] << bs;
@@ -1277,64 +1402,69 @@ static void rb_build(splits **sa, int *tmpp, int P, int cap) {
     for (i = 0; i <= P; i++) {
         int r2;
         for (r0 = 0; r0 <= cap; r0++) for (r2 = 0; r2 <= cap; r2++) {
-            unsigned long long bit = rb_bits[i][(size_t)r0*rb_words + (r2>>6)] >> (r2 & 63) & 1ULL;
+            unsigned long long bit = rb->bits[i][(size_t)r0 * rb->words + (r2 >> 6)]
+                >> (r2 & 63) & 1ULL;
             short b = bit ? (short)(r0 + r2) : -1;
-            if (r0 && rb_mx[i][(size_t)(r0-1)*W + r2] > b) b = rb_mx[i][(size_t)(r0-1)*W + r2];
-            if (r2 && rb_mx[i][(size_t)r0*W + r2-1] > b) b = rb_mx[i][(size_t)r0*W + r2-1];
-            rb_mx[i][(size_t)r0*W + r2] = b;
+            if (r0 && rb->mx[i][(size_t)(r0 - 1) * W + r2] > b)
+                b = rb->mx[i][(size_t)(r0 - 1) * W + r2];
+            if (r2 && rb->mx[i][(size_t)r0 * W + r2 - 1] > b)
+                b = rb->mx[i][(size_t)r0 * W + r2 - 1];
+            rb->mx[i][(size_t)r0 * W + r2] = b;
         }
     }
 }
-static void rb_release(void) {
+static void rb_release(radio_reachability_state *rb) {
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
     int i;
-    for (i = 1; i < rb_P; i++) {
-        int q = rb_P - i;
-        int mass = rb_mrem[i];
+    for (i = 1; i < rb->parts; i++) {
+        int q = rb->parts - i;
+        int mass = rb->remaining_mass[i];
         int excess = mass - 2 * q;
         fprintf(stderr,
                 "RB_PROFILE_SUFFIX index=%d parts=%d mass=%d excess=%d calls=%llu pruned=%llu\n",
                 i, q, mass, excess,
-                rb_suffix_tested[i], rb_suffix_pruned[i]);
+                rb->suffix_tested[i], rb->suffix_pruned[i]);
     }
-    fprintf(stderr, "RB_PROFILE_END tested=%lld pruned=%lld", rb_tested, rb_pruned);
+    fprintf(stderr, "RB_PROFILE_END tested=%lld pruned=%lld", rb->tested, rb->pruned);
 #if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
-    fprintf(stderr, " pliable_skipped=%lld", rb_pliable_skipped);
+    fprintf(stderr, " pliable_skipped=%lld", rb->pliable_skipped);
 #endif
     fputc('\n', stderr);
 #endif
 #if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
     fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%), %lld pliable-skipped\n",
-            rb_tested, rb_pruned, rb_tested ? 100.0*rb_pruned/rb_tested : 0.0,
-            rb_pliable_skipped);
+            rb->tested, rb->pruned, rb->tested ? 100.0 * rb->pruned / rb->tested : 0.0,
+            rb->pliable_skipped);
 #else
     fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%)\n",
-            rb_tested, rb_pruned, rb_tested ? 100.0*rb_pruned/rb_tested : 0.0);
+            rb->tested, rb->pruned, rb->tested ? 100.0 * rb->pruned / rb->tested : 0.0);
 #endif
-    rb_free(); rb_on = 0; rb_tested = rb_pruned = 0;
+    rb_free(rb);
+    rb->on = 0;
+    rb->tested = rb->pruned = 0;
 #if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
-    rb_pliable_skipped = 0;
+    rb->pliable_skipped = 0;
 #endif
 }
-static inline int rb_dead(int nexti, int p0, int p1, int p2) {
-    int W = rb_cap + 1;
-    int a = rb_cap - p0, cc = rb_cap - p2;
-    long long need = (long long)p1 + rb_mrem[nexti] - rb_cap;
-    rb_tested++;
+static inline int rb_dead(radio_reachability_state *rb, int nexti, int p0, int p1, int p2) {
+    int W = rb->cap + 1;
+    int a = rb->cap - p0, cc = rb->cap - p2;
+    long long need = (long long)p1 + rb->remaining_mass[nexti] - rb->cap;
+    rb->tested++;
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-    rb_suffix_tested[nexti]++;
+    rb->suffix_tested[nexti]++;
 #endif
     if (a < 0 || cc < 0) {
-        rb_pruned++;
+        rb->pruned++;
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-        rb_suffix_pruned[nexti]++;
+        rb->suffix_pruned[nexti]++;
 #endif
         return 1;
     }
-    if (rb_mx[nexti][(size_t)a*W + cc] >= need) return 0;
-    rb_pruned++;
+    if (rb->mx[nexti][(size_t)a * W + cc] >= need) return 0;
+    rb->pruned++;
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-    rb_suffix_pruned[nexti]++;
+    rb->suffix_pruned[nexti]++;
 #endif
     return 1;
 }
@@ -1348,19 +1478,19 @@ static inline int rb_dead(int nexti, int p0, int p1, int p2) {
    later suffix are pliable, rb_dead cannot reject after the search has assigned i parts.  The
    existing prefix-max table decides the definition exactly: among contributions with r0 <= h0 and
    r2 <= h2, some choice also has r1 <= h1 iff max(r0+r2) >= suffix_mass-h1. */
-static int rb_suffix_pliable(int suffix, int slack) {
-    int side = rb_cap + 1;
-    int target = rb_mrem[suffix] + slack;
+static int rb_suffix_pliable(radio_reachability_state *rb, int suffix, int slack) {
+    int side = rb->cap + 1;
+    int target = rb->remaining_mass[suffix] + slack;
     int h0;
 
-    for (h0 = 0; h0 <= rb_cap; h0++) {
-        int h2_lo = max(0, target - h0 - rb_cap);
-        int h2_hi = min(rb_cap, target - h0);
+    for (h0 = 0; h0 <= rb->cap; h0++) {
+        int h2_lo = max(0, target - h0 - rb->cap);
+        int h2_hi = min(rb->cap, target - h0);
         int h2;
         for (h2 = h2_lo; h2 <= h2_hi; h2++) {
             int h1 = target - h0 - h2;
-            int best = rb_mx[suffix][(size_t)h0 * side + h2];
-            int need = rb_mrem[suffix] - h1;
+            int best = rb->mx[suffix][(size_t)h0 * side + h2];
+            int need = rb->remaining_mass[suffix] - h1;
             if (best < 0 || best < need) return FALSE;
         }
     }
@@ -1408,7 +1538,8 @@ static int rb_has_two_one_base(const splits *table, int mass, int slack) {
    `coarse` is the simpler nonunit-length corollary.  For q parts of total mass W, let D=W-2q.
    Starting from a (2:1) base, q>=D+2 at slack 1 or q>=D+1 at slack >=2 certifies the whole hereditary
    tail (subject to the same retained-corner check). */
-static void rb_report_pliability(splits **tables, const int *parts, FILE *out, int verbose) {
+static void rb_report_pliability(radio_reachability_state *rb, splits **tables,
+                                 const int *parts, FILE *out, int verbose) {
     unsigned char exact[17] = {0};
     unsigned char hereditary[17] = {0};
     unsigned char theorem[17] = {0};
@@ -1417,33 +1548,33 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
     unsigned char corners[17] = {0};
     unsigned char all_corners[17] = {0};
     unsigned char all_nonempty[17] = {0};
-    int slack = 3 * rb_cap - rb_mrem[0];
+    int slack = 3 * rb->cap - rb->remaining_mass[0];
     int sorted_by_mass = TRUE;
-    int exact_head = rb_P;
-    int theorem_head = rb_P;
-    int coarse_head = rb_P;
-    int slack_excess_head = rb_P;
+    int exact_head = rb->parts;
+    int theorem_head = rb->parts;
+    int coarse_head = rb->parts;
+    int slack_excess_head = rb->parts;
     int potential_call_suffixes = 0;
     int i;
 
-    for (i = 0; i < rb_P - 1; i++) {
+    for (i = 0; i < rb->parts - 1; i++) {
         if (sb_pairs[parts[i]] < sb_pairs[parts[i + 1]]) sorted_by_mass = FALSE;
     }
-    for (i = 0; i <= rb_P; i++) exact[i] = rb_suffix_pliable(i, slack);
-    hereditary[rb_P] = exact[rb_P];
-    theorem[rb_P] = TRUE;
-    coarse[rb_P] = TRUE;
-    slack_excess[rb_P] = TRUE;
-    all_corners[rb_P] = TRUE;
-    all_nonempty[rb_P] = TRUE;
+    for (i = 0; i <= rb->parts; i++) exact[i] = rb_suffix_pliable(rb, i, slack);
+    hereditary[rb->parts] = exact[rb->parts];
+    theorem[rb->parts] = TRUE;
+    coarse[rb->parts] = TRUE;
+    slack_excess[rb->parts] = TRUE;
+    all_corners[rb->parts] = TRUE;
+    all_nonempty[rb->parts] = TRUE;
 
-    for (i = rb_P - 1; i >= 0; i--) {
+    for (i = rb->parts - 1; i >= 0; i--) {
         int mass = sb_pairs[parts[i]];
-        int tail_mass = rb_mrem[i + 1];
+        int tail_mass = rb->remaining_mass[i + 1];
         int extension_ok;
         int special_base;
-        int q = rb_P - i;
-        int excess = rb_mrem[i] - 2 * q;
+        int q = rb->parts - i;
+        int excess = rb->remaining_mass[i] - 2 * q;
         int coarse_bound = FALSE;
         int slack_excess_bound = FALSE;
 
@@ -1453,13 +1584,14 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
         hereditary[i] = exact[i] && hereditary[i + 1];
         extension_ok = theorem[i + 1] && corners[i]
             && 2LL * mass <= (long long)tail_mass + slack + 2;
-        special_base = i == rb_P - 1 && rb_has_two_one_base(tables[i], mass, slack);
+        special_base = i == rb->parts - 1 && rb_has_two_one_base(tables[i], mass, slack);
         /* If slack >= 2*cap, every residual capacity is at least the entire suffix mass: the
            other two capacities can consume at most 2*cap.  Then any retained routing fits. */
-        theorem[i] = (slack >= 2 * rb_cap && all_nonempty[i]) || extension_ok || special_base;
+        theorem[i] = (slack >= 2 * rb->cap && all_nonempty[i]) || extension_ok || special_base;
 
         if (sorted_by_mass && all_corners[i]
-            && rb_has_two_one_base(tables[rb_P - 1], sb_pairs[parts[rb_P - 1]], slack)) {
+            && rb_has_two_one_base(tables[rb->parts - 1],
+                                   sb_pairs[parts[rb->parts - 1]], slack)) {
             if (q == 1) coarse_bound = TRUE;
             else if (slack == 1 && q >= excess + 2) coarse_bound = TRUE;
             else if (slack >= 2 && q >= excess + 1) coarse_bound = TRUE;
@@ -1493,19 +1625,19 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
         }
     }
 
-    for (i = 0; i <= rb_P; i++) {
+    for (i = 0; i <= rb->parts; i++) {
         if (hereditary[i]) { exact_head = i; break; }
     }
-    for (i = 0; i <= rb_P; i++) {
+    for (i = 0; i <= rb->parts; i++) {
         if (theorem[i]) { theorem_head = i; break; }
     }
-    for (i = 0; i <= rb_P; i++) {
+    for (i = 0; i <= rb->parts; i++) {
         if (coarse[i]) { coarse_head = i; break; }
     }
-    for (i = 0; i <= rb_P; i++) {
+    for (i = 0; i <= rb->parts; i++) {
         if (slack_excess[i]) { slack_excess_head = i; break; }
     }
-    for (i = 1; i < rb_P; i++) {
+    for (i = 1; i < rb->parts; i++) {
         if (!exact[i]) potential_call_suffixes++;
     }
 
@@ -1514,19 +1646,21 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
             "potential_call_suffixes=%d exact_head=%d exact_tail=%d "
             "theorem_head=%d theorem_tail=%d coarse_head=%d coarse_tail=%d "
             "slack_excess_head=%d slack_excess_tail=%d\n",
-            rb_P, rb_mrem[0], rb_cap, slack, exact[0], potential_call_suffixes,
-            exact_head, rb_P - exact_head, theorem_head, rb_P - theorem_head,
-            coarse_head, rb_P - coarse_head,
-            slack_excess_head, rb_P - slack_excess_head);
+            rb->parts, rb->remaining_mass[0], rb->cap, slack, exact[0],
+            potential_call_suffixes, exact_head, rb->parts - exact_head,
+            theorem_head, rb->parts - theorem_head, coarse_head,
+            rb->parts - coarse_head, slack_excess_head,
+            rb->parts - slack_excess_head);
 
     if (verbose) {
-        for (i = 0; i < rb_P; i++) {
+        for (i = 0; i < rb->parts; i++) {
             int mass = sb_pairs[parts[i]];
-            int margin = rb_mrem[i + 1] + slack + 2 - 2 * mass;
+            int margin = rb->remaining_mass[i + 1] + slack + 2 - 2 * mass;
             fprintf(out,
                     "RB_PLIABILITY_SUFFIX index=%d parts=%d mass=%d exact=%d hereditary=%d "
                     "theorem=%d coarse=%d slack_excess=%d corners=%d extension_margin=%d\n",
-                    i, rb_P - i, rb_mrem[i], exact[i], hereditary[i], theorem[i], coarse[i],
+                    i, rb->parts - i, rb->remaining_mass[i], exact[i], hereditary[i],
+                    theorem[i], coarse[i],
                     slack_excess[i], corners[i], margin);
         }
     }
@@ -1534,20 +1668,23 @@ static void rb_report_pliability(splits **tables, const int *parts, FILE *out, i
 #endif
 
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-static void rb_profile_begin(splits **tables, const int *parts, int k) {
+static void rb_profile_begin(radio_reachability_state *rb, splits **tables,
+                             const int *parts, int k) {
     int i;
     fprintf(stderr, "RB_PROFILE_BEGIN k=%d cap=%d parts=%d mass=%d slack=%d state=Sb(",
-            k, rb_cap, rb_P, rb_mrem[0], 3 * rb_cap - rb_mrem[0]);
-    for (i = 0; i < rb_P; i++) {
+            k, rb->cap, rb->parts, rb->remaining_mass[0],
+            3 * rb->cap - rb->remaining_mass[0]);
+    for (i = 0; i < rb->parts; i++) {
         if (i) fputc(',', stderr);
-        fputs(sbb_to_str[rb_profile_parts[i]], stderr);
+        fputs(sbb_to_str[rb->profile_parts[i]], stderr);
     }
     fprintf(stderr, ")\n");
-    rb_report_pliability(tables, parts, stderr, TRUE);
+    rb_report_pliability(rb, tables, parts, stderr, TRUE);
 }
 #endif
 
-int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
+int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
+                  uint64_t parent_deadline){
 #ifdef DEBUG1
     if(k>7) {
         printf("in canSolveB k=%d ", k);
@@ -1595,12 +1732,12 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
     int query_size = size;
     cache_l1_entry *l1_entry;
     uint32_t l1_hash = 0;
-    int ck = cache_l1_probe(tmp, size, k, &l1_entry, &l1_hash);
+    int ck = cache_l1_probe(ctx, tmp, size, k, &l1_entry, &l1_hash);
     if (ck == TRUE || ck == FALSE) return ck;
     if (singleton_size == size) {
         // Singleton states are decided exactly by majorization against G_k.
         ck = singleton_majorization_can_solve(tmp, size, k);
-        cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
+        cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
         return ck;
     }
     // Apply Singleton Majorization to the full star expansion: (n:m) becomes m copies of (n:1).
@@ -1608,7 +1745,7 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
     // singleton sequence and adds only nonnegative entries.  It is a necessary condition, not an
     // ordering heuristic; see docs/theorems/singleton-majorization.md.
     if (!star_expansion_majorization_can_solve(tmp, size, k)) {
-        cache_l1_store(l1_entry, l1_hash, tmp, size, k, FALSE);
+        cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, FALSE);
         return FALSE;
     }
 #ifdef RADIO_EXTERNAL_EXACT_LOOKUP
@@ -1619,20 +1756,20 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
        theorem checks so an external research artifact can never override them. */
     ck = RADIO_EXTERNAL_EXACT_LOOKUP(tmp, size, k);
     if (ck == TRUE || ck == FALSE) {
-        cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
+        cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
         return ck;
     }
 #endif
     //check cache
     ck = checkCacheTrie(tmp, size, k);
-    cache_l1_store(l1_entry, l1_hash, tmp, size, k, ck);
+    cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
     //	printf("got from cache %d\n", ck);
     if (parent_deadline == CACHE_ONLY || ck == TRUE || ck == FALSE) {
 //        debug_printf("returning ck=%d\n", ck);
         return ck;
     }
     if (parent_deadline != NO_DEADLINE && parent_deadline != FAST_ONLY
-        && deadline_expired(parent_deadline, radio_budget_now()))
+        && deadline_expired(parent_deadline, radio_budget_now_ctx(ctx)))
         return MAYBE;
     
     int size_1 = size-1;
@@ -1657,11 +1794,12 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
     /* Search is depth first.  Building every suffix table here made a large-k state pay for
        many parts it never reached.  Materialise the first table now and each suffix only when
        the prefix survives far enough to enter it. */
-    splitsarr[0] = prepare_splits(tmp[0], k, size > 1);
+    splitsarr[0] = prepare_splits_ctx(ctx, tmp[0], k, size > 1);
     //full search
     clock_t cpu_start = clock();
     clock_t progress = cpu_start + PROGRESS_INTERVAL;
-    uint64_t budget_start = radio_budget_now();
+    uint64_t budget_start = radio_budget_now_ctx(ctx);
+    radio_reachability_state *rb = radio_search_context_reachability(ctx);
     
     /* Reachability is armed by observed cost, not by a shape signature. A state that has already
        burned RB_TRIGGER candidate evaluations has earned the ~1-2 ms the tables take to build, and
@@ -1762,8 +1900,8 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
         printf("solving in %d pass=%d ", k, pass);
 #ifdef RADIO_WORK_BUDGET
         printf("budget=%llu ",
-               (unsigned long long)(deadline > radio_budget_now()
-                   ? deadline - radio_budget_now() : 0));
+               (unsigned long long)(deadline > radio_budget_now_ctx(ctx)
+                   ? deadline - radio_budget_now_ctx(ctx) : 0));
 #else
         printf("deadline=%llu ",
                (unsigned long long)(deadline > (uint64_t)t
@@ -1810,7 +1948,8 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                             deadline = radio_budget_add(deadline, deadline - budget_start);
                         }
                         if (pass >= 2) {
-                            if (!no_deadline && deadline_expired(deadline, radio_budget_now())) {
+                            if (!no_deadline
+                                && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
                                 cont2=0;
                             } else if (probe_seconds <= UINT_MAX / 2) {
                                 /* Monotone work allowance replaces the old cache-progress gate:
@@ -1857,11 +1996,11 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                 debug_printf("checking split solvability for %s -> [%d, %d], before: s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
                 int kk = s[4];
                 uint64_t dd = size > 1 ? deadline : CACHE_ONLY;
-                int ttt = canSolveB(s, 1, kk, dd);
+                int ttt = canSolveB_ctx(ctx, s, 1, kk, dd);
                 if (ttt==TRUE) {
-                    ttt = canSolveB(s+3, 1, kk, dd);
+                    ttt = canSolveB_ctx(ctx, s+3, 1, kk, dd);
                     if (ttt==TRUE) {
-                        ttt = canSolveB(s+1, 2, kk, dd);
+                        ttt = canSolveB_ctx(ctx, s+1, 2, kk, dd);
                     }
                 }
                 if (ttt == TRUE)
@@ -1890,28 +2029,30 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                     skipped_some = 1;
                 } else {
                     totalsplits++;
-                    radio_budget_charge_split();
+                    radio_budget_charge_split_ctx(ctx);
                     /* Accepted prefixes can be extremely sparse in information-tight long states.
                        The deterministic clock is checked at every charged prefix.  The historical
                        CPU fallback retains its every-2^16 poll to keep clock() out of the hottest
                        loop.  A NO_DEADLINE proof is never stopped here, so exact work stays exact. */
 #ifdef RADIO_WORK_BUDGET
-                    if (!no_deadline && deadline_expired(deadline, radio_budget_now())) {
+                    if (!no_deadline
+                        && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
 #else
                     if (!no_deadline && !(totalsplits & DEADLINE_POLL_MASK)
-                        && deadline_expired(deadline, radio_budget_now())) {
+                        && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
 #endif
-                        if (rb_here) rb_release();
+                        if (rb_here) rb_release(rb);
                         return MAYBE;
                     }
-                    /* `>=`, not `==`. rb_on is global, so only one state holds the tables at a time; with
+                    /* `>=`, not `==`. One reachability scratch set belongs to the complete recursive
+                       search context, so only one state in that tree holds the tables at a time. With
                        equality a state whose trigger instant fell while another was armed lost its
                        only chance and ran the rest unpruned. Arming later is never worse than never
                        arming - the prune is a performance device, not a correctness one - so this
                        is safe. NOTE: this was originally changed while chasing a 27-minute cold
                        monster run that turned out to be a cold-vs-warm comparison error, not a
                        race. The fragility is real but has not been observed to fire. */
-                    if (!rb_here && !rb_on && totalsplits >= RB_TRIGGER
+                    if (!rb_here && !rb->on && totalsplits >= RB_TRIGGER
                         && size >= 4 && power3[k_1] < RB_MAXCAP) {
                         int ri;
                         /* Reachability needs every suffix at once.  This is deliberately the
@@ -1921,17 +2062,17 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                             if (splitsarr[ri] == NULL)
                                 splitsarr[ri] = ensure_splits(tmp[ri], k);
                         }
-                        rb_on = rb_here = 1;
-                        rb_build(splitsarr, tmp, size, power3[k_1]);
+                        rb->on = rb_here = 1;
+                        rb_build(rb, splitsarr, tmp, size, power3[k_1]);
 #ifdef RADIO_RB_PLIABLE_CUTOFF
                         {
-                            int slack = 3 * rb_cap - rb_mrem[0];
-                            for (ri = 0; ri <= rb_P; ri++)
-                                rb_pliable[ri] = rb_suffix_pliable(ri, slack);
+                            int slack = 3 * rb->cap - rb->remaining_mass[0];
+                            for (ri = 0; ri <= rb->parts; ri++)
+                                rb->pliable[ri] = rb_suffix_pliable(rb, ri, slack);
                         }
 #endif
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
-                        rb_profile_begin(splitsarr, tmp, k);
+                        rb_profile_begin(rb, splitsarr, tmp, k);
 #endif
                     }
                     int p0 = sb0p[i] = sb_pairs[sb0[i] = s[0]] + (i>0?sb0p[i-1]:0);
@@ -1951,21 +2092,21 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
 #endif
                     if (within_cap && rb_here && i + 1 < size
 #ifdef RADIO_RB_PLIABLE_CUTOFF
-                        && !rb_pliable[i + 1]
+                        && !rb->pliable[i + 1]
 #endif
                         ) {
-                        rb_rejected = rb_dead(i + 1, p0, p1, p2);
+                        rb_rejected = rb_dead(rb, i + 1, p0, p1, p2);
                         if (rb_rejected) rb_tainted_contraction = 1;
                     }
 #if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
-                    else if (within_cap && rb_here && i + 1 < size && rb_pliable[i + 1]) {
-                        rb_pliable_skipped++;
+                    else if (within_cap && rb_here && i + 1 < size && rb->pliable[i + 1]) {
+                        rb->pliable_skipped++;
                     }
 #endif
                     if (within_cap && !rb_rejected
-                        && (cs0 = canSolveB(sb0, i+1, k_1, CACHE_ONLY))
-                        && (cs2 = canSolveB(sb2, i+1, k_1, CACHE_ONLY))
-                        && (cs1 = canSolveB(sb1, (i+1) * 2, k_1, CACHE_ONLY))
+                        && (cs0 = canSolveB_ctx(ctx, sb0, i+1, k_1, CACHE_ONLY))
+                        && (cs2 = canSolveB_ctx(ctx, sb2, i+1, k_1, CACHE_ONLY))
+                        && (cs1 = canSolveB_ctx(ctx, sb1, (i+1) * 2, k_1, CACHE_ONLY))
 //                        && ((i != size/2) ||
 //                            (((cs0 == TRUE) || (cs0 = canSolveB(sb0, i+1, k_1, SUBSPLIT_DEADLINE)))
 //                             && ((cs2 == TRUE) || (cs2 = canSolveB(sb2, i+1, k_1, SUBSPLIT_DEADLINE)))
@@ -1980,13 +2121,13 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                         debug_printf("can solve\n");
                         if (i == size_1) {
                             if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
-                                uint64_t budget_now = radio_budget_now();
+                                uint64_t budget_now = radio_budget_now_ctx(ctx);
                                 if (deadline_expired(deadline, budget_now)) {
                                     if (no_deadline) {
                                         deadline = radio_budget_add(
                                             budget_now, radio_budget_seconds(10));
                                     } else {
-                                        { if (rb_here) rb_release(); return MAYBE; }
+                                        { if (rb_here) rb_release(rb); return MAYBE; }
                                     }
                                 }
                                 clock_t cpu_now = clock();
@@ -1998,7 +2139,7 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                                     printSb(sb1, size2);
                                     printSb(sb2, size);
 #ifdef RADIO_WORK_BUDGET
-                                    uint64_t work_used = radio_budget_now() - budget_start;
+                                    uint64_t work_used = radio_budget_now_ctx(ctx) - budget_start;
                                     uint64_t work_limit = deadline > budget_start
                                         ? deadline - budget_start : 0;
                                     printf(" elapsed %llu/%llu work=%llu/%llu left=%d/%d totalsplits=%llu",
@@ -2026,15 +2167,15 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                                 }
                             }
                             uint64_t cd = probe_child_deadline(
-                                deadline, radio_budget_now(), probe_seconds, size);
+                                deadline, radio_budget_now_ctx(ctx), probe_seconds, size);
                             /* MAYBE in one branch must not hide an easy refutation in another.
                                Probe all still-possible children, stopping only after a FALSE. */
                             if (cs0 == MAYBE)
-                                cs0 = canSolveB(sb0, i+1, k_1, cd);
+                                cs0 = canSolveB_ctx(ctx, sb0, i+1, k_1, cd);
                             if (cs0 != FALSE && cs2 == MAYBE)
-                                cs2 = canSolveB(sb2, i+1, k_1, cd);
+                                cs2 = canSolveB_ctx(ctx, sb2, i+1, k_1, cd);
                             if (cs0 != FALSE && cs2 != FALSE && cs1 == MAYBE)
-                                cs1 = canSolveB(sb1, (i+1) * 2, k_1, cd);
+                                cs1 = canSolveB_ctx(ctx, sb1, (i+1) * 2, k_1, cd);
 
                             if (cs0 == TRUE && cs2 == TRUE && cs1 == TRUE) {
                                 //can solve
@@ -2049,15 +2190,16 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
                             /* A child may have consumed the remainder of this probe's shared
                                allowance.  Unwind now instead of starting another candidate with
                                an already-expired parent budget. */
-                            if (!no_deadline && deadline_expired(deadline, radio_budget_now())) {
-                                if (rb_here) rb_release();
+                            if (!no_deadline
+                                && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
+                                if (rb_here) rb_release(rb);
                                 return MAYBE;
                             }
                         } else {
                             i++;
                             /* `rb_build` may already have materialised this table, but FAST is
                                intentionally prepared only when ordinary search reaches it. */
-                            splitsarr[i] = prepare_splits(tmp[i], k, size > 1);
+                            splitsarr[i] = prepare_splits_ctx(ctx, tmp[i], k, size > 1);
                             if (i>max_solvable_maybe) {
                                 max_solvable_maybe = i;
                                 debug_printf("max_solvable_maybe=%d\n", max_solvable_maybe);
@@ -2153,10 +2295,10 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
         //        fflush(stdout);
         
     } else if (skipped_some) {
-        if (rb_here) rb_release();
+        if (rb_here) rb_release(rb);
         return MAYBE;
     } else {
-        cant_solve_count++;
+        ctx->cant_solve_count++;
         printf("can't solve ");
         int contraction_candidate_size = max_solvable_maybe + 1;
         int contraction_suppressed = contraction_candidate_size < size && rb_tainted_contraction;
@@ -2180,7 +2322,7 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
         printf(" took %ld", s);
     else
         printf(" took 0.%03ld", t * 1000/CLOCKS_PER_SEC);
-    if (rb_here) rb_release();
+    if (rb_here) rb_release(rb);
     printf(" totalsplits=%llu pass=%d fast_solve=%d", totalsplits, pass, fast_solve);
     if (shared_probe) printf(" probe=shared");
     else printf(" probe=%us", probe_seconds);
@@ -2188,7 +2330,7 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
         printf(" contraction=rb-suppressed:%d", max_solvable_maybe + 1);
 #ifdef RADIO_WORK_BUDGET
     printf(" work=%llu rate=%llu",
-           (unsigned long long)(radio_budget_now() - budget_start),
+           (unsigned long long)(radio_budget_now_ctx(ctx) - budget_start),
            (unsigned long long)RADIO_BUDGET_UNITS_PER_SECOND);
 #endif
 #ifdef MEASURE_FAST_REPLAY
@@ -2203,7 +2345,7 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
 #ifdef DEBUG1
     fflush(stdout);
 #endif
-    cache_l1_store(l1_entry, l1_hash, tmp, query_size, k, canSolve);
+    cache_l1_store(ctx, l1_entry, l1_hash, tmp, query_size, k, canSolve);
     cache(tmp, size, canSolve, k, pairs);
     //    fflush(stdout);
     printf("\n");
@@ -2213,20 +2355,30 @@ int canSolveB(int *sb, int size, int k, uint64_t parent_deadline){
     return canSolve;
 }
 
+int canSolveB(int *sb, int size, int k, uint64_t parent_deadline) {
+    return canSolveB_ctx(&radio_default_search_context, sb, size, k, parent_deadline);
+}
+
 int sbb_to_min_k[MAX_SBB+1];
 
-int minK(int sbb) {
+int minK_ctx(radio_search_context *ctx, int sbb) {
     int kk = sbb_to_min_k[sbb];
     if (kk<0) {
         debug_printf("computing min_k for %s...\n", sbb_to_str[sbb]);
         kk=1;
         int rr;
-        while ((rr = canSolveB(&sbb, 1, kk, radio_budget_after_seconds(1000))) == TRUE) kk++;
+        while ((rr = canSolveB_ctx(
+                    ctx, &sbb, 1, kk, radio_budget_after_seconds_ctx(ctx, 1000))) == TRUE)
+            kk++;
         debug_printf("min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
         if (rr == FALSE) sbb_to_min_k[sbb]=kk; // if we got maybe, assume false, but do not memorize
         debug_printf("cached min_k=%d for %s...\n", kk, sbb_to_str[sbb]);
     }
     return kk;
+}
+
+int minK(int sbb) {
+    return minK_ctx(&radio_default_search_context, sbb);
 }
 
 void cache_a(int canSolve, int n, int k) {
@@ -2653,7 +2805,7 @@ splits *ensure_splits(int sbb, int k) {
     return s;
 }
 
-splits *prepare_splits(int sbb, int k, int need_fast) {
+splits *prepare_splits_ctx(radio_search_context *ctx, int sbb, int k, int need_fast) {
     splits *sp = ensure_splits(sbb, k);
     if (need_fast && sp->size > 0 && sp->splitsl[0][FAST] < 0) {
         int n1 = sbb_to_n1[sbb];
@@ -2668,11 +2820,13 @@ splits *prepare_splits(int sbb, int k, int need_fast) {
                 /* Special case for square groups (n1==n2). */
                 if (m2 == m1 - 1) fast = TRUE;
             } else {
-                int sbb1 = get_max_sbb(m1, n2 - m2, n1 - m1, m2);
-                if ((m2 == 0 || compare_solvability(
-                         sbb1, get_max_sbb(m1, n2 - m2 + 1, n1 - m1, m2 - 1)) <= 0)
-                    && (m2 == n2 || compare_solvability(
-                         sbb1, get_max_sbb(m1, n2 - m2 - 1, n1 - m1, m2 + 1)) <= 0)) {
+                int sbb1 = get_max_sbb_ctx(ctx, m1, n2 - m2, n1 - m1, m2);
+                if ((m2 == 0 || compare_solvability_ctx(
+                         ctx, sbb1,
+                         get_max_sbb_ctx(ctx, m1, n2 - m2 + 1, n1 - m1, m2 - 1)) <= 0)
+                    && (m2 == n2 || compare_solvability_ctx(
+                         ctx, sbb1,
+                         get_max_sbb_ctx(ctx, m1, n2 - m2 - 1, n1 - m1, m2 + 1)) <= 0)) {
                     fast = TRUE;
                 }
             }
@@ -2683,6 +2837,10 @@ splits *prepare_splits(int sbb, int k, int need_fast) {
         }
     }
     return sp;
+}
+
+splits *prepare_splits(int sbb, int k, int need_fast) {
+    return prepare_splits_ctx(&radio_default_search_context, sbb, k, need_fast);
 }
 
 int canSolveAll4(int n1, int n2, int m1, int m2, int k) {
@@ -3197,6 +3355,9 @@ static void radio_provenance_constructor(void) {
 
 void init(){
     radio_print_provenance();
+    radio_default_search_context.work_clock = RADIO_WORK_CLOCK_ORIGIN;
+    radio_default_search_context.cache_l1 = radio_default_cache_l1;
+    memset(radio_default_cache_l1, 0, sizeof(radio_default_cache_l1));
 #ifdef MEASURE_CACHE_L1
     atexit(print_cache_l1_stats);
 #endif

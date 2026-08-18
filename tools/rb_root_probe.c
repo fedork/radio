@@ -123,14 +123,17 @@ int main(int argc, char **argv) {
     double table_ms = 1000.0 * (double)(clock() - table_start) / CLOCKS_PER_SEC;
 
     clock_t build_start = clock();
-    rb_on = 1;
-    rb_build(tables, state, size, power3[k - 1]);
-    int dead = rb_dead(0, 0, 0, 0);
+    radio_reachability_state *rb =
+        radio_search_context_reachability(&radio_default_search_context);
+    rb->on = 1;
+    rb_build(rb, tables, state, size, power3[k - 1]);
+    int dead = rb_dead(rb, 0, 0, 0, 0);
     double build_ms = 1000.0 * (double)(clock() - build_start) / CLOCKS_PER_SEC;
 
     printf(" result=%s table_build_ms=%.3f rb_build_ms=%.3f\n",
            dead ? "DEAD" : "ALIVE", table_ms, build_ms);
-    rb_report_pliability(tables, state, stdout, getenv("RB_PLIABILITY_VERBOSE") != NULL);
-    rb_release();
+    rb_report_pliability(
+        rb, tables, state, stdout, getenv("RB_PLIABILITY_VERBOSE") != NULL);
+    rb_release(rb);
     return 0;
 }
