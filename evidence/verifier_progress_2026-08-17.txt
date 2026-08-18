@@ -1,7 +1,8 @@
 # Completed-target telemetry and dedicated run9 verifier launch
 
 Status: verifier telemetry implemented and locally gated; the dedicated AWS run from the clean
-commit and immutable source bundle recorded below is live in the dominant k=7 coloring batch.
+commit and immutable source bundle recorded below was intentionally stopped in the dominant k=7
+coloring batch. Final diagnostics were hash-checked; no colored certificate or replay exists.
 
 ## Why the old display was insufficient
 
@@ -146,8 +147,8 @@ task turnover prove continued enumeration; the completion-rate collapse is algor
 fact, not a deadlock or scheduler starvation. The four-interval mean is 0.517 target/s. A naive
 projection of that local rate across the remaining 2,396,183 four-part targets is about 54 days,
 far beyond the twelve-hour phase cap. Canonical cost may change again with mass, so 54 days is a
-diagnostic local extrapolation rather than a forecast. The run remains useful for measuring how the
-rate evolves and will be stopped by its cap unless it accelerates dramatically.
+diagnostic local extrapolation rather than a forecast. Later measurements and the stop decision are
+recorded below.
 
 This transition also exposed that the total and 0.75-history EWMA ETAs react too slowly to an
 ordered cost-regime change. The local status helper now adds
@@ -166,3 +167,61 @@ were preserved.  `i-06b1c144063fc4d88` exposed the AL2023 `curl`/`curl-minimal` 
 final fix leaves the image's existing `curl-minimal` in place and makes the regression portable
 with `grep -E`.  The three failures consumed about 21, 34 and 20 seconds before detection and did
 not touch the certificate pipeline.
+
+## Final stop, preservation and disposition
+
+At the user's direction, full coloring was deferred: a verifier that independently re-solves the
+same negative states more slowly than the proof-producing solver is not a useful full-corpus proof
+format. TERM was sent to the exact capped-run wrapper, which propagated it to the verifier and let
+the supervisor perform its normal final upload. The final status was:
+
+    updated UTC          2026-08-18 05:02:51
+    stage / exit         COLOR / 130 (intentional interruption)
+    color elapsed        11,460.1 seconds
+    completed            119,649 / 2,505,858 (4.7748%)
+    part counts          19/19 np1; 1,235/1,235 np2; 108,083/108,083 np3;
+                         10,312/2,396,521 np4
+    outcomes             119,649 verified; 0 unverified; 0 budget
+    recursion nodes      105,605,161,144
+    final window rate    0.450 target/s
+    colored certificate  none
+
+The supervisor finalized at 05:02:58 UTC. The on-demand instance was billable for about 3h14m from
+launch through finalization, approximately $2.79 at the recorded $0.86216/hour rate. Its final S3
+prefix is:
+
+    s3://radio-sa193-393287594714/run9-verifier-progress/20260818T014906Z/
+
+Selected final-manifest SHA-256 values:
+
+    3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116  run9-sanitized.cert
+    59b7f74730037ce8ccf5ff30049d78f5c0472b2c1fdc59586af780df27872d7c  run9-sanitized.cert.zst
+    da1f4afc238ea62304681dda9d5ca13abfcdc8e46fdf65d2930b4456edc9a1f3  color.out.zst
+
+The compressed normalized certificate and color output were streamed from S3 and independently
+matched those hashes. Instance `i-01f8c56b7a53a1178` reached `stopped`; its sole 30-GiB gp3 volume
+was read back with `DeleteOnTermination=true`, after which the exact instance was terminated. The
+shared `i-0005d74f985c52ae1` census host was not stopped.
+
+The older fourteen-worker run was stopped in the same operation. It had colored from
+2026-08-17 16:34:55 UTC until 2026-08-18 05:02:49 UTC, about 12h28m, and its frozen binary had closed
+only the k=9 and k=8 barriers before entering k=7. It also exited 130, produced no colored
+certificate, and finalized under:
+
+    s3://radio-sa193-393287594714/run9-verifier/20260817T163700Z/
+
+Its selected final-manifest hashes are:
+
+    f6fa14fabbb0f22d5df7ae375243b9f41774488a429301a1b2ee9bbf6b01efa4  run9-sanitized.cert.zst
+    53e09f421d1778a4c5d98c8bb215d5038d778dfcf1f21568725d8a6e70c95952  color.out.zst
+
+No interrupted verifier artifact was promoted to a GitHub release. The normalized certificate is
+a derived duplicate of the durable run9 raw proof source, and an incomplete color log is diagnostic
+rather than proof evidence. The exact measurements and hashes are retained here; the S3 objects
+remain available for operational inspection.
+
+The next verifier prototype should validate solver-emitted split-space coverage and lower-level
+citations rather than search for that coverage independently. The current verifier remains useful
+for small complete corpora, targeted audits and regression tests. Top-down coloring should be
+revisited only after checking an explicit derivation is cheap enough that reachability—not proof
+search—is the coloring cost.

@@ -7043,3 +7043,59 @@ also emit `eta_window_s`; both are explicitly latest-interval extrapolations. At
 helper showed 59.39 days, while the four-interval mean is the less noisy 54-day figure. Use
 `tools/run9_verifier_progress_status.sh 20260818T014906Z`; the detailed record is
 [`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
+
+## 2026-08-17 — full run9 coloring deferred after measured proof-search cost
+
+The full-run9 coloring experiment is closed without a certificate. The key result is negative but
+useful: even after the product and adaptive block indexes, this checker is independently solving
+millions of negative states, and the k=7 four-part region makes that work slower than the solver
+which produced the facts. Coloring can discard unreachable facts only after paying that search
+cost, so continuing would spend substantially more compute without improving the proof strategy.
+At the user's direction, both coloring runs were stopped and the approach was deferred.
+
+The instrumented sixteen-core run on dedicated `c8a.4xlarge` instance
+`i-01f8c56b7a53a1178` ended its k=7 color phase after 11,460.1 seconds. Its exact final snapshot was
+119,649/2,505,858 targets (4.7748%): 19/19 one-part, 1,235/1,235 two-part, 108,083/108,083
+three-part and 10,312/2,396,521 four-part. Every completed target verified; unverified and budget
+counts were zero. The workers had admitted 105,605,161,144 recursion nodes, and the last complete
+minute delivered 0.450 targets/s. Advancing active cursors and task turnover had already ruled out
+deadlock; this is the algorithm's real proof-search cost. The wrapper propagated TERM, the
+supervisor finalized with exit 130 at 2026-08-18T05:02:58Z, and no partial colored certificate was
+claimed. From launch through finalization the instance ran about 3h14m, approximately **$2.79** at
+the recorded on-demand rate of $0.86216/hour; the three earlier sub-35-second bootstrap probes add
+less than two cents.
+
+The older fourteen-worker verifier on shared `r7iz.4xlarge` host `i-0005d74f985c52ae1` was stopped
+at the same time. It had spent about 12h28m in coloring, closing only the k=9 and k=8 barriers before
+entering k=7; its frozen binary supplied no intra-level cursor. It also finalized with exit 130 and
+no colored bundle or replay. Its marginal dollar cost cannot be separated honestly from the shared
+host, which continues to run the one-core Pareto census.
+
+Both supervisors uploaded before cleanup. The dedicated prefix is
+`s3://radio-sa193-393287594714/run9-verifier-progress/20260818T014906Z/`; its normalized certificate
+and `color.out.zst` were streamed back and matched final-manifest SHA-256 values
+`59b7f74730037ce8ccf5ff30049d78f5c0472b2c1fdc59586af780df27872d7c` and
+`da1f4afc238ea62304681dda9d5ca13abfcdc8e46fdf65d2930b4456edc9a1f3`. The old prefix is
+`s3://radio-sa193-393287594714/run9-verifier/20260817T163700Z/`; the corresponding hashes are
+`f6fa14fabbb0f22d5df7ae375243b9f41774488a429301a1b2ee9bbf6b01efa4` and
+`53e09f421d1778a4c5d98c8bb215d5038d778dfcf1f21568725d8a6e70c95952`.
+Neither prefix was promoted to a GitHub release: the 106-MB normalized input duplicates the durable
+run9 raw proof source, and the interrupted color logs are diagnostics rather than proof objects.
+The small measurements and hashes are retained in `evidence/`.
+
+After the final upload was checked, the dedicated instance was allowed to reach `stopped`. Its sole
+30-GiB encrypted gp3 volume was read back with `DeleteOnTermination=true`, then the exact instance
+was terminated, deleting that volume. This is recoverable: the source proof remains in the private
+GitHub release and the run-specific diagnostics remain in S3. The shared instance was deliberately
+left running. At 2026-08-18T05:07:48Z its census process was healthy at 99.9% CPU and 8,903.2 MiB
+RSS; the host had 113.7 GiB available, no swap, and no verifier process.
+
+The next verifier design should be proof-carrying rather than search-repeating. For each negative
+fact, the solver should emit a compact cover of the admissible test/split space—ranges or subboxes
+annotated with the rejecting outcome and cited lower-level fact or theorem. An independent checker
+would validate that the cover is complete and that each citation is exact, with work close to the
+certificate size. A first prototype should target one retained hard k=7 four-part fact and measure
+proof bytes, solver emission overhead and checker wall. The current readable certificate remains a
+good envelope, and the current verifier remains valuable for small complete corpora and targeted
+audits. Binary encoding is not the issue measured here. Top-down coloring should return only after
+explicit citations make graph reachability cheap; it should not trigger a second solve.

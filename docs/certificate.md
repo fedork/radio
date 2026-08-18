@@ -94,13 +94,24 @@ down, using only the split semantics and the proved Singleton Majorization, Unit
 and Subgraph Monotonicity theorems. It has verified the full `Sa(113)` k=9 ladder—304,105 negative
 facts across k=2..8—with zero unverified.
 
-An end-to-end verifier replay of the new 3.17-million-fact run9 DAG is running on AWS but has not
-yet returned a verdict. It further reduces the trusted implementation from the solver to the
-independent checker, but it is not a prerequisite for the repository's `proven-exhaustive`
-classification. The current result rests on a retained, fully provenanced, current proof-safe
-exhaustive run plus the independently checked positive witness. Launch state and the bounded
-one-shot progress command are recorded in
-[`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
+Two end-to-end run9 coloring attempts were stopped on 2026-08-18 after establishing that the
+current checker is not economical at this scale. The instrumented sixteen-core run completed only
+119,649/2,505,858 k=7 targets in 11,460.1 seconds, despite 105,605,161,144 recursion nodes and zero
+unresolved/budget outcomes; the older fourteen-worker run had spent about 12h28m at the same
+barrier. Neither produced a colored certificate or replay verdict. This does not change the
+repository's `proven-exhaustive` classification, which rests on the retained, fully provenanced,
+current proof-safe exhaustive run plus the independently checked positive witness. Final diagnostic
+records are in
+[`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt) and
+[`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
+
+Full coloring is deferred until the certificate design changes. The current checker independently
+searches split space for every negative fact; top-down coloring decides which such searches to run
+but does not make them cheap. The next prototype should have the solver record a compact coverage
+proof—ranges or subboxes of tests annotated with the rejecting outcome and cited lower-level fact—so
+the independent checker validates coverage and citations instead of reconstructing the proof by
+search. The readable text envelope remains appropriate; binary packing should remain an internal
+indexing choice until parsing or storage is measured as the bottleneck.
 
 ### Parallel checker and durable certificate prototype (2026-08-16)
 
@@ -151,8 +162,8 @@ format must distinguish roots from incidental top-level facts.
 
 Commands, hashes, the complete scaling table and sanitizer results are retained in
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
-This remains the completed small-corpus prototype; the separate full run9 coloring/replay is now
-live and incomplete on AWS.
+This remains the completed small-corpus prototype. The attempted full run9 coloring/replay is now a
+closed performance diagnostic, not an active proof run.
 
 ### Packed dominance and adaptive block index (2026-08-17)
 

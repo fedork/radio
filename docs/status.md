@@ -14,9 +14,9 @@ at all depths in that parked slice; exact loss-sliced cover excludes rank 1180 t
 depth five and eventual constructibility remain open;
 the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correct the old
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
-proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`, while the
-separate resumed k=8 Pareto-prefix census and two independent run9 certificate coloring/replays
-remain live across the shared and right-sized AWS instances).
+proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
+separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
+attempts were stopped after measuring that independent proof search is slower than the solver).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -323,26 +323,27 @@ Do not run `gh auth switch`.
 ## Running now
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
-reported UNSOLVABLE. Two follow-ups share AWS instance `i-0005d74f985c52ae1`: the k=8 Pareto-prefix
-census and old-index run9 certificate replay. A progress-reporting replay also runs on dedicated
-`c8a.4xlarge` instance `i-01f8c56b7a53a1178`, run `20260818T014906Z`. Do not stop either instance
-until its supervisors finish and upload their final artifacts.
+reported UNSOLVABLE. The only active research job is the k=8 Pareto-prefix census on shared AWS
+instance `i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 05:07:48 UTC it remained healthy
+at one core and 8,903.2 MiB RSS, with 113.7 GiB host memory available and no swap. It had all 815
+second-cut blocks represented, 48 of 70 freshly recomputed blocks, 1,688 targets, 1,893 endpoints
+and 991 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
+the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact rather than that
+stale object.
 
-At 2026-08-18 00:12 UTC the census still had all 815 second-cut blocks represented, including 48 of
-70 freshly recomputed blocks, and had emitted 1,688 targets but no endpoint or full-state record.
-It was healthy at one core and 8,861.5 MiB RSS. The concurrent fourteen-worker verifier was healthy
-in run9 coloring's `k=7` barrier at 1,399% CPU and 1,296.6 MiB RSS; the host had 112.4 GiB available
-and no swap. The census S3 `STATUS` object is still the launch snapshot; use the live output or final
-artifact, not that stale object, for progress. Exact operational paths are in [aws-run.md](aws-run.md).
+Both optional run9 coloring attempts were intentionally interrupted on 2026-08-18 with exit 130,
+after their supervisors uploaded final diagnostics. The old fourteen-worker shared-host build had
+spent about 12h28m in coloring and had only closed the k=9/k=8 barriers; it had no intra-k=7 cursor.
+The progress build ran its k=7 color phase for 11,460.1 seconds and completed 119,649 of 2,505,858
+targets (4.7748%): every one-, two- and three-part target, but only 10,312 of 2,396,521 four-part
+targets. All completed targets verified, with zero unresolved/budget outcomes, after
+105,605,161,144 recursion nodes. No colored certificate or replay result exists.
 
-At 2026-08-18 02:08:09 UTC the dedicated sixteen-worker verifier had passed its remote regression,
-input hashes, normalization and byte round-trip. Pre-color k=7 minimalization produced the same
-2,507,270 facts as the old run in 77.17 seconds versus 713.01 seconds on the shared host. Coloring
-then finished all 108,083 three-part targets quickly but only 124 four-part targets over the next
-four minutes, 0.517/s, with zero unresolved. Advancing node cursors show deep enumeration rather
-than a stall. The local-rate extrapolation is roughly 54 days, so the twelve-hour cap is likely to
-make this a diagnostic rather than a completion unless later regions become far cheaper. Use
-`tools/run9_verifier_progress_status.sh 20260818T014906Z` for completed-work telemetry.
+The progress run's final S3 manifest and compressed logs were streamed back and hash-checked. Its
+dedicated `c8a.4xlarge` instance `i-01f8c56b7a53a1178` and 30-GiB root volume were then terminated;
+the shared census instance was untouched. Full run9 coloring is now deferred: the current checker
+independently re-solves each negative state, so coloring does not make the expensive part cheaper.
+Exact operational paths and disposition are in [aws-run.md](aws-run.md).
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
@@ -623,36 +624,29 @@ negative records, and the 106 MB readable certificate round-trips byte-identical
 `zstd -19`). A bounded top-layer pass verified all sixteen `k=9` roots and cited all 2,545
 canonical `k=8` facts; it stopped before checking any of those facts. This is not a proof replay.
 
-A first complete end-to-end verifier replay of the new 3.17-million-fact run9 DAG is running on the
-shared AWS host but has not yet completed. The launch reproduced the normalized input at the known SHA-256 and
-completed pre-color minimalization with fourteen workers while leaving two of sixteen vCPUs
-unassigned. The dominant `k=7` level retained 2,507,270 of 2,576,885 facts (97.30%) after 713.01
-seconds. Coloring verified the sixteen `k=9` roots and all 2,151 minimal `k=8` targets; those cited
-2,506,515 `k=7` facts, or 99.97% of its minimal level. The earlier 190x painting reduction from the
-superseded 2023 corpus therefore does not transfer to run9. The verifier is now coloring that
-full-scale `k=7` batch; the existing census still holds its own full core and the host has no swap.
-At the bounded 2026-08-18 00:12:08 UTC query it remained healthy after 7h37m13s at 1399% CPU and
-1,296.6 MiB RSS, with 112.4 GiB host memory available. This is process health, not intra-level
-proof progress.
+Two end-to-end coloring attempts established why the current design should not be used for full
+run9. Both reproduced the 3,126,190-record normalized input and the 2,507,270-fact minimal k=7
+level. The old fourteen-worker build closed k=9 and k=8, which cited 2,506,515 k=7 targets—99.97%
+of that minimal level—but exposed no finer progress. The later sixteen-core build made progress
+observable and confirmed that the bottleneck was computation rather than a hang: active cursors
+advanced and tasks turned over while throughput collapsed after the three-part region.
 
-The deployed binary reports only at whole-level barriers. There is no defensible intra-`k=7`
-percentage or ETA from this build: the target count is the batch size, not a processed counter.
-High CPU plus increasing elapsed time demonstrates health, while `coloring_milestone=3/9` will be
-the next proof milestone. The same supervisor will replay the resulting bundle. Use
-`tools/run9_verifier_status.sh`; exact evidence is in
-[`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
-This remains an optional trust-base strengthening, not an H3 dependency.
-
-A second clean replay now runs independently on right-sized on-demand `c8a.4xlarge`
-`i-01f8c56b7a53a1178`. Unlike the frozen first binary, it publishes exact completed/claimed/active
-counts, per-part progress, recursion-node rate and the three oldest active states every minute.
-The telemetry immediately exposed the cost transition: three-part states reached 191/s, whereas
-the first four complete four-part intervals delivered only 0.467--0.550 target/s despite 15--17
-million recursion nodes/s. Active facts turn over with advancing 2^20-node cursors, so this is
-algorithmic enumeration cost, not deadlock or scheduler imbalance. The status helper now adds a
-latest-window projection because the frozen binary's total/EWMA ETAs lag this ordered regime
-change. Exact launch hashes and measurements are in
+The progress run was stopped after 11,460.1 seconds of k=7 coloring at 119,649/2,505,858 targets.
+It had verified all 108,083 three-part states but only 10,312 of 2,396,521 four-part states, spending
+105,605,161,144 recursion nodes with zero unresolved or budget outcomes. Its final one-minute rate
+was 0.450 target/s. The older run was stopped at the same time after about 12h28m in coloring. Both
+exited 130 by request, their final diagnostic manifests were hash-checked, and neither emitted a
+complete colored certificate or began proof replay. Exact records are in
+[`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt) and
 [`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
+
+Full coloring is therefore deferred, not merely waiting for a faster instance. `radio_verify`
+remains valuable for small corpora, explicit-root controls and targeted audits, but its current
+negative check is itself a search. A useful full certificate must carry enough branch-level
+derivation that an independent checker validates recorded choices and coverage instead of solving
+millions of negative states again. Only after that check is cheap should top-down reachability
+coloring be reconsidered as an artifact-pruning pass. This optional strengthening remains outside
+the established `Sa(10)=192` proof dependency.
 
 The packed product-profile verifier index and its adaptive block summaries are now deployed.
 Canonical facts remain untouched for stable hashes and text output; a separate immutable
@@ -825,11 +819,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Let all three AWS follow-ups finish and archive their final output before stopping their
-   instances.** These are the k=8 Pareto-prefix census, the old-index run9 replay on the shared host,
-   and the progress-reporting replay on the dedicated host. The Sa solver artifacts and final
-   sidecars are already preserved; use `tools/run9_verifier_status.sh` for the old replay and
-   `tools/run9_verifier_progress_status.sh 20260818T014906Z` for completed-work telemetry.
+0. **Let the k=8 Pareto-prefix census finish and archive its final output before stopping the shared
+   instance.** It is the only remaining AWS research process. Both coloring verifiers were stopped,
+   their diagnostic uploads were hash-checked, and the dedicated instance was terminated. Do not
+   restart full run9 coloring without first changing the certificate so checking branch coverage is
+   materially cheaper than independently re-solving the negative states.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are

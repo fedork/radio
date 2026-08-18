@@ -1,4 +1,4 @@
-# RUNNING: independent run9 coloring and verifier replay on AWS.
+# STOPPED: independent run9 coloring was intentionally interrupted; no replay was produced.
 # Snapshot date: 2026-08-17 16:35:12 UTC.
 # Instance: i-0005d74f985c52ae1, r7iz.4xlarge, 16 vCPU / 128 GiB.
 # Work: /root/run9-verifier-20260817T163700Z
@@ -30,8 +30,8 @@ k  before   minimal  removed  wall_s
 4    33042     24816     8226    0.08
 5   125246     82674    42572    1.01
 6   388317    229341   158976   10.17
-# It was then using all fourteen workers on the 2,576,885-fact k=7 level. No coloring verdict
-# below the previously measured top-only gate has yet been produced; this is a progress record,
+# It then used all fourteen workers on the 2,576,885-fact k=7 level. At this snapshot no coloring
+# verdict below the previously measured top-only gate had been produced; this is a progress record,
 # not a completed independent certificate.
 
 # Launch preflight history, retained so the same shell mistake is not repeated:
@@ -71,3 +71,23 @@ k  in_level  targets  verified  unverified  budget  wall_s  cited_k_minus_1
 # host available memory was 112.4 GiB and swap remained zero. No new coloring line appeared, so
 # this is process health only. The old-index verifier was not restarted to pick up the new local
 # optimization.
+
+# Final disposition, 2026-08-18:
+# - TERM was sent to capped-run wrapper PID 484450 at the user's direction; it propagated cleanup
+#   to verifier PID 484457. The supervisor finished normally and uploaded diagnostics.
+# - COLOR ran from 2026-08-17T16:34:55Z through 2026-08-18T05:02:49Z, about 12h28m.
+# - exit_status=130 records the intentional interruption, not a verifier verdict.
+# - The frozen binary exposed only whole-level barriers. It had closed k=9 and k=8 and entered k=7;
+#   it produced no complete colored certificate and never began replay.
+# - Final objects: s3://radio-sa193-393287594714/run9-verifier/20260817T163700Z/
+# - The normalized input remained SHA-256
+#   3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116.
+# - Selected compressed final-manifest hashes:
+#   f6fa14fabbb0f22d5df7ae375243b9f41774488a429301a1b2ee9bbf6b01efa4  run9-sanitized.cert.zst
+#   53e09f421d1778a4c5d98c8bb215d5038d778dfcf1f21568725d8a6e70c95952  color.out.zst
+# - Both compressed streams were read back from S3 and matched the manifest.
+# - The co-resident Pareto census remained live and healthy; its instance was not stopped.
+#
+# Decision: do not resume this coloring batch. The later progress build quantified that independent
+# proof search over four-part k=7 facts is slower than the solver. A future certificate should carry
+# a compact split-space coverage derivation for cheap checking; see verifier_progress_2026-08-17.txt.

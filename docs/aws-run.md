@@ -1,7 +1,7 @@
-# The `Sa(193)` AWS runs — final solver record and remaining follow-ups
+# The `Sa(193)` AWS runs — final solver record and remaining census
 
-This page is the operational record for the completed cold runs and the remaining follow-ups on
-the original shared instance plus the right-sized dedicated verifier; the findings go to
+This page is the operational record for the completed cold runs, the concluded verifier
+diagnostics and the remaining census on the original shared instance; the findings go to
 [journal.md](journal.md) as usual.
 
 ## What is running
@@ -9,14 +9,14 @@ the original shared instance plus the right-sized dedicated verifier; the findin
 | | |
 |---|---|
 | shared instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| dedicated verifier | `i-01f8c56b7a53a1178`, `c8a.4xlarge` (16 physical cores, 32 GiB), run `20260818T014906Z`, on-demand |
+| dedicated verifier | `i-01f8c56b7a53a1178`, run `20260818T014906Z`: **terminated 2026-08-18** after final uploads were hash-checked; its 30-GiB root volume was `DeleteOnTermination=true` |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
-| active jobs | shared host: `pareto_k8_aws` and old-index `run9_verify`; dedicated host: progress-reporting `run9_verify_p` |
+| active jobs | shared host: `pareto_k8_aws` only; both `run9_verify` processes were intentionally stopped |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| active memory guards | shared host: 20 GiB census and 80 GiB verifier; dedicated host: 24 GiB verifier |
-| completion | each supervisor finalizes to S3; the shared idle guard and dedicated shutdown policy stop only their own host |
+| active memory guards | shared host: 20 GiB census; its joint/idle guards remain live |
+| completion | the census supervisor finalizes to S3; do not stop its host before that upload is checked |
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
@@ -33,24 +33,23 @@ fix. Run9 is the proof source.
 | `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | completed; performance only; 412561.4 CPU s, 1.32 GB peak RSS |
 | `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
 
-At **2026-08-17 00:52 UTC**, the remaining `pareto_k8_aws` process had run for 2d23h at one
-full core and 8,892,056 KiB RSS. Its 44,833,189-byte output contained all 815
-`CENSUS SECOND_SUMMARY` blocks, the closed prefix summary and 1,688 targets. It had not yet emitted
-an endpoint or full-state record, so the upgrade/full-state phase remains unfinished. The host had
-113 GiB available, no swap and 194 GB free disk. Do not stop the instance. The S3 `STATUS` object
-for this census is still the launch snapshot; inspect the live output or final artifact rather than
-using that stale object as a health signal.
+At **2026-08-18 05:07:48 UTC**, the remaining `pareto_k8_aws` process had run for 358,022 seconds at
+one full core and 8,903.2 MiB RSS. Its output contained all 815 `CENSUS SECOND_SUMMARY` blocks, 48 of
+70 freshly recomputed blocks, the closed prefix summary, 1,688 targets, 1,893 endpoints and 991
+full-state records. It had not yet emitted a final `CENSUS END` record. The host had 113.7 GiB
+available, no swap and 193.1 GiB free disk. Do not stop the instance. The S3 `STATUS` object for
+this census is still the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact
+rather than that stale object.
 
 At **2026-08-17 16:34:44 UTC**, the independent run9 verifier launched from commit `8856509`.
 It reproduced the 3,126,190-record sanitized certificate byte-for-byte and completed pre-color
 antichain reduction. The dominant `k=7` level fell only from 2,576,885 to 2,507,270 facts in 713.01
 seconds. Coloring then verified all sixteen `k=9` roots and all 2,151 minimal `k=8` targets, which
-cited 2,506,515 `k=7` facts—99.97% of that level. It is now coloring that full-scale `k=7` batch.
-Fourteen nice-level-10 workers are pinned to CPUs 0--13, leaving two vCPUs for the one-core census
-and the host; both jobs retain full CPU and the host has no swap. The verifier will replay the
-resulting closed bundle and upload compressed results under `run9-verifier/20260817T163700Z/`.
-Follow it with
-`tools/run9_verifier_status.sh`; launch hashes and the first snapshot are in
+cited 2,506,515 `k=7` facts—99.97% of that level. Its frozen display had no intra-level cursor. On
+2026-08-18 at 05:02:49 UTC its wrapper was sent TERM after about 12h28m in coloring; cleanup returned
+exit 130 and uploaded final diagnostics under `run9-verifier/20260817T163700Z/`. No colored bundle
+or replay result exists. The census retained its core throughout and remains live. Launch hashes,
+the first snapshot and final disposition are in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 
 At **2026-08-18 01:49:11 UTC**, a second, progress-reporting replay began on dedicated on-demand
@@ -63,13 +62,23 @@ the first run's 2,507,270 facts but completed in 77.17 rather than 713.01 second
 combines the new verifier index, two more workers and physical-core hardware. Its k=7 coloring
 batch contains 2,505,858 cited targets. The first 108,083 three-part targets ran at 144--191/s, but
 the first four complete four-part intervals fell to 0.467--0.550/s while node cursors kept
-advancing. At 960 seconds it had verified 109,675 total targets with zero unresolved; only 338 of
-2,396,521 four-part targets were done. The four-interval local extrapolation is roughly 54 days,
-not a forecast, and demonstrates that the twelve-hour cap is likely to stop this diagnostic unless
-later mass regions become dramatically cheaper. Follow it with
-`tools/run9_verifier_progress_status.sh 20260818T014906Z`; exact identifiers, bootstrap lessons and
-snapshots are in
+advancing. The run was intentionally stopped at 05:02:58 UTC rather than spend more on an approach
+that was already slower than the proof-producing solver. Its final k=7 snapshot had completed
+119,649/2,505,858 targets in 11,460.1 seconds: 10,312/2,396,521 four-part targets, 105,605,161,144
+nodes, zero unresolved/budget outcomes and a 0.450/s last-window rate. Cleanup returned exit 130,
+uploaded the final manifest, and produced no partial colored certificate. The compressed normalized
+input and color log were streamed back and matched that manifest. Instance
+`i-01f8c56b7a53a1178` was then terminated, deleting its `DeleteOnTermination` root volume. Its
+approximate on-demand compute cost from launch through finalization was **$2.79**. Exact identifiers,
+bootstrap lessons, snapshots and final hashes are in
 [`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
+
+Neither interrupted run was promoted to a GitHub release. The 106-MB normalized input is a derived
+duplicate of the durable run9 raw proof source, and no completed proof object resulted. The small,
+durable measurements and hashes are committed in `evidence/`; the final diagnostic objects remain
+under their S3 prefixes for operational inspection. Full coloring is deferred until the
+certificate carries a compact, independently checkable proof of split-space coverage rather than
+requiring the checker to rediscover it.
 
 Final Sa sidecars that existed only on EBS were copied to immutable `run3/final/`, `run8/final/`
 and `run9/final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; the shared
@@ -213,22 +222,25 @@ aws-vault exec default -- aws ec2 describe-instances \
 
 ## Stopping it
 
-**Do not stop the shared host yet:** `pareto_k8_aws` and old-index `run9_verify` are still running. After both exit, their
-final raw output, certificates and sidecars must appear under `pareto-census-k8/20260814T0132Z/`
-and `run9-verifier/20260817T163700Z/` and be hash-checked. Only then stop the instance while
-preserving the EBS volume and all run directories:
+**Do not stop the shared host yet:** `pareto_k8_aws` is still running. The old-index verifier has
+already exited 130 and its final diagnostic upload under `run9-verifier/20260817T163700Z/` was
+hash-checked. After the census exits, its final raw output and sidecars must appear under
+`pareto-census-k8/20260814T0132Z/` and be checked. Only then stop the instance while preserving the
+EBS volume and run directories:
 
 ```
 aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52ae1
 ```
 
-The active idle guard includes both job names and can stop the host only after both have gone. A
-manual stop before either finishes is an interruption, not a result. The Sa artifacts are already
-final; the census and independent replay artifacts are not.
+The active idle guard still recognizes both job names but only the census remains. A manual stop
+before it finishes is an interruption, not a result. The Sa and verifier diagnostic artifacts are
+already final; the census artifact is not.
 
-Do not stop the dedicated `c8a.4xlarge` either. Its supervisor uploads final material and requests
-shutdown on completion or failure; EC2 shutdown behavior is `stop`, and the independently verified
-hard-stop timer fires at 2026-08-19 02:49:19 UTC if the supervisor cannot do so.
+The dedicated `c8a.4xlarge` no longer exists. It was stopped by its supervisor, its final S3
+manifest was checked, and exact instance `i-01f8c56b7a53a1178` was terminated on 2026-08-18. Its
+single 30-GiB encrypted gp3 volume had `DeleteOnTermination=true` and was deleted; the normalized
+run9 source remains recoverable from the durable raw proof release, and the run-specific diagnostic
+objects remain in S3.
 
 ## Resuming historical Sa work
 

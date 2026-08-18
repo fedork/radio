@@ -126,6 +126,7 @@ an all-depth exclusion.
 | | raw | why |
 |---|---|---|
 | `radio.zip` (`~/radio_old`) | 3.56 G → 23 G | ~18 GB of unreliable 2023 `out*`; over the 2 GB asset limit. Everything of value extracted. Cold backstop only. |
+| interrupted full-run9 coloring attempts (`run9-verifier/20260817T163700Z`, `run9-verifier-progress/20260818T014906Z`) | two 106-MB normalized inputs plus small diagnostics | No colored certificate or replay verdict was produced; each normalized input is a derived duplicate of the archived run9 raw proof source. Final counters and hashes are committed in `evidence/`; operational objects remain in the private S3 bucket. |
 
 ### Extracted into git, so the bulk is no longer load-bearing
 

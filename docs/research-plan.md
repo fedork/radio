@@ -341,51 +341,49 @@ The intermediate full-pipeline benchmark is also delivered. Explicit Sa(66) root
 facts to 9 roots plus 120,528 support facts, and independent replay closed all 120,537 records and
 2,491,817,467 recursion nodes with zero gaps. On the same `r7iz.4xlarge` hardware and exact run9
 verifier binary, 8/14/16 workers replayed in 434.86/369.57/347.91 seconds. This establishes the
-policy before run9 finishes: sixteen is minimum wall on an idle host, eight is CPU-efficient, and
+small-corpus scaling result: sixteen is minimum wall on an idle host, eight is CPU-efficient, and
 fourteen is a sound shared-host compromise. The dominant Sa(113) k=6 batch retained 92.91% of its
-minimal level, so coloring is valuable for artifact size but not a substitute for optimizing the
-hot verification level. Full evidence:
+minimal level. Coloring can reduce a completed artifact, but this benchmark did not establish that
+independent proof search remains cheaper than the solver at run9 scale. Full evidence:
 [`../evidence/verifier_pipeline_benchmark_2026-08-17.txt`](../evidence/verifier_pipeline_benchmark_2026-08-17.txt).
 
-Next, in order:
+Disposition and next design work:
 
 1. **Delivered:** normalize run9 to `radio-negative-certificate-v1` and round-trip it byte-for-byte;
    a bounded top pass also verifies the sixteen explicit roots and shows that they cite all 2,545
    canonical `k=8` facts, but deliberately verifies nothing below `k=9`;
 2. **Delivered on AWS:** minimalize every support level. The dominant `k=7` level retained
    2,507,270 of 2,576,885 facts (97.30%), so same-level reduction is modest on this corpus;
-3. **Running on AWS:** color from the sixteen roots. The `k=9` and `k=8` barriers verified 2,167
-   targets and cited 2,506,515 `k=7` facts—99.97% of its minimal level. The earlier 190x `k=7`
-   reduction from the superseded 2023 corpus does not transfer; the old fourteen-worker build is
-   still processing this full-scale batch, with no intra-level cursor or defensible ETA. A second
-   right-sized sixteen-physical-core run now reports completed counts, rates, part-count mix and
-   oldest active state once per minute. It uses the same 2,507,270-fact minimal level, cited
-   2,505,858 k=7 targets, and completed all 108,083 three-part targets quickly. The first four
-   complete four-part intervals then fell to 0.467--0.550 target/s with advancing node cursors and
-   zero unresolved. That local rate extrapolates to roughly 54 days, far beyond the twelve-hour
-   phase cap; measure later mass regions before deciding whether a new optimization can justify a
-   completion run;
-4. both supervisors will replay their colored bundle and require zero unresolved targets. Compare
-   their final certificate hashes, fact counts, node counts and walls before selecting the durable
-   result; different support sets are permitted, but each closed replay must verify independently;
-5. **Delivered:** the packed product-profile index retains canonical fact storage but scans a
+3. **Stopped and deferred:** both full-run9 coloring attempts were interrupted by request on
+   2026-08-18. The instrumented sixteen-core run spent 11,460.1 seconds in k=7 coloring and closed
+   119,649/2,505,858 targets, including all 108,083 three-part targets but only 10,312/2,396,521
+   four-part targets. It had consumed 105,605,161,144 recursion nodes with zero unresolved/budget
+   outcomes; its final window rate was 0.450 target/s. The old fourteen-worker run spent about
+   12h28m in coloring and had only whole-level progress. Neither produced a colored bundle or replay
+   result. Final diagnostic uploads were hash-checked and the dedicated instance was terminated;
+4. **Delivered:** the packed product-profile index retains canonical fact storage but scans a
    separate `(np,max-product,total-mass)` permutation with denormalized mass and packed n/m/product
    columns. On an exact hard run9 k=7 root it preserves the 4,644,469-node proof and memo counts
    while reducing verifier wall from 209.63 to 33.24 seconds (6.31x). A complete 120,302-record
    Sa(113) colored replay also closes with zero gaps. Measurements, build IDs and controls are in
    [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt);
-6. **Delivered:** adaptive fixed-size block summaries over the packed index. Full 256-fact blocks
+5. **Delivered:** adaptive fixed-size block summaries over the packed index. Full 256-fact blocks
    inside an equal primary-key group retain the Pareto-minimal `(mass,top-four products)` profiles;
    levels below 65,536 facts take the product-only loop. The exact hard root keeps all proof/memo
    counts while falling from a contemporaneous 39.16 to 11.70 seconds (3.35x), and the small-level
    Sa(113) guard is neutral. The failed ungated layout, size sweep and sanitizer controls are in
-   [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
-7. Let both the already-running old-index replay and the dedicated progress run finish. Archive and
-   compare the closed outputs; do not treat an ETA or a colored-but-unreplayed bundle as completion.
-   A further verifier layer is optional, not the next default task: the hard control still tests
-   4.89 billion block-front points and 5.51 billion per-fact candidates, so a two-level summary is
-   measurable if verifier wall remains important. Keep readable text as the durable source and
-   retain the exact matcher.
+   [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt);
+6. **Redesign before another full run.** Keep readable text as the durable envelope, but make the
+   solver emit a proof of split-space coverage: compact ranges/subboxes annotated with the outcome
+   and lower-level fact (or theorem) that rejects them. The checker should validate a disjoint or
+   otherwise auditable cover and exact citations, not rediscover that cover by recursive search.
+   Start with one retained hard k=7 fact and require checker work to be close to certificate size;
+   compare proof bytes, generation overhead and checker wall against the solver's already-paid work;
+7. use the current search-based verifier only for small-corpus regression, targeted independent
+   audits and format experiments. Reconsider top-down coloring only after explicit citations make
+   graph reachability cheap; it then becomes a separate pruning pass rather than another solve.
+   Do not trade the readable source format for binary until measured parsing or storage, rather
+   than proof search, is the bottleneck.
 
 The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
 context through the complete recursive tree; its deterministic work clock, exact L1 and joint
