@@ -66,6 +66,12 @@ Run `tools/check_witness.py` on any new tree **before** recording the result. Ru
 Note that a missing `can't solve` line does **not** mean unsolvable. `canSolveB` returns a
 tri-state and gives up with `MAYBE` when it hits a deadline, printing nothing.
 
+Do not use the current 120,302-record colored Sa(113) bundle as proof. On 2026-08-18 the frozen
+solver-core refuter exposed nine uncovered splits while closing the complete 304,105-record
+normalized corpus; `radio_verify.c` had reported the colored subset closed. Coloring/replay remains
+diagnostic until that discrepancy is fixed. The raw cold run9 proof is unaffected; details are in
+`evidence/verifier_frozen_trie_2026-08-18.txt`.
+
 The finite search budget is a shared absolute bound, not permission for a descendant to manufacture
 more work.  The default clock is deterministic: one unit per accepted split prefix across the whole
 recursive tree, calibrated at 20,000,000 units per nominal second.  A finite state may return `MAYBE`

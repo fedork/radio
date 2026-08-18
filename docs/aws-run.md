@@ -9,13 +9,13 @@ diagnostics and the remaining census on the original shared instance; the findin
 | | |
 |---|---|
 | shared instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| dedicated verifier | `i-0b81cd58d3ba14f0c`, run `20260818T062429Z`, on-demand `c8a.4xlarge`: mass-descending ordinary audit in full k=7 verification |
+| dedicated verifier | `i-0cb3783e937115ff1`, run `20260818T074026Z`, on-demand `c8a.4xlarge`: frozen solver-core refuter in full k=7 verification |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
-| active jobs | shared host: `pareto_k8_aws`; dedicated host: optimized `run9_verify_p` audit (no coloring) |
+| active jobs | shared host: `pareto_k8_aws`; dedicated host: `run9_refute` (no coloring or writes during worker epochs) |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| active memory guards | shared host: 20 GiB census; dedicated verifier: 24 GiB per phase and 128 MiB pair rows per worker |
+| active memory guards | shared host: 20 GiB census; dedicated refuter: 8 GiB RSS per phase |
 | completion | each supervisor finalizes to S3; do not stop either host before its upload is checked |
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
@@ -33,10 +33,10 @@ fix. Run9 is the proof source.
 | `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | completed; performance only; 412561.4 CPU s, 1.32 GB peak RSS |
 | `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
 
-At **2026-08-18 05:07:48 UTC**, the remaining `pareto_k8_aws` process had run for 358,022 seconds at
-one full core and 8,903.2 MiB RSS. Its output contained all 815 `CENSUS SECOND_SUMMARY` blocks, 48 of
-70 freshly recomputed blocks, the closed prefix summary, 1,688 targets, 1,893 endpoints and 991
-full-state records. It had not yet emitted a final `CENSUS END` record. The host had 113.7 GiB
+At **2026-08-18 07:51:22 UTC**, the remaining `pareto_k8_aws` process had run for 367,837 seconds at
+one full core and 8,927.0 MiB RSS. Its output contained all 815 `CENSUS SECOND_SUMMARY` blocks, 48 of
+70 freshly recomputed blocks, the closed prefix summary, 1,688 targets, 1,893 endpoints and 1,033
+full-state records. It had not yet emitted a final `CENSUS END` record. The host had 113.6 GiB
 available, no swap and 193.1 GiB free disk. Do not stop the instance. The S3 `STATUS` object for
 this census is still the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact
 rather than that stale object.
@@ -101,18 +101,35 @@ normalization and byte round-trip passed. The identical 9,995-fact sample closed
 3,197,377,218 nodes / 341.32 seconds—7.41x fewer nodes and 4.77x less wall than the canonical-order
 run. Its k=7 four-part projection is 81,917 seconds (22.75 hours), safely below the seven-day gate,
 and full k=7 verification began at 06:31:23 UTC. The live `BATCH_START` includes
-`group_order=3`. This run remains on-demand because the dominant checkpoint has no restart cursor;
-the unchanged seven-day phase cap, nine-day hard stop and 24-GiB RSS guard remain active. Its
-two-minute full-stage snapshot was 24,973/2,576,885 with zero gaps, comprising all one- and
-two-part facts and 16,924/170,037 three-part facts; no four-part target had started, so its early
-cheap-prefix ETA is not used in place of the representative sample projection.
+`group_order=3`. The run was stopped deliberately at 07:08:07 UTC after the full phase reached
+251,131/2,576,885 k=7 claims, including 73,045 four-part claims, with zero gaps in 2,160 seconds and
+48,049,145,431 nodes. Its capped wrapper finalized with exit 130. Every object named by
+`final.sha256`, including the normalized certificate and raw source, was streamed back and matched;
+instance `i-0b81cd58d3ba14f0c` was then terminated. The result is diagnostic: even after the ordering
+improvement, this checker repeated more work than the proof-producing solver.
+
+At **2026-08-18 07:40:32 UTC**, frozen solver-core refuter run `20260818T074026Z` launched on
+dedicated on-demand `c8a.4xlarge` instance `i-0cb3783e937115ff1`. Its clean source is commit
+`e0402900f4a74853ac44344aa8080c41ce0688fe`; the 1,620,907-byte source bundle has SHA-256
+`37bfe28092e394c09bf7cc136c95dbf102f5d78525b35e3110bdef126f9c43e8` and is under
+`s3://radio-sa193-393287594714/run9-frozen-refute/20260818T074026Z/`. The run reuses the hash-checked
+3,126,190-record normalized input from the concluded ordinary audit. It serially builds the compact
+negative trie and required split metadata, then gives sixteen workers immutable solver tables and
+worker-local search contexts. Its 9,995-fact gate closed with zero gaps in 81.200 wall and
+1,293.979 CPU seconds, projecting the k=7 four-part level at 19,488 wall / 310,555 CPU seconds.
+That is 5.41 hours and 74.06% of the complete cold solver's CPU, so both gates passed and full k=7
+began at 07:47:30 UTC. Completed k=7, k<=6 and k=8..9 are retained as separate checkpoints. An
+8-GiB RSS cap, 24-hour phase cap and 36-hour hard stop bound the run. At its 180-second full-stage
+checkpoint it had completed 188,695/2,576,885 claims with zero gaps; all reported active roots were
+four-part, and RSS was 1,203.7 MiB with no swap. Use
+`tools/run9_refute_status.sh 20260818T074026Z` for its cache/freeze/batch/active-root progress.
 
 The two interrupted coloring runs and the canonical-order gate were not promoted to a GitHub
 release. Their 106-MB normalized inputs are derived duplicates of the durable run9 raw proof
 source, and none produced a completed proof checkpoint. The small, durable measurements and hashes
 are committed in `evidence/`; diagnostic objects remain under their S3 prefixes for operational
-inspection. If the active ordinary audit completes, its independently verified checkpoints do
-deserve a `radio-data` GitHub release. Full coloring remains deferred until the certificate carries
+inspection. If the active frozen refuter completes, its validation checkpoints deserve a
+`radio-data` GitHub release, clearly labeled as solver-core rather than independent. Full coloring remains deferred until the certificate carries
 a compact, independently checkable proof of split-space coverage rather than requiring the checker
 to rediscover it.
 
@@ -268,12 +285,18 @@ EBS volume and run directories:
 aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52ae1
 ```
 
-The active idle guard still recognizes both job names but only the census remains. A manual stop
+The shared-host idle guard still recognizes both old job names but only the census remains. A manual stop
 before it finishes is an interruption, not a result. The Sa and verifier diagnostic artifacts are
 already final; the census artifact is not.
 
-The dedicated `c8a.4xlarge` no longer exists. It was stopped by its supervisor, its final S3
-manifest was checked, and exact instance `i-01f8c56b7a53a1178` was terminated on 2026-08-18. Its
+Do not manually stop active refuter instance `i-0cb3783e937115ff1`. Its supervisor uploads live
+status every minute, preserves every completed phase at exit, stops the host two minutes after
+finalization, and has an independent 36-hour hard stop. Check it with
+`tools/run9_refute_status.sh 20260818T074026Z`; only terminate it after the final manifest has been
+downloaded and verified.
+
+The dedicated coloring `c8a.4xlarge` no longer exists. It was stopped by its supervisor, its final
+S3 manifest was checked, and exact instance `i-01f8c56b7a53a1178` was terminated on 2026-08-18. Its
 single 30-GiB encrypted gp3 volume had `DeleteOnTermination=true` and was deleted; the normalized
 run9 source remains recoverable from the durable raw proof release, and the run-specific diagnostic
 objects remain in S3.

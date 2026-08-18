@@ -1,0 +1,134 @@
+Frozen solver-core negative refuter, 2026-08-18
+================================================
+
+Decision
+--------
+
+The independent kd-indexed verifier was stopped after its representative run9 gate had already
+shown the relevant cost.  Run 20260818T062429Z verified 9,995/9,995 sampled k=7 four-part claims
+with zero gaps in 3,197,377,218 recursion nodes and 341.32 wall seconds on 16 c8a.4xlarge vCPUs.
+During the full phase it reached 251,131/2,576,885 k=7 claims (73,045 four-part), still with zero
+gaps, after 2,160 seconds and 48,049,145,431 nodes.  It was then stopped deliberately: exit 130,
+all final-manifest hashes checked, and instance i-0b81cd58d3ba14f0c terminated.  Repeating more
+search than the original solver is not a useful verifier endpoint.
+
+The replacement is radio_refute.c at commit
+e0402900f4a74853ac44344aa8080c41ce0688fe.  It deliberately shares the production solver core;
+it is a validation replay, not an independent implementation.  The intended comparison is the
+user-proposed baseline: perform the same exhaustive refutation as the solver, but against a
+read-only cache and without recursive solving or learning.
+
+Frozen-epoch contract
+---------------------
+
+1. Parse the readable radio-negative-certificate-v1 envelope and load all negative facts into the
+   production compact dominance trie once.  No binary certificate format is needed.
+2. Before workers start, materialize every root-part split table required by the selected batch and
+   advance its one-part s[4]/s[5] viability frontier using theorem checks and CACHE_ONLY queries.
+3. Publish a read epoch.  Each worker owns radio_search_context (accepted-prefix clock, exact L1,
+   and reachability workspace).  A queried level-k root bypasses its own L1/external/trie entry,
+   starts at exhaustive pass 2, and never writes the cache or split metadata.
+4. Every child is at k-1 and is answered only by an exact theorem or the immutable negative trie.
+   One FALSE child rejects the test.  A complete split with no FALSE child is reported as a gap;
+   it is never recursively solved.  Therefore worker order and cross-level barriers are irrelevant.
+5. Cache arena allocation counts and a checksum of every materialized split table are compared
+   before and after the worker epoch.  Any mutation is fatal.  Per-root reachability diagnostics
+   are suppressed in this mode; batch progress reports completed claims, per-level totals, prefix
+   throughput, ETA, and the three longest-running active roots.
+
+Correctness and concurrency controls
+------------------------------------
+
+- tools/test_radio_refute.sh verifies the same closed 11-claim fixture with one and two workers,
+  forces reachability to arm at the first prefix, checks identical three-prefix work and a stable
+  frozen checksum, and confirms that the frozen path does not emit per-root telemetry.
+- A deliberately false `fact 1 Sb(1:1)` certificate fails closed as a contradicted claim.
+- ASan+UBSan and ThreadSanitizer two-worker runs on the closed fixture completed without a finding.
+- tools/test_radio_verify.sh, tools/search_context_regression.sh,
+  tools/work_budget_regression.sh, tools/rb_contraction_regression.sh, and
+  tools/provenance_regression.sh all pass.  The provenance regression also caused the complete
+  verifier/refuter runtime-knob allow-list to be synchronized between embedded and wrapper output.
+
+Sa(113) controls
+----------------
+
+The full normalized 304,105-claim Sa(113) certificate closed completely with 12 M4 Pro workers:
+
+  cache:       0.523 wall s, 76,693 branches, 105,933 fronts
+  freeze:      0.054 wall s, 893 tables, 213,546 options
+  verification 10.232 wall s, 1,272,552,775 accepted prefixes
+  result:      304,105 verified, 0 gaps
+  whole run:   13.76 real s, 123.61 user s, 0.53 sys s, 312,213,504 max RSS bytes
+
+The previously colored 120,302-claim Sa(113) bundle does NOT pass this refuter: 120,293 verify and
+nine expose uncovered splits (one k=5, seven k=6, one k=7).  The first is
+Sb(15:8,8:5,8:5)@5; the k=7 gap is Sb(40:23,25:25)@7.  The older independent C verifier had reported
+that bundle closed, so its coloring/replay result is no longer accepted as evidence until that
+discrepancy is diagnosed.  This does not affect the raw cold run9 proof.  It is also why the new AWS
+run consumes the full normalized certificate, not the colored support subset.
+
+Local run9 gate
+---------------
+
+Input was the hash-checked 3,126,190-claim normalized run9 certificate:
+
+  readable SHA-256: 3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+  zstd SHA-256:     59b7f74730037ce8ccf5ff30049d78f5c0472b2c1fdc59586af780df27872d7c
+
+On 12 M4 Pro workers the same deterministic 9,995-claim k=7 four-part stride used by the old
+verifier closed with zero gaps:
+
+  cache:        263.457 wall s, 439,499 branches, 2,706,062 fronts
+  freeze:       0.080 wall s, 593 tables, 313,374 options
+  verification: 126.337 wall s, 14,246,550,669 accepted prefixes
+  projected k=7 four-part verification wall: 30,330 s (8.43 h) on this 12-worker host
+  whole run:    393.27 real s, 1,751.02 user s, 6.53 sys s
+  memory:       854,917,120 max RSS bytes; 1,369,130,376 peak footprint bytes
+
+The old independent verifier needed 341.32 seconds for the identical sample on 16 AWS vCPUs, so
+the solver-core traversal is already 2.70x lower wall despite using fewer, different local cores.
+Its sample implies about 3.419 trillion accepted prefixes for all k=7 four-part claims, close to
+the original solver's 3.228 trillion final-pass k=7 split count.  The AWS gate below measures CPU
+directly before deciding whether that comparison is good enough to continue.
+
+AWS deployment
+--------------
+
+Run 20260818T074026Z launched at 2026-08-18 07:40:32 UTC on dedicated on-demand c8a.4xlarge
+instance i-0cb3783e937115ff1.  It uses 16 workers, an 8-GiB RSS cap, a 24-hour cap per phase and a
+36-hour hard host stop.  Source commit is e0402900f4a74853ac44344aa8080c41ce0688fe; its source
+bundle is 1,620,907 bytes with SHA-256
+37bfe28092e394c09bf7cc136c95dbf102f5d78525b35e3110bdef126f9c43e8 and is stored under:
+
+  s3://radio-sa193-393287594714/run9-frozen-refute/20260818T074026Z/
+
+The remote clang-15 build ID is
+3624d703e6a407000b10cf06a16f05d3644f4272019939bafc5b9f25078f92ed and the binary SHA-256 is
+7ed91ba46c927a1d45a5d298aeefc1e8da6c28c386cc6e4bf182712c7de50911.
+
+The pipeline first runs regressions and the same 9,995-fact gate.  It enters full k=7 only if the
+sample projects at most 86,400 wall seconds and 419,353 CPU seconds (the complete cold run9 solver
+cost).  Completed k=7, k<=6, and k=8..9 phases are separate retained checkpoints.  Live status:
+
+  tools/run9_refute_status.sh 20260818T074026Z
+
+The remote regression passed and the gate closed 9,995/9,995 with zero gaps:
+
+  cache:        296.104 wall s, 439,499 branches, 2,706,062 fronts
+  freeze:       0.090 wall s, 593 tables, 313,374 options
+  checksum:     b85d3cad4e229afc before and after the worker epoch
+  verification: 81.200 wall s, 1,293.979 CPU s, 14,231,681,107 accepted prefixes
+  projection:   19,488 wall s (5.41 h), 310,555 CPU s for all 2,398,799 k=7 four-part facts
+
+The CPU projection is 74.06% of the complete cold run9 solver's 419,353.1 seconds, leaving about
+30.2 CPU hours for cache construction and the other levels before an end-to-end replay would equal
+the solver.  On the same c8a.4xlarge instance type the 81.200-second gate is 4.20x faster than the
+independent checker's 341.32-second mass-descending gate.  Both automatic gates passed, and full k=7 began.  This is the first measured strategy
+which meets the stated requirement rather than merely moving the independent checker's bottleneck.
+
+The retained full-k=7 process rebuilt the cache in 291.931 seconds and froze 772 tables / 383,875
+options in 0.112 seconds, publishing split checksum 828a877ab5649882.  Its exact batch size is
+2,576,885 claims on sixteen workers.  At 180 seconds it had completed 188,695 with zero gaps and
+all reported active roots were four-part, so the dominant region—not only the cheap prefix—is
+advancing.  The process used 1,203.7 MiB RSS with 28.9 GiB host memory available and no swap.  Its
+short mixed-region ETA is still deliberately not used in place of the completed four-part gate.

@@ -336,10 +336,12 @@ wall time fell from 14.13 to 2.79 seconds. A one-root colored certificate retain
 and replayed cleanly. Details and hashes:
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
 
-The intermediate full-pipeline benchmark is also delivered. Explicit Sa(66) roots produced a
-2,037-record colored proof at every tested width. Explicit Sa(113) roots reduced 304,105 normalized
-facts to 9 roots plus 120,528 support facts, and independent replay closed all 120,537 records and
-2,491,817,467 recursion nodes with zero gaps. On the same `r7iz.4xlarge` hardware and exact run9
+The intermediate full-pipeline performance benchmark is delivered. Explicit Sa(66) roots produced
+a 2,037-record colored bundle at every tested width. Explicit Sa(113) roots reduced 304,105
+normalized facts to 9 roots plus 120,528 support facts, and the independent checker reported all
+120,537 records closed in 2,491,817,467 recursion nodes. A later solver-core replay exposed nine
+uncovered splits in the colored subset while closing the full normalized corpus, so this is no
+longer a proof result. On the same `r7iz.4xlarge` hardware and exact run9
 verifier binary, 8/14/16 workers replayed in 434.86/369.57/347.91 seconds. This establishes the
 small-corpus scaling result: sixteen is minimum wall on an idle host, eight is CPU-efficient, and
 fourteen is a sound shared-host compromise. The dominant Sa(113) k=6 batch retained 92.91% of its
@@ -365,7 +367,8 @@ Disposition and next design work:
    separate `(np,max-product,total-mass)` permutation with denormalized mass and packed n/m/product
    columns. On an exact hard run9 k=7 root it preserves the 4,644,469-node proof and memo counts
    while reducing verifier wall from 209.63 to 33.24 seconds (6.31x). A complete 120,302-record
-   Sa(113) colored replay also closes with zero gaps. Measurements, build IDs and controls are in
+   Sa(113) colored replay also reported zero gaps; retain that only as a performance measurement.
+   Measurements, build IDs and controls are in
    [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt);
 5. **Delivered:** adaptive fixed-size block summaries over the packed index. Full 256-fact blocks
    inside an equal primary-key group retain the Pareto-minimal `(mass,top-four products)` profiles;
@@ -380,18 +383,23 @@ Disposition and next design work:
    k=6 and k=7 antichain passes reproduce 229,341 and 2,507,270 minima in 3.8 and 49.8 seconds.
    A subsequent descending-segment-mass part order reduced a twenty-root level-spread sample from
    41,945,991 to 5,336,038 nodes and a complete Sa(113) replay from 2,491,283,058 to 330,226,371
-   nodes, with all 120,302 records still verified and no gaps.
+   nodes, with all 120,302 colored records reported closed. The solver-core discrepancy supersedes
+   that verdict without changing the traversal-cost comparison.
    Soundness, memory caps and the Sa(113) guard are in
    [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt);
-7. **One bounded ordinary run9 audit is now justified, without coloring.** The dedicated pipeline
-   first verifies a deterministic 9,995-fact k=7 sample and refuses the multi-day phase if it
-   projects beyond seven days. It then retains k=7, k<=6 and k=8..9 as separate checkpoints on a
-   right-sized on-demand host. Spot remains inappropriate until the dominant level has a restart
-   cursor. The first frozen sample established the former canonical-n before measurement at
-   23,697,303,379 nodes / 1,627.30 seconds. The clean mass-descending run reduced the identical
-   sample to 3,197,377,218 / 341.32 seconds, projected the dominant level at 22.75 hours and entered
-   full k=7 verification. This is an empirical completion attempt, not a claim that search
-   repetition is the ideal certificate design;
+7. **The bounded independent run9 audit answered its engineering question and was stopped.** The
+   mass-descending sample fell to 3,197,377,218 nodes / 341.32 seconds, but the full phase still
+   repeated more work than the solver. It was stopped at 251,131/2,576,885 k=7 claims after 2,160
+   seconds and 48,049,145,431 nodes, with zero gaps; final hashes were checked and its host was
+   terminated. The replacement `radio_refute.c` freezes the production negative trie and split
+   metadata, then runs the solver's exhaustive traversal in parallel with root-cache bypass,
+   CACHE_ONLY k-1 children and no recursive solving or writes. Its AWS gate rejects the full run if
+   either projected wall exceeds 24 hours or projected CPU exceeds the complete 419,353.1-second
+   cold solver. The gate closed 9,995/9,995 with zero gaps in 81.200 wall / 1,293.979 CPU seconds,
+   projecting 19,488 wall / 310,555 CPU seconds; full k=7 is now running. It uses the complete
+   normalized certificate because the colored Sa(113) control is missing nine required supports.
+   Architecture, controls and exact measurements are in
+   [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt);
 8. keep readable text as the durable envelope, but make the solver emit split-space coverage if the
    bounded audit is still uneconomic: compact ranges/subboxes annotated with the outcome and
    lower-level fact (or theorem) that rejects them. The checker should validate an auditable cover
@@ -406,8 +414,11 @@ reachability workspace are worker-owned. The legacy entry point wraps a default 
 1,038-answer serial corpus is byte-identical, both budget schedulers pass, and sanitizer coverage is
 clean. Full commands and hashes are in
 [`../evidence/parallel_solver_context_2026-08-17.txt`](../evidence/parallel_solver_context_2026-08-17.txt).
-This is not yet a thread-safe solver: the dominance trie, lazy split catalog with learned cut
-metadata, and minimum-`k` memo remain mutable process globals.
+`radio_refute.c` now exercises a deliberately narrower thread-safe frozen epoch: cache and split
+metadata are completed serially, worker roots cannot learn, and allocation counts plus a split
+checksum prove that the read epoch stayed immutable. This is still not a thread-safe mutable
+solver: the dominance trie, lazy split catalog with learned cut metadata, and minimum-`k` memo
+remain process-global outside that mode.
 
 Next, introduce a frozen read-only result-cache view plus worker-local exact-result overlay, then
 separate immutable split geometry from mutable cut metadata. Only after that gate should the

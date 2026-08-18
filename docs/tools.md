@@ -92,10 +92,12 @@ and
 with the production hierarchy in
 [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
 
-With the mass-descending part order, the full 120,302-record Sa(113) replay remained gap-free and
-fell from the prior 2,491,283,058 nodes / 119.19 seconds to 330,226,371 nodes / 25.10 seconds on
-twelve workers. Group order changes proof-search cost and cited witnesses, so node equality with
-the old order is not expected; complete verdict agreement is the correctness control.
+With the mass-descending part order, the full 120,302-record Sa(113) colored replay reported
+330,226,371 nodes / 25.10 seconds on twelve workers. **Do not treat that colored replay as proof.**
+On 2026-08-18 the solver-core refuter below exposed nine uncovered splits in the same bundle, while
+the complete 304,105-record normalized input closed with zero gaps. The independent checker's
+coloring/replay discrepancy remains to be diagnosed; its benchmark remains useful as a performance
+measurement, not as evidence that the pruned support set is closed.
 
 The durable input/output format is text, and is deliberately simpler than a raw log:
 
@@ -112,6 +114,32 @@ canonicalized and mass is recomputed, never trusted from an annotation. Unknown 
 after the header. `CERT_ONLY=1 CERT_OUT=FILE` normalizes a raw log without verifying it. The current
 in-memory representation still limits each coordinate to 255; that is an implementation limit,
 not part of the text grammar.
+
+## Frozen solver-core refuter
+
+`radio_refute.c` is the fast validation path when sharing the production solver core is acceptable:
+
+```
+tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 \
+  radio_refute.c -o radio_refute
+REFUTE_THREADS=16 REFUTE_PROGRESS_SECONDS=60 \
+  tools/run_with_provenance.py ./radio_refute certificate.cert
+```
+
+It loads every negative claim into the production compact dominance trie, materializes required
+split geometry and one-part viability metadata serially, then freezes both structures. Each worker
+owns a `radio_search_context`. An audited root bypasses its own level-k cache entry and enumerates
+the solver's exhaustive pass; children are theorem/CACHE_ONLY queries at k-1. A cache miss is an
+uncovered split, never permission to recurse, learn or write a fact. Cache allocation counts and a
+full split-table checksum must be identical after the worker epoch.
+
+`REFUTE_MIN_K`/`MAX_K`, `REFUTE_MIN_PARTS`/`MAX_PARTS`, and
+`REFUTE_STRIDE`/`OFFSET` select a deterministic batch. Runtime order needs no level barrier because
+every dependency decreases k. Progress reports cache loading, serial freeze work, completed and
+per-level targets, accepted-prefix throughput, ETA, and the three oldest active roots. This tool is
+not an independent proof implementation; it is deliberately the solver's read-only, refute-only
+baseline. Design, controls, Sa(113) results and the run9 gate are in
+[`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt).
 
 Top-down coloring alone has a level barrier, because citations made while verifying `k` become the
 targets at `k-1`:

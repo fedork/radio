@@ -7198,3 +7198,68 @@ seven-day gate and began the full k=7 checkpoint at 06:31:23 UTC. The progress s
 120 seconds the full stage had verified 24,973/2,576,885 with zero gaps, but it was still in the
 cheap three-part prefix; the completed four-part sample, not this early aggregate rate, controls
 the forecast.
+
+## 2026-08-18 — frozen solver-core refuter meets the solver-cost gate
+
+The independent ordinary audit answered its engineering question before completion. The optimized
+mass-descending run `20260818T062429Z` had reached 251,131/2,576,885 k=7 claims after 2,160 seconds:
+all one-, two- and three-part facts plus 73,045 four-part facts, with zero gaps but
+48,049,145,431 recursion nodes. That is still more repeated proof search than is useful for a
+verifier. Its capped wrapper was sent TERM, the supervisor finalized at 07:08:07 UTC with exit 130,
+and every final-manifest object—including raw and normalized inputs—was downloaded and hash-checked.
+Instance `i-0b81cd58d3ba14f0c` was terminated; the shared Pareto-census host was untouched.
+
+The replacement implements the proposed “same as the solver, read-only and refute-only” baseline.
+`radio_refute.c` parses the readable certificate, loads every negative into the production compact
+dominance trie, and serially materializes required split geometry plus the per-split one-part
+viability frontier. It then freezes the epoch. Each pthread owns `radio_search_context`; an audited
+root bypasses its own level-k cache entry, starts directly in exhaustive pass 2, and can ask only
+theorems or the immutable k-1 cache about children. A complete split with no FALSE child is a gap,
+not a recursive solve. No worker writes a cache fact or split field. Pre/post cache allocation
+counts and a checksum of every materialized split field make that ownership contract executable.
+Because all dependencies decrease k, verification order needs no level barrier.
+
+The new regression checks one- and two-worker agreement on a closed eleven-claim corpus, forces the
+reachability accelerator to arm, locks exact prefix work and the frozen checksum, and supplies a
+false `Sb(1:1)@1` claim which must fail as contradicted. ASan+UBSan and TSan pass. The existing
+independent-verifier, search-context, work-budget, contraction and provenance regressions also pass.
+The provenance check exposed older missing verifier environment names in both allow-lists; those
+lists now cover every literal runtime knob plus all `REFUTE_*` selectors.
+
+Sa(113) supplied the semantic gate. The complete normalized 304,105-claim certificate closed with
+zero gaps in 1,272,552,775 accepted prefixes and 10.232 verification wall seconds on twelve M4 Pro
+workers (13.76 seconds end to end, 123.61 user seconds, 312,213,504 bytes maximum RSS). The colored
+120,302-claim subset did not close: it exposed nine uncovered splits—one at k=5, seven at k=6 and
+one at k=7. The first is `Sb(15:8,8:5,8:5)@5`; the k=7 gap is
+`Sb(40:23,25:25)@7`. The existing independent C verifier had reported this same bundle closed, so
+that coloring/replay result is retracted as evidence until the discrepancy is diagnosed. This does
+not affect the cold run9 proof, and the new run deliberately uses all normalized facts.
+
+On the complete normalized run9 input, twelve local M4 Pro workers verified the same deterministic
+9,995-fact four-part sample with zero gaps in 126.337 verification seconds and
+14,246,550,669 accepted prefixes. Including the one-core 3.126-million-fact cache load, the process
+took 393.27 real / 1,751.02 user / 6.53 sys seconds, 854,917,120 bytes maximum RSS and a
+1,369,130,376-byte peak footprint. The verification-only projection was 8.43 wall hours locally,
+already 2.70x lower wall than the old independent checker's 341.32-second AWS sample despite using
+fewer and different cores.
+
+Clean commit `e0402900f4a74853ac44344aa8080c41ce0688fe` was pushed before deployment. Frozen-refuter
+run `20260818T074026Z` launched at 07:40:32 UTC on dedicated on-demand `c8a.4xlarge` instance
+`i-0cb3783e937115ff1`. The exact 1,620,907-byte source bundle SHA-256 is
+`37bfe28092e394c09bf7cc136c95dbf102f5d78525b35e3110bdef126f9c43e8`. The remote regression
+passed. Cache construction took 296.104 seconds; serial freeze took 0.090 seconds for 593 tables /
+313,374 options and published checksum `b85d3cad4e229afc`. The 9,995-fact gate then closed with zero
+gaps in 81.200 wall / 1,293.979 CPU seconds and 14,231,681,107 accepted prefixes. Its full k=7
+four-part projection is 19,488 wall / 310,555 CPU seconds: 5.41 hours and 74.06% of the complete
+cold solver's 419,353.1 CPU seconds. Both automatic gates passed, and full k=7 began at 07:47:30
+UTC. The 8-GiB RSS cap, 24-hour phase cap, 36-hour host stop and separately uploaded level
+checkpoints bound the unattended run. Live cache, freeze, batch, ETA and oldest-active-root state
+is available from `tools/run9_refute_status.sh 20260818T074026Z`. Full commands and comparisons are
+in `evidence/verifier_frozen_trie_2026-08-18.txt`. The retained full-k=7 process rebuilt the cache
+in 291.931 seconds, froze 772 tables / 383,875 options in 0.112 seconds with checksum
+`828a877ab5649882`, and entered its exact 2,576,885-claim worker batch. At its first 60-second
+checkpoint it had completed 82,863 with zero gaps. At 180 seconds it had completed 188,695 with
+zero gaps and all displayed active roots were four-part, confirming that the expensive region was
+advancing rather than merely the cheap prefix. RSS was 1,203.7 MiB with 28.9 GiB host memory
+available and no swap. The completed four-part sample, not the short mixed-region ETA, remains the
+forecast.

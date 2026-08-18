@@ -183,9 +183,11 @@ reducing 39.16 to 11.70 seconds, at 0.53 versus 0.57 GB peak RSS. An ungated ver
 the complete Sa(113) replay, which is why smaller levels retain the product-only loop.
 
 A newly colored Sa(113) certificate with 9 roots and 120,293 support facts then replayed under the
-production build: all 120,302 records verified, with zero unresolved/budget outcomes and exactly
-2,491,283,058 nodes in 140.28 seconds on eight workers. A full run9 parse/write pass remained
-byte-identical, so this is strictly an internal representation change. See
+production build: the checker reported all 120,302 records closed and exactly 2,491,283,058 nodes
+in 140.28 seconds on eight workers. The frozen solver-core refuter later exposed nine uncovered
+splits in this colored support set, so retain the result only as a performance measurement. A full
+run9 parse/write pass remained byte-identical, so the index itself is still strictly an internal
+representation change. See
 [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt).
 Block design, failed layouts and final controls are in
 [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
@@ -205,23 +207,43 @@ pairwise forward checking through 512 options reduced the five-root control from
 4,690,828 recursion nodes and from 21.00 to 5.34 seconds. Pair rows have a 128-MiB-per-worker
 fail-open ceiling. Complete run9 k=6 and k=7 antichain passes reproduced 229,341 and 2,507,270
 minimal facts in 3.8 and 49.8 seconds locally. The complete 120,302-record Sa(113) replay retained
-its established 2,491,283,058 nodes and closed with zero gaps under the then-current group order.
+its established 2,491,283,058 nodes and reported zero gaps under the then-current group order; that
+colored-support verdict is now superseded.
 
 A later missing control changed only the order in which parent parts are enumerated: descending
 segment mass, then descending long side. On twenty roots spread across the dominant run9 k=7
 four-part level it reduced 41,945,991 canonical-order nodes to 5,336,038. The complete Sa(113)
-replay again verified all 120,302 records with zero gaps, now in 330,226,371 nodes and 25.10 seconds
-on twelve workers instead of 2,491,283,058 nodes and 119.19 seconds. This traversal permutation is
-now the default; the former order and two failed alternatives remain selectable controls.
+colored replay reported all 120,302 records closed in 330,226,371 nodes and 25.10 seconds on twelve
+workers instead of 2,491,283,058 nodes and 119.19 seconds. These remain valid traversal-cost
+comparisons, not proof acceptance. This permutation is now the independent checker's default; the
+former order and two failed alternatives remain selectable controls.
 
-These measurements justify a bounded ordinary audit of the existing run9 facts, not a return to
-coloring. The dedicated pipeline first times 9,995 representative k=7 four-part facts and aborts if
-they project beyond seven days, then retains k=7, k<=6 and k=8..9 as separate proof checkpoints.
-The clean mass-descending sample verified all 9,995 facts with zero gaps in 341.32 seconds and
-projected the dominant four-part level at 22.75 hours, so full k=7 verification is now active.
-Explicit split-space coverage remains the preferable next certificate design even if this
-search-based audit completes. Full measurements and the soundness argument are in
+These measurements justified a bounded ordinary audit of the existing run9 facts, not a return to
+coloring. Its sample verified all 9,995 facts with zero gaps in 341.32 seconds, but the partial full
+phase still repeated more work than the solver and was stopped at 251,131/2,576,885 k=7 claims.
+The replacement below is the solver-core baseline. Explicit split-space coverage remains the
+preferable independent certificate design. Full measurements and the index soundness argument are in
 [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
+
+### Frozen solver-core refutation (2026-08-18)
+
+`radio_refute.c` loads the full readable negative certificate into the production compact trie,
+prepares all selected split tables and one-part viability frontiers serially, then publishes an
+immutable epoch. Each worker owns its search context. The audited root bypasses its own cached
+claim and runs only exhaustive pass 2; all children are theorem or frozen k-1 cache queries. An
+uncovered split fails closed instead of launching recursive solving, and no worker publishes a
+fact. Cache allocation counts and a complete split-table checksum must remain unchanged.
+
+This is intentionally not independent of the solver. It answers the practical baseline question:
+can the original exhaustive refutation be replayed read-only and in parallel without costing more
+than the solver? A full normalized Sa(113) control closed 304,105/304,105 in 10.232 verification
+seconds on twelve M4 Pro workers. The colored 120,302-record subset exposed nine gaps, which is why
+run9 uses all 3,126,190 normalized claims. The deterministic local run9 gate closed 9,995/9,995 in
+126.337 verification seconds and projects 8.43 hours on twelve local workers. AWS run
+`20260818T074026Z` closed the same gate in 81.200 wall / 1,293.979 CPU seconds, projecting 19,488
+wall / 310,555 CPU seconds. Both its 24-hour wall gate and 419,353-CPU-second solver-cost gate
+passed, and full k=7 is running. Details are in
+[`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt).
 
 ### Live completed-target telemetry (2026-08-17)
 

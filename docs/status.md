@@ -16,8 +16,8 @@ the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correc
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
 proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
 separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
-attempts were stopped; a mass-descending kd-indexed ordinary audit passed its bounded sample gate
-without reviving coloring and is verifying full k=7).
+attempts and the slower kd-indexed ordinary audit were stopped; a frozen, solver-core,
+read-only/refute-only replay passed its wall/CPU gate and is verifying full k=7).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -38,7 +38,8 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
-| **`canSolveB_ctx` is not yet permission to call the solver concurrently.** | The context owns the accepted-prefix clock, exact L1 and reachability scratch, but the dominance trie/arenas, lazy split catalog and learned `s[4]`/`s[5]`/`FAST` metadata, and `sbb_to_min_k` still mutate process-global storage. A thread pool around the new entry point would have C data races. Freeze those into a read epoch and publish worker results only at batch boundaries; see [parallel-solver.md](parallel-solver.md). |
+| **`canSolveB_ctx` is not general permission to call the mutable solver concurrently.** | The context owns the accepted-prefix clock, exact L1 and reachability scratch, but ordinary solving still mutates the dominance trie/arenas, lazy split catalog, learned `s[4]`/`s[5]`/`FAST` metadata, and `sbb_to_min_k`. `radio_refute.c` is the narrow safe exception: it prepares cache and split metadata serially, checks their frozen checksum/allocation counts, permits only root enumeration plus k-1 CACHE_ONLY reads, and publishes no results. A thread pool around ordinary solving would still have C data races; see [parallel-solver.md](parallel-solver.md). |
+| **Do not use the current Sa(113) colored certificate as proof.** | The independent checker reported its 120,302 records closed, but the frozen solver-core refuter exposes nine uncovered splits while closing all 304,105 normalized facts. The first gap is `Sb(15:8,8:5,8:5)@5`; the discrepancy in `radio_verify.c` coloring/replay is undiagnosed. Coloring stays deferred and full normalized input is mandatory for the active replay. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **The old `m=5` formula and `BBBD` profile stop being optimal after `k=8`.** | Li--Wu--Triesch prove the piecewise correction: add 1 at `k=9,10` and add 2 from `k=11`; hence `n(9,5)=481` and `n(10,5)=985`.  The old word is still a valid lower construction, not an equality.  Their displayed intermediate equations (69)–(70) have apparent index/off-by-one inconsistencies, so cite the theorem and use the recomputed assembly in [the exact m=5 calibration](theorems/m5-pareto-assembly.md), not those displays. |
 | **Do not report that the eventual `m=5` strategy “requires six atomization levels.”** | The first eventual hard leaf `P_7=(127,119,119,118,111)@7` has sharp exact and embedded depth **three**.  Six is instead the first nonnegative scalar inventory for one depth that could exactify `P_r` uniformly for all large `r`; the 64-piece component identities do not yet pack into one synchronized tree.  The paper needs only majorization and proves no aligned `AABD` profile.  Its `k>=11` theorem does rule out later changes in the numerical frontier. See [the exactification analysis](theorems/m5-pareto-assembly.md#exactifying-the-decisive-majorized-leaf). |
@@ -325,24 +326,32 @@ Do not run `gh auth switch`.
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
 reported UNSOLVABLE. The k=8 Pareto-prefix census remains active on shared AWS instance
-`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 05:07:48 UTC it remained healthy
-at one core and 8,903.2 MiB RSS, with 113.7 GiB host memory available and no swap. It had all 815
+`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 07:51:22 UTC it remained healthy
+at one core and 8,927.0 MiB RSS, with 113.6 GiB host memory available and no swap. It had all 815
 second-cut blocks represented, 48 of 70 freshly recomputed blocks, 1,688 targets, 1,893 endpoints
-and 991 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
+and 1,033 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
 the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact rather than that
 stale object.
 
-The mass-descending ordinary run9 audit is active on separate on-demand `c8a.4xlarge` instance
-`i-0b81cd58d3ba14f0c`, run `20260818T062429Z`, from clean commit `5869a46`. It does no coloring.
-Regression, raw hash, normalization and byte round-trip passed. Its deterministic 9,995-fact k=7
-sample verified every fact with zero gaps in 3,197,377,218 nodes / 341.32 seconds, projecting the
-full four-part level at 81,917 seconds (22.75 hours). That is 7.41x fewer nodes and 4.77x less wall
-than the separately retained canonical-order before measurement. Full k=7 verification began at
-2026-08-18 06:31:23 UTC; `BATCH_START` explicitly reports `group_order=3`. If it closes, k<=6 and
-k=8..9 run as separately retained checkpoints. At two minutes it had closed 24,973/2,576,885 with
-zero gaps, still in the cheap three-part prefix; use the completed four-part sample projection, not
-that early aggregate rate. Live status:
-`tools/run9_verifier_progress_status.sh 20260818T062429Z`.
+The mass-descending independent audit is no longer active. Run `20260818T062429Z` reached
+251,131/2,576,885 k=7 claims (73,045 four-part), with zero gaps, after 2,160 seconds and
+48,049,145,431 nodes. That was enough to confirm that even the optimized independent checker was
+repeating more search than the original solver. It was stopped deliberately with exit 130; its
+final manifest was hash-checked and instance `i-0b81cd58d3ba14f0c` was terminated.
+
+The replacement frozen solver-core refuter is active on dedicated on-demand `c8a.4xlarge` instance
+`i-0cb3783e937115ff1`, run `20260818T074026Z`, from clean commit `e040290`. It loads the complete
+3,126,190-fact normalized certificate into the production dominance trie, prepares split metadata
+serially, and then publishes an immutable epoch to sixteen worker-local search contexts. Roots
+bypass their own cache entry; children are theorem/CACHE_ONLY queries at k-1; a miss is an exposed
+gap rather than recursive solving. The 9,995-fact gate closed with zero gaps in 81.200 wall /
+1,293.979 CPU seconds and projects the dominant level at 19,488 wall / 310,555 CPU seconds—5.41
+hours and 74.06% of the complete cold solver's CPU. Both gates passed, and full k=7 began at
+2026-08-18 07:47:30 UTC. At its 180-second batch checkpoint it had completed 188,695 claims with
+zero gaps and showed active four-part roots. RSS was 1,203.7 MiB with no swap. This confirms that
+the dominant region is advancing; use the completed four-part gate, not the short mixed-region
+ETA, for the forecast. Live status:
+`tools/run9_refute_status.sh 20260818T074026Z`.
 
 The canonical-order before run `20260818T055255Z` passed the same sample with zero gaps in
 23,697,303,379 nodes / 1,627.30 seconds. Its superseded full phase was immediately stopped through
@@ -614,21 +623,24 @@ Run9 began from an empty cache, stayed in one session, passed its positive contr
 embedded provenance and used the contraction-safe build. This avoids both defects that made the
 2023 result unusable: inherited unarchived facts and false implicit shorter negatives.
 
-`radio_verify.c` remains an independent strengthening path, not a prerequisite for the current
-`proven-exhaustive` classification. It shares no solver search code and has already verified the
-whole `Sa(113)` k=9 ladder—304,105 negative facts across k=2..8—with zero unverified. It now also
-has a pthread verifier, parallel pre-color antichain reduction, explicit root records and a strict
-human-readable `radio-negative-certificate-v1` format. Ordinary verification mixes all levels in
-one queue; only coloring has a level barrier. On the retained 62,366-fact `out_k7.txt` corpus,
-one through sixteen workers returned the identical 97,483,464-node proof, with wall time falling
-from 14.13 to 2.79 seconds. A one-root colored test shrank to 373 support facts and replayed cleanly;
-full measurements and hashes are in
+`radio_verify.c` is an experimental independent strengthening path, not a prerequisite for the
+current `proven-exhaustive` classification. It shares no solver search code and reported the whole
+normalized `Sa(113)` k=9 ladder—304,105 negative facts across k=2..8—with zero unverified; the new
+solver-core refuter (separate from that checker, but deliberately sharing solver code) also closes
+the full normalized corpus. However,
+the same refuter exposes nine uncovered splits in the 120,302-record colored Sa(113) subset which
+`radio_verify.c` reported closed. Until that discrepancy is diagnosed, do not promote its colored
+replays as evidence. Its pthread scaling, parallel pre-color antichain reduction, explicit root
+records and strict human-readable `radio-negative-certificate-v1` format remain useful engineering.
+On the retained 62,366-fact `out_k7.txt` corpus, one through sixteen workers returned the identical
+97,483,464-node result, with wall time falling from 14.13 to 2.79 seconds. Full measurements are in
 [`../evidence/radio_verify_parallel_2026-08-16.txt`](../evidence/radio_verify_parallel_2026-08-16.txt).
 
-The full explicit-root `Sa(113)` pipeline is now a stronger completed benchmark. On an isolated
+The full explicit-root `Sa(113)` pipeline remains a completed performance benchmark. On an isolated
 same-type AWS host using the exact live-run9 verifier binary, 304,105 normalized facts became a
 3,953,000-byte readable certificate with 9 roots and 120,528 support facts. Independent replay
-verified all 120,537 records and exactly 2,491,817,467 recursion nodes with zero gaps. The 14-worker
+reported all 120,537 records and exactly 2,491,817,467 recursion nodes with zero gaps, but the
+newly exposed colored-support discrepancy means this is not presently a proof result. The 14-worker
 sanitize/round-trip/color/replay stages took 0.30/0.24/375.04/369.57 seconds and peaked at
 1,043,216 KiB, just under 1 GiB.
 Replay at 8/14/16 workers took 434.86/369.57/347.91 seconds: sixteen minimizes wall, eight uses CPU
@@ -680,32 +692,34 @@ On the exact hard run9 k=7 root, the final product-only and block builds returne
 209.63-second control to 33.24 seconds. The summaries add 45.1 MiB and rejected 98.0% of 271,663,392
 block probes, skipping 68,141,963,520 positions. The cutoff matters: an ungated block build slightly
 regressed the full Sa(113) replay, while the final small-level control preserved exactly
-251,437,448 nodes and took 15.88 versus 15.95 seconds. Full Sa(113) replay had already closed all
-120,302 records and 2,491,283,058 nodes.
+251,437,448 nodes and took 15.88 versus 15.95 seconds. The then-current checker reported all
+120,302 colored records closed in 2,491,283,058 nodes; the newly exposed nine-gap discrepancy
+reclassifies this as a performance control rather than proof validation.
 
 The kd hierarchy reduces the exact hard-root fact probes from 5.509 billion to 431.317 million and
 verifier wall from 11.70 to 4.20 seconds with identical proof/memo counts. Bounded forward checking
 through 512-option lists then reduces the five-root control from 9,158,686 to 4,690,828 nodes and
 from 21.00 to 5.34 seconds. Pair rows have a 128-MiB-per-worker fail-open ceiling. Complete run9
 k=6/k=7 antichain passes reproduce 229,341/2,507,270 minimal facts in 3.8/49.8 seconds. A twelve-
-worker complete Sa(113) guard again closed all 120,302 records and exactly 2,491,283,058 nodes, with
-zero gaps.
+worker Sa(113) guard reported all 120,302 colored records closed and exactly 2,491,283,058 nodes;
+that verdict is superseded by the solver-core refuter's nine explicit gaps.
 
 The missing traversal control was segment mass in the opposite direction from the rejected
 mass-ascending experiment: enumerate parent parts by descending mass, then descending long side.
 This is a sound permutation of the same Cartesian product. On twenty roots spread across all
 2,398,799 k=7 four-part facts it reduced canonical-n search from 41,945,991 nodes / 44.88 seconds
-to 5,336,038 / 7.48 seconds. A 100-root spread sample closed 100/100 with zero gaps in 30,978,940
-nodes / 40.58 seconds. Most importantly, a complete twelve-worker Sa(113) replay again verified
-all 120,302 records with no gaps, while dropping from 2,491,283,058 nodes / 119.19 seconds to
-330,226,371 / 25.10 seconds. The new order is now the local production default; every supported
+to 5,336,038 / 7.48 seconds. A 100-root spread sample reported 100/100 with zero gaps in 30,978,940
+nodes / 40.58 seconds. A complete twelve-worker Sa(113) colored replay reported 120,302/120,302
+while dropping from 2,491,283,058 nodes / 119.19 seconds to 330,226,371 / 25.10 seconds; use these
+only as traversal-cost measurements. The new order is now the local production default; every supported
 order agrees on the committed closed multi-part regression fixture, and a forced-kd ASan+UBSan run
 closed five run9 roots without an error.
 
-This improvement justifies one bounded ordinary run9 audit without reviving coloring. The remote
-pipeline first verifies a deterministic 9,995-fact k=7 sample and aborts if it projects above seven
-days, then retains k=7, k<=6 and k=8..9 as separate checkpoints. Proof-carrying split coverage
-remains the fallback if this measured attempt is still uneconomic. Source hashes, failed layouts,
+That optimization justified a bounded ordinary run9 audit, but its partial full phase confirmed
+that the independent checker still repeats too much search. The active replacement reuses the
+solver's exhaustive traversal against a frozen negative trie; its AWS gate compares projected CPU
+directly with the complete cold solver cost. Proof-carrying split coverage remains the longer-term
+independent-checker direction. Source hashes, failed layouts,
 tuning and sanitizer controls are in
 [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt)
 and
@@ -863,11 +877,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Let the k=8 Pareto-prefix census finish and preserve the bounded ordinary run9 audit.** Never
-   stop the shared census instance before its final output is archived. The independent audit uses
-   a separate right-sized host, does no coloring, and must pass its 9,995-fact projection gate before
-   entering the full k=7 checkpoint. Preserve every completed level log before terminating that
-   host. Do not restart either superseded coloring pipeline.
+0. **Let the k=8 Pareto-prefix census finish and preserve the frozen solver-core run9 replay.** Never
+   stop the shared census instance before its final output is archived. The refuter uses a separate
+   right-sized host, does no coloring, and must pass both wall and solver-CPU gates on its 9,995-fact
+   sample before entering full k=7. Preserve every completed level log before terminating that
+   host. Do not restart either coloring pipeline or the superseded independent ordinary audit.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
