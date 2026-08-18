@@ -1,7 +1,7 @@
-# The `Sa(193)` AWS runs — final solver record and remaining census
+# The `Sa(193)` AWS runs — final solver record, verifier replays and remaining census
 
-This page is the operational record for the completed cold runs, the concluded verifier
-diagnostics and the remaining census on the original shared instance; the findings go to
+This page is the operational record for the completed cold runs, active solver-core verifier
+replays and the remaining census on the original shared instance; the findings go to
 [journal.md](journal.md) as usual.
 
 ## What is running
@@ -10,13 +10,15 @@ diagnostics and the remaining census on the original shared instance; the findin
 |---|---|
 | shared instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
 | dedicated verifier | terminated: `i-0cb3783e937115ff1`, run `20260818T074026Z`; complete frozen solver-core replay is release-verified |
+| uncolored level replay | `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`, on-demand |
+| colored level replay | `i-0901e2b2c266f7db2`, `c8a.4xlarge`, run `20260818T205010Z`, on-demand |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
-| active jobs | shared host only: `pareto_k8_aws` |
+| active jobs | shared `pareto_k8_aws`; separate sixteen-worker uncolored and citation-colored replays |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| active memory guards | shared host: 20 GiB census |
-| completion | verifier finalized to S3 and GitHub; do not stop the census host before its upload is checked |
+| active memory guards | shared host: 20 GiB census; each verifier phase: 8 GiB RSS |
+| completion | do not stop any active host; every final upload and manifest must be checked first |
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
@@ -33,13 +35,37 @@ fix. Run9 is the proof source.
 | `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | completed; performance only; 412561.4 CPU s, 1.32 GB peak RSS |
 | `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
 
-At **2026-08-18 14:21:54 UTC**, the remaining `pareto_k8_aws` process had run for 391,269 seconds at
-one full core and 9,041.7 MiB RSS. Its output contained all 815 `CENSUS SECOND_SUMMARY` blocks, 48 of
-70 freshly recomputed blocks, the closed prefix summary, 1,688 targets, 1,893 endpoints and 1,070
-full-state records. It had not yet emitted a final `CENSUS END` record. The host had 113.5 GiB
+At **2026-08-18 21:02:48 UTC**, the remaining `pareto_k8_aws` process had run for 415,323 seconds at
+one full core and 9,130.4 MiB RSS. Its output contained all 815 `CENSUS SECOND_SUMMARY` blocks, 48 of
+70 freshly recomputed blocks, the closed prefix summary, 1,688 targets, 1,893 endpoints and 1,087
+full-state records. It had not yet emitted a final `CENSUS END` record. The host had 113.4 GiB
 available, no swap and 193.1 GiB free disk. Do not stop the instance. The S3 `STATUS` object for
 this census is still the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact
 rather than that stale object.
+
+At **2026-08-18 19:45:13 UTC**, complete uncolored level-v2 replay
+`20260818T194508Z` launched on dedicated on-demand `c8a.4xlarge`
+`i-04126f6d3016378a9`. It packages all eight populated levels independently and audits each against
+only complete k-1 support. Its sixteen-worker 9,995-root k7 gate closed with zero gaps in 53.582
+wall / 854.158 CPU seconds and projected 12,860 wall / 204,998 CPU seconds for the four-part band,
+so full k7 continued. Use `tools/run9_refute_status.sh 20260818T194508Z`; completed levels are
+uploaded under `s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/` before the next
+process starts.
+
+At **2026-08-18 20:50:15 UTC**, the requested separate top-down colored replay
+`20260818T205010Z` launched on dedicated on-demand `c8a.4xlarge`
+`i-0901e2b2c266f7db2`. Its clean source commit is `e206766`; the 1,653,058-byte bundle has SHA-256
+`db198050c5e77ab010952e59200ee22770c769c4c195153edea444854ed7adb1`. This is not the retired
+independent checker: the compile-time coloring mode traces original support indices on the already
+gated frozen production trie, validates each complete parent selection, then generates and audits
+the selected next level. Its same-host k7 gate closed 9,995/9,995 with zero gaps in 55.977 wall /
+891.641 CPU seconds, projecting 13,434 wall / 213,994 CPU seconds. K9 then verified all 16 top
+claims and durably selected 2,151/2,545 k8 facts. K8 verified all 2,151 selected claims with zero
+gaps, selected 2,508,278/2,576,885 k7 facts and checkpointed them before the sixteen-worker k7
+phase began. Its first 60-second k7 report closed 112,031 claims with zero gaps at 1,470% CPU,
+318.4 MiB RSS and zero swap; early canonical task order makes its ETA non-predictive. Use
+`tools/run9_color_refute_status.sh 20260818T205010Z`; checkpoints are under
+`s3://radio-sa193-393287594714/run9-colored-refute/20260818T205010Z/`.
 
 At **2026-08-17 16:34:44 UTC**, the independent run9 verifier launched from commit `8856509`.
 It reproduced the 3,126,190-record sanitized certificate byte-for-byte and completed pre-color
@@ -133,9 +159,11 @@ are committed in `evidence/`; diagnostic objects remain under their S3 prefixes 
 inspection. The completed frozen replay is preserved in the private release
 [`sa193-frozen-refute-2026-08-18`](https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18),
 clearly labeled as solver-core rather than independent. Its exact S3 manifest and the release
-download/decompression/SHA-256 round trip both pass. Full coloring remains deferred until the certificate carries
-a compact, independently checkable proof of split-space coverage rather than requiring the checker
-to rediscover it.
+download/decompression/SHA-256 round trip both pass. The old independent-checker coloring remains
+retired until a certificate carries compact, independently checkable split-space coverage. The new
+active coloring run is a different, narrower operation: it traces reachability through the fast
+solver-core audit and independently replays every selected level, so it compresses that validation
+chain without claiming a new proof implementation.
 
 Final Sa sidecars that existed only on EBS were copied to immutable `run3/final/`, `run8/final/`
 and `run9/final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; the shared
@@ -293,6 +321,17 @@ The shared-host idle guard still recognizes both old job names but only the cens
 before it finishes is an interruption, not a result. The Sa and verifier diagnostic artifacts are
 already final; the census artifact is not.
 
+**Do not stop either active dedicated replay.** The uncolored run has no within-k7 checkpoint; the
+colored run checkpoints only between levels. Their supervisors stop the hosts after finalization,
+but a stopped instance and its root volume should be terminated only after every final checksum has
+been independently verified and any durable bundle has moved to the private GitHub release store.
+The one-shot commands are:
+
+```
+tools/run9_refute_status.sh 20260818T194508Z
+tools/run9_color_refute_status.sh 20260818T205010Z
+```
+
 The frozen-refuter host no longer exists. Its supervisor stopped it after exit 0; every object in
 the exact final manifest was downloaded and verified, and the complete payload was independently
 round-tripped through the private GitHub release. Exact instance `i-0cb3783e937115ff1` was then
@@ -301,7 +340,7 @@ terminated on 2026-08-18. Its sole root volume, `vol-0dfe51cb88d605ffd`, had
 deletion. This action did not address or touch shared census instance
 `i-0005d74f985c52ae1`.
 
-The dedicated coloring `c8a.4xlarge` no longer exists. It was stopped by its supervisor, its final
+The old independent-checker coloring `c8a.4xlarge` no longer exists. It was stopped by its supervisor, its final
 S3 manifest was checked, and exact instance `i-01f8c56b7a53a1178` was terminated on 2026-08-18. Its
 single 30-GiB encrypted gp3 volume had `DeleteOnTermination=true` and was deleted; the normalized
 run9 source remains recoverable from the durable raw proof release, and the run-specific diagnostic

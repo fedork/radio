@@ -7419,3 +7419,73 @@ the expensive region had begun rather than the run merely racing through its che
 Live state is `tools/run9_refute_status.sh 20260818T194508Z`; artifacts are under
 `s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`. The separate shared census
 instance `i-0005d74f985c52ae1` remained running and was not touched.
+
+## 2026-08-18 — frozen-trie citation coloring implemented and launched
+
+The old coloring conclusion was narrower than it first sounded. `radio_verify.c` was slow because
+it independently re-solved every retained negative; coloring itself needs only graph reachability
+once the efficient frozen solver-core audit is already available. The new
+`RADIO_REFUTE_ENABLE_COLORING` build therefore uses exactly the level-v2 refuter. While the k-1
+support cache is built serially, every retained negative Pareto terminal receives the 1-based index
+of the original support record which supplied it. A child cache rejection marks that source.
+Dominated facts which do not survive in the trie cannot be emitted accidentally.
+
+Literal per-fact reference counters would make billions of hot cache hits contend on shared memory,
+while coloring needs only zero versus nonzero. Split preparation and each worker instead receive a
+private dense bitset; the driver ORs them after the immutable epoch and separately sums the total
+hit count for profiling. Eager split preparation is included because its DEAD decisions are part of
+the proof traversal. That may conservatively retain a fact consulted for a table option later made
+irrelevant, but cannot omit a required support. Source ids are stored behind the packed Pareto
+points, so an ordinary comparison scan loads the wider lane only after it has found a match.
+
+The output is strict human-readable `radio-negative-color-selection-v1`: parent and selected
+levels, source/audited/support/used counts, citation hits, then ordered `use INDEX Sb(...)` records.
+`tools/make_refute_level_certificate.py --selection` refuses partial parent audits, validates every
+index and copied state against the full normalized v1 level, keeps complete lower support, and
+regenerates dictionary and split hints. `used 0` is an explicit terminal. The coloring executable
+reserves a new output path before starting, refuses overwrite, and never leaves a valid selection
+after a gap. A regression extracted `Sb(4:4,4:2)@3` from run9: one and two workers emitted the same
+one-fact selection, the filtered k2 fact verified, and the chain stopped at zero. Tampered state,
+partial/empty handoff, v1 input and output overwrite all fail closed.
+
+The final-source matched local k7 gate used the same 9,995 four-part stride as the level-v2 work.
+Ordinary replay closed in 79.490 wall / 929.906 CPU seconds; coloring closed in 82.363 / 967.790,
+or 3.61% wall and 4.07% CPU overhead. Both verified 9,995 claims with zero gaps and exactly
+13,403,862,290 accepted prefixes. Coloring selected 209,189/388,317 supports from 4,881,149,078
+cache hits. The 7,479,772-byte selection was byte-identical across two differently scheduled
+colored builds. Cache front storage rose from 4,428,648 to 15,099,464 bytes, still negligible. A
+combined ASan+UBSan run loaded all 388,317 supports and exercised attributed-front growth with no
+finding; a two-worker TSan fixture was also clean. The exact hashes and commands are in
+`evidence/verifier_coloring_citations_2026-08-18.txt`.
+
+A real local top handoff then verified all sixteen run9 k9 claims, selected 2,151 of 2,545 k8 facts
+from 123,600 citations, and generated a valid 53,288,979-byte k8 file with those 2,151 claims plus
+complete 2,576,885-fact k7 support. This was enough to authorize the requested separate parallel
+run. Commit `e206766eb7dee8888e798964150485c98893926b` was pushed before deployment.
+
+Run `20260818T205010Z` launched at 20:50:15 UTC on dedicated on-demand `c8a.4xlarge` instance
+`i-0901e2b2c266f7db2`. On-demand remains appropriate: the likely multi-hour k7 barrier has no
+within-level checkpoint, while the remote supervisor uploads each completed certificate,
+selection, verifier log, provenance check and checksum before descending. The exact 1,653,058-byte
+source bundle has SHA-256 `db198050c5e77ab010952e59200ee22770c769c4c195153edea444854ed7adb1`.
+The same-host coloring gate closed 9,995/9,995 with zero gaps in 55.977 wall / 891.641 CPU seconds,
+projecting 13,434 wall / 213,994 CPU seconds for the full four-part band, below both automatic
+guards. K9 then independently reproduced the local 2,151-fact selection, uploaded its checkpoint,
+and k8 loaded complete k7 support. The attributed full-k7 cache took 301.309 seconds to build;
+the actual k8 audit then verified 2,151/2,151 with zero gaps in 0.365 worker seconds and selected
+2,508,278/2,576,885 k7 facts from 41,460,414 citations. That second checkpoint uploaded before k7
+started all sixteen workers on its 2,508,278 selected targets. At the first 60-second report k7 had
+verified 112,031 claims with zero gaps and 14,691,829,604 accepted prefixes; CPU was 1,470%, RSS
+318.4 MiB and swap zero. The active roots were already four-part, but the initial 1,284-second ETA
+is still a changing-task-mix projection rather than a forecast. Live status is
+`tools/run9_color_refute_status.sh 20260818T205010Z`; staging is
+`s3://radio-sa193-393287594714/run9-colored-refute/20260818T205010Z/`. The complete uncolored replay
+and shared census were not modified. S3 is live staging rather than the durable destination; after
+completion and manifest verification, the compact chain belongs in a private `fedork/radio-data`
+GitHub release.
+
+The final process inventory at 21:02 UTC showed all three authorized jobs healthy. The uncolored
+replay was at 954,616/2,576,885 k7 claims with zero gaps, 1,596% CPU, 385.3 MiB RSS and no swap. The
+colored replay was at 112,031/2,508,278 with zero gaps. Shared census `pareto_k8_aws` remained at one
+core and 9,130.4 MiB RSS with 113.4 GiB available, 1,087 full-state records and no `CENSUS END`.
+No local refuter, solver, one-off Python search or orphan `Python -`/`python3 -` process remained.

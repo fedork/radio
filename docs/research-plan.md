@@ -356,13 +356,15 @@ Disposition and next design work:
    canonical `k=8` facts, but deliberately verifies nothing below `k=9`;
 2. **Delivered on AWS:** minimalize every support level. The dominant `k=7` level retained
    2,507,270 of 2,576,885 facts (97.30%), so same-level reduction is modest on this corpus;
-3. **Stopped and deferred:** both full-run9 coloring attempts were interrupted by request on
+3. **Stopped and retired (independent checker):** both original full-run9 coloring attempts were interrupted by request on
    2026-08-18. The instrumented sixteen-core run spent 11,460.1 seconds in k=7 coloring and closed
    119,649/2,505,858 targets, including all 108,083 three-part targets but only 10,312/2,396,521
    four-part targets. It had consumed 105,605,161,144 recursion nodes with zero unresolved/budget
    outcomes; its final window rate was 0.450 target/s. The old fourteen-worker run spent about
    12h28m in coloring and had only whole-level progress. Neither produced a colored bundle or replay
-   result. Final diagnostic uploads were hash-checked and the dedicated instance was terminated;
+   result. Final diagnostic uploads were hash-checked and the dedicated instance was terminated.
+   This finding applies to `radio_verify.c` rediscovering proofs; item 8 records the later
+   production-trie citation coloring which does not repeat that implementation;
 4. **Delivered:** the packed product-profile index retains canonical fact storage but scans a
    separate `(np,max-product,total-mass)` permutation with denormalized mass and packed n/m/product
    columns. On an exact hard run9 k=7 root it preserves the 4,644,469-node proof and memo counts
@@ -404,7 +406,7 @@ Disposition and next design work:
    It uses the complete normalized certificate because the colored Sa(113) control is missing nine required supports.
    Architecture, controls and exact measurements are in
    [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt);
-8. **Delivered locally; next gate is same-type AWS k7.** Readable text remains the durable envelope,
+8. **Delivered; uncolored and top-down colored replays are active separately.** Readable text remains the durable envelope,
    now as one self-contained file per level. `radio-negative-level-certificate-v2` orders an
    explicit part dictionary, complete k-1 support, checked split-part hints and level-k claims;
    only support enters the trie. The run9 k7 file reduces cache construction locally from 263.457
@@ -418,15 +420,27 @@ Disposition and next design work:
    the four-part band. Details:
    [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
-   Run this exact gate on a right-sized short-lived instance before authorizing a complete k7
-   replay; compare projected CPU on the same hardware with the cold solver. Collect per-root
-   reachability build/prune benefit so later level files may carry non-semantic activation hints.
-   A compact global exact hash is deferred: neither the 34.7% theorem profile nor solver order
-   demonstrates enough first-touch exact hits to justify another lookup. Separately make the solver
-   emit split-space coverage if the bounded audit remains uneconomic: compact ranges/subboxes
-   annotated with the outcome and lower-level fact (or theorem) that rejects them. The checker
-   should validate an auditable cover and exact citations, not rediscover it. Reconsider top-down
-   coloring only after explicit citations make graph reachability cheap.
+   The same-type gate passed and complete uncolored run `20260818T194508Z` is in its dominant k7
+   phase. Coloring is a separate compile-time mode, not a change to that baseline. Every surviving
+   negative Pareto terminal carries its original support-record index; eager split preparation and
+   each audit worker record citations in private bitsets, merged only after zero gaps. The readable
+   selection is checked against the complete source index and copied state before it can generate
+   the next level's file, and the chain stops only at `used 0`. A final-source local A/B on the
+   same 9,995 roots kept all 13,403,862,290 prefixes and zero gaps; coloring added 3.61% wall and
+   4.07% CPU. ASan+UBSan exercised all 388,317 support insertions and front growth, and a two-worker
+   TSan control was clean. Details:
+   [`../evidence/verifier_coloring_citations_2026-08-18.txt`](../evidence/verifier_coloring_citations_2026-08-18.txt).
+
+   Dedicated on-demand run `20260818T205010Z` passed its sixteen-worker AWS gate in 55.977 wall /
+   891.641 CPU seconds, projecting 13,434 wall / 213,994 CPU seconds for the full four-part band.
+   Its first durable top-down checkpoint verified all sixteen k9 roots and selected 2,151/2,545 k8
+   facts. K8 verified those 2,151 claims with zero gaps, selected 2,508,278/2,576,885 k7 facts and
+   checkpointed them before the sixteen-worker k7 phase began. Let both active runs finish and
+   verify their manifests before archival. A compact global exact hash remains deferred: neither the 34.7%
+   theorem profile nor solver order demonstrates enough first-touch exact hits to justify another
+   lookup. Separately make the solver emit split-space coverage if an independently cheap verifier
+   is required: compact ranges/subboxes annotated with the outcome and exact lower-fact/theorem
+   citation, so checking scales with the cover instead of rediscovering it.
 
 The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
 context through the complete recursive tree; its deterministic work clock, exact L1 and joint

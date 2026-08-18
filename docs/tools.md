@@ -163,8 +163,31 @@ the level format, majorization proof and k7 controls are in
 split hints and dictionary order, endpoint-majorization equivalence, the L1 control, and a
 fail-closed false claim.
 
-Top-down coloring alone has a level barrier, because citations made while verifying `k` become the
-targets at `k-1`:
+The same refuter performs top-down citation coloring behind a compile flag:
+
+```
+tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 \
+  -DRADIO_REFUTE_ENABLE_COLORING radio_refute.c -o radio_refute_color
+REFUTE_THREADS=16 tools/run_with_provenance.py \
+  ./radio_refute_color level-9.cert selected-level-8.txt
+tools/make_refute_level_certificate.py complete.cert --level 8 \
+  --selection selected-level-8.txt -o level-8.cert
+```
+
+Every retained negative Pareto point carries its original support-record index. Split preparation
+and each worker mark private dense bitsets, avoiding shared writes on billions of cache hits; the
+driver ORs them after a zero-gap epoch. The readable selection includes ordered source indices and
+`Sb(...)` text. The converter requires `audited == source-claims`, checks each index and state
+against the complete v1 level, keeps complete next support and regenerates dictionary/split hints.
+`used 0` ends the chain. A coloring binary accepts only level-v2 input, refuses an existing output
+path and emits no valid selection after a gap. Eager split preparation is conservatively included,
+so the result is sound reachability compression, not a claim of minimum support. The test script
+also locks byte-identical one/two-worker selection, a nonempty two-level handoff, terminal zero and
+tamper/overwrite rejection. Design, sanitizer controls and the dominant k7 A/B are in
+[`../evidence/verifier_coloring_citations_2026-08-18.txt`](../evidence/verifier_coloring_citations_2026-08-18.txt).
+
+The older independent checker also has top-down coloring, but its Sa(113) output has nine known
+gaps under the solver-core refuter and must not be used as proof. Its historical invocation was:
 
 ```
 TOPDOWN=9 ROOTS=roots.cert MINIMIZE_BEFORE_COLOR=1 CERT_OUT=colored.cert \
@@ -247,6 +270,22 @@ with:
 tools/run9_verifier_progress_status.sh
 tools/run9_verifier_progress_status.sh --watch
 ```
+
+Current level-v2 solver-core deployments use different, one-shot helpers:
+
+```
+tools/run9_refute_ec2_launch.sh                 # complete uncolored per-level replay
+tools/run9_refute_status.sh RUN_ID
+tools/run9_color_refute_ec2_launch.sh           # top-down citation-colored replay
+tools/run9_color_refute_status.sh RUN_ID
+```
+
+Both launchers require a clean tracked source/pipeline set, archive the exact commit, run the
+regression and a same-host k7 gate, use sixteen workers on a dedicated on-demand `c8a.4xlarge`, and
+upload live status every minute. The uncolored runner checkpoints each independent level. The
+colored runner begins with all k9 claims, validates and checkpoints each selection, generates the
+next filtered claims with complete lower support, and stops only at `used 0`. There is no
+within-level restart cursor, so the multi-hour k7 phase is intentionally not Spot.
 
 ## Engine internals worth knowing
 
