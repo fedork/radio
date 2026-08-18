@@ -7149,8 +7149,8 @@ launch. Run `20260818T055255Z` then started on on-demand `c8a.4xlarge` instance
 hash, normalization and byte round-trip passed before the sample. Its first complete minute closed
 198/9,995 sampled four-part facts with zero gaps at 3.300/s, 1,472% CPU, 1,359.6 MiB RSS and no
 swap. That local-window extrapolation is about 8.4 days and is not the decision: the canonical
-sample spans the whole level, and the committed supervisor will apply the seven-day gate only to
-its complete measured wall. Live data is under
+sample spans the whole level, and the committed supervisor applied the seven-day gate only to its
+complete measured wall. The retained data is under
 `s3://radio-sa193-393287594714/run9-verifier-progress/20260818T055255Z/`.
 
 ### The missing group-order control is the largest verifier win
@@ -7178,8 +7178,23 @@ The cross-level guard was stronger. A new twelve-worker full Sa(113) replay veri
 forced-kd ASan+UBSan build also verified five run9 roots without an error. The regression now runs
 all four supported group orders on one closed multi-part fixture and rejects invalid selectors.
 
-Mass-descending is therefore the production default for the clean rerun. The active
-`20260818T055255Z` instance remains an immutable canonical-order before measurement and will be
-allowed to reach its committed sample gate. Only after its final upload is checked and its exact
-instance is terminated should a new clean source bundle launch. This separation costs less than an
-hour of instance time and makes the speedup, provenance and operational decision auditable.
+Mass-descending is therefore the production default for the clean rerun. The immutable
+canonical-order before run completed the same 9,995-fact sample with zero gaps in 23,697,303,379
+nodes / 1,627.30 seconds, projecting 390,552 seconds (4.52 days). It therefore passed the committed
+gate. Its just-entered superseded full phase was stopped through the capped wrapper; the supervisor
+finalized with exit 130, every object in `final.sha256` was streamed back and matched, and instance
+`i-066a6cd0b7f66d581` was terminated at 06:23:18 UTC with its disposable root volume. Its 30.3
+minutes cost approximately $0.44. The shared census instance was never touched.
+
+Only then did clean commit `5869a46b70cc568a6ed83e70a64b08601c235e85` launch run
+`20260818T062429Z` on on-demand `c8a.4xlarge` instance `i-0b81cd58d3ba14f0c`. The source-bundle
+SHA-256 is `1cb324193d79fbd788c81961f4c35437b8096a2577dfbd61037ceda856b36e19`; its `radio_verify`
+build ID is `a3391fb7ceb3f8c41bb3ceee2de5ee27443bad1e64b916384194cb65e68cfd0c`. Regression, raw hash,
+normalization and byte round-trip passed. The identical sample then closed 9,995/9,995 with zero
+gaps in 3,197,377,218 nodes / 341.32 seconds: 7.41x fewer nodes and 4.77x less wall than the frozen
+before run. Its measured full-level projection is 81,917 seconds (22.75 hours), so it passed the
+seven-day gate and began the full k=7 checkpoint at 06:31:23 UTC. The progress stream exposes
+`group_order=3`, making the selected traversal visible without opening provenance metadata. At
+120 seconds the full stage had verified 24,973/2,576,885 with zero gaps, but it was still in the
+cheap three-part prefix; the completed four-part sample, not this early aggregate rate, controls
+the forecast.

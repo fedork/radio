@@ -16,8 +16,8 @@ the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correc
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
 proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
 separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
-attempts were stopped; a new kd-indexed ordinary audit is in its bounded sample gate without
-reviving coloring, while a measured mass-descending part order is ready for its clean rerun).
+attempts were stopped; a mass-descending kd-indexed ordinary audit passed its bounded sample gate
+without reviving coloring and is verifying full k=7).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -332,16 +332,23 @@ and 991 full-state records, but no final `CENSUS END` record. The census S3 `STA
 the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact rather than that
 stale object.
 
-An ordinary run9 audit is also active on separate on-demand `c8a.4xlarge` instance
-`i-066a6cd0b7f66d581`, run `20260818T055255Z`, from clean commit `cbc3ead`. It does no coloring.
-Regression, raw hash, normalization and byte round-trip passed; its deterministic 9,995-fact k=7
-sample gate began at 2026-08-18 05:53:58 UTC. The first complete minute verified 198/9,995 facts
-with zero gaps at 3.300/s, 1,472% CPU, 1,359.6 MiB RSS and zero swap. Do not extrapolate that first
-canonical slice: the complete sample automatically aborts if its full-level projection exceeds
-seven days. This frozen run explicitly uses the former canonical-n part order and is the before
-measurement; it will not be mutated. A newly measured descending-segment-mass order is the intended
-clean rerun. If accepted, k=7, k<=6 and k=8..9 are retained separately. Live status:
-`tools/run9_verifier_progress_status.sh 20260818T055255Z`.
+The mass-descending ordinary run9 audit is active on separate on-demand `c8a.4xlarge` instance
+`i-0b81cd58d3ba14f0c`, run `20260818T062429Z`, from clean commit `5869a46`. It does no coloring.
+Regression, raw hash, normalization and byte round-trip passed. Its deterministic 9,995-fact k=7
+sample verified every fact with zero gaps in 3,197,377,218 nodes / 341.32 seconds, projecting the
+full four-part level at 81,917 seconds (22.75 hours). That is 7.41x fewer nodes and 4.77x less wall
+than the separately retained canonical-order before measurement. Full k=7 verification began at
+2026-08-18 06:31:23 UTC; `BATCH_START` explicitly reports `group_order=3`. If it closes, k<=6 and
+k=8..9 run as separately retained checkpoints. At two minutes it had closed 24,973/2,576,885 with
+zero gaps, still in the cheap three-part prefix; use the completed four-part sample projection, not
+that early aggregate rate. Live status:
+`tools/run9_verifier_progress_status.sh 20260818T062429Z`.
+
+The canonical-order before run `20260818T055255Z` passed the same sample with zero gaps in
+23,697,303,379 nodes / 1,627.30 seconds. Its superseded full phase was immediately stopped through
+the capped wrapper; exit 130 and every final-manifest hash were checked before instance
+`i-066a6cd0b7f66d581` was terminated. It cost approximately $0.44 and did not touch the shared
+census host.
 
 Both optional run9 coloring attempts were intentionally interrupted on 2026-08-18 with exit 130,
 after their supervisors uploaded final diagnostics. The old fourteen-worker shared-host build had

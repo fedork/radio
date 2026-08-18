@@ -217,8 +217,10 @@ now the default; the former order and two failed alternatives remain selectable 
 These measurements justify a bounded ordinary audit of the existing run9 facts, not a return to
 coloring. The dedicated pipeline first times 9,995 representative k=7 four-part facts and aborts if
 they project beyond seven days, then retains k=7, k<=6 and k=8..9 as separate proof checkpoints.
-Explicit split-space coverage remains the preferable next certificate design if this search-based
-audit is still uneconomic. Full measurements and the soundness argument are in
+The clean mass-descending sample verified all 9,995 facts with zero gaps in 341.32 seconds and
+projected the dominant four-part level at 22.75 hours, so full k=7 verification is now active.
+Explicit split-space coverage remains the preferable next certificate design even if this
+search-based audit completes. Full measurements and the soundness argument are in
 [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
 
 ### Live completed-target telemetry (2026-08-17)

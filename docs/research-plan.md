@@ -387,9 +387,11 @@ Disposition and next design work:
    first verifies a deterministic 9,995-fact k=7 sample and refuses the multi-day phase if it
    projects beyond seven days. It then retains k=7, k<=6 and k=8..9 as separate checkpoints on a
    right-sized on-demand host. Spot remains inappropriate until the dominant level has a restart
-   cursor. The first frozen sample uses the former canonical-n order as a before measurement; a
-   clean mass-descending rerun is the intended audit. This is an empirical completion attempt, not
-   a claim that search repetition is the ideal certificate design;
+   cursor. The first frozen sample established the former canonical-n before measurement at
+   23,697,303,379 nodes / 1,627.30 seconds. The clean mass-descending run reduced the identical
+   sample to 3,197,377,218 / 341.32 seconds, projected the dominant level at 22.75 hours and entered
+   full k=7 verification. This is an empirical completion attempt, not a claim that search
+   repetition is the ideal certificate design;
 8. keep readable text as the durable envelope, but make the solver emit split-space coverage if the
    bounded audit is still uneconomic: compact ranges/subboxes annotated with the outcome and
    lower-level fact (or theorem) that rejects them. The checker should validate an auditable cover

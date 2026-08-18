@@ -9,7 +9,7 @@ diagnostics and the remaining census on the original shared instance; the findin
 | | |
 |---|---|
 | shared instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| dedicated verifier | `i-066a6cd0b7f66d581`, run `20260818T055255Z`, on-demand `c8a.4xlarge`: canonical-order audit sample gate active as the before measurement; mass-descending rerun pending |
+| dedicated verifier | `i-0b81cd58d3ba14f0c`, run `20260818T062429Z`, on-demand `c8a.4xlarge`: mass-descending ordinary audit in full k=7 verification |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
 | active jobs | shared host: `pareto_k8_aws`; dedicated host: optimized `run9_verify_p` audit (no coloring) |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
@@ -85,19 +85,36 @@ and zero swap. That one-minute projection is about 8.4 days and is not the gate 
 cost varies, so the pipeline waits for the complete sample and automatically refuses the full k=7
 phase if its measured projection exceeds seven days. If accepted, k=7, k<=6 and k=8..9 become
 separately retained checkpoints. The seven-day phase cap, nine-day host stop and 24-GiB RSS guard
-bound the attempt. This frozen source explicitly uses the former canonical-n part order. A later
-local control found that descending segment mass, then descending long side reduces a twenty-root
-level-spread sample from 41,945,991 to 5,336,038 nodes and a complete Sa(113) replay from
-2,491,283,058 to 330,226,371 nodes, with zero gaps. The original gate remains unmodified as a
-before measurement; its replacement will launch only from a clean commit. Spot is not used because
-k=7 has no intra-level restart cursor.
+bound the attempt. This frozen source explicitly used the former canonical-n part order. It
+ultimately verified all 9,995 sampled facts with zero gaps in 23,697,303,379 nodes / 1,627.30
+seconds and projected 390,552 seconds (4.52 days), passing the gate. Once it entered the now-
+superseded full phase, its capped wrapper was sent TERM. The supervisor finalized with exit 130;
+every final-manifest object was streamed back and hash-checked. Instance `i-066a6cd0b7f66d581`
+was terminated at 06:23:18 UTC, deleting its `DeleteOnTermination=true` root volume. Approximate
+on-demand compute cost was $0.44.
 
-Neither interrupted run was promoted to a GitHub release. The 106-MB normalized input is a derived
-duplicate of the durable run9 raw proof source, and no completed proof object resulted. The small,
-durable measurements and hashes are committed in `evidence/`; the final diagnostic objects remain
-under their S3 prefixes for operational inspection. Full coloring is deferred until the
-certificate carries a compact, independently checkable proof of split-space coverage rather than
-requiring the checker to rediscover it.
+At **2026-08-18 06:24:35 UTC**, the clean mass-descending replacement launched as run
+`20260818T062429Z` on instance `i-0b81cd58d3ba14f0c`. Its source commit is `5869a46`; source-bundle
+SHA-256 is `1cb324193d79fbd788c81961f4c35437b8096a2577dfbd61037ceda856b36e19`; and its live prefix is
+`s3://radio-sa193-393287594714/run9-verifier-progress/20260818T062429Z/`. Regression, raw hash,
+normalization and byte round-trip passed. The identical 9,995-fact sample closed with zero gaps in
+3,197,377,218 nodes / 341.32 seconds—7.41x fewer nodes and 4.77x less wall than the canonical-order
+run. Its k=7 four-part projection is 81,917 seconds (22.75 hours), safely below the seven-day gate,
+and full k=7 verification began at 06:31:23 UTC. The live `BATCH_START` includes
+`group_order=3`. This run remains on-demand because the dominant checkpoint has no restart cursor;
+the unchanged seven-day phase cap, nine-day hard stop and 24-GiB RSS guard remain active. Its
+two-minute full-stage snapshot was 24,973/2,576,885 with zero gaps, comprising all one- and
+two-part facts and 16,924/170,037 three-part facts; no four-part target had started, so its early
+cheap-prefix ETA is not used in place of the representative sample projection.
+
+The two interrupted coloring runs and the canonical-order gate were not promoted to a GitHub
+release. Their 106-MB normalized inputs are derived duplicates of the durable run9 raw proof
+source, and none produced a completed proof checkpoint. The small, durable measurements and hashes
+are committed in `evidence/`; diagnostic objects remain under their S3 prefixes for operational
+inspection. If the active ordinary audit completes, its independently verified checkpoints do
+deserve a `radio-data` GitHub release. Full coloring remains deferred until the certificate carries
+a compact, independently checkable proof of split-space coverage rather than requiring the checker
+to rediscover it.
 
 Final Sa sidecars that existed only on EBS were copied to immutable `run3/final/`, `run8/final/`
 and `run9/final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; the shared

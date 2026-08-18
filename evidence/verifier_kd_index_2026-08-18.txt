@@ -169,12 +169,29 @@ fact sample, refuses the expensive phase if that sample projects above seven day
 k=7, k<=6 and k=8..9 as three separately retained checkpoints. A multi-day level has no restart
 cursor, so the production launch uses the right-sized on-demand 16-vCPU host rather than Spot.
 
-The exact canonical-order gate launch is run `20260818T055255Z`, instance
-`i-066a6cd0b7f66d581`, clean
-commit `cbc3eade963ca93e9986be614f6c91557c762fda`, source-bundle SHA-256
-`9d89857e4449b51f7d0283d9bf178d4bb96b6fd66c9f4912fb2ef8cd670e0a07`, and S3 prefix
+The exact canonical-order gate launch was run `20260818T055255Z`, instance
+`i-066a6cd0b7f66d581`, clean commit `cbc3eade963ca93e9986be614f6c91557c762fda`, source-bundle
+SHA-256 `9d89857e4449b51f7d0283d9bf178d4bb96b6fd66c9f4912fb2ef8cd670e0a07`, and S3 prefix
 `s3://radio-sa193-393287594714/run9-verifier-progress/20260818T055255Z/`. Regression, raw hash,
-normalization and byte round-trip passed. The sample's first complete minute closed 198/9,995
-facts with zero gaps at 3.300/s; the complete sample, not that early canonical slice, controls the
-seven-day gate. This frozen launch is retained as the before measurement; it will not be mutated to
-pick up the subsequently discovered mass-descending order.
+normalization and byte round-trip passed. Its sample verified 9,995/9,995 facts with zero gaps in
+23,697,303,379 nodes / 1,627.30 seconds. That projected the k=7 four-part level at 390,552 seconds
+(4.52 days), so the committed gate passed. The newly entered old-order full phase was then stopped
+through its capped wrapper: the supervisor finalized with exit 130, every object in its final
+manifest was streamed back and hash-checked, and the instance was terminated at 06:23:18 UTC with
+its `DeleteOnTermination=true` root volume. Its roughly 30.3 minutes cost about $0.44 at the
+recorded $0.86216/hour rate.
+
+The mass-descending audit is run `20260818T062429Z`, on-demand `c8a.4xlarge` instance
+`i-0b81cd58d3ba14f0c`, clean commit `5869a46b70cc568a6ed83e70a64b08601c235e85`, source-bundle
+SHA-256 `1cb324193d79fbd788c81961f4c35437b8096a2577dfbd61037ceda856b36e19`, and S3 prefix
+`s3://radio-sa193-393287594714/run9-verifier-progress/20260818T062429Z/`. Its EC2 build ID is
+`a3391fb7ceb3f8c41bb3ceee2de5ee27443bad1e64b916384194cb65e68cfd0c` and binary SHA-256 is
+`1ccbf383b1c15636fe00850ab3430b57a1a9e5a89fc2ad664620b0ddef27a726`. Regression, raw hash,
+normalization and byte round-trip passed. The identical sample then verified 9,995/9,995 facts with
+zero gaps in 3,197,377,218 nodes / 341.32 seconds. Relative to the frozen before measurement this is
+7.41x fewer nodes and 4.77x less wall; its full-level projection is 81,917 seconds (22.75 hours),
+well inside the seven-day gate. The full k=7 checkpoint began at 06:31:23 UTC with the live stream
+explicitly reporting `group_order=3`. At 120 seconds it had verified 24,973/2,576,885 facts with
+zero gaps: all 84 one-part and 7,965 two-part facts plus 16,924/170,037 three-part facts. No
+four-part fact had started, so that cheap-prefix rate is deliberately not used as the full-level
+forecast; the completed four-part sample is the relevant 22.75-hour projection.
