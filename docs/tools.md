@@ -113,7 +113,8 @@ The checker refuses `CERT_OUT` after a partial or filtered verification; use `CE
 intent is normalization rather than a proof replay.
 
 `tools/test_radio_verify.sh` covers serial/parallel agreement, text parsing, minimalization,
-deterministic coloring and replay, plus a forced-small-block antichain comparison. The first corpus
+deterministic coloring and replay, progress-option validation, plus a forced-small-block antichain
+comparison. The first corpus
 measurement used
 [`fullsolve-2026`](https://github.com/fedork/radio-data/releases/tag/fullsolve-2026): all 62,366
 facts and 97,483,464 recursion nodes were identical from one through sixteen workers; measured
@@ -137,7 +138,17 @@ The parallel prototype deliberately rejects `TIMECAP`, diagnostic split printing
 subtree-DP experiment. Their current process-global reporting/bulk allocation is not safe or useful
 to duplicate per worker.
 
-The detached full-run9 AWS pipeline is staged by `tools/run9_verifier_aws_remote.sh`. It validates
+Long batches can expose a live, completed-work cursor with `VERIFY_PROGRESS_SECONDS=N`. Each
+interval reports completed/claimed/queued targets, verified/unresolved counts, cumulative/window/
+EWMA throughput, cumulative recursion nodes, progress by `k` and part count, and the three oldest
+active facts with their age and a coarse recursion-node cursor. `eta_total_s` and `eta_ewma_s` are
+explicit throughput projections, not deadlines: canonical task order changes the cost mix, so use
+the two estimates together with `PROGRESS_PARTS` and active ages. `BATCH_START` and `BATCH_DONE`
+remain exact machine-readable boundaries even when periodic reporting is disabled. The reporter
+adds no atomic operation to dominance scans; an active worker publishes its node cursor only every
+2^20 recursion nodes and all other counters update once per completed target.
+
+The original detached full-run9 AWS pipeline is staged by `tools/run9_verifier_aws_remote.sh`. It validates
 the raw log and source archive hashes, normalizes and byte-round-trips the text input, minimalizes
 and colors it, replays the colored bundle, then compresses and uploads the result. Its current
 one-shot progress command is:
@@ -146,11 +157,21 @@ one-shot progress command is:
 tools/run9_verifier_status.sh
 ```
 
-The status command uses one bounded SSM request and exits; it does not leave a local watcher. Its
+That status command uses one bounded SSM request and exits; it does not leave a local watcher. Its
 leading `PROGRESS` block distinguishes the four pipeline steps and separates process health from
-proof progress. The deployed verifier reports only when an entire minimalization/coloring level or
-the whole replay batch finishes, so the command labels completed-level record fractions as
-milestones rather than percentages of wall time and refuses to invent an intra-level ETA.
+proof progress. The frozen binary on the shared host predates live counters and still reports only
+completed levels.
+
+New dedicated runs use `tools/run9_verifier_ec2_launch.sh`. It refuses a second active run, archives
+the exact clean commit, launches a 16-core `c8a.4xlarge`, runs the regression before the full
+pipeline, publishes `STATUS` and a bounded `PROGRESS` tail to S3 every minute, and stops the host
+after final upload. Each color/replay phase has a 12-hour backstop and a 24-GiB RSS guard. Follow the
+latest run once, or continuously, with:
+
+```
+tools/run9_verifier_progress_status.sh
+tools/run9_verifier_progress_status.sh --watch
+```
 
 ## Engine internals worth knowing
 

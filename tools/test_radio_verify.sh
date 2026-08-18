@@ -18,6 +18,10 @@ VERIFY_THREADS=2 VERIFY_MEMO_BITS=18 \
 
 rg -q 'TOTAL verified 11, unverified 0, budget 0, nodes 6' "$work_dir/serial.out"
 rg -q 'TOTAL verified 11, unverified 0, budget 0, nodes 6' "$work_dir/parallel.out"
+rg -q '^BATCH_START phase=verify k=all targets=11 threads=2 progress_seconds=0\.0$' \
+    "$work_dir/parallel.out"
+rg -q '^BATCH_DONE phase=verify k=all completed=11/11 verified=11 unverified=0 budget=0 nodes=6 ' \
+    "$work_dir/parallel.out"
 
 for workers in 1 2; do
     TOPDOWN=2 MINIMIZE_BEFORE_COLOR=1 VERIFY_THREADS=$workers VERIFY_MEMO_BITS=18 \
@@ -58,4 +62,11 @@ if CERT_OUT="$work_dir/partial.cert" VERIFY_THREADS=2 VERIFY_MEMO_BITS=18 \
 fi
 [ ! -e "$work_dir/partial.cert" ]
 
-echo 'radio_verify regression: serial, parallel, coloring, minimalization and text replay OK'
+if VERIFY_PROGRESS_SECONDS=invalid "$work_dir/radio_verify" "$fixture" 2 \
+    > "$work_dir/invalid-progress.out" 2>&1; then
+    echo 'invalid progress interval was accepted' >&2
+    exit 1
+fi
+rg -q 'VERIFY_PROGRESS_SECONDS must be in 0\.\.86400' "$work_dir/invalid-progress.out"
+
+echo 'radio_verify regression: serial, parallel, coloring, minimalization, progress and text replay OK'

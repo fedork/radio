@@ -178,6 +178,26 @@ byte-identical, so this is strictly an internal representation change. See
 Block design, failed layouts and final controls are in
 [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
 
+### Live completed-target telemetry (2026-08-17)
+
+The absence of an intra-level cursor in the first full run9 replay made a healthy 2.5-million-target
+`k=7` batch indistinguishable from a pathological tail. The verifier now optionally reports actual
+completed targets, not the batch size or the atomic claim cursor. Every interval also includes
+recent/cumulative/EWMA completion rates, completed recursion nodes, progress by level and part
+count, and the three oldest active facts with age and a node cursor. This separates three cases that
+previously looked identical: steady work, a harder region of the canonical order, and a few stuck
+tail facts.
+
+The two ETA fields are deliberately labelled projections. Fact costs are heterogeneous, so
+`eta_total_s` extrapolates all work so far while `eta_ewma_s` follows recent batches; neither is a
+promise. A growing active age with an advancing node cursor means deep enumeration, while a growing
+age with a flat cursor points toward support-index work inside one recursion node. This is enough to
+identify the state and phase for a focused profile without enabling the high-overhead per-candidate
+index counters in the production proof run.
+
+The final local Sa(113) gate and the new dedicated-EC2 launch contract are recorded in
+[`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
+
 ## Superseded 2023 route
 
 The 2023 run reached the same conclusion after 4,079,185 solve seconds and roughly 90 GB of virtual

@@ -1,0 +1,91 @@
+# Completed-target telemetry and dedicated run9 verifier launch
+
+Status: verifier telemetry implemented and locally gated; dedicated AWS launch follows the clean
+commit recorded below.  This file is updated with the immutable launch identifiers after EC2
+accepts the instance.
+
+## Why the old display was insufficient
+
+The first full run9 replay reached a coloring barrier containing 2,506,515 k=7 targets.  Its frozen
+binary printed the target count before doing the work and printed a result only after the whole
+level returned.  The status helper therefore could prove that the process was alive at 1,399% CPU,
+but it could not distinguish the first target from the last, a changing cost region from steady
+work, or a small pathological tail.
+
+The new counters are proof-neutral.  Workers publish:
+
+* one completed/verified/unverified/budget update per finished target;
+* completed counts by k and by part count;
+* completed recursion nodes; and
+* for an active fact, a coarse node cursor once per 2^20 recursion nodes.
+
+A reporter wakes only when `VERIFY_PROGRESS_SECONDS` is positive.  It emits total/window/EWMA
+throughput and explicitly labelled ETA projections, plus the three oldest active facts with state,
+age and node cursor.  The actual completion counter is separate from the atomic claim cursor.  A
+flat completion count with advancing active-node cursors means deep enumeration; flat cursors and
+growing ages identify time below one recursion node, normally the dominance index.  `BATCH_START`
+and `BATCH_DONE` are exact even without periodic reporting.
+
+## Local gates
+
+The complete Sa(113) pipeline used the same 315,276-line input and nine roots as the retained AWS
+benchmark.  With eight workers and a ten-second report interval it returned:
+
+    normalized SHA-256  41e64f81233d19aa4acd2141fb24ba28e0276c59c497aa19134c7e3562609dba
+    colored facts       120,293
+    colored SHA-256     5c6d986e34d2e22f53cb3327b37343687df9809085ea41341db431f18ceb4032
+    hot color k=6       60,447/60,447 verified, 0 unresolved, 2,439,342,138 nodes
+    full replay         120,302/120,302 verified, 0 unresolved, 2,491,283,058 nodes
+    color/replay wall   151.71 / 146.84 seconds
+    color/replay RSS    973,200 / 1,044,592 KiB
+
+The certificate hash and every logical count match the pre-telemetry production-index result.  The
+measured pipeline source SHA-256 was
+`d65e97cded0c5571dd2120365613df4edecf1d61adc609541074750b4c4eccff`; the only subsequent C changes
+made reporter snapshots reject a worker/task race and revised a comment.  The final source
+SHA-256 is `62f2a171f9ef23b5fccbc30e51bcc9ccbcfa57d8740087a4d941c827900f56ad`.
+
+The final source then verified the retained hard run9 target
+`Sb(35:10,33:13,30:26,28:18)@7` with the exact prior 4,644,469 nodes and printed advancing active
+node cursors.  Its O3 build ID was
+`4935b6b1d26b3e66fef9fe4e09baed3470ca704d8563695d90fa77a52371a8da`; verifier wall was 12.51
+seconds.  ASan+UBSan and ThreadSanitizer builds exercised the periodic reporter against the same
+target under a 100,000-node expected-budget exit.  They printed 23 and 95 progress snapshots,
+respectively, with no sanitizer finding.  Build IDs:
+
+    ASan+UBSan  d111e7ff1ae1ab8460bcf8d4de6b7cf11c587b23b739d21ab7c5d362c3ed605a
+    TSan        f089d05af2314c3a55b54bc0ca481cbc7543ac29b16b2db829f9a6b6e901f958
+
+An alternating same-binary hard-target check measured batch walls of 12.56/12.74 seconds with
+periodic reporting disabled and 12.61/12.67 seconds with a 60-second interval (the reporter slept
+through each batch, while workers still published the coarse active cursor).  Means were 12.65 and
+12.64 seconds, so this control detects no telemetry cost above run noise.
+
+`tools/test_radio_verify.sh` also passes and now locks the exact batch-boundary records plus invalid
+progress-option rejection.
+
+## Right-sizing and cost envelope
+
+The AWS API reported these Oregon on-demand inputs on 2026-08-17:
+
+    type             vCPU  physical cores  threads/core  RAM GiB  sustained GHz  USD/hour
+    c8a.4xlarge        16       16               1          32         4.5         0.86216
+    c7i.4xlarge        16        8               2          32         3.2         0.71400
+    r7iz.4xlarge       16        8               2         128         --          1.48800
+
+`c8a.4xlarge` is offered in us-west-2b.  It supplies sixteen real cores for the measured
+sixteen-worker policy, while 32 GiB is still over twenty-five times the ~1.2-GiB measured verifier
+peak.  The run uses a 30-GiB encrypted gp3 root volume, a 24-GiB RSS guard, a 12-hour cap on each of
+coloring and replay, and an independent 25-hour instance shutdown.  It is on-demand: coloring has
+no intra-level checkpoint, so a Spot interruption would discard the entire expensive k=7 batch.
+
+The remote supervisor validates the raw and normalized hashes, runs the verifier regression before
+the full input, normalizes and byte-round-trips, colors, replays, requires zero unresolved records,
+uploads final compressed material, and stops the instance.  `STATUS` and the last 120 structured
+progress records are uploaded once per minute.  A failed upload does not delete the 30-GiB EBS
+volume; shutdown behavior is stop, not terminate.
+
+Monitor once or continuously:
+
+    tools/run9_verifier_progress_status.sh
+    tools/run9_verifier_progress_status.sh --watch

@@ -56,6 +56,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdatomic.h>
 
@@ -106,6 +107,43 @@ typedef struct { unsigned char np, src; Part p[MAXP]; int mass; } Fact;
 #ifdef VERIFY_BLOCK_PARETO
 typedef struct { uint64_t pp; int mass; } BlockProfile;
 #endif
+
+/* Long batches are deliberately observable without putting an atomic increment in the hot
+   dominance scans.  Workers publish one completion per fact and, while a fact is active, a
+   coarse node cursor every 2^20 recursion nodes.  VERIFY_PROGRESS_SECONDS enables the reporter;
+   the default emits exact batch boundaries but does not start the periodic reporter. */
+static double g_progress_seconds;
+static TLS atomic_ullong *g_progress_node_slot;
+
+static double monotonic_seconds(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+}
+
+static uint64_t monotonic_nanoseconds(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
+static struct timespec realtime_after(double seconds) {
+    struct timespec ts;
+    long add_ns = (long)((seconds - (long)seconds) * 1e9);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += (time_t)seconds;
+    ts.tv_nsec += add_ns;
+    if (ts.tv_nsec >= 1000000000L) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
+    return ts;
+}
+
+static void write_fact_inline(FILE *fp, const Fact *f) {
+    int i;
+    fputs("Sb(", fp);
+    for (i = 0; i < f->np; i++)
+        fprintf(fp, "%s%d:%d", i ? "," : "", f->p[i].n, f->p[i].m);
+    fputc(')', fp);
+}
 
 /* A partial child under construction. Built by copy-and-insert from the parent depth rather
    than re-canonicalised: measured 2026-08-04, canon() from scratch was 987M calls over 5.6
@@ -746,13 +784,103 @@ typedef struct {
     const Level *level;
     unsigned char *keep;
     atomic_int next;
+    atomic_int done;
+    int k, threads;
+    double started;
+    struct MinWorkerProgress_ *progress;
+    pthread_mutex_t progress_mu;
+    pthread_cond_t progress_cv;
+    int progress_stop;
 } MinBatch;
 
+typedef struct MinWorkerProgress_ {
+    atomic_int task;                  /* -1 while idle */
+    atomic_ullong started_ns;
+} MinWorkerProgress;
+
+typedef struct {
+    MinBatch *batch;
+    int slot;
+} MinWorkerArg;
+
 static void *minimize_worker(void *vp) {
-    MinBatch *b = vp;
+    MinWorkerArg *a = vp;
+    MinBatch *b = a->batch;
+    MinWorkerProgress *p = &b->progress[a->slot];
     int q;
-    while ((q = atomic_fetch_add_explicit(&b->next, 1, memory_order_relaxed)) < b->level->n)
+    while ((q = atomic_fetch_add_explicit(&b->next, 1, memory_order_relaxed)) < b->level->n) {
+        atomic_store_explicit(&p->started_ns, monotonic_nanoseconds(), memory_order_relaxed);
+        atomic_store_explicit(&p->task, q, memory_order_release);
         b->keep[q] = (unsigned char)!level_redundant(b->level, q);
+        atomic_store_explicit(&p->task, -1, memory_order_release);
+        atomic_fetch_add_explicit(&b->done, 1, memory_order_release);
+    }
+    return NULL;
+}
+
+static void print_minimize_progress(MinBatch *b, int *last_done, double *last_time) {
+    double now = monotonic_seconds(), elapsed = now - b->started;
+    int total = b->level->n;
+    int done = atomic_load_explicit(&b->done, memory_order_acquire);
+    int claimed = atomic_load_explicit(&b->next, memory_order_relaxed);
+    int active = 0, oldest_slot = -1, oldest_task = -1, i;
+    uint64_t now_ns = monotonic_nanoseconds(), oldest_age_ns = 0;
+    if (claimed > total) claimed = total;
+    for (i = 0; i < b->threads; i++) {
+        int q = atomic_load_explicit(&b->progress[i].task, memory_order_acquire);
+        if (q < 0 || q >= total) continue;
+        uint64_t started = atomic_load_explicit(&b->progress[i].started_ns,
+                                                memory_order_relaxed);
+        uint64_t age = now_ns > started ? now_ns - started : 0;
+        if (atomic_load_explicit(&b->progress[i].task, memory_order_acquire) != q) continue;
+        active++;
+        if (age > oldest_age_ns) {
+            oldest_age_ns = age; oldest_slot = i; oldest_task = q;
+        }
+    }
+    double total_rate = done / (elapsed > 0 ? elapsed : 1);
+    double window_elapsed = now - *last_time;
+    double window_rate = (done - *last_done) / (window_elapsed > 0 ? window_elapsed : 1);
+    printf("PROGRESS phase=minimize k=%d elapsed_s=%.1f completed=%d/%d percent=%.4f "
+           "claimed=%d active=%d queued=%d rate_total=%.3f/s rate_window=%.3f/s ",
+           b->k, elapsed, done, total, 100.0 * done / (total ? total : 1),
+           claimed, active, total - claimed, total_rate, window_rate);
+    if (total_rate > 0) printf("eta_total_s=%.0f ", (total - done) / total_rate);
+    else printf("eta_total_s=unknown ");
+    if (window_rate > 0) printf("eta_recent_s=%.0f\n", (total - done) / window_rate);
+    else printf("eta_recent_s=unknown\n");
+    if (oldest_slot >= 0) {
+        int q = atomic_load_explicit(&b->progress[oldest_slot].task, memory_order_acquire);
+        if (q == oldest_task && q >= 0 && q < total) {
+            const Fact *f = &b->level->f[q];
+            printf("PROGRESS_ACTIVE phase=minimize k=%d worker=%d task=%d age_s=%.1f "
+                   "np=%d mass=%d state=", b->k, oldest_slot, q,
+                   oldest_age_ns * 1e-9, f->np, f->mass);
+            write_fact_inline(stdout, f);
+            fputc('\n', stdout);
+        }
+    }
+    fflush(stdout);
+    *last_done = done;
+    *last_time = now;
+}
+
+static void *minimize_progress_reporter(void *vp) {
+    MinBatch *b = vp;
+    int last_done = 0;
+    double last_time = b->started;
+    pthread_mutex_lock(&b->progress_mu);
+    while (!b->progress_stop) {
+        struct timespec until = realtime_after(g_progress_seconds);
+        int rc = 0;
+        while (!b->progress_stop && rc != ETIMEDOUT)
+            rc = pthread_cond_timedwait(&b->progress_cv, &b->progress_mu, &until);
+        if (b->progress_stop) break;
+        pthread_mutex_unlock(&b->progress_mu);
+        print_minimize_progress(b, &last_done, &last_time);
+        pthread_mutex_lock(&b->progress_mu);
+    }
+    pthread_mutex_unlock(&b->progress_mu);
     return NULL;
 }
 
@@ -788,24 +916,62 @@ static void level_drop_indexes(Level *L) {
 #endif
 }
 
-static int level_minimize(Level *L, int threads) {
+static int level_minimize(Level *L, int threads, int k) {
     int i, w = 0;
     if (L->n < 2) return 0;
     unsigned char *keep = malloc((size_t)L->n);
     if (!keep) { fprintf(stderr, "no memory for minimalization marks\n"); exit(1); }
     if (threads < 1) threads = 1;
     if (threads > L->n) threads = L->n;
-    MinBatch b = { .level = L, .keep = keep };
+    MinBatch b = { .level = L, .keep = keep, .k = k, .threads = threads,
+                   .started = monotonic_seconds() };
     atomic_init(&b.next, 0);
+    atomic_init(&b.done, 0);
+    b.progress = calloc((size_t)threads, sizeof *b.progress);
+    MinWorkerArg *args = calloc((size_t)threads, sizeof *args);
     pthread_t *ids = threads > 1 ? malloc((size_t)(threads - 1) * sizeof *ids) : NULL;
-    if (threads > 1 && !ids) { fprintf(stderr, "no memory for minimalization workers\n"); exit(1); }
+    pthread_t reporter;
+    int have_reporter = 0;
+    if (!b.progress || !args || (threads > 1 && !ids)) {
+        fprintf(stderr, "no memory for minimalization workers\n"); exit(1);
+    }
+    for (i = 0; i < threads; i++) {
+        atomic_init(&b.progress[i].task, -1);
+        atomic_init(&b.progress[i].started_ns, 0);
+        args[i].batch = &b; args[i].slot = i;
+    }
+    printf("BATCH_START phase=minimize k=%d targets=%d threads=%d progress_seconds=%.1f\n",
+           k, L->n, threads, g_progress_seconds);
+    fflush(stdout);
+    if (g_progress_seconds > 0) {
+        pthread_mutex_init(&b.progress_mu, NULL);
+        pthread_cond_init(&b.progress_cv, NULL);
+        if (pthread_create(&reporter, NULL, minimize_progress_reporter, &b)) {
+            fprintf(stderr, "cannot create minimalization progress reporter\n"); exit(1);
+        }
+        have_reporter = 1;
+    }
     for (i = 0; i < threads - 1; i++)
-        if (pthread_create(&ids[i], NULL, minimize_worker, &b)) {
+        if (pthread_create(&ids[i], NULL, minimize_worker, &args[i])) {
             fprintf(stderr, "cannot create minimalization worker %d\n", i); exit(1);
         }
-    minimize_worker(&b);
+    minimize_worker(&args[threads - 1]);
     for (i = 0; i < threads - 1; i++) pthread_join(ids[i], NULL);
+    if (have_reporter) {
+        pthread_mutex_lock(&b.progress_mu);
+        b.progress_stop = 1;
+        pthread_cond_signal(&b.progress_cv);
+        pthread_mutex_unlock(&b.progress_mu);
+        pthread_join(reporter, NULL);
+        pthread_cond_destroy(&b.progress_cv);
+        pthread_mutex_destroy(&b.progress_mu);
+    }
+    printf("BATCH_DONE phase=minimize k=%d completed=%d/%d wall_s=%.2f\n",
+           k, atomic_load(&b.done), L->n, monotonic_seconds() - b.started);
+    fflush(stdout);
     free(ids);
+    free(args);
+    free(b.progress);
     for (i = 0; i < L->n; i++) if (keep[i]) L->f[w++] = L->f[i];
     free(keep);
     i = L->n - w;
@@ -1299,6 +1465,9 @@ static TLS uint64_t g_dom[MAXP + 1][MAXP][FCW];        /* live domain of each gr
 
 static int splits_rec(int i, int s2, int s0, int s1) {
     g_nodes++; g_fact_nodes++;
+    if (g_progress_node_slot && !(g_fact_nodes & ((1LL << 20) - 1)))
+        atomic_store_explicit(g_progress_node_slot, (unsigned long long)g_fact_nodes,
+                              memory_order_relaxed);
     /* Per-fact node budget. Aborting a fact makes its verdict UNKNOWN, never "verified", so this
        is only ever used to measure the cost distribution - which is the quantity that decides
        whether a level is feasible, and which a mean cannot express when per-fact costs span four
@@ -1537,14 +1706,32 @@ typedef struct {
 } VerifyTask;
 
 typedef struct {
+    atomic_size_t task;               /* SIZE_MAX while idle */
+    atomic_ullong started_ns;
+    atomic_ullong nodes;              /* coarse cursor for the active fact */
+} VerifyWorkerProgress;
+
+typedef struct {
     VerifyTask *tasks;
     size_t ntasks;
     atomic_size_t next;
+    atomic_size_t done, verified, unverified, budget;
+    atomic_ullong completed_nodes;
+    atomic_size_t done_by_k[MAXK + 1], done_by_np[MAXP + 1];
+    size_t total_by_k[MAXK + 1], total_by_np[MAXP + 1];
     int memo_bits;
+    int threads, progress_k;
+    const char *phase;
+    double started;
+    VerifyWorkerProgress *progress;
+    pthread_mutex_t progress_mu;
+    pthread_cond_t progress_cv;
+    int progress_stop;
 } Batch;
 
 typedef struct {
     Batch *batch;
+    int slot;
     BatchStats stats;
 } WorkerArg;
 
@@ -1645,16 +1832,33 @@ static void add_batch_stats(BatchStats *a, const BatchStats *b) {
 static void *batch_worker(void *vp) {
     WorkerArg *a = vp;
     Batch *b = a->batch;
+    VerifyWorkerProgress *p = &b->progress[a->slot];
     size_t q;
     worker_state_init(b->memo_bits);
     while ((q = atomic_fetch_add_explicit(&b->next, 1, memory_order_relaxed)) < b->ntasks) {
         VerifyTask *t = &b->tasks[q];
         /* verify() returns before its ordinary per-fact setup for direct COUNT/MAJ proofs. */
         g_fact_nodes = 0; g_budget_hit = 0;
+        atomic_store_explicit(&p->nodes, 0, memory_order_relaxed);
+        atomic_store_explicit(&p->started_ns, monotonic_nanoseconds(), memory_order_relaxed);
+        atomic_store_explicit(&p->task, q, memory_order_release);
+        g_progress_node_slot = g_progress_seconds > 0 ? &p->nodes : NULL;
         int ok = verify(&((const Level *)g_levels)[t->k - 1], t->fact, t->k);
+        g_progress_node_slot = NULL;
         t->nodes = g_fact_nodes;
         t->status = g_budget_hit ? 2 : (unsigned char)(ok ? 1 : 0);
         if (g_budget_hit) budget_out++;
+        atomic_store_explicit(&p->nodes, (unsigned long long)g_fact_nodes,
+                              memory_order_relaxed);
+        atomic_fetch_add_explicit(&b->completed_nodes, (unsigned long long)g_fact_nodes,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&b->done_by_k[t->k], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&b->done_by_np[t->fact->np], 1, memory_order_relaxed);
+        if (t->status == 1) atomic_fetch_add_explicit(&b->verified, 1, memory_order_relaxed);
+        else if (t->status == 2) atomic_fetch_add_explicit(&b->budget, 1, memory_order_relaxed);
+        else atomic_fetch_add_explicit(&b->unverified, 1, memory_order_relaxed);
+        atomic_store_explicit(&p->task, SIZE_MAX, memory_order_release);
+        atomic_fetch_add_explicit(&b->done, 1, memory_order_release);
     }
     worker_state_finish(&a->stats);
     return NULL;
@@ -1666,35 +1870,192 @@ static int default_memo_bits(int threads) {
     return bits;
 }
 
-static double monotonic_seconds(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
+static void print_batch_progress(Batch *b, size_t *last_done, double *last_time,
+                                 double *ewma_rate) {
+    double now = monotonic_seconds(), elapsed = now - b->started;
+    size_t done = atomic_load_explicit(&b->done, memory_order_acquire);
+    size_t claimed = atomic_load_explicit(&b->next, memory_order_relaxed);
+    size_t verified = atomic_load_explicit(&b->verified, memory_order_relaxed);
+    size_t unverified = atomic_load_explicit(&b->unverified, memory_order_relaxed);
+    size_t budget = atomic_load_explicit(&b->budget, memory_order_relaxed);
+    unsigned long long nodes = atomic_load_explicit(&b->completed_nodes, memory_order_relaxed);
+    size_t oldest_task[3] = {SIZE_MAX, SIZE_MAX, SIZE_MAX};
+    int oldest_worker[3] = {-1, -1, -1};
+    uint64_t oldest_age[3] = {0, 0, 0};
+    uint64_t now_ns = monotonic_nanoseconds();
+    int active = 0, i, z;
+    char kval[16];
+    if (claimed > b->ntasks) claimed = b->ntasks;
+    if (b->progress_k >= 0) snprintf(kval, sizeof kval, "%d", b->progress_k);
+    else strcpy(kval, "all");
+    for (i = 0; i < b->threads; i++) {
+        size_t q = atomic_load_explicit(&b->progress[i].task, memory_order_acquire);
+        if (q >= b->ntasks) continue;
+        uint64_t started = atomic_load_explicit(&b->progress[i].started_ns,
+                                                memory_order_relaxed);
+        uint64_t age = now_ns > started ? now_ns - started : 0;
+        if (atomic_load_explicit(&b->progress[i].task, memory_order_acquire) != q) continue;
+        active++;
+        for (z = 0; z < 3; z++) if (age > oldest_age[z]) {
+            int y;
+            for (y = 2; y > z; y--) {
+                oldest_age[y] = oldest_age[y - 1];
+                oldest_task[y] = oldest_task[y - 1];
+                oldest_worker[y] = oldest_worker[y - 1];
+            }
+            oldest_age[z] = age; oldest_task[z] = q; oldest_worker[z] = i;
+            break;
+        }
+    }
+    double total_rate = done / (elapsed > 0 ? elapsed : 1);
+    double window_elapsed = now - *last_time;
+    double window_rate = (done - *last_done) / (window_elapsed > 0 ? window_elapsed : 1);
+    if (window_rate > 0) *ewma_rate = *ewma_rate > 0
+        ? 0.75 * *ewma_rate + 0.25 * window_rate : window_rate;
+    printf("PROGRESS phase=%s k=%s elapsed_s=%.1f completed=%zu/%zu percent=%.4f "
+           "claimed=%zu active=%d queued=%zu verified=%zu unverified=%zu budget=%zu "
+           "rate_total=%.3f/s rate_window=%.3f/s rate_ewma=%.3f/s "
+           "nodes_done=%llu nodes_rate=%.3f/s ",
+           b->phase, kval, elapsed, done, b->ntasks,
+           100.0 * done / (b->ntasks ? b->ntasks : 1), claimed, active,
+           b->ntasks - claimed, verified, unverified, budget, total_rate, window_rate,
+           *ewma_rate, nodes, nodes / (elapsed > 0 ? elapsed : 1));
+    if (total_rate > 0) printf("eta_total_s=%.0f ", (b->ntasks - done) / total_rate);
+    else printf("eta_total_s=unknown ");
+    if (*ewma_rate > 0) printf("eta_ewma_s=%.0f\n", (b->ntasks - done) / *ewma_rate);
+    else printf("eta_ewma_s=unknown\n");
+
+    printf("PROGRESS_LEVELS phase=%s", b->phase);
+    for (i = 0; i <= MAXK; i++) if (b->total_by_k[i])
+        printf(" k%d=%zu/%zu", i,
+               atomic_load_explicit(&b->done_by_k[i], memory_order_relaxed), b->total_by_k[i]);
+    fputc('\n', stdout);
+    printf("PROGRESS_PARTS phase=%s", b->phase);
+    for (i = 0; i <= MAXP; i++) if (b->total_by_np[i])
+        printf(" np%d=%zu/%zu", i,
+               atomic_load_explicit(&b->done_by_np[i], memory_order_relaxed), b->total_by_np[i]);
+    fputc('\n', stdout);
+
+    for (z = 0; z < 3 && oldest_task[z] < b->ntasks; z++) {
+        size_t current = atomic_load_explicit(&b->progress[oldest_worker[z]].task,
+                                              memory_order_acquire);
+        if (current != oldest_task[z]) continue;
+        const VerifyTask *t = &b->tasks[oldest_task[z]];
+        unsigned long long cursor = atomic_load_explicit(&b->progress[oldest_worker[z]].nodes,
+                                                         memory_order_relaxed);
+        printf("PROGRESS_ACTIVE phase=%s k=%d worker=%d task=%zu age_s=%.1f nodes_cursor=%llu "
+               "np=%d mass=%d state=", b->phase, t->k, oldest_worker[z], oldest_task[z],
+               oldest_age[z] * 1e-9, cursor, t->fact->np, t->fact->mass);
+        write_fact_inline(stdout, t->fact);
+        fputc('\n', stdout);
+    }
+    fflush(stdout);
+    *last_done = done;
+    *last_time = now;
+}
+
+static void *batch_progress_reporter(void *vp) {
+    Batch *b = vp;
+    size_t last_done = 0;
+    double last_time = b->started;
+    double ewma_rate = 0;
+    pthread_mutex_lock(&b->progress_mu);
+    while (!b->progress_stop) {
+        struct timespec until = realtime_after(g_progress_seconds);
+        int rc = 0;
+        while (!b->progress_stop && rc != ETIMEDOUT)
+            rc = pthread_cond_timedwait(&b->progress_cv, &b->progress_mu, &until);
+        if (b->progress_stop) break;
+        pthread_mutex_unlock(&b->progress_mu);
+        print_batch_progress(b, &last_done, &last_time, &ewma_rate);
+        pthread_mutex_lock(&b->progress_mu);
+    }
+    pthread_mutex_unlock(&b->progress_mu);
+    return NULL;
 }
 
 static double run_batch(VerifyTask *tasks, size_t ntasks, int threads, int memo_bits,
-                        BatchStats *total) {
+                        const char *phase, int progress_k, BatchStats *total) {
     double t0 = monotonic_seconds();
     int i;
     memset(total, 0, sizeof *total);
     if (!ntasks) return 0;
     if (threads < 1) threads = 1;
     if ((size_t)threads > ntasks) threads = (int)ntasks;
-    Batch b = { .tasks = tasks, .ntasks = ntasks, .memo_bits = memo_bits };
+    Batch b = { .tasks = tasks, .ntasks = ntasks, .memo_bits = memo_bits,
+                .threads = threads, .progress_k = progress_k, .phase = phase,
+                .started = t0 };
     atomic_init(&b.next, 0);
+    atomic_init(&b.done, 0); atomic_init(&b.verified, 0);
+    atomic_init(&b.unverified, 0); atomic_init(&b.budget, 0);
+    atomic_init(&b.completed_nodes, 0);
+    for (i = 0; i <= MAXK; i++) atomic_init(&b.done_by_k[i], 0);
+    for (i = 0; i <= MAXP; i++) atomic_init(&b.done_by_np[i], 0);
+    for (size_t q = 0; q < ntasks; q++) {
+        b.total_by_k[tasks[q].k]++;
+        b.total_by_np[tasks[q].fact->np]++;
+    }
+    b.progress = calloc((size_t)threads, sizeof *b.progress);
     WorkerArg *args = calloc((size_t)threads, sizeof *args);
     pthread_t *ids = threads > 1 ? malloc((size_t)(threads - 1) * sizeof *ids) : NULL;
-    if (!args || (threads > 1 && !ids)) { fprintf(stderr, "no memory for worker pool\n"); exit(1); }
-    for (i = 0; i < threads; i++) args[i].batch = &b;
+    pthread_t reporter;
+    int have_reporter = 0;
+    if (!b.progress || !args || (threads > 1 && !ids)) {
+        fprintf(stderr, "no memory for worker pool\n"); exit(1);
+    }
+    for (i = 0; i < threads; i++) {
+        atomic_init(&b.progress[i].task, SIZE_MAX);
+        atomic_init(&b.progress[i].started_ns, 0);
+        atomic_init(&b.progress[i].nodes, 0);
+        args[i].batch = &b; args[i].slot = i;
+    }
+    if (progress_k >= 0)
+        printf("BATCH_START phase=%s k=%d targets=%zu threads=%d progress_seconds=%.1f\n",
+               phase, progress_k, ntasks, threads, g_progress_seconds);
+    else
+        printf("BATCH_START phase=%s k=all targets=%zu threads=%d progress_seconds=%.1f\n",
+               phase, ntasks, threads, g_progress_seconds);
+    fflush(stdout);
+    if (g_progress_seconds > 0) {
+        pthread_mutex_init(&b.progress_mu, NULL);
+        pthread_cond_init(&b.progress_cv, NULL);
+        if (pthread_create(&reporter, NULL, batch_progress_reporter, &b)) {
+            fprintf(stderr, "cannot create verifier progress reporter\n"); exit(1);
+        }
+        have_reporter = 1;
+    }
     for (i = 0; i < threads - 1; i++)
         if (pthread_create(&ids[i], NULL, batch_worker, &args[i])) {
             fprintf(stderr, "cannot create verifier worker %d\n", i); exit(1);
         }
     batch_worker(&args[threads - 1]);
     for (i = 0; i < threads - 1; i++) pthread_join(ids[i], NULL);
+    if (have_reporter) {
+        pthread_mutex_lock(&b.progress_mu);
+        b.progress_stop = 1;
+        pthread_cond_signal(&b.progress_cv);
+        pthread_mutex_unlock(&b.progress_mu);
+        pthread_join(reporter, NULL);
+        pthread_cond_destroy(&b.progress_cv);
+        pthread_mutex_destroy(&b.progress_mu);
+    }
     for (i = 0; i < threads; i++) add_batch_stats(total, &args[i].stats);
-    free(ids); free(args);
-    return monotonic_seconds() - t0;
+    double wall = monotonic_seconds() - t0;
+    if (progress_k >= 0)
+        printf("BATCH_DONE phase=%s k=%d completed=%zu/%zu verified=%zu unverified=%zu "
+               "budget=%zu nodes=%llu wall_s=%.2f\n",
+               phase, progress_k, atomic_load(&b.done), ntasks, atomic_load(&b.verified),
+               atomic_load(&b.unverified), atomic_load(&b.budget),
+               atomic_load(&b.completed_nodes), wall);
+    else
+        printf("BATCH_DONE phase=%s k=all completed=%zu/%zu verified=%zu unverified=%zu "
+               "budget=%zu nodes=%llu wall_s=%.2f\n",
+               phase, atomic_load(&b.done), ntasks, atomic_load(&b.verified),
+               atomic_load(&b.unverified), atomic_load(&b.budget),
+               atomic_load(&b.completed_nodes), wall);
+    fflush(stdout);
+    free(ids); free(args); free(b.progress);
+    return wall;
 }
 
 /* ---------------------------------------------------------------- log parsing */
@@ -1827,11 +2188,9 @@ static void dedup_facts(Fact *f, int *np) {
 }
 
 static void write_state(FILE *fp, const char *kind, int k, const Fact *f) {
-    int i;
-    fprintf(fp, "%s %d Sb(", kind, k);
-    for (i = 0; i < f->np; i++)
-        fprintf(fp, "%s%d:%d", i ? "," : "", f->p[i].n, f->p[i].m);
-    fprintf(fp, ")\n");
+    fprintf(fp, "%s %d ", kind, k);
+    write_fact_inline(fp, f);
+    fputc('\n', fp);
 }
 
 static void write_certificate(const char *path, const Level *L, int maxk, int colored, int topk) {
@@ -1865,6 +2224,17 @@ int main(int argc, char **argv) {
     int threads = 1, memo_bits;
     { char *e = getenv("VERIFY_THREADS"); if (e) threads = atoi(e); }
     if (threads < 1) { fprintf(stderr, "VERIFY_THREADS must be positive\n"); return 2; }
+    { char *e = getenv("VERIFY_PROGRESS_SECONDS");
+      if (e) {
+          char *end = NULL;
+          errno = 0;
+          g_progress_seconds = strtod(e, &end);
+          if (errno || end == e || *end || g_progress_seconds < 0
+                  || g_progress_seconds > 86400 || g_progress_seconds != g_progress_seconds) {
+              fprintf(stderr, "VERIFY_PROGRESS_SECONDS must be in 0..86400\n"); return 2;
+          }
+      }
+    }
     memo_bits = default_memo_bits(threads);
     { char *e = getenv("VERIFY_MEMO_BITS"); if (e) memo_bits = atoi(e); }
     if (argc > 3) g_order = atoi(argv[3]);
@@ -2027,7 +2397,7 @@ int main(int argc, char **argv) {
             for (kk = 1; kk < topk; kk++) if (L[kk].n > 1) {
                 int before = L[kk].n;
                 double t0 = monotonic_seconds();
-                int removed = level_minimize(&L[kk], threads);
+                int removed = level_minimize(&L[kk], threads, kk);
                 printf("  k=%d: %d -> %d facts, removed %d (%.2f s)\n",
                        kk, before, L[kk].n, removed, monotonic_seconds() - t0);
             }
@@ -2063,7 +2433,8 @@ int main(int argc, char **argv) {
                     tasks[q].k = kk; tasks[q].fact = f;
                     tasks[q].status = 0; tasks[q].nodes = 0;
                 }
-                double sec = run_batch(tasks, (size_t)nt, threads, memo_bits, &bs);
+                double sec = run_batch(tasks, (size_t)nt, threads, memo_bits,
+                                       "color", kk, &bs);
                 for (q = 0; q < nt; q++) {
                     if (tasks[q].status == 1) ver++;
                     else if (tasks[q].status == 2) budg++;
@@ -2134,7 +2505,8 @@ int main(int argc, char **argv) {
                 tasks[q].k = k; tasks[q].fact = &rootlvl[k][i]; tasks[q++].status = 0;
             }
         }
-        double wall = run_batch(tasks, (size_t)total_tasks, threads, memo_bits, &bs);
+        double wall = run_batch(tasks, (size_t)total_tasks, threads, memo_bits,
+                                "verify", -1, &bs);
         for (q = 0; q < total_tasks; q++) {
             k = tasks[q].k; nodes[k] += tasks[q].nodes;
             if (tasks[q].status == 1) ver[k]++;
