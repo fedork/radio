@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full raw-log -> colored certificate -> independent replay pipeline for a dedicated EC2 host.
+# Full raw-log -> normalized certificate -> independent level-by-level audit on dedicated EC2.
 # The caller has already unpacked the exact source bundle at /root/source.
 set -euo pipefail
 
@@ -15,11 +15,17 @@ SANITIZED_SHA256=3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd56372511
 THREADS=16
 CPUSET=0-15
 RSS_GIB=24
-PHASE_SECONDS=43200
+PHASE_SECONDS=604800
 PROGRESS_SECONDS=60
 BINARY=run9_verify_p
 FINALIZED=0
 SOURCE_DIR=/root/source
+K7_FACTS=2576885
+K7_FOUR_PART_FACTS=2398799
+LOWER_FACTS=546744
+UPPER_FACTS=2561
+BENCH_STRIDE=240
+MAX_PROJECTED_SECONDS=604800
 
 usage() {
     echo "usage: $0 --run-id ID --work /root/DIR --prefix S3_PREFIX --source-commit SHA --source-sha256 SHA --raw-key KEY" >&2
@@ -75,8 +81,10 @@ current_output() {
         TEST) echo test.out ;;
         SANITIZE) echo sanitize.out ;;
         ROUNDTRIP) echo roundtrip.out ;;
-        COLOR) echo color.out ;;
-        VERIFY|COMPLETE) echo verify.out ;;
+        BENCH) echo bench.out ;;
+        VERIFY_K7) echo verify-k7.out ;;
+        VERIFY_LOWER) echo verify-lower.out ;;
+        VERIFY_UPPER|COMPLETE) echo verify-upper.out ;;
         *) echo bootstrap.out ;;
     esac
 }
@@ -178,23 +186,27 @@ preserve_final() {
     printf '%s\n' "$status" > exit.status
     if [[ "$status" == 0 ]]; then printf 'COMPLETE\n' > stage; fi
     write_status finished
-    for file in run9-sanitized.cert run9-colored.cert; do
+    for file in run9-sanitized.cert; do
         [[ -f "$file" ]] || continue
         zstd -T2 -10 -f "$file" -o "$file.zst" || true
     done
     for file in test.out test.err sanitize.out sanitize.err roundtrip.out roundtrip.err \
-            color.out color.err verify.out verify.err bootstrap.out; do
+            bench.out bench.err verify-k7.out verify-k7.err verify-lower.out verify-lower.err \
+            verify-upper.out verify-upper.err bootstrap.out; do
         [[ -f "$file" ]] || continue
         zstd -T1 -5 -f "$file" -o "$file.zst" || true
     done
-    sha256sum run9-sanitized.cert run9-colored.cert *.zst > final.sha256 2>/dev/null || true
+    sha256sum run9-sanitized.cert *.zst > final.sha256 2>/dev/null || true
     upload_live finished
-    for file in STATUS PROGRESS run.meta exit.status verify.total final.sha256 \
+    for file in STATUS PROGRESS run.meta exit.status verify.total verify-k7.total \
+            verify-lower.total verify-upper.total final.sha256 \
             "$BINARY.provenance" test.out.zst test.err.zst sanitize.out.zst sanitize.err.zst \
-            roundtrip.out.zst roundtrip.err.zst color.out.zst color.err.zst verify.out.zst \
-            verify.err.zst bootstrap.out.zst run9-sanitized.cert.zst run9-colored.cert.zst \
-            sanitize-provenance.txt roundtrip-provenance.txt color-provenance.txt \
-            verify-provenance.txt; do
+            roundtrip.out.zst roundtrip.err.zst bench.out.zst bench.err.zst \
+            verify-k7.out.zst verify-k7.err.zst verify-lower.out.zst verify-lower.err.zst \
+            verify-upper.out.zst verify-upper.err.zst bootstrap.out.zst \
+            run9-sanitized.cert.zst sanitize-provenance.txt roundtrip-provenance.txt \
+            bench-provenance.txt verify-k7-provenance.txt verify-lower-provenance.txt \
+            verify-upper-provenance.txt benchmark.projection; do
         [[ -f "$file" ]] || continue
         aws s3 cp "$file" "s3://$BUCKET/$PREFIX/$file" --no-progress || true
     done
@@ -252,28 +264,59 @@ run_phase run9-progress-roundtrip 4 roundtrip.out roundtrip.err \
 cmp run9-sanitized.cert run9-sanitized-roundtrip.cert
 rm -f -- run9-sanitized-roundtrip.cert
 
-set_stage COLOR
-run_phase run9-progress-color "$RSS_GIB" color.out color.err \
-    env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=color" TOPDOWN=9 \
-        ROOTS=/root/source/evidence/sa193_unsolvable_in_10.txt MINIMIZE_BEFORE_COLOR=1 \
-        CERT_OUT="$WORK/run9-colored.cert" VERIFY_THREADS="$THREADS" \
+set_stage BENCH
+run_phase run9-progress-bench "$RSS_GIB" bench.out bench.err \
+    env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=bench" VERIFY_THREADS="$THREADS" \
         VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
-        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" 9
-"$SOURCE_DIR/tools/check_provenance.py" color.out > color-provenance.txt
-[[ "$(grep -c '^root ' run9-colored.cert)" == 16 ]]
-[[ "$(grep -c '^fact ' run9-colored.cert)" -gt 0 ]]
+        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" \
+        7 0 1 3 4 4 "$BENCH_STRIDE" 0 7
+"$SOURCE_DIR/tools/check_provenance.py" bench.out > bench-provenance.txt
+grep -Eq '^TOTAL verified [0-9]+, unverified 0, budget 0,' bench.out
+bench_done=$(awk '/^BATCH_DONE / {for(i=1;i<=NF;i++) if($i ~ /^completed=/) {split($i,a,"[=/]"); print a[2]}}' bench.out | tail -n 1)
+bench_wall=$(awk '/^BATCH_DONE / {for(i=1;i<=NF;i++) if($i ~ /^wall_s=/) {split($i,a,"="); print a[2]}}' bench.out | tail -n 1)
+[[ "$bench_done" =~ ^[1-9][0-9]*$ && "$bench_wall" =~ ^[0-9]+([.][0-9]+)?$ ]]
+projected=$(awk -v wall="$bench_wall" -v sample="$bench_done" -v total="$K7_FOUR_PART_FACTS" \
+    'BEGIN {printf "%.0f", wall * total / sample}')
+{
+    printf 'sample_facts=%s\nsample_wall_seconds=%s\nprojected_k7_four_part_seconds=%s\n' \
+        "$bench_done" "$bench_wall" "$projected"
+    printf 'gate_max_projected_seconds=%s\n' "$MAX_PROJECTED_SECONDS"
+} > benchmark.projection
+(( projected <= MAX_PROJECTED_SECONDS )) || {
+    printf 'benchmark projection %s exceeds gate %s\n' "$projected" "$MAX_PROJECTED_SECONDS" >&2
+    exit 75
+}
 
-set_stage VERIFY
-run_phase run9-progress-verify "$RSS_GIB" verify.out verify.err \
-    env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify" VERIFY_THREADS="$THREADS" \
+set_stage VERIFY_K7
+run_phase run9-progress-verify-k7 "$RSS_GIB" verify-k7.out verify-k7.err \
+    env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify-k7" VERIFY_THREADS="$THREADS" \
         VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
-        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-colored.cert" 9
-"$SOURCE_DIR/tools/check_provenance.py" verify.out > verify-provenance.txt
-grep '^TOTAL verified ' verify.out | tail -n 1 > verify.total
-grep -Eq '^TOTAL verified [0-9]+, unverified 0, budget 0,' verify.total
-verified=$(sed -E 's/^TOTAL verified ([0-9]+),.*/\1/' verify.total)
-expected=$(( $(grep -c '^root ' run9-colored.cert) + $(grep -c '^fact ' run9-colored.cert) ))
-[[ "$verified" == "$expected" ]]
+        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" \
+        7 0 1 3 0 999 1 0 7
+"$SOURCE_DIR/tools/check_provenance.py" verify-k7.out > verify-k7-provenance.txt
+grep '^TOTAL verified ' verify-k7.out | tail -n 1 > verify-k7.total
+grep -Eq "^TOTAL verified $K7_FACTS, unverified 0, budget 0," verify-k7.total
+
+set_stage VERIFY_LOWER
+run_phase run9-progress-verify-lower "$RSS_GIB" verify-lower.out verify-lower.err \
+    env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify-lower" VERIFY_THREADS="$THREADS" \
+        VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
+        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" 6
+"$SOURCE_DIR/tools/check_provenance.py" verify-lower.out > verify-lower-provenance.txt
+grep '^TOTAL verified ' verify-lower.out | tail -n 1 > verify-lower.total
+grep -Eq "^TOTAL verified $LOWER_FACTS, unverified 0, budget 0," verify-lower.total
+
+set_stage VERIFY_UPPER
+run_phase run9-progress-verify-upper "$RSS_GIB" verify-upper.out verify-upper.err \
+    env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify-upper" VERIFY_THREADS="$THREADS" \
+        VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
+        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" \
+        9 0 1 3 0 999 1 0 8
+"$SOURCE_DIR/tools/check_provenance.py" verify-upper.out > verify-upper-provenance.txt
+grep '^TOTAL verified ' verify-upper.out | tail -n 1 > verify-upper.total
+grep -Eq "^TOTAL verified $UPPER_FACTS, unverified 0, budget 0," verify-upper.total
+printf 'TOTAL verified %d, unverified 0, budget 0 (three level checkpoints)\n' \
+    "$((K7_FACTS + LOWER_FACTS + UPPER_FACTS))" > verify.total
 
 kill "$monitor_pid" 2>/dev/null || true
 wait "$monitor_pid" 2>/dev/null || true

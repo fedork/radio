@@ -640,21 +640,20 @@ complete colored certificate or began proof replay. Exact records are in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt) and
 [`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
 
-Full coloring is therefore deferred, not merely waiting for a faster instance. `radio_verify`
-remains valuable for small corpora, explicit-root controls and targeted audits, but its current
-negative check is itself a search. A useful full certificate must carry enough branch-level
-derivation that an independent checker validates recorded choices and coverage instead of solving
-millions of negative states again. Only after that check is cheap should top-down reachability
-coloring be reconsidered as an artifact-pruning pass. This optional strengthening remains outside
-the established `Sa(10)=192` proof dependency.
+Full coloring is therefore deferred, not merely waiting for a faster instance. A useful compact
+certificate should eventually carry enough branch-level derivation that an independent checker
+validates recorded choices and coverage instead of solving millions of negative states again. Only
+after that check is cheap should top-down reachability coloring return as an artifact-pruning pass.
+This optional strengthening remains outside the established `Sa(10)=192` proof dependency.
 
-The packed product-profile verifier index and its adaptive block summaries are now deployed.
-Canonical facts remain untouched for stable hashes and text output; a separate immutable
-`(part-count,max-product,total-mass)` permutation scans denormalized mass plus packed sorted n, m and
-top-four product columns before the exact injection matcher. On levels with at least 65,536 facts,
-full 256-fact blocks inside one primary-key group add a Pareto-minimal `(mass,products)` rejection
-summary. A missing summary fit soundly skips the block; a fit still runs every original exact check.
-No implied facts are inserted.
+The packed product-profile columns remain deployed, but the adaptive fixed blocks are now a
+retained control rather than the production hierarchy. Canonical facts remain untouched for stable
+hashes and text output. On levels with at least 65,536 facts, a balanced immutable kd tree
+partitions total mass, four sorted products, eight sorted n sides and eight independently sorted m
+sides. Each node stores componentwise minima. A failed minimum soundly rejects every descendant; a
+fitting 32-fact leaf still reaches the original packed filters and exact injection matcher. The
+same exact lookup, excluding self, accelerates same-level minimalization. No implied fact is
+inserted.
 
 On the exact hard run9 k=7 root, the final product-only and block builds returned identical
 4,644,469 nodes, 5,583,390 memo hits and 5,187,272 misses. Verifier wall fell from a contemporaneous
@@ -663,11 +662,26 @@ On the exact hard run9 k=7 root, the final product-only and block builds returne
 block probes, skipping 68,141,963,520 positions. The cutoff matters: an ungated block build slightly
 regressed the full Sa(113) replay, while the final small-level control preserved exactly
 251,437,448 nodes and took 15.88 versus 15.95 seconds. Full Sa(113) replay had already closed all
-120,302 records and 2,491,283,058 nodes. Source hashes, failed layouts, tuning and sanitizer controls
-are in
+120,302 records and 2,491,283,058 nodes.
+
+The kd hierarchy reduces the exact hard-root fact probes from 5.509 billion to 431.317 million and
+verifier wall from 11.70 to 4.20 seconds with identical proof/memo counts. Bounded forward checking
+through 512-option lists then reduces the five-root control from 9,158,686 to 4,690,828 nodes and
+from 21.00 to 5.34 seconds. Pair rows have a 128-MiB-per-worker fail-open ceiling. Complete run9
+k=6/k=7 antichain passes reproduce 229,341/2,507,270 minimal facts in 3.8/49.8 seconds. A twelve-
+worker complete Sa(113) guard again closed all 120,302 records and exactly 2,491,283,058 nodes, with
+zero gaps.
+
+This improvement justifies one bounded ordinary run9 audit without reviving coloring. The remote
+pipeline first verifies a deterministic 9,995-fact k=7 sample and aborts if it projects above seven
+days, then retains k=7, k<=6 and k=8..9 as separate checkpoints. Proof-carrying split coverage
+remains the fallback if this measured attempt is still uneconomic. Source hashes, failed layouts,
+tuning and sanitizer controls are in
 [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt)
 and
-[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
+[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt),
+with the current hierarchy in
+[`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
 Solver cache structure remains a separate experiment.
 
 The abandoned 2023-corpus painting and sixteen missing-k=8-fact programme is superseded: it was a
@@ -819,11 +833,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Let the k=8 Pareto-prefix census finish and archive its final output before stopping the shared
-   instance.** It is the only remaining AWS research process. Both coloring verifiers were stopped,
-   their diagnostic uploads were hash-checked, and the dedicated instance was terminated. Do not
-   restart full run9 coloring without first changing the certificate so checking branch coverage is
-   materially cheaper than independently re-solving the negative states.
+0. **Let the k=8 Pareto-prefix census finish and preserve the bounded ordinary run9 audit.** Never
+   stop the shared census instance before its final output is archived. The independent audit uses
+   a separate right-sized host, does no coloring, and must pass its 9,995-fact projection gate before
+   entering the full k=7 checkpoint. Preserve every completed level log before terminating that
+   host. Do not restart either superseded coloring pipeline.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are

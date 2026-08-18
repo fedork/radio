@@ -1,0 +1,132 @@
+# Hierarchical dominance index for the independent verifier
+
+Status: measured verifier optimization and launch gate; no solver code, certificate fact or
+mathematical verdict changed.
+
+## Motivation and input
+
+The stopped progress-reporting run9 verifier used the packed product-order index but still projected
+roughly 54--59 days in the first sustained k=7 four-part region. Instrumentation on the retained
+hard root showed why: even the later 256-fact block filter admitted 5,509,150,342 individual fact
+candidates and tested 4,894,904,555 block-front points for one 4,644,469-node proof. Increasing the
+pairwise forward-checking cutoff from 256 to 512 halved recursion nodes on representative states,
+but improved wall by only 6--9% while dominance lookup remained linear inside admitted blocks.
+
+All run9 measurements use the normalized form of the proof-safe raw log from
+
+https://github.com/fedork/radio-data/releases/tag/sa193-cold-2026-08-16
+
+    raw SHA-256        ba635d9141601ebb643ed4f102703deb112fc3e8260f4936e8545fe44a300cf4
+    normalized SHA-256 3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+    normalized facts   3,126,190
+
+The exact hard target is
+
+    fact 7 Sb(35:10,33:13,30:26,28:18)
+
+and the five-target sample, in canonical order, is
+
+    Sb(32:17,32:16,32:16,32:16)
+    Sb(34:10,33:12,32:31,28:13)
+    Sb(35:10,33:13,30:26,28:18)
+    Sb(36:10,34:18,28:26,28:13)
+    Sb(37:15,32:24,32:11,30:12)
+
+## Sound index
+
+The production verifier still keeps canonical facts and exact hashing unchanged. For a large
+level it now builds a balanced read-only tree over the separate product-index positions. The 21
+partition coordinates are total mass, four independently sorted segment products, eight sorted n
+sides and eight independently sorted m sides. Every coordinate is only a necessary condition for
+multiset injection.
+
+Each tree node retains the componentwise minimum of those packed profiles over its descendants. If
+one minimum lane exceeds the query, no descendant can dominate the query and the whole node is
+skipped. A node whose minima fit proves nothing: the search descends, and every candidate in a
+surviving 32-fact leaf still passes the existing packed filters and exact bipartite injection
+matcher. Arbitrary median partitioning therefore changes cost and witness order, never acceptance.
+The same exact tree query, excluding the query's own fact index, now serves same-level antichain
+minimalization.
+
+The tree is built only for levels with at least 65,536 facts. This preserves the measured
+product-only path for the smaller level that dominates Sa(113). On the 3.126-million-record run9
+input the 32-leaf prototype built 330,677 nodes / 165,345 leaves in 4.28 seconds and used 26.9 MiB
+for nodes plus the leaf permutation. The tree is immutable after construction and shared by all
+workers without locks.
+
+The independent split search also raises the bounded pairwise-forward-checking cutoff from 256 to
+512 options. Pair rows remain worker-local, and their new 128-MiB-per-worker allocation ceiling is
+fail-open: reaching it merely declines that optimization and returns to ordinary enumeration. It
+cannot manufacture a rejection. The five-target sample built 26 pair tables using 0.3 MiB and hit
+no ceiling.
+
+## Measurements
+
+All rows below are single-worker Apple M4 Pro measurements with `VERIFY_MEMO_BITS=20`. The proof
+node and memo counts are the correctness controls. Setup/parsing is excluded from verifier wall;
+the tree's one-time 4.1--4.5-second build is separately reported above and amortizes over a full
+level.
+
+    hard root index/pruning       proof nodes   verifier wall
+    product-only                    4,644,469        39.16 s
+    256-fact Pareto blocks          4,644,469        11.70 s
+    kd leaf 32, pair cutoff 256     4,644,469         4.20 s
+    kd leaf 64, pair cutoff 512     2,400,534         3.93 s
+
+For the five-target sample:
+
+    index/pruning                  proof nodes   verifier wall
+    256-fact blocks, cutoff 256      9,158,686        21.00 s
+    kd leaf 32, cutoff 256           9,158,686         7.79 s
+    kd leaf 32, cutoff 512           4,690,828         5.34 s
+    kd leaf 16, cutoff 512           4,690,828         5.91 s
+    kd leaf 64, cutoff 512           4,690,828         6.92 s
+
+Thus leaf 32 is the production choice. A warning-clean build of the final bounded-pair code repeated
+the five targets in 6.04 seconds with the same 4,690,828 nodes; the 5.34/6.04 difference is timing
+variation, not a changed proof. On the instrumented hard-root run, kd lookup reduced
+individual fact probes from the block build's 5.509 billion to 431.317 million while preserving
+4,644,469 proof nodes, 5,583,390 memo hits and 5,187,272 misses. The wider pair cutoff changes the
+enumerated prefix tree, as intended, but not the complete split-space result.
+
+The full same-level controls are more important than a microbenchmark because pre-color
+minimalization previously consumed hours:
+
+    level   input facts   minimal facts   kd query wall
+      k=6       388,317         229,341          3.8 s
+      k=7     2,576,885       2,507,270         49.8 s
+
+Both minimal counts exactly reproduce the retained prior results. The complete k=7 process took
+55.55 external seconds including parse and a 4.19-second index build, with 0.50 GiB peak footprint.
+
+The complete 120,302-record Sa(113) colored replay is a small-level guard. Twelve local workers
+verified every record with zero unresolved/budget outcomes and the established exact
+2,491,283,058 recursion nodes in 119.19 seconds; the kd cutoff intentionally indexed no level in
+that artifact. Aggregate pair-row storage was 109.3 MiB with zero budget refusals. The input comes
+from the private release
+
+https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17
+
+## Correctness gates and disposition
+
+`tools/test_radio_verify.sh` now forces a two-fact-leaf kd build and requires its same-level
+minimal antichain to equal both the plain and block indexes. The existing serial/parallel,
+color/replay and progress tests pass. Forced-kd AddressSanitizer + UndefinedBehaviorSanitizer runs
+also passed both ordinary two-worker verification and the synthetic antichain. Warning-clean
+`-Wall -Wextra -Wpedantic` builds passed. The provenance-complete Sa(113) output passed
+`tools/check_provenance.py`.
+
+The final local warning-clean production build used source SHA-256
+`49b5233008f71ec2beb2b4d69bcaf06bedf780facf7fde746555dd46f9eb2dea`, build ID
+`40036898365b3711ae655886aaa853dd25b5d6b26e4f63f098a04363949da8af`, and binary SHA-256
+`1b45ecb28604d8c94a6e675cdbe9ddb5d9c50cf2d09168d99354eae75ae978b6`. The eventual EC2 build
+will carry the clean committed source identity separately.
+
+This result does not retract the proof-carrying design: explicit split-space coverage is still the
+preferred way to make checking proportional to proof size. It does justify one bounded full audit
+of the existing run9 data because the measured product-index-to-kd improvement puts the projected
+k=7 cost back near the original solver's scale. The new EC2 pipeline deliberately does no
+coloring. It normalizes and byte-round-trips the retained raw log, checks a deterministic 9,995-
+fact sample, refuses the expensive phase if that sample projects above seven days, then verifies
+k=7, k<=6 and k=8..9 as three separately retained checkpoints. A multi-day level has no restart
+cursor, so the production launch uses the right-sized on-demand 16-vCPU host rather than Spot.

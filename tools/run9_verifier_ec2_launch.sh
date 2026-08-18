@@ -63,7 +63,7 @@ cat > "$userdata" <<EOF
 exec > >(tee -a /var/log/run9-verifier-bootstrap.log) 2>&1
 set -euo pipefail
 trap 'rc=\$?; aws s3 cp /var/log/run9-verifier-bootstrap.log s3://$BUCKET/$prefix/bootstrap-failure.log --no-progress || true; shutdown -h +2 >/dev/null 2>&1 || true; exit \$rc' EXIT
-systemd-run --unit=run9-verifier-hard-stop --on-active=25h /sbin/shutdown -h now
+systemd-run --unit=run9-verifier-hard-stop --on-active=9d /sbin/shutdown -h now
 dnf install -y clang python3 zstd tar gzip time procps-ng
 cd /root
 aws s3 cp s3://$BUCKET/$source_key source.tar.zst --no-progress

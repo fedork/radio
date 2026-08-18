@@ -7099,3 +7099,45 @@ proof bytes, solver emission overhead and checker wall. The current readable cer
 good envelope, and the current verifier remains valuable for small complete corpora and targeted
 audits. Binary encoding is not the issue measured here. Top-down coloring should return only after
 explicit citations make graph reachability cheap; it should not trigger a second solve.
+
+## 2026-08-17 — hierarchical dominance lookup reopens one bounded ordinary run9 audit
+
+The first follow-up was intentionally narrow. Raising pairwise forward checking from 256 to 512
+options halved the representative five-root recursion tree from 9,158,686 to 4,690,828 nodes, but
+the existing block index improved wall by only 6--9%: dominance lookup, not recursion dispatch, was
+still the cost. Larger direct memos likewise moved the exact hard root by less than two percent.
+Those experiments ruled out treating either knob as the main verifier redesign.
+
+`radio_verify.c` now builds an immutable kd hierarchy over each large lower level's sound packed
+profiles: total mass, four sorted products, eight independently sorted n sides and eight sorted m
+sides. Every node stores componentwise minima. A failed lane skips the subtree; a fitting 32-fact
+leaf still executes the existing packed tests and exact injection matcher. Thus the tree can only
+remove work, never supply a proof. The same query excludes self and accelerates pre-color
+same-level minimalization. Canonical facts, exact hashing and certificate text are unchanged.
+
+The exact hard k=7 root kept 4,644,469 proof nodes, 5,583,390 memo hits and 5,187,272 misses while
+kd lookup reduced individual fact probes from 5.509 billion under adaptive blocks to 431.317
+million. Verifier wall fell from 11.70 to 4.20 seconds before wider pairs. On five representative
+four-part roots, kd plus the 512 cutoff produced the same complete verdict in 4,690,828 nodes and
+5.34 seconds (6.04 seconds in the final warning-clean repeat), versus 9,158,686 nodes and 21.00
+seconds under blocks. Leaf sizes 16 and 64 took 5.91 and 6.92 seconds, so 32 is the measured
+default. Pair rows now have a 128-MiB-per-worker fail-open cap; reaching it disables only forward
+checking. The five-root run used 0.3 MiB.
+
+Two full antichain passes supplied a stronger semantic gate. K=6 reproduced 229,341 minima from
+388,317 facts in 3.8 seconds. K=7 reproduced the prior exact 2,507,270 minima from 2,576,885 facts
+in 49.8 seconds, or 55.55 seconds including parse/index build at 0.50 GiB peak. The complete
+120,302-record Sa(113) replay then returned zero gaps and the established 2,491,283,058 nodes in
+119.19 seconds on twelve local workers; pair rows used 109.3 MiB aggregate with no budget refusal.
+The regression now forces a two-fact kd leaf and compares its minimal antichain with both plain and
+block indexes. Forced-kd ASan+UBSan checks and warning-clean builds pass.
+
+This does not reverse the decision to defer coloring. Instead it makes one ordinary audit of the
+existing 3,126,190 run9 facts plausibly comparable to the original solver cost. The dedicated
+pipeline now does no reachability pruning: after normalization and byte round-trip it times a
+deterministic 9,995-fact k=7 sample, refuses the expensive stage if that projects above seven days,
+then retains k=7, k<=6 and k=8..9 as separate checkpoints. A 16-vCPU `c8a.4xlarge` remains the
+right-sized choice. The long k=7 level has no restart cursor, so on-demand is justified and Spot is
+not. If the measured gate still fails, explicit solver-emitted split-space coverage remains the
+next design rather than buying a larger instance. Full local commands, hashes and controls are in
+`evidence/verifier_kd_index_2026-08-18.txt`.

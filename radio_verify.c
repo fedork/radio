@@ -68,17 +68,18 @@
 
 #define MAXC (2 * MAXP)          /* a mixed child has two parts per group */
 
-/* The product index plus adaptive block summaries is the production default.
+/* The product columns plus a read-only kd hierarchy are the production default.
    VERIFY_LEGACY_INDEX retains the former (np,largest-n,mass) layout for exact A/B reproduction;
    defining either product implementation macro explicitly suppresses all defaults, which permits
-   product-only and profile-only diagnostics. VERIFY_NO_BLOCK_PARETO is the convenient default-
-   product control when no other implementation macro is supplied. */
+   product-only and profile-only diagnostics. VERIFY_BLOCK_PARETO explicitly selects the older
+   fixed-block hierarchy; VERIFY_NO_BLOCK_PARETO is the convenient product-only control. */
 #if !defined(VERIFY_LEGACY_INDEX) && !defined(VERIFY_PRODUCT_PROFILE) && \
     !defined(VERIFY_PRODUCT_SORT)
 #define VERIFY_PRODUCT_PROFILE
 #define VERIFY_PRODUCT_SORT
-#if !defined(VERIFY_NO_BLOCK_PARETO) && !defined(VERIFY_BLOCK_PARETO)
-#define VERIFY_BLOCK_PARETO
+#if !defined(VERIFY_NO_BLOCK_PARETO) && !defined(VERIFY_BLOCK_PARETO) && \
+    !defined(VERIFY_KD_INDEX)
+#define VERIFY_KD_INDEX
 #endif
 #endif
 
@@ -87,6 +88,9 @@
 #endif
 #if defined(VERIFY_BLOCK_PARETO) && !defined(VERIFY_PRODUCT_SORT)
 #error "VERIFY_BLOCK_PARETO requires VERIFY_PRODUCT_SORT"
+#endif
+#if defined(VERIFY_KD_INDEX) && (!defined(VERIFY_PRODUCT_SORT) || !defined(VERIFY_PRODUCT_PROFILE))
+#error "VERIFY_KD_INDEX requires VERIFY_PRODUCT_SORT and VERIFY_PRODUCT_PROFILE"
 #endif
 
 #ifndef VERIFY_BLOCK_SIZE
@@ -101,11 +105,30 @@
 #if VERIFY_BLOCK_MIN_LEVEL_FACTS < VERIFY_BLOCK_SIZE
 #error "VERIFY_BLOCK_MIN_LEVEL_FACTS must be at least VERIFY_BLOCK_SIZE"
 #endif
+#ifndef VERIFY_KD_LEAF_SIZE
+#define VERIFY_KD_LEAF_SIZE 32
+#endif
+#if VERIFY_KD_LEAF_SIZE < 2
+#error "VERIFY_KD_LEAF_SIZE must be at least 2"
+#endif
+#ifndef VERIFY_KD_MIN_LEVEL_FACTS
+#define VERIFY_KD_MIN_LEVEL_FACTS 65536
+#endif
 
 typedef struct { unsigned char n, m; } Part;
 typedef struct { unsigned char np, src; Part p[MAXP]; int mass; } Fact;
 #ifdef VERIFY_BLOCK_PARETO
 typedef struct { uint64_t pp; int mass; } BlockProfile;
+#endif
+#ifdef VERIFY_KD_INDEX
+/* A read-only orthogonal-search tree over the sound packed dominance profiles.  Internal-node
+   minima can only reject: a surviving leaf still runs the unchanged profile filters and exact
+   bipartite injection matcher. */
+typedef struct {
+    uint64_t pn, pm, pp;
+    int mass;
+    int32_t lo, hi, left, right;
+} KdNode;
 #endif
 
 /* Long batches are deliberately observable without putting an atomic increment in the hot
@@ -322,6 +345,12 @@ typedef struct Level_ {
     BlockProfile *block_min;  /* componentwise minima: cheap sound rejection first */
     BlockProfile *block_prof; /* minimal (mass, sorted-product-profile) points */
 #endif
+#ifdef VERIFY_KD_INDEX
+    int32_t *kd_order;         /* tree leaf position -> product-index position */
+    KdNode *kd_node;
+    int kd_nnode, kd_cap;
+    int32_t kd_root[MAXP + 1];
+#endif
 #else
     int *b2;                 /* b2[np * 257 + x] = first index with np and largest-n >= x */
 #endif
@@ -522,6 +551,133 @@ static void level_build_blocks(Level *L) {
 }
 #endif
 
+#ifdef VERIFY_KD_INDEX
+static long long g_kd_build_nodes, g_kd_build_leaves, g_kd_build_facts;
+static double g_kd_build_seconds;
+
+static inline uint64_t packed_u8_min(uint64_t a, uint64_t b) {
+    unsigned char aa[8], bb[8];
+    int i;
+    memcpy(aa, &a, 8); memcpy(bb, &b, 8);
+    for (i = 0; i < 8; i++) if (bb[i] < aa[i]) aa[i] = bb[i];
+    memcpy(&a, aa, 8);
+    return a;
+}
+
+static inline uint64_t packed_u16_min(uint64_t a, uint64_t b) {
+    uint16_t aa[4], bb[4];
+    int i;
+    memcpy(aa, &a, 8); memcpy(bb, &b, 8);
+    for (i = 0; i < 4; i++) if (bb[i] < aa[i]) aa[i] = bb[i];
+    memcpy(&a, aa, 8);
+    return a;
+}
+
+/* Dimensions are total mass, four independently sorted products, eight n sides and eight m
+   sides.  They are all necessary conditions for multiset injection, never sufficient ones. */
+static inline int kd_coord(const Level *L, int pos, int dim) {
+    if (dim == 0) return L->imass[pos];
+    if (dim <= 4) {
+        uint16_t v[4]; memcpy(v, &L->pp[pos], 8); return v[dim - 1];
+    }
+    if (dim <= 12) {
+        unsigned char v[8]; memcpy(v, &L->pn[pos], 8); return v[dim - 5];
+    }
+    { unsigned char v[8]; memcpy(v, &L->pm[pos], 8); return v[dim - 13]; }
+}
+
+static const Level *g_kd_sort_level;
+static int g_kd_sort_dim;
+
+static int kd_pos_cmp(const void *A, const void *B) {
+    int32_t a, b;
+    int ca, cb;
+    memcpy(&a, A, sizeof a); memcpy(&b, B, sizeof b);
+    ca = kd_coord(g_kd_sort_level, a, g_kd_sort_dim);
+    cb = kd_coord(g_kd_sort_level, b, g_kd_sort_dim);
+    if (ca != cb) return ca < cb ? -1 : 1;
+    return a < b ? -1 : a > b;
+}
+
+static int kd_new_node(Level *L) {
+    if (L->kd_nnode == L->kd_cap) {
+        int nc = L->kd_cap ? L->kd_cap * 2 : 1024;
+        KdNode *p = realloc(L->kd_node, (size_t)nc * sizeof(KdNode));
+        if (!p) { fprintf(stderr, "no memory for dominance kd tree\n"); exit(1); }
+        L->kd_node = p; L->kd_cap = nc;
+    }
+    return L->kd_nnode++;
+}
+
+static int kd_build_rec(Level *L, int lo, int hi) {
+    int ni = kd_new_node(L), pos, dim, bestdim = 0;
+    int mn[21], mx[21];
+    KdNode *n;
+    for (dim = 0; dim < 21; dim++) mn[dim] = 0x7fffffff, mx[dim] = 0;
+    for (pos = lo; pos < hi; pos++) {
+        int ip = L->kd_order[pos];
+        for (dim = 0; dim < 21; dim++) {
+            int v = kd_coord(L, ip, dim);
+            if (v < mn[dim]) mn[dim] = v;
+            if (v > mx[dim]) mx[dim] = v;
+        }
+    }
+    n = &L->kd_node[ni];
+    n->lo = lo; n->hi = hi; n->left = n->right = -1;
+    n->mass = mn[0];
+    {
+        int ip = L->kd_order[lo];
+        n->pn = L->pn[ip]; n->pm = L->pm[ip]; n->pp = L->pp[ip];
+        for (pos = lo + 1; pos < hi; pos++) {
+            ip = L->kd_order[pos];
+            n->pn = packed_u8_min(n->pn, L->pn[ip]);
+            n->pm = packed_u8_min(n->pm, L->pm[ip]);
+            n->pp = packed_u16_min(n->pp, L->pp[ip]);
+        }
+    }
+    if (hi - lo <= VERIFY_KD_LEAF_SIZE) { g_kd_build_leaves++; return ni; }
+    {
+        long long bestscore = -1;
+        for (dim = 0; dim < 21; dim++) {
+            long long span = (long long)mx[dim] - mn[dim];
+            /* Relative range keeps byte-valued side coordinates competitive with mass/product. */
+            long long score = span * 1000000 / (mx[dim] ? mx[dim] : 1);
+            if (score > bestscore) { bestscore = score; bestdim = dim; }
+        }
+    }
+    if (mx[bestdim] != mn[bestdim]) {
+        g_kd_sort_level = L; g_kd_sort_dim = bestdim;
+        qsort(L->kd_order + lo, (size_t)(hi - lo), sizeof(int32_t), kd_pos_cmp);
+    }
+    {
+        int mid = lo + (hi - lo) / 2;
+        int left = kd_build_rec(L, lo, mid);
+        int right = kd_build_rec(L, mid, hi);
+        /* Recursion can realloc the arena; reacquire the pointer. */
+        L->kd_node[ni].left = left; L->kd_node[ni].right = right;
+    }
+    return ni;
+}
+
+static void level_build_kd(Level *L) {
+    int i, np;
+    clock_t t0 = clock();
+    L->kd_order = NULL; L->kd_node = NULL; L->kd_nnode = L->kd_cap = 0;
+    for (np = 0; np <= MAXP; np++) L->kd_root[np] = -1;
+    if (L->n < VERIFY_KD_MIN_LEVEL_FACTS) return;
+    L->kd_order = malloc((size_t)L->n * sizeof(int32_t));
+    if (!L->kd_order) { fprintf(stderr, "no memory for dominance kd order\n"); exit(1); }
+    for (i = 0; i < L->n; i++) L->kd_order[i] = i;
+    for (np = 1; np <= MAXP; np++) {
+        int lo = L->bstart[np], hi = L->bstart[np + 1];
+        if (lo < hi) L->kd_root[np] = kd_build_rec(L, lo, hi);
+    }
+    g_kd_build_nodes += L->kd_nnode;
+    g_kd_build_facts += L->n;
+    g_kd_build_seconds += (double)(clock() - t0) / CLOCKS_PER_SEC;
+}
+#endif
+
 static void level_freeze(Level *L) {
     int i, cap = 16;
     qsort(L->f, L->n, sizeof(Fact), fact_cmp);
@@ -577,6 +733,9 @@ static void level_freeze(Level *L) {
     }
 #ifdef VERIFY_BLOCK_PARETO
     level_build_blocks(L);
+#endif
+#ifdef VERIFY_KD_INDEX
+    level_build_kd(L);
 #endif
 #else
     L->b2 = malloc((MAXP + 2) * 257 * sizeof(int));
@@ -719,6 +878,11 @@ static int level_find(const Level *L, const Fact *q) {
     return -1;
 }
 
+#ifdef VERIFY_KD_INDEX
+static int kd_find_dominator(const Level *L, int ni, const Fact *s,
+                             uint64_t qn, uint64_t qm, uint64_t qp, int exclude);
+#endif
+
 /* Subgraph Monotonicity: is there an injection a -> b with each part componentwise <= ? */
 static int dom_rec(const Fact *a, const Fact *b, int i, unsigned used) {
     if (i == a->np) return 1;
@@ -750,6 +914,13 @@ static int level_redundant(const Level *L, int q) {
     bq.pp = qp; bq.mass = f->mass;
 #endif
     prof_of(f->p, f->np, &qn, &qm);
+#ifdef VERIFY_KD_INDEX
+    if (L->kd_order) {
+        for (np = 1; np <= lim; np++) if (L->kd_root[np] >= 0)
+            if (kd_find_dominator(L, L->kd_root[np], f, qn, qm, qp, q) >= 0) return 1;
+        return 0;
+    }
+#endif
     for (np = 1; np <= lim; np++) {
         int end = level_candidate_end(L, np, f);
         i = L->bstart[np];
@@ -896,6 +1067,9 @@ static void level_drop_indexes(Level *L) {
 #ifdef VERIFY_BLOCK_PARETO
     free(L->block_at); free(L->block_off); free(L->block_min); free(L->block_prof);
 #endif
+#ifdef VERIFY_KD_INDEX
+    free(L->kd_order); free(L->kd_node);
+#endif
 #else
     free(L->b2);
 #endif
@@ -910,6 +1084,10 @@ static void level_drop_indexes(Level *L) {
     L->block_at = NULL; L->block_off = NULL;
     L->block_min = NULL; L->block_prof = NULL;
     L->nblocks = L->block_points = 0;
+#endif
+#ifdef VERIFY_KD_INDEX
+    L->kd_order = NULL; L->kd_node = NULL;
+    L->kd_nnode = L->kd_cap = 0;
 #endif
 #else
     L->b2 = NULL;
@@ -1040,6 +1218,9 @@ static TLS long long idx_match_calls = 0, idx_match_hits = 0;
 static TLS long long idx_block_tests = 0, idx_block_rejects = 0, idx_block_min_rejects = 0;
 static TLS long long idx_block_skipped = 0, idx_block_front_tests = 0;
 #endif
+#ifdef VERIFY_KD_INDEX
+static TLS long long idx_kd_nodes = 0, idx_kd_rejects = 0, idx_kd_leaves = 0;
+#endif
 #define IDX_INC(x) ((x)++)
 #define IDX_ADD(x, n) ((x) += (n))
 #else
@@ -1104,6 +1285,34 @@ static inline __attribute__((always_inline)) int dominance_candidate(
     return -1;
 }
 
+#ifdef VERIFY_KD_INDEX
+static int kd_find_dominator(const Level *L, int ni, const Fact *s,
+                             uint64_t qn, uint64_t qm, uint64_t qp, int exclude) {
+    const KdNode *n = &L->kd_node[ni];
+    int pos, hit;
+    IDX_INC(idx_kd_nodes);
+    if (n->mass > s->mass || !prod_prof_le(n->pp, qp)
+            || !prof_le(n->pn, qn) || !prof_le(n->pm, qm)) {
+        IDX_INC(idx_kd_rejects);
+        return -1;
+    }
+    if (n->left < 0) {
+        IDX_INC(idx_kd_leaves);
+        for (pos = n->lo; pos < n->hi; pos++) {
+            int ip = L->kd_order[pos];
+            if (level_fact_index(L, ip) == exclude) continue;
+            if (L->imass[ip] > s->mass) continue;
+            hit = dominance_candidate(L, s, ip, qn, qm, qp);
+            if (hit >= 0) return hit;
+        }
+        return -1;
+    }
+    hit = kd_find_dominator(L, n->left, s, qn, qm, qp, exclude);
+    if (hit >= 0) return hit;
+    return kd_find_dominator(L, n->right, s, qn, qm, qp, exclude);
+}
+#endif
+
 static int refuted_raw(const Level *L, const Fact *s, int k) {
     g_wit = -1;
     if (s->mass > pow3[k]) return 1;                 /* COUNT - a rule, no fact to paint */
@@ -1136,6 +1345,14 @@ static int refuted_raw(const Level *L, const Fact *s, int k) {
       bq.pp = qp; bq.mass = s->mass;
 #endif
       prof_of(s->p, s->np, &qn, &qm);
+#ifdef VERIFY_KD_INDEX
+      if (L->kd_order) {
+        for (np = 2; np <= lim; np++) if (L->kd_root[np] >= 0) {
+            int hit = kd_find_dominator(L, L->kd_root[np], s, qn, qm, qp, -1);
+            if (hit >= 0) { g_wit = hit; return 1; }
+        }
+      } else
+#endif
 #ifdef VERIFY_BLOCK_PARETO
       if (L->block_at) {
         for (np = 2; np <= lim; np++) {
@@ -1311,14 +1528,23 @@ static const Split *live_get(const Level *below, int k, Part p, int restrict_, i
    so the tables are shared across every fact, like the live lists. Built lazily and only for
    option lists up to FCMAXO, which is where the high-part-count facts live anyway. */
 
-#define FCMAXO 256                     /* skip pair tables above this many options */
-#define FCW    (FCMAXO / 64)
+#ifndef FCMAXO
+#define FCMAXO 512                     /* skip pair tables above this many options */
+#endif
+#if FCMAXO < 64 || FCMAXO > 4096
+#error "FCMAXO must be in 64..4096"
+#endif
+#define FCW    ((FCMAXO + 63) / 64)
 #define PAIRSZ (1 << 17)
+#ifndef VERIFY_PAIR_MAX_MIB
+#define VERIFY_PAIR_MAX_MIB 128        /* per worker; refusal only loses an optimization */
+#endif
 
 typedef struct { uint64_t key; uint64_t *rows; int li, wj; } PairEnt;
 static TLS PairEnt *pairtab;
 static TLS long long pair_built = 0, pair_reused = 0, fc_prunes = 0, fc_dom_skips = 0;
 static TLS long long pair_bits_set = 0, pair_bits_tot = 0;
+static TLS long long pair_bytes = 0, pair_budget_skips = 0;
 
 static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part pj, int rj,
                                 int *wjp) {
@@ -1340,9 +1566,15 @@ static const uint64_t *pair_get(const Level *below, int k, Part pi, int ri, Part
     const Split *si = live_get(below, k, pi, ri, &li);
     const Split *sj = live_get(below, k, pj, rj, &lj);
     if (li > FCMAXO || lj > FCMAXO) { *wjp = 0; return NULL; }
-    pair_built++;
     int wj = (lj + 63) / 64;
-    uint64_t *rows = calloc((size_t)li * wj ? (size_t)li * wj : 1, sizeof(uint64_t));
+    size_t nword = (size_t)li * wj;
+    size_t nbyte = (nword ? nword : 1) * sizeof(uint64_t);
+    if (nbyte > (size_t)VERIFY_PAIR_MAX_MIB * 1024 * 1024 - (size_t)pair_bytes) {
+        pair_budget_skips++; *wjp = 0; return NULL;
+    }
+    uint64_t *rows = calloc(nword ? nword : 1, sizeof(uint64_t));
+    if (!rows) { pair_budget_skips++; *wjp = 0; return NULL; }
+    pair_built++; pair_bytes += (long long)nbyte;
     int oi, oj;
     Part t[4];
     Fact f;
@@ -1683,7 +1915,7 @@ typedef struct {
     long long nodes, memo_hit, memo_miss;
     long long live_built, live_reused;
     long long pair_built, pair_reused, fc_prunes, fc_dom_skips;
-    long long pair_bits_set, pair_bits_tot;
+    long long pair_bits_set, pair_bits_tot, pair_bytes, pair_budget_skips;
     long long paint_hits, pref_hits, pref_miss;
     long long derived_ok, derived_no;
     long long dp_hit, dp_miss, dp_skip;
@@ -1694,6 +1926,9 @@ typedef struct {
 #ifdef VERIFY_BLOCK_PARETO
     long long idx_block_tests, idx_block_rejects, idx_block_min_rejects;
     long long idx_block_skipped, idx_block_front_tests;
+#endif
+#ifdef VERIFY_KD_INDEX
+    long long idx_kd_nodes, idx_kd_rejects, idx_kd_leaves;
 #endif
 #endif
 } BatchStats;
@@ -1756,7 +1991,7 @@ static void worker_state_init(int memo_bits) {
     memo_hit = memo_miss = paint_hits = pref_hits = pref_miss = 0;
     derived_ok = derived_no = live_built = live_reused = 0;
     pair_built = pair_reused = fc_prunes = fc_dom_skips = 0;
-    pair_bits_set = pair_bits_tot = 0;
+    pair_bits_set = pair_bits_tot = pair_bytes = pair_budget_skips = 0;
     dp_gen = 0; dp_hit = dp_miss = dp_skip = 0;
 #ifdef VERIFY_INDEX_STATS
     idx_candidates = idx_product_rejects = idx_nm_rejects = 0;
@@ -1764,6 +1999,9 @@ static void worker_state_init(int memo_bits) {
 #ifdef VERIFY_BLOCK_PARETO
     idx_block_tests = idx_block_rejects = idx_block_min_rejects = 0;
     idx_block_skipped = idx_block_front_tests = 0;
+#endif
+#ifdef VERIFY_KD_INDEX
+    idx_kd_nodes = idx_kd_rejects = idx_kd_leaves = 0;
 #endif
 #endif
     cost_sum = budget_out = 0;
@@ -1779,6 +2017,7 @@ static void worker_state_finish(BatchStats *s) {
     s->pair_built = pair_built; s->pair_reused = pair_reused;
     s->fc_prunes = fc_prunes; s->fc_dom_skips = fc_dom_skips;
     s->pair_bits_set = pair_bits_set; s->pair_bits_tot = pair_bits_tot;
+    s->pair_bytes = pair_bytes; s->pair_budget_skips = pair_budget_skips;
     s->paint_hits = paint_hits; s->pref_hits = pref_hits; s->pref_miss = pref_miss;
     s->derived_ok = derived_ok; s->derived_no = derived_no;
     s->dp_hit = dp_hit; s->dp_miss = dp_miss; s->dp_skip = dp_skip;
@@ -1792,6 +2031,10 @@ static void worker_state_finish(BatchStats *s) {
     s->idx_block_min_rejects = idx_block_min_rejects;
     s->idx_block_skipped = idx_block_skipped;
     s->idx_block_front_tests = idx_block_front_tests;
+#endif
+#ifdef VERIFY_KD_INDEX
+    s->idx_kd_nodes = idx_kd_nodes; s->idx_kd_rejects = idx_kd_rejects;
+    s->idx_kd_leaves = idx_kd_leaves;
 #endif
 #endif
     for (k = 0; k <= MAXK; k++) for (r = 0; r < 2; r++) if (live_tab[k][r]) {
@@ -1812,7 +2055,8 @@ static void add_batch_stats(BatchStats *a, const BatchStats *b) {
     ADD_STAT(nodes); ADD_STAT(memo_hit); ADD_STAT(memo_miss);
     ADD_STAT(live_built); ADD_STAT(live_reused);
     ADD_STAT(pair_built); ADD_STAT(pair_reused); ADD_STAT(fc_prunes); ADD_STAT(fc_dom_skips);
-    ADD_STAT(pair_bits_set); ADD_STAT(pair_bits_tot);
+    ADD_STAT(pair_bits_set); ADD_STAT(pair_bits_tot); ADD_STAT(pair_bytes);
+    ADD_STAT(pair_budget_skips);
     ADD_STAT(paint_hits); ADD_STAT(pref_hits); ADD_STAT(pref_miss);
     ADD_STAT(derived_ok); ADD_STAT(derived_no);
     ADD_STAT(dp_hit); ADD_STAT(dp_miss); ADD_STAT(dp_skip);
@@ -1823,6 +2067,9 @@ static void add_batch_stats(BatchStats *a, const BatchStats *b) {
     ADD_STAT(idx_block_tests); ADD_STAT(idx_block_rejects); ADD_STAT(idx_block_min_rejects);
     ADD_STAT(idx_block_skipped);
     ADD_STAT(idx_block_front_tests);
+#endif
+#ifdef VERIFY_KD_INDEX
+    ADD_STAT(idx_kd_nodes); ADD_STAT(idx_kd_rejects); ADD_STAT(idx_kd_leaves);
 #endif
 #endif
     if (b->max_fact_nodes > a->max_fact_nodes) a->max_fact_nodes = b->max_fact_nodes;
@@ -2309,6 +2556,15 @@ int main(int argc, char **argv) {
                     / (1024.0 * 1024.0));
     fflush(stdout);
 #endif
+#ifdef VERIFY_KD_INDEX
+    printf("kd dominance index: leaf=%d, min level=%d facts, %lld nodes/%lld leaves, "
+           "%lld indexed facts, %.2f s build, %.1f MiB nodes/order\n",
+           VERIFY_KD_LEAF_SIZE, VERIFY_KD_MIN_LEVEL_FACTS,
+           g_kd_build_nodes, g_kd_build_leaves, g_kd_build_facts, g_kd_build_seconds,
+           (double)(g_kd_build_nodes * (long long)sizeof(KdNode)
+                    + g_kd_build_facts * (long long)sizeof(int32_t)) / (1024.0 * 1024.0));
+    fflush(stdout);
+#endif
     for (k = 1; k <= MAXK; k++) if (rootn[k] && (k < g_mink || k > maxk)) {
         fprintf(stderr, "explicit root at k=%d is outside the requested verification range %d..%d\n",
                 k, g_mink, maxk);
@@ -2528,10 +2784,11 @@ int main(int argc, char **argv) {
           printf("\nTOTAL verified %lld, unverified %lld, budget %lld, nodes %lld, %.2f s wall on %d thread%s\n",
                  tv, tu, tb, bs.nodes, wall, threads, threads == 1 ? "" : "s");
           printf("memo: %lld hits, %lld misses (%.1f%%); live tables %lld built/%lld reused; "
-                 "pair tables %lld built/%lld reused\n",
+                 "pair tables %lld built/%lld reused, %.1f MiB, %lld budget skips\n",
                  bs.memo_hit, bs.memo_miss,
                  100.0 * bs.memo_hit / (bs.memo_hit + bs.memo_miss ? bs.memo_hit + bs.memo_miss : 1),
-                 bs.live_built, bs.live_reused, bs.pair_built, bs.pair_reused);
+                 bs.live_built, bs.live_reused, bs.pair_built, bs.pair_reused,
+                 (double)bs.pair_bytes / (1024.0 * 1024.0), bs.pair_budget_skips);
 #ifdef VERIFY_INDEX_STATS
           printf("dominance index: %lld candidates; product rejected %lld (%.1f%%); "
                  "n/m rejected %lld; exact matching %lld calls/%lld hits\n",
@@ -2545,6 +2802,12 @@ int main(int argc, char **argv) {
                  100.0 * bs.idx_block_rejects / (bs.idx_block_tests ? bs.idx_block_tests : 1),
                  bs.idx_block_min_rejects, bs.idx_block_skipped, bs.idx_block_front_tests,
                  (double)bs.idx_block_front_tests / (bs.idx_block_tests ? bs.idx_block_tests : 1));
+#endif
+#ifdef VERIFY_KD_INDEX
+          printf("kd filter: %lld nodes tested/%lld rejected (%.1f%%); %lld leaves scanned\n",
+                 bs.idx_kd_nodes, bs.idx_kd_rejects,
+                 100.0 * bs.idx_kd_rejects / (bs.idx_kd_nodes ? bs.idx_kd_nodes : 1),
+                 bs.idx_kd_leaves);
 #endif
 #endif
           if (getenv("CERT_OUT") && !tu && !tb)
@@ -2621,6 +2884,11 @@ int main(int argc, char **argv) {
            idx_block_min_rejects, idx_block_skipped, idx_block_front_tests,
            (double)idx_block_front_tests / (idx_block_tests ? idx_block_tests : 1));
 #endif
+#ifdef VERIFY_KD_INDEX
+    printf("kd filter: %lld nodes tested/%lld rejected (%.1f%%); %lld leaves scanned\n",
+           idx_kd_nodes, idx_kd_rejects,
+           100.0 * idx_kd_rejects / (idx_kd_nodes ? idx_kd_nodes : 1), idx_kd_leaves);
+#endif
 #endif
     printf("\nTOTAL verified %lld, unverified %lld, nodes %lld, %.2f s single-threaded\n",
            tot_ver, tot_un, tot_nodes, tot_s);
@@ -2628,8 +2896,10 @@ int main(int argc, char **argv) {
       for (q = 1; q <= MAXP; q++) if (np_facts[q])
           printf("  %2d parts %8lld facts %14lld nodes %10.0f/fact\n",
                  q, np_facts[q], np_nodes[q], (double)np_nodes[q] / np_facts[q]); }
-    printf("pair tables: %lld built, %lld reused; fc prunes %lld, domain skips %lld\n",
-           pair_built, pair_reused, fc_prunes, fc_dom_skips);
+    printf("pair tables: %lld built, %lld reused, %.1f MiB, %lld budget skips; "
+           "fc prunes %lld, domain skips %lld\n",
+           pair_built, pair_reused, (double)pair_bytes / (1024.0 * 1024.0),
+           pair_budget_skips, fc_prunes, fc_dom_skips);
     if (pair_bits_tot) printf("pair row density q = %.4f (%lld of %lld option pairs live)\n",
            (double)pair_bits_set / pair_bits_tot, pair_bits_set, pair_bits_tot);
     if (derived_ok + derived_no)

@@ -62,21 +62,29 @@ columns contain total mass plus packed sorted n, m and top-four segment-product 
 sound necessary componentwise conditions; only the survivors touch the full `Fact` and run the
 exact injection matcher.
 
-Large levels add one bounded index layer: full 256-fact blocks inside an equal
-`(part count,largest product)` group store the Pareto-minimal `(mass,top-four products)` profiles.
-A block is skipped only if no summary point fits, so a positive summary still falls through to the
-unchanged per-fact and exact checks. Levels below 65,536 facts use the product-only loop; this avoids
-a regression on the smaller level that dominates Sa(113). The hard retained run9 k=7 control keeps
-the same 4,644,469 nodes and memo counts while falling from a contemporaneous 39.16 to 11.70
-single-worker seconds; the older legacy layout took 209.63 seconds. The block layer adds 45.1 MiB on
-that 3.1-million-fact input. `VERIFY_LEGACY_INDEX` restores the old
-`(part count,largest n,total mass)` scan. Explicit `VERIFY_PRODUCT_PROFILE` plus
-`VERIFY_PRODUCT_SORT`, or `VERIFY_NO_BLOCK_PARETO` on an otherwise default build, gives the
-product-only control; `VERIFY_INDEX_STATS` prints both block and per-fact filter counters. Design,
-failed layouts, tuning and controls are in
+Large levels now add an immutable kd hierarchy over the 21 necessary profile coordinates. Each
+node stores componentwise minima; a failed minimum skips the whole subtree, while a fitting leaf
+still falls through to the unchanged packed filters and exact injection matcher. The tree is also
+used for same-level redundancy checks, excluding the query itself. Levels below 65,536 facts keep
+the product-only loop, avoiding a regression on the smaller level that dominates Sa(113). On the
+retained hard run9 k=7 root, the tree reduced the block build's 5.509 billion individual fact
+probes to 431.317 million while preserving the exact 4,644,469-node proof and memo counts; verifier
+wall fell from 11.70 to 4.20 seconds before wider pair pruning. A 32-fact leaf build adds 26.9 MiB
+and takes about 4.3 seconds once per full run9 load.
+
+Pairwise forward checking now covers option lists through 512 entries. Its rows are worker-local
+and capped at 128 MiB per worker; a refused allocation only disables that optimization. The five-
+root control fell from 9,158,686 nodes / 21.00 seconds under 256-fact blocks to 4,690,828 nodes /
+5.34 seconds under the kd tree plus wider pairs. `VERIFY_LEGACY_INDEX` restores the oldest
+`(part count,largest n,total mass)` scan. Explicit product-profile/sort macros or
+`VERIFY_NO_BLOCK_PARETO` give the product-only control; `VERIFY_BLOCK_PARETO` selects the former
+fixed-block hierarchy; `VERIFY_INDEX_STATS` reports the selected hierarchy and per-fact filters.
+Design, failed layouts, tuning and controls are in
 [`../evidence/verifier_product_index_2026-08-17.txt`](../evidence/verifier_product_index_2026-08-17.txt)
 and
-[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
+[`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt),
+with the production hierarchy in
+[`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
 
 The durable input/output format is text, and is deliberately simpler than a raw log:
 
@@ -165,10 +173,14 @@ proof progress. The frozen binary on the shared host predates live counters and 
 completed levels.
 
 New dedicated runs use `tools/run9_verifier_ec2_launch.sh`. It refuses a second active run, archives
-the exact clean commit, launches a 16-core `c8a.4xlarge`, runs the regression before the full
-pipeline, publishes `STATUS` and a bounded `PROGRESS` tail to S3 every minute, and stops the host
-after final upload. Each color/replay phase has a 12-hour backstop and a 24-GiB RSS guard. Follow the
-latest run once, or continuously, with:
+the exact clean commit, launches an on-demand 16-vCPU `c8a.4xlarge`, runs the regression, normalizes
+and byte-round-trips run9, then audits the existing certificate without coloring. A deterministic
+9,995-fact k=7 four-part sample must project below seven days before the expensive phase starts.
+The full audit retains k=7, k<=6 and k=8..9 as separate checkpoints; every phase has a 24-GiB RSS
+guard, k=7 has a seven-day wall cap, and the host has an independent nine-day shutdown. `STATUS`
+and a bounded `PROGRESS` tail reach S3 every minute. Spot is deliberately not used because the
+multi-day k=7 phase has no intra-level restart cursor. Follow the latest run once, or continuously,
+with:
 
 ```
 tools/run9_verifier_progress_status.sh

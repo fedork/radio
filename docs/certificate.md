@@ -189,6 +189,30 @@ byte-identical, so this is strictly an internal representation change. See
 Block design, failed layouts and final controls are in
 [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
 
+### Immutable kd dominance hierarchy (2026-08-18)
+
+The fixed blocks were still spatially broad: a single hard k=7 proof admitted 5.509 billion fact
+positions. The production index now recursively partitions the same sound mass, sorted-product and
+independently sorted n/m profiles. Each immutable node carries componentwise minima. A failed lane
+rejects every descendant; a fitting 32-fact leaf still reaches the old packed tests and exact
+injection matcher, so the hierarchy cannot create a citation. The same query accelerates
+same-level minimalization while explicitly excluding the fact being tested.
+
+On the exact hard root, the hierarchy preserved the 4,644,469-node proof and memo counts while
+reducing fact probes to 431.317 million and verifier wall to 4.20 seconds. Extending bounded
+pairwise forward checking through 512 options reduced the five-root control from 9,158,686 to
+4,690,828 recursion nodes and from 21.00 to 5.34 seconds. Pair rows have a 128-MiB-per-worker
+fail-open ceiling. Complete run9 k=6 and k=7 antichain passes reproduced 229,341 and 2,507,270
+minimal facts in 3.8 and 49.8 seconds locally. The complete 120,302-record Sa(113) replay retained
+its established 2,491,283,058 nodes and closed with zero gaps.
+
+These measurements justify a bounded ordinary audit of the existing run9 facts, not a return to
+coloring. The dedicated pipeline first times 9,995 representative k=7 four-part facts and aborts if
+they project beyond seven days, then retains k=7, k<=6 and k=8..9 as separate proof checkpoints.
+Explicit split-space coverage remains the preferable next certificate design if this search-based
+audit is still uneconomic. Full measurements and the soundness argument are in
+[`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
+
 ### Live completed-target telemetry (2026-08-17)
 
 The absence of an intra-level cursor in the first full run9 replay made a healthy 2.5-million-target

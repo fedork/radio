@@ -9,6 +9,9 @@ cd "$repo_dir"
 tools/build_radio.py -O2 -pthread radio_verify.c -o "$work_dir/radio_verify"
 tools/build_radio.py -O2 -pthread -DVERIFY_BLOCK_PARETO -DVERIFY_BLOCK_SIZE=2 \
     -DVERIFY_BLOCK_MIN_LEVEL_FACTS=2 radio_verify.c -o "$work_dir/radio_verify_forced_blocks"
+tools/build_radio.py -O2 -pthread -DVERIFY_NO_BLOCK_PARETO -DVERIFY_KD_INDEX \
+    -DVERIFY_KD_LEAF_SIZE=2 -DVERIFY_KD_MIN_LEVEL_FACTS=2 \
+    radio_verify.c -o "$work_dir/radio_verify_forced_kd"
 
 fixture=tools/testdata/radio_verify_v1.cert
 VERIFY_THREADS=1 VERIFY_MEMO_BITS=18 \
@@ -48,11 +51,17 @@ blocks_fixture=tools/testdata/radio_verify_blocks_v1.cert
 MINIMAL_K=1 "$work_dir/radio_verify" "$blocks_fixture" 1 > "$work_dir/minimal-plain.out"
 MINIMAL_K=1 "$work_dir/radio_verify_forced_blocks" "$blocks_fixture" 1 \
     > "$work_dir/minimal-block.out"
+MINIMAL_K=1 "$work_dir/radio_verify_forced_kd" "$blocks_fixture" 1 \
+    > "$work_dir/minimal-kd.out"
 grep -Eq 'block Pareto index: size=2, min level=2 facts, 2 blocks' "$work_dir/minimal-block.out"
+grep -Eq 'kd dominance index: leaf=2, min level=2 facts,' "$work_dir/minimal-kd.out"
 grep -Eq 'TOTAL         4 facts          2 minimal  \(50\.0% redundant\)' "$work_dir/minimal-block.out"
+grep -Eq 'TOTAL         4 facts          2 minimal  \(50\.0% redundant\)' "$work_dir/minimal-kd.out"
 grep -E 'np=|  TOTAL' "$work_dir/minimal-plain.out" > "$work_dir/minimal-plain.summary"
 grep -E 'np=|  TOTAL' "$work_dir/minimal-block.out" > "$work_dir/minimal-block.summary"
+grep -E 'np=|  TOTAL' "$work_dir/minimal-kd.out" > "$work_dir/minimal-kd.summary"
 cmp "$work_dir/minimal-plain.summary" "$work_dir/minimal-block.summary"
+cmp "$work_dir/minimal-plain.summary" "$work_dir/minimal-kd.summary"
 
 if CERT_OUT="$work_dir/partial.cert" VERIFY_THREADS=2 VERIFY_MEMO_BITS=18 \
     "$work_dir/radio_verify" "$fixture" 2 0 1 3 0 999 1 0 2 \
@@ -69,4 +78,4 @@ if VERIFY_PROGRESS_SECONDS=invalid "$work_dir/radio_verify" "$fixture" 2 \
 fi
 grep -Eq 'VERIFY_PROGRESS_SECONDS must be in 0\.\.86400' "$work_dir/invalid-progress.out"
 
-echo 'radio_verify regression: serial, parallel, coloring, minimalization, progress and text replay OK'
+echo 'radio_verify regression: serial, parallel, coloring, block/kd minimalization, progress and text replay OK'

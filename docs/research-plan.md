@@ -373,17 +373,26 @@ Disposition and next design work:
    counts while falling from a contemporaneous 39.16 to 11.70 seconds (3.35x), and the small-level
    Sa(113) guard is neutral. The failed ungated layout, size sweep and sanitizer controls are in
    [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt);
-6. **Redesign before another full run.** Keep readable text as the durable envelope, but make the
-   solver emit a proof of split-space coverage: compact ranges/subboxes annotated with the outcome
-   and lower-level fact (or theorem) that rejects them. The checker should validate a disjoint or
-   otherwise auditable cover and exact citations, not rediscover that cover by recursive search.
-   Start with one retained hard k=7 fact and require checker work to be close to certificate size;
-   compare proof bytes, generation overhead and checker wall against the solver's already-paid work;
-7. use the current search-based verifier only for small-corpus regression, targeted independent
-   audits and format experiments. Reconsider top-down coloring only after explicit citations make
-   graph reachability cheap; it then becomes a separate pruning pass rather than another solve.
-   Do not trade the readable source format for binary until measured parsing or storage, rather
-   than proof search, is the bottleneck.
+6. **Delivered:** an immutable kd hierarchy over the packed necessary profiles, reused for ordinary
+   dominance lookup and same-level minimalization. Every fitting 32-fact leaf still reaches exact
+   injection matching. Together with bounded 512-option pairwise forward checking, the five-root
+   k=7 control fell from 21.00 seconds / 9,158,686 nodes to 5.34 seconds / 4,690,828 nodes. Complete
+   k=6 and k=7 antichain passes reproduce 229,341 and 2,507,270 minima in 3.8 and 49.8 seconds.
+   Soundness, memory caps and the Sa(113) guard are in
+   [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt);
+7. **One bounded ordinary run9 audit is now justified, without coloring.** The dedicated pipeline
+   first verifies a deterministic 9,995-fact k=7 sample and refuses the multi-day phase if it
+   projects beyond seven days. It then retains k=7, k<=6 and k=8..9 as separate checkpoints on a
+   right-sized on-demand host. Spot remains inappropriate until the dominant level has a restart
+   cursor. This is an empirical completion attempt, not a claim that search repetition is the ideal
+   certificate design;
+8. keep readable text as the durable envelope, but make the solver emit split-space coverage if the
+   bounded audit is still uneconomic: compact ranges/subboxes annotated with the outcome and
+   lower-level fact (or theorem) that rejects them. The checker should validate an auditable cover
+   and exact citations, not rediscover it. Start with one retained hard k=7 fact and require checker
+   work close to certificate size. Reconsider top-down coloring only after explicit citations make
+   graph reachability cheap; do not choose binary until parsing or storage is the measured
+   bottleneck.
 
 The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
 context through the complete recursive tree; its deterministic work clock, exact L1 and joint

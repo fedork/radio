@@ -37,6 +37,7 @@ certify a frontier cell:
 | `verifier_pipeline_benchmark_2026-08-17.txt` | complete Sa(66) thread/affinity sweep and Sa(113) sanitize, minimalize/color, replay and 8/14/16-worker comparison on the AWS run9 hardware class |
 | `verifier_product_index_2026-08-17.txt` | packed product-profile verifier index: soundness, hard-root A/B, full Sa(113) control and rejected diagnostics |
 | `verifier_block_pareto_2026-08-17.txt` | adaptive fixed-block Pareto summaries over the packed verifier index: failed first layout, tuning, 3.35x hard-root speedup and small-level guard |
+| `verifier_kd_index_2026-08-18.txt` | immutable kd dominance hierarchy and bounded wider pair pruning: exact hard/sample controls, complete k=6/k=7 antichains, Sa(113) guard and full-audit launch gate |
 
 ## Regenerating and auditing
 
