@@ -7412,7 +7412,9 @@ At its first 60-second report it had verified 140,144/2,576,885 claims with zero
 15,623,138,715 accepted prefixes. CPU utilization was about 14.77 cores, RSS 298.6 MiB, host
 memory available 29.7 GiB and swap zero. The displayed 1,043-second ETA is not a forecast for the
 whole phase because these first roots are the cheap three-part prefix; the completed four-part gate
-is the defensible forecast.
+is the defensible forecast. At 180 seconds the run had reached 207,666 claims and
+42,929,747,543 prefixes with zero gaps; every displayed active root was four-part, confirming that
+the expensive region had begun rather than the run merely racing through its cheap prefix.
 
 Live state is `tools/run9_refute_status.sh 20260818T194508Z`; artifacts are under
 `s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`. The separate shared census

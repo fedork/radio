@@ -363,9 +363,10 @@ complete k-1 support, checked split hints and target claims. The exact 1,643,619
 has SHA-256 `beb62def6dba281ff1c387c97f70bd0400f8007a99b455b74e784dd8195a654c`.
 The same-host 9,995-root k7 gate closed with zero gaps in 53.582 worker wall / 854.158 CPU seconds
 and projects 12,860 wall / 204,998 CPU seconds for the four-part band, safely below the cold
-solver's 419,353.1 CPU seconds. Full k7 began normally: after its first 60 worker seconds it had
-verified 140,144/2,576,885 claims with zero gaps and 15,623,138,715 accepted prefixes. This early
-rate is still in the cheap three-part prefix and is not the completion forecast. RSS was 298.6 MiB,
+solver's 419,353.1 CPU seconds. Full k7 began normally: after its first 60 batch seconds it had
+verified 140,144/2,576,885 claims with zero gaps and 15,623,138,715 accepted prefixes. At 180
+seconds it had reached 207,666 with zero gaps and all displayed active roots were four-part, so the
+expensive band is advancing. These early rates are not the completion forecast. RSS was 298.6 MiB,
 29.7 GiB host memory remained available, and swap was zero. Each completed level is compressed,
 hashed and uploaded immediately. Live state is `tools/run9_refute_status.sh 20260818T194508Z` and
 the durable prefix is `s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`.
