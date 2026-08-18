@@ -1,0 +1,3 @@
+radio-negative-certificate-v1
+# Deliberately false negative: the Unit Group Elimination base case solves this state.
+fact 1 Sb(1:1)

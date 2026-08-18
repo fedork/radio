@@ -106,6 +106,11 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #define CACHE_ONLY 1
 #define NO_DEADLINE 2
 #define FAST_ONLY 3
+/* Exhaust one state against an already-frozen negative cache.  Unlike CACHE_ONLY, this bypasses
+   the queried state's own level-k cache entry and enumerates its complete split space.  Every
+   child is answered only by theorem checks or the immutable k-1 cache; a cache miss makes the
+   claimed refutation unverified instead of recursively solving or learning anything. */
+#define FROZEN_REFUTE 4
 
 /* Per-search state is deliberately separate from the process-wide mathematical universe, result
    trie and split catalog.  The latter two are still mutable and therefore still serialize solver
@@ -1413,7 +1418,7 @@ static void rb_build(radio_reachability_state *rb, splits **sa, int *tmpp, int P
         }
     }
 }
-static void rb_release(radio_reachability_state *rb) {
+static void rb_release_mode(radio_reachability_state *rb, int quiet) {
 #ifdef RADIO_RB_PROFILE_DIAGNOSTIC
     int i;
     for (i = 1; i < rb->parts; i++) {
@@ -1431,14 +1436,19 @@ static void rb_release(radio_reachability_state *rb) {
 #endif
     fputc('\n', stderr);
 #endif
+    /* A frozen verifier may arm this per root across millions of independent claims.  Its
+       batch-level progress already reports aggregate work, so the solver's per-state diagnostic
+       would turn stderr into a multi-gigabyte log and materially perturb the benchmark. */
+    if (!quiet) {
 #if defined(RADIO_RB_PLIABLE_CUTOFF) && defined(RADIO_RB_PROFILE_DIAGNOSTIC)
-    fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%), %lld pliable-skipped\n",
-            rb->tested, rb->pruned, rb->tested ? 100.0 * rb->pruned / rb->tested : 0.0,
-            rb->pliable_skipped);
+        fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%), %lld pliable-skipped\n",
+                rb->tested, rb->pruned, rb->tested ? 100.0 * rb->pruned / rb->tested : 0.0,
+                rb->pliable_skipped);
 #else
-    fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%)\n",
-            rb->tested, rb->pruned, rb->tested ? 100.0 * rb->pruned / rb->tested : 0.0);
+        fprintf(stderr, "\nREACH: %lld tested, %lld pruned (%.1f%%)\n",
+                rb->tested, rb->pruned, rb->tested ? 100.0 * rb->pruned / rb->tested : 0.0);
 #endif
+    }
     rb_free(rb);
     rb->on = 0;
     rb->tested = rb->pruned = 0;
@@ -1446,6 +1456,7 @@ static void rb_release(radio_reachability_state *rb) {
     rb->pliable_skipped = 0;
 #endif
 }
+#define rb_release(rb) rb_release_mode((rb), FALSE)
 static inline int rb_dead(radio_reachability_state *rb, int nexti, int p0, int p1, int p2) {
     int W = rb->cap + 1;
     int a = rb->cap - p0, cc = rb->cap - p2;
@@ -1685,6 +1696,7 @@ static void rb_profile_begin(radio_reachability_state *rb, splits **tables,
 
 int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                   uint64_t parent_deadline){
+    int frozen_refute = parent_deadline == FROZEN_REFUTE;
 #ifdef DEBUG1
     if(k>7) {
         printf("in canSolveB k=%d ", k);
@@ -1730,10 +1742,15 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     int shared_probe = size <= 2;
     if (size>1) sort1(tmp, size);
     int query_size = size;
-    cache_l1_entry *l1_entry;
+    cache_l1_entry *l1_entry = NULL;
     uint32_t l1_hash = 0;
-    int ck = cache_l1_probe(ctx, tmp, size, k, &l1_entry, &l1_hash);
-    if (ck == TRUE || ck == FALSE) return ck;
+    int ck = MAYBE;
+    /* The level-k claim being audited is present in the frozen trie.  Looking it up here would
+       prove it by circular citation, so only ordinary solver calls probe the root cache. */
+    if (!frozen_refute) {
+        ck = cache_l1_probe(ctx, tmp, size, k, &l1_entry, &l1_hash);
+        if (ck == TRUE || ck == FALSE) return ck;
+    }
     if (singleton_size == size) {
         // Singleton states are decided exactly by majorization against G_k.
         ck = singleton_majorization_can_solve(tmp, size, k);
@@ -1754,21 +1771,25 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
        boundary.  A hook must return MAYBE on absence and may only return definitive archived
        facts for full canonical state equality.  Keep it after independent exact/necessary
        theorem checks so an external research artifact can never override them. */
-    ck = RADIO_EXTERNAL_EXACT_LOOKUP(tmp, size, k);
-    if (ck == TRUE || ck == FALSE) {
-        cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
-        return ck;
+    if (!frozen_refute) {
+        ck = RADIO_EXTERNAL_EXACT_LOOKUP(tmp, size, k);
+        if (ck == TRUE || ck == FALSE) {
+            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
+            return ck;
+        }
     }
 #endif
     //check cache
-    ck = checkCacheTrie(tmp, size, k);
-    cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
+    if (!frozen_refute) {
+        ck = checkCacheTrie(tmp, size, k);
+        cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
+    }
     //	printf("got from cache %d\n", ck);
     if (parent_deadline == CACHE_ONLY || ck == TRUE || ck == FALSE) {
 //        debug_printf("returning ck=%d\n", ck);
         return ck;
     }
-    if (parent_deadline != NO_DEADLINE && parent_deadline != FAST_ONLY
+    if (!frozen_refute && parent_deadline != NO_DEADLINE && parent_deadline != FAST_ONLY
         && deadline_expired(parent_deadline, radio_budget_now_ctx(ctx)))
         return MAYBE;
     
@@ -1794,9 +1815,11 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     /* Search is depth first.  Building every suffix table here made a large-k state pay for
        many parts it never reached.  Materialise the first table now and each suffix only when
        the prefix survives far enough to enter it. */
-    splitsarr[0] = prepare_splits_ctx(ctx, tmp[0], k, size > 1);
+    splitsarr[0] = frozen_refute
+        ? ensure_splits(tmp[0], k)
+        : prepare_splits_ctx(ctx, tmp[0], k, size > 1);
     //full search
-    clock_t cpu_start = clock();
+    clock_t cpu_start = frozen_refute ? 0 : clock();
     clock_t progress = cpu_start + PROGRESS_INTERVAL;
     uint64_t budget_start = radio_budget_now_ctx(ctx);
     radio_reachability_state *rb = radio_search_context_reachability(ctx);
@@ -1812,14 +1835,17 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
        that argument is no longer available for this invocation; retain the exact full negative but
        never cache the tempting shorter one.  Keep this local across iterative-deepening passes. */
     int rb_tainted_contraction = 0;
-    uint64_t deadline = search_deadline(parent_deadline, budget_start, size);
+    uint64_t deadline = frozen_refute
+        ? UINT64_MAX : search_deadline(parent_deadline, budget_start, size);
     
     //    printf("k=%d parent_budget=%llu start=%llu limit=%llu\n",
     //           k, parent_deadline, budget_start, deadline);
     
     int cont2=1;
     int skipped_some;
-    int pass = 0;
+    /* Start the frozen audit at pass 2: there is no point running the solver's deliberately
+       incomplete FAST witness pass before an exhaustive refutation-only traversal. */
+    int pass = frozen_refute ? 1 : 0;
     unsigned int probe_seconds = RADIO_INITIAL_PROBE_SECONDS(k, size, parent_deadline);
     if (probe_seconds == 0) probe_seconds = PROBE_SECONDS;
     int max_solvable_maybe = 0;
@@ -1866,13 +1892,13 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 #endif
         fast_solve = FALSE;
         if (pass==1) {
-            fast_solve = TRUE && size > 2 && k >= FAST_MIN_K;
+            fast_solve = !frozen_refute && size > 2 && k >= FAST_MIN_K;
         }
         
         // Every child call is bounded, including children of a NO_DEADLINE proof.  An unresolved
         // exhaustive pass doubles probe_seconds and starts over, so this is iterative deepening
         // rather than a same-budget retry.  Finite calls stop at their shared absolute limit.
-        int no_deadline = parent_deadline == NO_DEADLINE;
+        int no_deadline = parent_deadline == NO_DEADLINE || frozen_refute;
         
 //        int no_deadline = (pass==1);
         
@@ -1992,7 +2018,9 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                 if (pm > max_pairs_1) { splitindex[i] = 0; continue; }
             }
 
-            while (s[4]<k) {
+            /* Frozen refute tables have this one-part viability frontier prepared serially before
+               workers start.  Never mutate shared split metadata inside the read epoch. */
+            while (!frozen_refute && s[4]<k) {
                 debug_printf("checking split solvability for %s -> [%d, %d], before: s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
                 int kk = s[4];
                 uint64_t dd = size > 1 ? deadline : CACHE_ONLY;
@@ -2041,7 +2069,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                     if (!no_deadline && !(totalsplits & DEADLINE_POLL_MASK)
                         && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
 #endif
-                        if (rb_here) rb_release(rb);
+                        if (rb_here) rb_release_mode(rb, frozen_refute);
                         return MAYBE;
                     }
                     /* `>=`, not `==`. One reachability scratch set belongs to the complete recursive
@@ -2120,6 +2148,26 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 #endif
                         debug_printf("can solve\n");
                         if (i == size_1) {
+                            /* One uncovered complete split is a complete audit failure.  A
+                               refute-only verifier must not recurse in an attempt to solve any of
+                               its children, and it need not enumerate later splits after this
+                               concrete gap has been found. */
+                            if (frozen_refute) {
+#ifdef RADIO_FROZEN_REFUTE_TRACE
+                                flockfile(stdout);
+                                printf("FROZEN_REFUTE_GAP root=");
+                                printSb(tmp, size);
+                                printf(" k=%d split=", k);
+                                printSb(sb0, size);
+                                printSb(sb1, size2);
+                                printSb(sb2, size);
+                                printf(" child_verdicts=%d,%d,%d\n", cs0, cs1, cs2);
+                                fflush(stdout);
+                                funlockfile(stdout);
+#endif
+                                if (rb_here) rb_release_mode(rb, frozen_refute);
+                                return MAYBE;
+                            }
                             if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
                                 uint64_t budget_now = radio_budget_now_ctx(ctx);
                                 if (deadline_expired(deadline, budget_now)) {
@@ -2127,7 +2175,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                         deadline = radio_budget_add(
                                             budget_now, radio_budget_seconds(10));
                                     } else {
-                                        { if (rb_here) rb_release(rb); return MAYBE; }
+                                        { if (rb_here) rb_release_mode(rb, frozen_refute); return MAYBE; }
                                     }
                                 }
                                 clock_t cpu_now = clock();
@@ -2192,14 +2240,16 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                an already-expired parent budget. */
                             if (!no_deadline
                                 && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
-                                if (rb_here) rb_release(rb);
+                                if (rb_here) rb_release_mode(rb, frozen_refute);
                                 return MAYBE;
                             }
                         } else {
                             i++;
                             /* `rb_build` may already have materialised this table, but FAST is
                                intentionally prepared only when ordinary search reaches it. */
-                            splitsarr[i] = prepare_splits_ctx(ctx, tmp[i], k, size > 1);
+                            splitsarr[i] = frozen_refute
+                                ? ensure_splits(tmp[i], k)
+                                : prepare_splits_ctx(ctx, tmp[i], k, size > 1);
                             if (i>max_solvable_maybe) {
                                 max_solvable_maybe = i;
                                 debug_printf("max_solvable_maybe=%d\n", max_solvable_maybe);
@@ -2263,6 +2313,12 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         }
     }
     
+    if (frozen_refute) {
+        if (rb_here) rb_release_mode(rb, frozen_refute);
+        if (!canSolve && !skipped_some) ctx->cant_solve_count++;
+        return skipped_some ? MAYBE : canSolve;
+    }
+
     if (canSolve) {
         //        printf("cansolve=true\n");
         //        fflush(stdout);
@@ -2295,7 +2351,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         //        fflush(stdout);
         
     } else if (skipped_some) {
-        if (rb_here) rb_release(rb);
+        if (rb_here) rb_release_mode(rb, frozen_refute);
         return MAYBE;
     } else {
         ctx->cant_solve_count++;
@@ -2322,7 +2378,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         printf(" took %ld", s);
     else
         printf(" took 0.%03ld", t * 1000/CLOCKS_PER_SEC);
-    if (rb_here) rb_release(rb);
+    if (rb_here) rb_release_mode(rb, frozen_refute);
     printf(" totalsplits=%llu pass=%d fast_solve=%d", totalsplits, pass, fast_solve);
     if (shared_probe) printf(" probe=shared");
     else printf(" probe=%us", probe_seconds);
@@ -2357,6 +2413,13 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 
 int canSolveB(int *sb, int size, int k, uint64_t parent_deadline) {
     return canSolveB_ctx(&radio_default_search_context, sb, size, k, parent_deadline);
+}
+
+/* Audit one claimed negative against a cache which the caller has completely built and frozen.
+   FALSE means every legal test was covered by a theorem or a cached lower-level negative;
+   MAYBE exposes a concrete uncovered test; TRUE means a base theorem contradicts the claim. */
+int canRefuteB_ctx(radio_search_context *ctx, int *sb, int size, int k) {
+    return canSolveB_ctx(ctx, sb, size, k, FROZEN_REFUTE);
 }
 
 int sbb_to_min_k[MAX_SBB+1];
@@ -3328,7 +3391,11 @@ static void radio_print_provenance(void) {
         "RADIO_LIMIT_WALL_SECONDS", "RADIO_LIMIT_RSS_GIB",
         "RADIO_LIMIT_PHYSICAL_FOOTPRINT_GIB", "RADIO_RUN_CONTEXT", "TWO_SIDED_ONLY",
         "TRACE_INDEX", "BENCH_K", "NODECAP", "TIMECAP", "MINIMAL_K", "TOPDOWN", "PASSES",
-        "RADIO_PROBE_INIT"
+        "VERIFY_THREADS", "VERIFY_MEMO_BITS", "VERIFY_PROGRESS_SECONDS", "ROOTS",
+        "MINIMIZE_BEFORE_COLOR", "CERT_ONLY", "CERT_OUT", "RB_PLIABILITY_VERBOSE",
+        "RADIO_PROBE_INIT", "REFUTE_THREADS", "REFUTE_PROGRESS_SECONDS", "REFUTE_MIN_K",
+        "REFUTE_MAX_K", "REFUTE_MIN_PARTS", "REFUTE_MAX_PARTS", "REFUTE_STRIDE",
+        "REFUTE_OFFSET"
     };
     for (size_t i = 0; i < sizeof(safe_env) / sizeof(safe_env[0]); i++) {
         const char *value = getenv(safe_env[i]);
