@@ -7311,3 +7311,67 @@ image is the right prerequisite for cheap distributed/spot shards. Those are con
 latency improvements. The independent-verifier direction remains solver-emitted split-space ranges
 with exact lower-fact citations, so checking scales with the cover rather than 3.463 trillion
 enumerated prefixes.
+
+## 2026-08-18 — level-local certificate, endpoint majorization and no-L1 k7 gate
+
+The cache dependency was simpler than the completed wrapper made it look. A level-k frozen root
+enumerates children only at k-1; loading same-level roots or unrelated levels into the trie is
+useless. The one apparent exception was inherited split metadata: `freeze_one_table` walked upward
+through several `kk` values to learn a minimum-solvability frontier reused by repeated root calls
+at that k. The frozen phase needs only the final question. It now asks all three isolated local
+outcomes directly at k-1 and marks the option dead if any is FALSE. TRUE or MAYBE retains it. This
+is sound by Subgraph Monotonicity and can find a later FALSE after an earlier MAYBE. On the retained
+gate it lowers accepted prefixes from 14,246,550,669 to 13,403,862,290 (5.915%) with all verdicts
+unchanged.
+
+The durable execution format is now one text file per level rather than one file containing only
+that level's roots plus an opaque full cache. `radio-negative-level-certificate-v2` puts sections in
+load order: explicit certificate-local part dictionary, complete k-1 support, split-part hints, and
+level-k claims. `tools/make_refute_level_certificate.py` is a bounded-memory multi-pass converter
+from normalized v1. Record and part-reference counts permit exact allocation. The verifier checks
+the dictionary, canonical ID order, section counts, every hinted root part and each occurrence
+count. Hints control eager table order only; it derives the entire split domain and theorem filter.
+This preserves the critical completeness boundary—a certificate cannot omit a split.
+
+Run9 k7 produces 1,052 dictionary parts, 388,317 k6 support facts, 772 split hints and 2,576,885 k7
+claims. The file is 63,781,183 bytes / 2,967,033 lines, SHA-256
+`e89963d7284affd659bbfb31d1a3e1072cf0aa6eb830062638dda0f16531d9c3`; `zstd -19` gives
+7,983,524 bytes, SHA-256
+`59a1724ae89aea3c26e9784c5904b0a5eadc012a878d288877ac71d19a9e3d4f`. This is slightly larger
+compressed than complete v1 because numeric IDs remove highly repetitive `n:m` strings; bounded
+loading, not compression, is the reason for v2. The compact offset/length claim arenas report
+6,043,290 bytes for support and 40,857,722 for roots, versus roughly 404 MB of geometrically grown
+fixed forty-part records. Support storage is freed after the k6 trie freezes. The support trie now
+builds in about 3.1 local seconds with 14,733 branches / 251,077 fronts; the old all-level build took
+263.457 seconds locally with 439,499 / 2,706,062. No explicit split table was shipped: the prior full
+k7 process derived all 772 tables / 383,875 options in 0.112 seconds, so reading and validating a
+supplied table could not repay its new completeness obligation.
+
+The 34.7% theorem profile did not establish that another cache probe would hit. The direct theorem
+optimization is stronger. Within the m equal values contributed by `(n:m)`, the difference between
+the lifted-state prefix and `G_k` has increments `n-G_k[r+j]`. They are non-decreasing because
+`G_k` is sorted, so the difference is discrete convex and its maximum lies at an endpoint. The
+beginning was already checked; only the run end is needed. This changes the comparison loop from
+`O(sum m_i)` to `O(parts)`. Hot states of at most sixteen parts also use a fixed sort buffer. A new
+differential C regression compares literal expansion on every one-, two- and three-part multiset at
+MAX_N=16/k<=6 plus 200,000 deterministic states through 24 parts: all 535,328 agree. Endpoint and
+literal builds also emit identical complete `split_regression` CHECK streams.
+
+The user also questioned whether exact L1 was worth probing at all. Actual k7 A/B answers it more
+directly than counters. On the identical 9,995-claim four-part stride, with level-v2, direct k-1
+freeze and no L1 fixed, literal versus endpoint majorization averaged 1,302.135 versus 928.493 worker
+CPU seconds and 111.654 versus 79.468 wall: endpoint saves 28.69% CPU / 28.83% wall. With endpoint
+fixed, L1 versus no L1 averaged 1,046.624 versus 928.493 CPU and 89.774 versus 79.468 wall: L1 costs
+11.29% CPU / 11.48% wall. Every run has exactly 13,403,862,290 prefixes and zero gaps. A final
+default build confirmed 9,995/9,995 in 79.672 wall / 934.528 CPU seconds after 3.099 seconds of cache
+and 0.062 seconds of split preparation; capped peak RSS was 0.30 GB. `radio_refute.c` therefore
+disables L1 by default and exposes `RADIO_REFUTE_ENABLE_L1` only as the rejected control. Ordinary
+solver builds retain L1 because their prior positive-path benchmark measured a benefit.
+
+The systematic gate projects 19,072 local wall seconds (5.30 hours) / 222,838 local CPU seconds for
+the 2,398,799 four-part k7 claims. Hardware differs from the completed AWS solver, so this is not yet
+a solver-cost ratio. The next authorized step is a short same-type/right-sized AWS gate; start a
+complete k7 replay only if that projection remains below the proof-producing solver. A global exact
+hash is deferred absent evidence that first-touch exact hits repay another universal probe.
+Per-root reachability benefit is the next useful hint measurement. Full commands, build/log hashes
+and controls are in `evidence/verifier_level_v2_2026-08-18.txt`.

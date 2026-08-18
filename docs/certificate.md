@@ -105,14 +105,15 @@ records are in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt) and
 [`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
 
-Full coloring is deferred until the certificate design changes. The current checker independently
-searches split space for every negative fact; top-down coloring decides which such searches to run
-but does not itself make them cheap. A subsequently optimized ordinary, non-coloring audit is a
-separate bounded attempt; the next certificate prototype should still have the solver record a compact coverage
-proof—ranges or subboxes of tests annotated with the rejecting outcome and cited lower-level fact—so
-the independent checker validates coverage and citations instead of reconstructing the proof by
-search. The readable text envelope remains appropriate; binary packing should remain an internal
-indexing choice until parsing or storage is measured as the bottleneck.
+Full coloring remains deferred. The independent checker searches split space for every negative
+fact; top-down coloring decides which such searches to run but does not make them cheap. Its later
+optimized ordinary audit was stopped after confirming that repeated search still cost too much.
+The level-local solver-core refuter below is the practical baseline; a future independent
+certificate should have the solver record a compact coverage proof—ranges or subboxes of tests
+annotated with the rejecting outcome and cited lower-level fact—so the checker validates coverage
+and citations instead of reconstructing the proof by search. The readable text envelope remains
+appropriate; binary packing should remain an internal indexing choice until parsing or storage is
+measured as the bottleneck.
 
 ### Parallel checker and durable certificate prototype (2026-08-16)
 
@@ -139,7 +140,44 @@ The format also passed a parse-only run9 gate: the old and new parsers both extr
 canonical negative records; normalization took 2.74 wall seconds and 457 MB peak RSS. The readable
 file is 106,011,566 bytes, 7,194,721 under `zstd -19`, and a read/write round trip was byte-identical
 with SHA-256 `3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`.
-This establishes the transport format, not the still-pending proof replay.
+This established the transport format; the subsequent frozen replay is recorded below.
+
+For frozen replay, v1 is now the complete source corpus rather than the execution layout.
+`tools/make_refute_level_certificate.py` deterministically produces one self-contained
+`radio-negative-level-certificate-v2` file per audited level:
+
+```text
+radio-negative-level-certificate-v2
+level 7
+parts 1052
+part <id> <n>:<m>
+...
+support 6 388317 1468377
+fact <part-id> ...
+...
+split-hints 772
+split <part-id> uses <occurrences>
+...
+claims 7 2576885 10121321
+claim <part-id> ...
+```
+
+The sections are deliberately in load order. IDs are local to the file and map through explicit
+`n:m` definitions; they are not the solver's internal `sbb` values. Definitions are in ascending
+total-mass/long-side order, so descending IDs give the canonical state order; the verifier checks
+both sides of that contract. The support and claim headers carry both record and part-reference
+counts, permitting exact compact allocation. Split hints list every nonunit claim part and its
+occurrence count, ordered by the producer as a performance hint.
+The verifier rejects a missing, extra or miscounted hint and re-derives all split geometry, so the
+hint section cannot remove a test. For a level-k phase, only support k-1 enters the dominance trie;
+level-k records are targets and support storage is released after freezing.
+
+The generated run9 k7 file is 63,781,183 readable bytes and 7,983,524 bytes under `zstd -19`. Its
+compressed size is slightly larger than complete v1 despite containing only two levels: numeric IDs
+compress less repetitively than literal `n:m`. That is acceptable—the format is for bounded phase
+loading, compact in-memory claims and distribution, not archive compression. Exact hashes and
+counts are in
+[`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
 A separately bounded top-layer coloring then verified the sixteen run9 `k=9` roots in 0.23 seconds
 on eight workers and cited all 2,545 canonical `k=8` facts. It intentionally stopped there: no
@@ -227,12 +265,15 @@ preferable independent certificate design. Full measurements and the index sound
 
 ### Frozen solver-core refutation (2026-08-18)
 
-`radio_refute.c` loads the full readable negative certificate into the production compact trie,
-prepares all selected split tables and one-part viability frontiers serially, then publishes an
-immutable epoch. Each worker owns its search context. The audited root bypasses its own cached
-claim and runs only exhaustive pass 2; all children are theorem or frozen k-1 cache queries. An
-uncovered split fails closed instead of launching recursive solving, and no worker publishes a
-fact. Cache allocation counts and a complete split-table checksum must remain unchanged.
+The completed AWS replay below used the original implementation, which loaded the full readable
+negative certificate into the production compact trie. Current `radio_refute.c` instead prefers one
+level-v2 file: only k-1 support enters the trie, while level-k claims remain compact targets. It
+uses the checked root-part hints to prepare independently derived split tables and asks local
+viability directly at k-1 before publishing an immutable epoch. Each worker owns its search
+context. The audited root bypasses its own cached claim and runs only exhaustive pass 2; all
+children are theorem or frozen k-1 cache queries. An uncovered split fails closed instead of
+launching recursive solving, and no worker publishes a fact. Cache allocation counts and a
+complete split-table checksum must remain unchanged.
 
 This is intentionally not independent of the solver. It answers the practical baseline question:
 can the original exhaustive refutation be replayed read-only and in parallel without costing more
@@ -249,15 +290,22 @@ solver. Peak RSS was 1.24 GB. The exact output is archived in the private releas
 Details are in
 [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt).
 
-The completed run also narrows the next optimization. Its k=7 worker CPU divided by wall was
-15.985 on sixteen workers, so shared-memory scheduling is already saturated. In a separate
-twelve-worker Sa(113) sample, 25,425 of 73,224 runnable 1-ms samples (34.7%) landed directly in
-`star_expansion_majorization_can_solve`. Frozen CACHE_ONLY children currently pay that theorem on
-an L1 miss before probing the immutable negative trie. The first controlled change should therefore
-be a frozen-only L1 -> explicit/trie -> theorem order, preceded by hit-rate counters. A compact
-exact-fact hash, larger/set-associative worker L1, and aggregate reachability counters are the next
-bounded experiments. A serialized contiguous trie is primarily a startup/distribution improvement;
-explicit split-space coverage remains the route to an independently asymptotically cheaper checker.
+The former “instrument then try trie/exact before theorem” priority is superseded by direct k7
+controls. The 34.7% profile showed theorem heat, not that an extra lookup would hit. Within each
+constant star run the majorization prefix difference is discrete convex, so checking its endpoint
+is exactly equivalent to checking every expanded prefix. Two matched controls measured 28.69% less
+worker CPU. Separately, compiling L1 out reduced worker CPU another 11.29%; it is now off only in
+the frozen verifier, not the mutable solver. The k7 level file reduced cache construction locally
+from 263.457 to about 3.1 seconds and the checked one-step split preparation reduced admitted sample
+prefixes by 5.915%. The final 12-worker gate closed 9,995/9,995 in 79.672 wall / 934.528 CPU seconds
+and projects 5.30 local wall hours for the four-part k7 band. Exact controls are in
+[`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
+
+The next bounded decision is a same-hardware AWS k7 gate, followed—only if its solver-cost gate
+passes—by a complete k7 replay. Per-root reachability telemetry/hints remain plausible. A global
+explicit-fact hash is deferred because no measured exact-hit case justifies paying another probe on
+every child. Explicit split-space coverage remains the route to an independently asymptotically
+cheaper checker.
 
 ### Live completed-target telemetry (2026-08-17)
 

@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-16.
+entries. Last revised 2026-08-18.
 
 ## High-level goals
 
@@ -404,20 +404,29 @@ Disposition and next design work:
    It uses the complete normalized certificate because the colored Sa(113) control is missing nine required supports.
    Architecture, controls and exact measurements are in
    [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt);
-8. **Next measured optimization:** keep readable text as the durable envelope and instrument the
-   frozen child-query path. The completed k=7 epoch averaged 15.985 active cores on sixteen workers,
-   while a twelve-worker Sa(113) profile put 34.7% of runnable samples directly in full-star
-   majorization. Test L1 -> explicit/trie -> theorem ordering in the frozen epoch, a compact exact
-   fact hash, L1 associativity/size, and `RB_TRIGGER` only after counters report exact, dominance,
-   theorem and reachability hit rates. Then serialize a contiguous derived cache image so repeated
-   and distributed shards do not each pay the roughly 290-second cache load. This is a constant-
-   factor programme; separately make the solver emit split-space coverage if the
-   bounded audit is still uneconomic: compact ranges/subboxes annotated with the outcome and
-   lower-level fact (or theorem) that rejects them. The checker should validate an auditable cover
-   and exact citations, not rediscover it. Start with one retained hard k=7 fact and require checker
-   work close to certificate size. Reconsider top-down coloring only after explicit citations make
-   graph reachability cheap; do not choose binary until parsing or storage is the measured
-   bottleneck.
+8. **Delivered locally; next gate is same-type AWS k7.** Readable text remains the durable envelope,
+   now as one self-contained file per level. `radio-negative-level-certificate-v2` orders an
+   explicit part dictionary, complete k-1 support, checked split-part hints and level-k claims;
+   only support enters the trie. The run9 k7 file reduces cache construction locally from 263.457
+   to about 3.1 seconds and compact claim/support storage from roughly 404 MB of fixed records to
+   about 47 MB. Explicit split options remain derived: all 383,875 full-k7 local options previously
+   took only 0.112 seconds, while trusting a supplied subset would introduce a completeness hole.
+   Full-star majorization now checks only the mathematically sufficient endpoint of each equal-star
+   run. Two matched controls save 28.69% worker CPU, and compiling exact L1 out of the frozen
+   verifier saves another 11.29%; the mutable solver retains L1. The final local 9,995-root k7 gate
+   closes with zero gaps in 79.672 wall / 934.528 CPU seconds and projects 5.30 local wall hours for
+   the four-part band. Details:
+   [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
+
+   Run this exact gate on a right-sized short-lived instance before authorizing a complete k7
+   replay; compare projected CPU on the same hardware with the cold solver. Collect per-root
+   reachability build/prune benefit so later level files may carry non-semantic activation hints.
+   A compact global exact hash is deferred: neither the 34.7% theorem profile nor solver order
+   demonstrates enough first-touch exact hits to justify another lookup. Separately make the solver
+   emit split-space coverage if the bounded audit remains uneconomic: compact ranges/subboxes
+   annotated with the outcome and lower-level fact (or theorem) that rejects them. The checker
+   should validate an auditable cover and exact citations, not rediscover it. Reconsider top-down
+   coloring only after explicit citations make graph reachability cheap.
 
 The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
 context through the complete recursive tree; its deterministic work clock, exact L1 and joint

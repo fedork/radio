@@ -120,26 +120,48 @@ not part of the text grammar.
 `radio_refute.c` is the fast validation path when sharing the production solver core is acceptable:
 
 ```
+tools/make_refute_level_certificate.py complete.cert --level 7 -o level-7.cert
 tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 \
   radio_refute.c -o radio_refute
 REFUTE_THREADS=16 REFUTE_PROGRESS_SECONDS=60 \
-  tools/run_with_provenance.py ./radio_refute certificate.cert
+  tools/run_with_provenance.py ./radio_refute level-7.cert
 ```
 
-It loads every negative claim into the production compact dominance trie, materializes required
-split geometry and one-part viability metadata serially, then freezes both structures. Each worker
-owns a `radio_search_context`. An audited root bypasses its own level-k cache entry and enumerates
-the solver's exhaustive pass; children are theorem/CACHE_ONLY queries at k-1. A cache miss is an
-uncovered split, never permission to recurse, learn or write a fact. Cache allocation counts and a
-full split-table checksum must be identical after the worker epoch.
+The preferred `radio-negative-level-certificate-v2` input is one text file per audited level, with
+sections in load order: a certificate-local `part ID -> n:m` dictionary, complete k-1 support,
+checked split-part hints, then level-k claims. Only support enters the production compact dominance
+trie; compact offset/length claims remain worker targets. The converter is bounded-memory and
+deterministic. Legacy full v1 certificates remain accepted for regression.
+
+The split hints list every nonunit root part with its occurrence count and determine serial
+preparation order. The verifier checks the list exactly against the claims, then independently
+derives every local split and theorem filter; hints cannot omit work. It asks isolated local
+outcomes directly at k-1 instead of inheriting the mutable solver's multi-level metadata walk, so
+the only result cache loaded for a level-k phase is k-1. It then freezes cache and split structures.
+Each worker owns a `radio_search_context`. An audited root bypasses its own level-k cache entry and
+enumerates the solver's exhaustive pass; children are theorem/CACHE_ONLY k-1 queries. A cache miss
+is an uncovered split, never permission to recurse, learn or write a fact. Cache allocation counts
+and a full split-table checksum must be identical after the worker epoch.
+
+Full-star majorization checks only the endpoint of each equal-value star run. The prefix-difference
+increments are non-decreasing because `G_k` is sorted, so this is exactly equivalent to testing
+every expanded prefix; `tools/star_majorization_regression.c` locks the equivalence. The frozen
+verifier compiles the worker L1 out by default after a matched k7 A/B measured an 11.3% CPU
+regression. `-DRADIO_REFUTE_ENABLE_L1` restores that rejected control; ordinary mutable solver
+builds retain L1.
 
 `REFUTE_MIN_K`/`MAX_K`, `REFUTE_MIN_PARTS`/`MAX_PARTS`, and
 `REFUTE_STRIDE`/`OFFSET` select a deterministic batch. Runtime order needs no level barrier because
 every dependency decreases k. Progress reports cache loading, serial freeze work, completed and
 per-level targets, accepted-prefix throughput, ETA, and the three oldest active roots. This tool is
 not an independent proof implementation; it is deliberately the solver's read-only, refute-only
-baseline. Design, controls, Sa(113) results and the run9 gate are in
-[`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt).
+baseline. The completed old full-v1 replay is in
+[`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt);
+the level format, majorization proof and k7 controls are in
+[`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
+`tools/test_radio_refute.sh` covers legacy and level inputs, serial/parallel agreement, corrupt
+split hints and dictionary order, endpoint-majorization equivalence, the L1 control, and a
+fail-closed false claim.
 
 Top-down coloring alone has a level barrier, because citations made while verifying `k` become the
 targets at `k-1`:

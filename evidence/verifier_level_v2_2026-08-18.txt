@@ -1,0 +1,152 @@
+Level-local frozen verifier and k=7 optimization controls — 2026-08-18
+=====================================================================
+
+Scope
+-----
+
+This is a performance/correctness engineering result, not a new mathematical verdict.  Every
+benchmark audits the same deterministic stride of 9,995 four-part k=7 claims from the completed
+run9 corpus and reports zero gaps.  The proof source remains the cold solver run.  Raw benchmark
+logs were small temporary controls and were not promoted to the artifact store; their relevant
+lines and SHA-256 hashes are recorded below.
+
+Certificate format
+------------------
+
+`tools/make_refute_level_certificate.py` converts the complete readable v1 corpus into one strict
+text file for a requested level.  Its sections are in consumption order:
+
+1. certificate-local `part ID -> n:m` dictionary;
+2. every level-(k-1) support fact;
+3. ordered `split` hints giving each nonunit root part and its exact occurrence count;
+4. every level-k claim to audit.
+
+The producer orders dictionary definitions by ascending total mass then long side.  The verifier
+checks that dictionary order, dense IDs, descending canonical state IDs, section record/reference
+counts, dictionary use, and exact equality between the split-hint set/counts and the claims.  Hints
+affect preparation order only.  Split geometry and theorem admissibility are re-derived, so a
+missing split cannot manufacture a refutation.
+
+Source v1 certificate:
+
+  bytes:   106,011,566
+  SHA-256: 3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116
+  release: https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18
+
+Generated k7 level certificate:
+
+  bytes / lines: 63,781,183 / 2,967,033
+  SHA-256:        e89963d7284affd659bbfb31d1a3e1072cf0aa6eb830062638dda0f16531d9c3
+  zstd -19:       7,983,524 bytes (7.61 MiB)
+  zstd SHA-256:   59a1724ae89aea3c26e9784c5904b0a5eadc012a878d288877ac71d19a9e3d4f
+  dictionary:     1,052 parts
+  support:        388,317 k6 facts / 1,468,377 part references
+  split hints:    772
+  claims:         2,576,885 k7 facts / 10,121,321 part references
+
+The compressed level file is slightly larger than the complete v1 file's previously measured
+7.19 MB because short numeric IDs destroy some repeated `n:m` text patterns.  Storage is still
+irrelevant at this scale; the level file exists to bound loading and make phase dependencies
+explicit, not to win compression.
+
+The old full-corpus `Claim` reserved forty uint16 parts per record and geometrically allocated
+about 404 MB.  The new offset/length records plus contiguous uint16 arenas report 6,043,290 bytes
+for k6 support and 40,857,722 bytes for k7 roots.  Support storage is released after its cache is
+frozen.
+
+Cache and split preparation
+---------------------------
+
+For a level-k audit, only k-1 facts enter the dominance trie.  Production split metadata walks
+several lower `kk` values to learn a minimum-solvability frontier reused by repeated root calls at
+that k.  The frozen verifier instead asks each isolated local outcome directly at k-1 and marks
+the split dead if any of the three is refuted.  TRUE and MAYBE both retain it.  This is sound by
+Subgraph Monotonicity and can inspect a later negative even when an earlier outcome was MAYBE.
+
+On the final local k7 gate:
+
+  cache:  388,317 claims, 3.099 s, 14,733 branches / 27,124,248 branch bytes,
+          251,077 fronts / 4,428,648 front bytes
+  freeze: 593 selected tables, 313,374 options, 0.062 s
+
+The former same-host full-v1 gate loaded 3,126,190 claims in 263.457 s with 439,499 branches and
+2,706,062 fronts.  Its 12-worker gate admitted 14,246,550,669 prefixes.  The one-step split
+preparation admits 13,403,862,290, a 5.915% reduction, with identical 9,995/9,995 verdicts.
+
+An explicit table of all local splits would not help this path: even the completed full k7 run
+derived 772 tables / 383,875 options in 0.112 s.  Reading a supplied table and establishing its
+completeness would cost at least comparable work.  The certificate therefore lists checked part
+hints and leaves the complete, cheap geometry derived.
+
+Endpoint-only star majorization
+-------------------------------
+
+For one expanded `(n:m)` run, let D(j) be left prefix minus the `G_k` prefix after j copies of n.
+Because `G_k` is non-increasing, `D(j)-D(j-1)=n-G_k[r+j]` is non-decreasing.  D is discrete convex,
+so its maximum on the run is at an endpoint.  The beginning was checked by the previous run; only
+the final prefix must be tested.  This replaces O(sum m_i) prefix comparisons by O(number of
+parts).  States of at most sixteen parts also use a fixed sort buffer, avoiding a hot VLA stack
+probe; longer solver states retain the general path.
+
+`tools/star_majorization_regression.c` compares the endpoint implementation with literal expanded
+prefixes on every one-, two- and three-part multiset at MAX_N=16 / k<=6 plus 200,000 deterministic
+states of up to 24 parts.  All 535,328 cases agree.  The ordinary split regression also emits an
+identical complete CHECK stream under endpoint and expanded-prefix builds.
+
+Matched k7 controls
+-------------------
+
+Hardware: M4 Pro, twelve verifier workers.  Each row used the same level-v2 certificate,
+`np=4`, `stride=240`, `offset=0`, and exactly 13,403,862,290 accepted prefixes.  Cache/freeze time
+is excluded from worker wall/CPU.
+
+  variant                         wall A/B (s)       CPU A/B (s)
+  expanded prefixes, no L1       110.002 / 113.307  1297.029 / 1307.241
+  endpoint prefixes, L1          90.949 / 88.600    1053.688 / 1039.561
+  endpoint prefixes, no L1       80.346 / 78.589     930.551 / 926.435
+  final default confirmation     79.672              934.528
+
+Endpoint versus expanded-prefix averages: 28.69% less worker CPU and 28.83% less wall.
+No-L1 versus L1 endpoint averages: 11.29% less worker CPU and 11.48% less wall.
+
+The current-tree reproduction matrix is:
+
+  tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 \
+      radio_refute.c -o /tmp/refute-endpoint-no-l1
+  tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 \
+      -DRADIO_REFUTE_ENABLE_L1 radio_refute.c -o /tmp/refute-endpoint-l1
+  tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 \
+      -DRADIO_STAR_MAJOR_EXPANDED_PREFIX radio_refute.c -o /tmp/refute-expanded-no-l1
+
+Run each binary twice with the same input and environment (the labels differed by variant):
+
+  REFUTE_THREADS=12 REFUTE_PROGRESS_SECONDS=0 REFUTE_MIN_K=7 REFUTE_MAX_K=7 \
+  REFUTE_MIN_PARTS=4 REFUTE_MAX_PARTS=4 REFUTE_STRIDE=240 REFUTE_OFFSET=0 \
+    tools/capped_run.sh --seconds 900 --rss-gb 8 --label k7-v2-control -- \
+      /tmp/refute-VARIANT run9-k7-v2.cert
+
+The frozen verifier consequently compiles L1 out by default; `RADIO_REFUTE_ENABLE_L1` retains the
+rejected control.  The mutable solver keeps its L1 because prior solver benchmarks measured a
+benefit there.  The systematic sample projects 19,072 local wall seconds (5.30 h) and 222,838
+local CPU seconds for the 2,398,799 four-part k7 claims.  A same-hardware AWS gate is still needed
+before comparing projected CPU with the cold solver or authorizing a complete k7 replay.
+
+Control build IDs and log SHA-256
+--------------------------------
+
+  endpoint + L1 build:     fe046cb3cedc7445be86521716cbbf330a866b34ac745c91c8377616681871a9
+    A log: fba1bc1ca20a14c88b78fa91e1b923a1ae14cd1a34d26c46cdea1c5a64aeaa10
+    B log: 53ee483ca37add53b15df6e138f97e504d9d5860722d8af85b4e3d7c55d0c6dd
+  endpoint, no L1 build:   ae81bca9f61fca1fb94376a3624fd6e4e5879c6be3359885ed49c8cbcd2b7ce7
+    A log: ec7a2da8b48a2802252d86e38ea33b499ca551eb66db3ae43ce7be33d5f50ec0
+    B log: 130f11cc2a8334b8230bdb26517a646b1e73bd44df723271df745d8420886240
+  expanded, no L1 build:   eb33b64da996afd1044eb76d4bec30ad721da357110ac924ce0b43be7402f56f
+    A log: 6f0ac2d7bf72d3132d00375cf8842e3762ae920c474a0402435cb7f42ef58282
+    B log: 5ff0c7469c68760448fc1e7c23d1dfd023457bd7567fc835fb3be167f35bab83
+  final-default build:     830b1662d09e6e6bebc52cc006e53c24d866a1237ce3dbc8f6a1fea2db6d1158
+    log:   be19fb1254dfda48e04b30fb6616d6398a067e713de2d665fef4f00a38721466
+
+All seven raw outputs pass `tools/check_provenance.py`.  The level-v2 regression additionally
+checks serial/parallel agreement, a deliberately incorrect split-use hint, fail-closed gaps,
+default/no-L1 equivalence, and ASan+UBSan.  Work-budget, search-context and reachability-contraction
+regressions pass after the theorem optimization.

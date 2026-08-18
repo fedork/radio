@@ -522,6 +522,7 @@ struct cache_l1_entry {
 };
 static cache_l1_entry radio_default_cache_l1[CACHE_L1_SIZE];
 
+#ifndef RADIO_DISABLE_CACHE_L1
 static cache_l1_entry *radio_search_context_cache_l1(radio_search_context *ctx) {
     if (ctx->cache_l1 == NULL) {
         if (ctx == &radio_default_search_context) {
@@ -536,6 +537,7 @@ static cache_l1_entry *radio_search_context_cache_l1(radio_search_context *ctx) 
     }
     return ctx->cache_l1;
 }
+#endif
 
 #ifdef MEASURE_CACHE_L1
 static void print_cache_l1_stats(void) {
@@ -1097,6 +1099,15 @@ static inline __attribute__((always_inline)) uint32_t cache_l1_hash(const int *s
 static inline __attribute__((always_inline)) int cache_l1_probe(
     radio_search_context *ctx, const int *sb, int size, int k,
     cache_l1_entry **entry_out, uint32_t *hash_out) {
+#ifdef RADIO_DISABLE_CACHE_L1
+    (void)ctx;
+    (void)sb;
+    (void)size;
+    (void)k;
+    *entry_out = NULL;
+    *hash_out = 0;
+    return MAYBE;
+#else
 #ifdef MEASURE_CACHE_L1
     ctx->cache_l1_queries++;
 #endif
@@ -1123,11 +1134,21 @@ static inline __attribute__((always_inline)) int cache_l1_probe(
         }
     }
     return MAYBE;
+#endif
 }
 
 static inline __attribute__((always_inline)) void cache_l1_store(
     radio_search_context *ctx, cache_l1_entry *entry, uint32_t hash,
     const int *sb, int size, int k, int verdict) {
+#ifdef RADIO_DISABLE_CACHE_L1
+    (void)ctx;
+    (void)entry;
+    (void)hash;
+    (void)sb;
+    (void)size;
+    (void)k;
+    (void)verdict;
+#else
     (void)ctx;
     if (entry != NULL && verdict != MAYBE) {
 #ifdef MEASURE_CACHE_L1
@@ -1140,6 +1161,7 @@ static inline __attribute__((always_inline)) void cache_l1_store(
         entry->k = (uint8_t)k;
         entry->verdict_plus_one = (uint8_t)(verdict + 1);
     }
+#endif
 }
 
 /* Kept as the cache-query API for regression tools and small diagnostic drivers.  The main solver
@@ -1237,15 +1259,45 @@ int singleton_majorization_can_solve(int *sb, int size, int k) {
     return TRUE;
 }
 
-/* Necessary condition for an arbitrary Sb state.  Replace each oriented part (n:m), n >= m,
-   by m disjoint singleton stars (n:1).  This is a vertex-splitting lift of the original graph:
-   pulling every test back to all clones preserves every edge transcript, so a strategy for the
-   original would solve the lift.  The Singleton Majorization Theorem then decides the lift.
+/* Check the star lift after `by_n` has been sorted by descending long side.  Within one part,
+   the left profile adds `copies` equal values n.  If g[] is the non-increasing singleton base,
 
-   Sort only the distinct input parts by n, not the expanded sequence.  Long states have many
-   repeated stars but few distinct parts, so this avoids making the stronger theorem expensive. */
-int star_expansion_majorization_can_solve(int *sb, int size, int k) {
-    int by_n[size];
+       D(j)-D(j-1) = n-g[rank+j].
+
+   Those increments are non-decreasing, so D is discrete convex and its maximum over the equal-n
+   run is at an endpoint.  The beginning was checked by the preceding run (or is D(0)=0), hence
+   only the final prefix is needed.  This is exactly the old expanded-prefix test, reduced from
+   O(sum m_i) comparisons to O(number of parts). */
+static int star_expansion_majorization_sorted(int *by_n, int size, int k) {
+    int i;
+    long long left_prefix = 0;
+    int rank = 0;
+    int right_len = singleton_base_len[k];
+    int right_total = singleton_base_prefix[k][right_len - 1];
+    for (i = 0; i < size; i++) {
+        int copies = sbb_to_n2[by_n[i]];
+        int n = sbb_to_n1[by_n[i]];
+#ifdef RADIO_STAR_MAJOR_EXPANDED_PREFIX
+        while (copies-- > 0) {
+            left_prefix += n;
+            {
+                int right_prefix = rank < right_len
+                    ? singleton_base_prefix[k][rank] : right_total;
+                if (left_prefix > right_prefix) return FALSE;
+            }
+            rank++;
+        }
+#else
+        left_prefix += (long long)copies * n;
+        rank += copies;
+        int right_prefix = rank <= right_len ? singleton_base_prefix[k][rank - 1] : right_total;
+        if (left_prefix > right_prefix) return FALSE;
+#endif
+    }
+    return TRUE;
+}
+
+static int star_expansion_majorization_with_buffer(int *sb, int size, int k, int *by_n) {
     int i;
     for (i = 0; i < size; i++) by_n[i] = sb[i];
     for (i = 1; i < size; i++) {
@@ -1256,22 +1308,29 @@ int star_expansion_majorization_can_solve(int *sb, int size, int k) {
         }
         by_n[j + 1] = v;
     }
+    return star_expansion_majorization_sorted(by_n, size, k);
+}
 
-    long long left_prefix = 0;
-    int rank = 0;
-    int right_len = singleton_base_len[k];
-    int right_total = singleton_base_prefix[k][right_len - 1];
-    for (i = 0; i < size; i++) {
-        int copies = sbb_to_n2[by_n[i]];
-        int n = sbb_to_n1[by_n[i]];
-        while (copies-- > 0) {
-            left_prefix += n;
-            int right_prefix = rank < right_len ? singleton_base_prefix[k][rank] : right_total;
-            if (left_prefix > right_prefix) return FALSE;
-            rank++;
-        }
+static int star_expansion_majorization_large(int *sb, int size, int k) {
+    int by_n[size];
+    return star_expansion_majorization_with_buffer(sb, size, k, by_n);
+}
+
+/* Necessary condition for an arbitrary Sb state.  Replace each oriented part (n:m), n >= m,
+   by m disjoint singleton stars (n:1).  This is a vertex-splitting lift of the original graph:
+   pulling every test back to all clones preserves every edge transcript, so a strategy for the
+   original would solve the lift.  The Singleton Majorization Theorem then decides the lift.
+
+   Hot verifier children contain at most eight parts.  Keep their sort buffer fixed-size so the
+   compiler does not emit variable-stack probing on every call; retain the general VLA path for
+   the solver's uncommon longer states. */
+int star_expansion_majorization_can_solve(int *sb, int size, int k) {
+    enum { STAR_MAJOR_LOCAL_PARTS = 16 };
+    if (size <= STAR_MAJOR_LOCAL_PARTS) {
+        int by_n[STAR_MAJOR_LOCAL_PARTS];
+        return star_expansion_majorization_with_buffer(sb, size, k, by_n);
     }
-    return TRUE;
+    return star_expansion_majorization_large(sb, size, k);
 }
 
 int get_max_sbb_ctx(radio_search_context *ctx, int n1, int n2, int n3, int n4) {

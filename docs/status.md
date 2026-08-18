@@ -17,7 +17,9 @@ the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correc
 proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
 separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
 attempts and the slower kd-indexed ordinary audit were stopped; a frozen, solver-core,
-read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived).
+read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived;
+its level-local successor now passes a substantially faster k7 gate and awaits a same-type AWS
+cost check before any complete replay).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -353,6 +355,15 @@ manifest and the private GitHub release round trip both pass SHA-256 verificatio
 The dedicated instance was terminated after verification; its sole root volume had
 `DeleteOnTermination=true` and is confirmed deleted. This is a solver-core validation replay, not an independent proof
 implementation; the proof-safe cold run9 remains the proof source.
+
+The next frozen-refuter implementation is local and tested but has not begun another full replay.
+Its per-level v2 input makes the dependency explicit: k6 support is loaded before k7 split hints and
+claims, and no unrelated level enters the trie. The generated run9 k7 file is 63,781,183 readable
+bytes / 7,983,524 bytes at `zstd -19`; its source remains the release above. The final systematic
+local k7 gate verified 9,995/9,995 with zero gaps in 79.672 worker wall / 934.528 CPU seconds after
+a 3.099-second support-cache build. Peak capped-run RSS was 0.30 GB. This is a performance gate, not
+a new proof or a complete k7 replay; exact A/B controls are in
+[`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
 The canonical-order before run `20260818T055255Z` passed the same sample with zero gaps in
 23,697,303,379 nodes / 1,627.30 seconds. Its superseded full phase was immediately stopped through
@@ -887,16 +898,19 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
-2. **Optimize the frozen verifier's child-query path before changing its parallel model.** The
-   completed k=7 epoch averaged 15.985 cores across sixteen workers, so scheduling and locks are not
-   the bottleneck. A twelve-worker Sa(113) sample profile put 34.7% of runnable samples directly in
-   full-star majorization, which currently runs on an L1 miss before the immutable negative trie.
-   First instrument exact/L1/trie/theorem hit rates, then test a frozen-only L1 -> exact/trie ->
-   theorem lookup order and a compact explicit-fact hash. Separately aggregate reachability build,
-   test and prune counts and tune `RB_TRIGGER` on the retained 9,995-root gate. Only after those
-   controls should the derived cache become a contiguous serializable image for cheap startup and
-   distributed shards. Explicit split-space coverage remains the route to an independently cheap
-   verifier.
+2. **Gate the level-local frozen verifier on same-type AWS k7 hardware.** The optimization controls
+   are complete locally. A strict one-file-per-level certificate now carries an explicit part
+   dictionary, complete k-1 support, checked split-part hints and level-k claims; only k-1 enters the
+   trie. On the retained 9,995-root k7 gate this cut cache construction from 263.457 to about 3.1
+   local seconds. Exact endpoint-only star majorization reduced matched worker CPU 28.69%, and
+   compiling L1 out of the verifier reduced it another 11.29%; the mutable solver still keeps L1.
+   The final local gate closed in 79.672 wall / 934.528 CPU seconds with zero gaps and projects 5.30
+   wall hours for the four-part band. Run the same gate on a right-sized short-lived instance;
+   authorize a complete k7 replay only if projected CPU remains below the proof solver. Then collect
+   per-root reachability benefit for optional hints. Do not add a global exact hash without a
+   measured first-touch hit case. Explicit split-space coverage remains the route to an
+   independently cheap verifier. See
+   [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
 3. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
    cache as a frozen read view plus worker-local overlay, then separate immutable split geometry
