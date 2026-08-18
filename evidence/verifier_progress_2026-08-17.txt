@@ -1,8 +1,7 @@
 # Completed-target telemetry and dedicated run9 verifier launch
 
-Status: verifier telemetry implemented and locally gated; dedicated AWS launch follows the clean
-commit recorded below.  This file is updated with the immutable launch identifiers after EC2
-accepts the instance.
+Status: verifier telemetry implemented and locally gated; the dedicated AWS run from the clean
+commit and immutable source bundle recorded below is live in the dominant k=7 coloring batch.
 
 ## Why the old display was insufficient
 
@@ -42,7 +41,7 @@ benchmark.  With eight workers and a ten-second report interval it returned:
 The certificate hash and every logical count match the pre-telemetry production-index result.  The
 measured pipeline source SHA-256 was
 `d65e97cded0c5571dd2120365613df4edecf1d61adc609541074750b4c4eccff`; the only subsequent C changes
-made reporter snapshots reject a worker/task race and revised a comment.  The final source
+made reporter snapshots reject a worker/task race and revised a comment.  The launched source
 SHA-256 is `62f2a171f9ef23b5fccbc30e51bcc9ccbcfa57d8740087a4d941c827900f56ad`.
 
 The final source then verified the retained hard run9 target
@@ -89,3 +88,81 @@ Monitor once or continuously:
 
     tools/run9_verifier_progress_status.sh
     tools/run9_verifier_progress_status.sh --watch
+
+For this exact run, append `20260818T014906Z` to either command.
+
+## Dedicated launch and first live measurements
+
+The accepted production launch is:
+
+    launched UTC       2026-08-18 01:49:11
+    instance            i-01f8c56b7a53a1178
+    instance type       c8a.4xlarge, on-demand, us-west-2b
+    run id              20260818T014906Z
+    source commit       f170dedc4a2e17d17b85c562efb3288e1d8946bb
+    source bundle SHA   4d4d952f06ce59cf157c0ed4c7a57d6d18c0d3799152bb1deccf1e8900fd1661
+    verifier build id   6cebdeff2aafa370a4c4f561b7c3ab05ae670e00e179ec1af487cd3a7764c8ae
+    S3 prefix           run9-verifier-progress/20260818T014906Z/
+
+The instance-initiated shutdown behavior was read back as `stop`, and the independent hard-stop
+timer was live for 2026-08-19 02:49:19 UTC.  The source bundle was streamed back from S3 and matched
+the SHA above.  The remote regression passed, sanitization reproduced the established 3,126,190
+facts and normalized hash, and byte round-trip passed before coloring began.
+
+The new and old builds produced the identical minimalization result at k=7: 2,576,885 facts became
+2,507,270, removing 69,615.  The new sixteen-physical-core run took 77.17 seconds end to end for
+that level, versus 713.01 seconds for the old-index fourteen-worker run on the shared SMT host.  The
+combined hardware/build comparison is 9.24x; it does not isolate either factor.  The new k=8
+verification chose a slightly smaller witness support set, so the k=7 color batch contains
+2,505,858 targets rather than the old build's 2,506,515.  This is allowed: search order may choose
+different valid support facts, while the minimal input level itself is unchanged.
+
+The first four one-minute k=7 coloring snapshots were steady:
+
+    elapsed  completed       rate total     nodes done       nodes/s        ETA projection
+       60 s      8,641       143.998/s       986,434,106     16,438,441/s       17,342 s
+      120 s     16,782       139.841/s     2,017,345,119     16,810,103/s       17,799 s
+      180 s     25,650       142.494/s     3,004,004,203     16,688,168/s       17,406 s
+      240 s     34,436       143.478/s     4,162,382,688     17,342,672/s       17,225 s
+
+All completed targets were verified, with zero unverified or budget outcomes.  CPU was 1,575% at
+the second snapshot, RSS 1,469.1 MiB, host memory available 28.6 GiB, and swap zero.  The three
+oldest displayed tasks were only 0.1 seconds old and the claimed/completed gap stayed at sixteen,
+so there was no early stuck-state signature. These samples were still entirely in the 108,083
+three-part region; the 2,396,521 four-part targets had not begun, so the roughly 4.8-hour ETA was not
+a completion forecast. The transition subsequently demonstrated why.
+
+At 720 seconds all three-part targets were complete and 214 four-part targets had finished. The
+next four complete one-minute intervals finished only 32, 31, 33 and 28 additional targets:
+
+    elapsed  four-part done  window rate  nodes/s       oldest displayed active state
+      780 s          246       0.533/s     17,146,189    24.9 s, cursor 16,777,216
+      840 s          277       0.517/s     16,686,594    39.3 s, cursor 22,020,096
+      900 s          310       0.550/s     16,178,734    24.6 s, cursor 11,534,336
+      960 s          338       0.467/s     15,684,902    36.2 s, cursor 17,825,792
+
+All 338 four-part completions verified, with zero unresolved or budget outcomes. Node cursors and
+task turnover prove continued enumeration; the completion-rate collapse is algorithmic cost per
+fact, not a deadlock or scheduler starvation. The four-interval mean is 0.517 target/s. A naive
+projection of that local rate across the remaining 2,396,183 four-part targets is about 54 days,
+far beyond the twelve-hour phase cap. Canonical cost may change again with mass, so 54 days is a
+diagnostic local extrapolation rather than a forecast. The run remains useful for measuring how the
+rate evolves and will be stopped by its cap unless it accelerates dramatically.
+
+This transition also exposed that the total and 0.75-history EWMA ETAs react too slowly to an
+ordered cost-regime change. The local status helper now adds
+`LATEST_WINDOW_PROJECTION ... basis=latest_interval_only` from the frozen run's `rate_window`; at
+960 seconds it reported 59.39 days. Future verifier builds emit `eta_window_s` alongside total and
+EWMA projections. This post-launch display-only C source has SHA-256
+`7664d73b9ac1eeb222c4314e69c203632e35ec8b6616e8db3b5133bdc663c435`; it is not the binary running
+on EC2. A one-thread two-root check put the quick `Sb(33:33)@7` before the retained hard root and
+printed numeric `eta_window_s=1` while the second task was active. It then verified both roots with
+zero unresolved and exactly 4,644,470 nodes in 12.85 seconds, one node more than the hard root alone.
+
+Three bounded bootstrap attempts preceded the accepted run and were terminated after their logs
+were preserved.  `i-06b1c144063fc4d88` exposed the AL2023 `curl`/`curl-minimal` package conflict;
+`i-09b7e4eb76bc3d414` reached the self-test and exposed its undeclared `rg` dependency; and
+`i-04b2cfad884a000a8` showed that `ripgrep` is absent from the enabled AL2023 repositories.  The
+final fix leaves the image's existing `curl-minimal` in place and makes the regression portable
+with `grep -E`.  The three failures consumed about 21, 34 and 20 seconds before detection and did
+not touch the certificate pipeline.

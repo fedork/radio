@@ -6989,3 +6989,57 @@ verifier was healthy in the full `k=7` coloring barrier after 7h19m30s at 1,399%
 RSS. The separate census remained healthy at one core and 8,860.6 MiB RSS; the host had 112.4 GiB
 available and no swap. Neither process had reached a new proof barrier, so no completion or ETA was
 inferred. No local solver, verifier, capped wrapper or one-off search process was started.
+
+## 2026-08-17 — a right-sized verifier now reports actual completed work
+
+The old shared-host run remained healthy after 9h21m58s in its k=7 color barrier, but its frozen
+binary still could not say whether it was near the beginning or end. `radio_verify.c` now has a
+proof-neutral progress reporter: workers publish completed outcomes and node counts; the reporter
+adds total/window/EWMA rates, per-k and per-part counts, and three oldest active facts with a coarse
+2^20-node cursor. Claims and completions are separate, so queued work is not presented as done.
+Exact `BATCH_START` and `BATCH_DONE` records remain available with reporting disabled.
+
+The gates were proportionate to the new concurrency. A full Sa(113) color/replay retained the same
+certificate hash and exact node/verdict counts; the exact hard run9 k=7 state retained its
+4,644,469 nodes; ASan+UBSan and TSan exercised repeated snapshots with no finding; and an alternating
+same-binary timing check found no overhead above noise. `tools/test_radio_verify.sh` now locks the
+batch records and invalid option handling. It was also changed from `rg` to portable `grep -E`
+after the first clean Amazon Linux host exposed that the regression had an undeclared dependency.
+
+The right-sized choice is on-demand `c8a.4xlarge`: sixteen physical 4.5-GHz cores, 32 GiB RAM and
+$0.86216/hour in us-west-2. A 30-GiB encrypted gp3 root, 24-GiB RSS guard, twelve-hour cap per
+color/replay phase and independent 25-hour shutdown bound the run. Spot is wrong for this launch
+because a k=7 barrier has no checkpoint. Three bootstrap probes, each under 35 seconds, found and
+fixed an AL2023 full-`curl` conflict, the missing `rg` test dependency, and the absence of a
+`ripgrep` package; their instances were terminated after diagnostic logs reached S3.
+
+The accepted instance is `i-01f8c56b7a53a1178`, run `20260818T014906Z`, from clean commit
+`f170dedc4a2e17d17b85c562efb3288e1d8946bb`. The immutable source bundle SHA-256 is
+`4d4d952f06ce59cf157c0ed4c7a57d6d18c0d3799152bb1deccf1e8900fd1661`, and the verifier build ID is
+`6cebdeff2aafa370a4c4f561b7c3ab05ae670e00e179ec1af487cd3a7764c8ae`. Remote self-test, raw and
+normalized hashes, sanitization and byte round-trip all passed. K=7 minimalization returned exactly
+the old 2,507,270-fact antichain, but took 77.17 rather than 713.01 seconds; this 9.24x is a combined
+new-index, worker-count and hardware comparison, not a single-factor claim.
+
+K=8 coloring cited 2,505,858 k=7 targets, 657 fewer than the old search order. That is not a logical
+disagreement: the unchanged minimal level can support different valid witness sub-DAGs. The first
+four k=7 snapshots completed 8,641, 16,782, 25,650 and 34,436 targets at 60-second intervals, all
+verified with zero unresolved. At 240 seconds the verifier sustained 143.478 targets/s and 17.34
+million recursion nodes/s; CPU was effectively all sixteen cores, RSS stayed below 1.5 GiB and swap
+was zero. No old active fact had emerged—but that early regime was misleading.
+
+At 720 seconds the three-part region finished. The next four full intervals completed only
+32/31/33/28 four-part targets, or 0.533/0.517/0.550/0.467 per second. The verifier still admitted
+15--17 million recursion nodes/s, active cursors advanced, and tasks turned over, so the abrupt
+slowdown is proof-search cost rather than deadlock or work-queue imbalance. The four-interval mean
+extrapolates the remaining 2.396 million states to roughly 54 days. Costs can change again along the
+canonical mass ordering, so that is a local diagnostic rather than a forecast, but it makes
+completion within the twelve-hour cap unlikely without a dramatic later speedup. Let the bounded
+run characterize that curve; do not call the first 4--8 hour total/EWMA ETA credible.
+
+The observation prompted one display correction without touching the running binary. The status
+helper derives `LATEST_WINDOW_PROJECTION` from the frozen `rate_window`, and subsequent C builds
+also emit `eta_window_s`; both are explicitly latest-interval extrapolations. At 960 seconds the
+helper showed 59.39 days, while the four-interval mean is the less noisy 54-day figure. Use
+`tools/run9_verifier_progress_status.sh 20260818T014906Z`; the detailed record is
+[`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).

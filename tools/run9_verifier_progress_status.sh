@@ -19,7 +19,7 @@ done
 aws_cmd=(aws-vault exec --server default -- aws)
 
 show_status() {
-    local query row instance state itype launched discovered prefix
+    local query row instance state itype launched discovered prefix status_text
     if [[ -n "$RUN_ID" ]]; then
         query=(Name=tag:Purpose,Values=run9-verifier-progress Name=tag:RunId,Values="$RUN_ID")
     else
@@ -39,7 +39,30 @@ show_status() {
     printf 'run9 verifier progress  run_id=%s instance=%s state=%s type=%s launched=%s\n' \
         "$RUN_ID" "$instance" "$state" "$itype" "$launched"
     if "${aws_cmd[@]}" s3 ls "s3://$BUCKET/$prefix/STATUS" >/dev/null 2>&1; then
-        "${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/STATUS" - --no-progress
+        status_text=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/STATUS" - --no-progress)
+        printf '%s\n' "$status_text"
+        printf '%s\n' "$status_text" | awk '
+            /^PROGRESS phase=/ {
+                done = total = rate = 0
+                for (i = 1; i <= NF; i++) {
+                    split($i, kv, "=")
+                    if (kv[1] == "completed") {
+                        split(kv[2], counts, "/")
+                        done = counts[1] + 0
+                        total = counts[2] + 0
+                    } else if (kv[1] == "rate_window") {
+                        sub(/\/s$/, "", kv[2])
+                        rate = kv[2] + 0
+                    }
+                }
+            }
+            END {
+                if (rate > 0 && total > done) {
+                    remaining = total - done
+                    eta = remaining / rate
+                    printf "LATEST_WINDOW_PROJECTION remaining=%d rate_window=%.3f/s eta_window_s=%.0f eta_window_h=%.2f eta_window_d=%.2f basis=latest_interval_only\n", remaining, rate, eta, eta / 3600, eta / 86400
+                }
+            }'
         if "${aws_cmd[@]}" s3 ls "s3://$BUCKET/$prefix/PROGRESS" >/dev/null 2>&1; then
             echo
             echo 'RECENT_PROGRESS'

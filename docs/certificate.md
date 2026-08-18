@@ -188,9 +188,11 @@ count, and the three oldest active facts with age and a node cursor. This separa
 previously looked identical: steady work, a harder region of the canonical order, and a few stuck
 tail facts.
 
-The two ETA fields are deliberately labelled projections. Fact costs are heterogeneous, so
-`eta_total_s` extrapolates all work so far while `eta_ewma_s` follows recent batches; neither is a
-promise. A growing active age with an advancing node cursor means deep enumeration, while a growing
+The three ETA fields are deliberately labelled projections. Fact costs are heterogeneous, so
+`eta_total_s` extrapolates all work so far, `eta_window_s` uses only the latest interval, and
+`eta_ewma_s` smooths recent intervals; none is a promise. The window estimate reacts immediately
+when canonical order enters a new part-count or mass region, while the other two deliberately lag.
+A growing active age with an advancing node cursor means deep enumeration, while a growing
 age with a flat cursor points toward support-index work inside one recursion node. This is enough to
 identify the state and phase for a focused profile without enabling the high-overhead per-candidate
 index counters in the production proof run.

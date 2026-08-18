@@ -356,10 +356,18 @@ Next, in order:
    2,507,270 of 2,576,885 facts (97.30%), so same-level reduction is modest on this corpus;
 3. **Running on AWS:** color from the sixteen roots. The `k=9` and `k=8` barriers verified 2,167
    targets and cited 2,506,515 `k=7` facts—99.97% of its minimal level. The earlier 190x `k=7`
-   reduction from the superseded 2023 corpus does not transfer; the fourteen workers are now
-   processing this full-scale batch, with no intra-level cursor or defensible ETA;
-4. the same supervisor will replay the colored bundle and require zero unresolved targets; use the
-   measured Sa(113) width policy above rather than restarting the live run merely to change width;
+   reduction from the superseded 2023 corpus does not transfer; the old fourteen-worker build is
+   still processing this full-scale batch, with no intra-level cursor or defensible ETA. A second
+   right-sized sixteen-physical-core run now reports completed counts, rates, part-count mix and
+   oldest active state once per minute. It uses the same 2,507,270-fact minimal level, cited
+   2,505,858 k=7 targets, and completed all 108,083 three-part targets quickly. The first four
+   complete four-part intervals then fell to 0.467--0.550 target/s with advancing node cursors and
+   zero unresolved. That local rate extrapolates to roughly 54 days, far beyond the twelve-hour
+   phase cap; measure later mass regions before deciding whether a new optimization can justify a
+   completion run;
+4. both supervisors will replay their colored bundle and require zero unresolved targets. Compare
+   their final certificate hashes, fact counts, node counts and walls before selecting the durable
+   result; different support sets are permitted, but each closed replay must verify independently;
 5. **Delivered:** the packed product-profile index retains canonical fact storage but scans a
    separate `(np,max-product,total-mass)` permutation with denormalized mass and packed n/m/product
    columns. On an exact hard run9 k=7 root it preserves the 4,644,469-node proof and memo counts
@@ -372,11 +380,12 @@ Next, in order:
    counts while falling from a contemporaneous 39.16 to 11.70 seconds (3.35x), and the small-level
    Sa(113) guard is neutral. The failed ungated layout, size sweep and sanitizer controls are in
    [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt).
-7. Let the already-running old-index AWS replay finish and archive it; do not restart the k=7
-   barrier merely to pick up this speedup. A further verifier layer is optional, not the next
-   default task: the hard control still tests 4.89 billion block-front points and 5.51 billion
-   per-fact candidates, so a two-level summary is measurable if verifier wall remains important.
-   Keep readable text as the durable source and retain the exact matcher.
+7. Let both the already-running old-index replay and the dedicated progress run finish. Archive and
+   compare the closed outputs; do not treat an ETA or a colored-but-unreplayed bundle as completion.
+   A further verifier layer is optional, not the next default task: the hard control still tests
+   4.89 billion block-front points and 5.51 billion per-fact candidates, so a two-level summary is
+   measurable if verifier wall remains important. Keep readable text as the durable source and
+   retain the exact matcher.
 
 The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
 context through the complete recursive tree; its deterministic work clock, exact L1 and joint

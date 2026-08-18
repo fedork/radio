@@ -1,20 +1,22 @@
 # The `Sa(193)` AWS runs — final solver record and remaining follow-ups
 
 This page is the operational record for the completed cold runs and the remaining follow-ups on
-the dedicated instance; the findings go to [journal.md](journal.md) as usual.
+the original shared instance plus the right-sized dedicated verifier; the findings go to
+[journal.md](journal.md) as usual.
 
 ## What is running
 
 | | |
 |---|---|
-| instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
+| shared instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
+| dedicated verifier | `i-01f8c56b7a53a1178`, `c8a.4xlarge` (16 physical cores, 32 GiB), run `20260818T014906Z`, on-demand |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
-| active jobs | `pareto_k8_aws`, the separate k=8 Pareto-prefix census; `run9_verify`, the independent run9 certificate coloring/replay |
+| active jobs | shared host: `pareto_k8_aws` and old-index `run9_verify`; dedicated host: progress-reporting `run9_verify_p` |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| active memory guards | 20 GiB for the census; 80 GiB for the verifier; neither process may consume the other's allowance |
-| completion | both supervisors finalize their S3 artifacts; the idle guard may stop the instance only after `pareto_k8_aws` and `run9_verify` are gone |
+| active memory guards | shared host: 20 GiB census and 80 GiB verifier; dedicated host: 24 GiB verifier |
+| completion | each supervisor finalizes to S3; the shared idle guard and dedicated shutdown policy stop only their own host |
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
@@ -50,6 +52,24 @@ resulting closed bundle and upload compressed results under `run9-verifier/20260
 Follow it with
 `tools/run9_verifier_status.sh`; launch hashes and the first snapshot are in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
+
+At **2026-08-18 01:49:11 UTC**, a second, progress-reporting replay began on dedicated on-demand
+instance `i-01f8c56b7a53a1178`. Run `20260818T014906Z` uses clean commit `f170ded`, sixteen physical
+cores on a `c8a.4xlarge`, a 24 GiB RSS guard, twelve-hour phase caps and an independent 25-hour hard
+stop. Its source bundle SHA-256 is
+`4d4d952f06ce59cf157c0ed4c7a57d6d18c0d3799152bb1deccf1e8900fd1661`. It passed the remote
+regression, hash checks, normalization and byte round-trip. The k=7 minimal level exactly matched
+the first run's 2,507,270 facts but completed in 77.17 rather than 713.01 seconds; the comparison
+combines the new verifier index, two more workers and physical-core hardware. Its k=7 coloring
+batch contains 2,505,858 cited targets. The first 108,083 three-part targets ran at 144--191/s, but
+the first four complete four-part intervals fell to 0.467--0.550/s while node cursors kept
+advancing. At 960 seconds it had verified 109,675 total targets with zero unresolved; only 338 of
+2,396,521 four-part targets were done. The four-interval local extrapolation is roughly 54 days,
+not a forecast, and demonstrates that the twelve-hour cap is likely to stop this diagnostic unless
+later mass regions become dramatically cheaper. Follow it with
+`tools/run9_verifier_progress_status.sh 20260818T014906Z`; exact identifiers, bootstrap lessons and
+snapshots are in
+[`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
 
 Final Sa sidecars that existed only on EBS were copied to immutable `run3/final/`, `run8/final/`
 and `run9/final/` prefixes under SSM command `4dfc8613-78aa-4b81-a122-895e9675bf54`; the shared
@@ -193,7 +213,7 @@ aws-vault exec default -- aws ec2 describe-instances \
 
 ## Stopping it
 
-**Do not stop it yet:** `pareto_k8_aws` and `run9_verify` are still running. After both exit, their
+**Do not stop the shared host yet:** `pareto_k8_aws` and old-index `run9_verify` are still running. After both exit, their
 final raw output, certificates and sidecars must appear under `pareto-census-k8/20260814T0132Z/`
 and `run9-verifier/20260817T163700Z/` and be hash-checked. Only then stop the instance while
 preserving the EBS volume and all run directories:
@@ -205,6 +225,10 @@ aws-vault exec default -- aws ec2 stop-instances --instance-ids i-0005d74f985c52
 The active idle guard includes both job names and can stop the host only after both have gone. A
 manual stop before either finishes is an interruption, not a result. The Sa artifacts are already
 final; the census and independent replay artifacts are not.
+
+Do not stop the dedicated `c8a.4xlarge` either. Its supervisor uploads final material and requests
+shutdown on completion or failure; EC2 shutdown behavior is `stop`, and the independently verified
+hard-stop timer fires at 2026-08-19 02:49:19 UTC if the supervisor cannot do so.
 
 ## Resuming historical Sa work
 

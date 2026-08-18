@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-17** (the published exact `m=5` result is now reconstructed
+don't know it. Last refreshed **2026-08-18** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
 for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
@@ -15,8 +15,8 @@ depth five and eventual constructibility remain open;
 the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correct the old
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
 proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`, while the
-separate resumed k=8 Pareto-prefix census and independent run9 certificate coloring/replay remain
-live on the instance).
+separate resumed k=8 Pareto-prefix census and two independent run9 certificate coloring/replays
+remain live across the shared and right-sized AWS instances).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -323,9 +323,10 @@ Do not run `gh auth switch`.
 ## Running now
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
-reported UNSOLVABLE. Two follow-ups now share AWS instance `i-0005d74f985c52ae1`: the separate
-k=8 Pareto-prefix census and the independent run9 certificate coloring/replay. Do not stop it until
-both supervisors finish and upload their final artifacts.
+reported UNSOLVABLE. Two follow-ups share AWS instance `i-0005d74f985c52ae1`: the k=8 Pareto-prefix
+census and old-index run9 certificate replay. A progress-reporting replay also runs on dedicated
+`c8a.4xlarge` instance `i-01f8c56b7a53a1178`, run `20260818T014906Z`. Do not stop either instance
+until its supervisors finish and upload their final artifacts.
 
 At 2026-08-18 00:12 UTC the census still had all 815 second-cut blocks represented, including 48 of
 70 freshly recomputed blocks, and had emitted 1,688 targets but no endpoint or full-state record.
@@ -333,6 +334,15 @@ It was healthy at one core and 8,861.5 MiB RSS. The concurrent fourteen-worker v
 in run9 coloring's `k=7` barrier at 1,399% CPU and 1,296.6 MiB RSS; the host had 112.4 GiB available
 and no swap. The census S3 `STATUS` object is still the launch snapshot; use the live output or final
 artifact, not that stale object, for progress. Exact operational paths are in [aws-run.md](aws-run.md).
+
+At 2026-08-18 02:08:09 UTC the dedicated sixteen-worker verifier had passed its remote regression,
+input hashes, normalization and byte round-trip. Pre-color k=7 minimalization produced the same
+2,507,270 facts as the old run in 77.17 seconds versus 713.01 seconds on the shared host. Coloring
+then finished all 108,083 three-part targets quickly but only 124 four-part targets over the next
+four minutes, 0.517/s, with zero unresolved. Advancing node cursors show deep enumeration rather
+than a stall. The local-rate extrapolation is roughly 54 days, so the twelve-hour cap is likely to
+make this a diagnostic rather than a completion unless later regions become far cheaper. Use
+`tools/run9_verifier_progress_status.sh 20260818T014906Z` for completed-work telemetry.
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
@@ -613,8 +623,8 @@ negative records, and the 106 MB readable certificate round-trips byte-identical
 `zstd -19`). A bounded top-layer pass verified all sixteen `k=9` roots and cited all 2,545
 canonical `k=8` facts; it stopped before checking any of those facts. This is not a proof replay.
 
-A complete end-to-end verifier replay of the new 3.17-million-fact run9 DAG is now running on AWS,
-but has not yet completed. The launch reproduced the normalized input at the known SHA-256 and
+A first complete end-to-end verifier replay of the new 3.17-million-fact run9 DAG is running on the
+shared AWS host but has not yet completed. The launch reproduced the normalized input at the known SHA-256 and
 completed pre-color minimalization with fourteen workers while leaving two of sixteen vCPUs
 unassigned. The dominant `k=7` level retained 2,507,270 of 2,576,885 facts (97.30%) after 713.01
 seconds. Coloring verified the sixteen `k=9` roots and all 2,151 minimal `k=8` targets; those cited
@@ -632,6 +642,17 @@ the next proof milestone. The same supervisor will replay the resulting bundle. 
 `tools/run9_verifier_status.sh`; exact evidence is in
 [`../evidence/run9_verifier_aws_2026-08-17.txt`](../evidence/run9_verifier_aws_2026-08-17.txt).
 This remains an optional trust-base strengthening, not an H3 dependency.
+
+A second clean replay now runs independently on right-sized on-demand `c8a.4xlarge`
+`i-01f8c56b7a53a1178`. Unlike the frozen first binary, it publishes exact completed/claimed/active
+counts, per-part progress, recursion-node rate and the three oldest active states every minute.
+The telemetry immediately exposed the cost transition: three-part states reached 191/s, whereas
+the first four complete four-part intervals delivered only 0.467--0.550 target/s despite 15--17
+million recursion nodes/s. Active facts turn over with advancing 2^20-node cursors, so this is
+algorithmic enumeration cost, not deadlock or scheduler imbalance. The status helper now adds a
+latest-window projection because the frozen binary's total/EWMA ETAs lag this ordered regime
+change. Exact launch hashes and measurements are in
+[`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
 
 The packed product-profile verifier index and its adaptive block summaries are now deployed.
 Canonical facts remain untouched for stable hashes and text output; a separate immutable
@@ -804,10 +825,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Let both AWS follow-ups finish and archive their final output before stopping the instance.**
-   These are the separate k=8 Pareto-prefix census and the run9 certificate coloring/replay. The Sa
-   solver artifacts and final sidecars are already preserved; use
-   `tools/run9_verifier_status.sh` for a bounded verifier query.
+0. **Let all three AWS follow-ups finish and archive their final output before stopping their
+   instances.** These are the k=8 Pareto-prefix census, the old-index run9 replay on the shared host,
+   and the progress-reporting replay on the dedicated host. The Sa solver artifacts and final
+   sidecars are already preserved; use `tools/run9_verifier_status.sh` for the old replay and
+   `tools/run9_verifier_progress_status.sh 20260818T014906Z` for completed-work telemetry.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are

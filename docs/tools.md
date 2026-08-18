@@ -141,9 +141,11 @@ to duplicate per worker.
 Long batches can expose a live, completed-work cursor with `VERIFY_PROGRESS_SECONDS=N`. Each
 interval reports completed/claimed/queued targets, verified/unresolved counts, cumulative/window/
 EWMA throughput, cumulative recursion nodes, progress by `k` and part count, and the three oldest
-active facts with their age and a coarse recursion-node cursor. `eta_total_s` and `eta_ewma_s` are
-explicit throughput projections, not deadlines: canonical task order changes the cost mix, so use
-the two estimates together with `PROGRESS_PARTS` and active ages. `BATCH_START` and `BATCH_DONE`
+active facts with their age and a coarse recursion-node cursor. `eta_total_s`, `eta_window_s` and
+`eta_ewma_s` are explicit throughput projections, not deadlines: canonical task order changes the
+cost mix, so use the estimates together with `PROGRESS_PARTS` and active ages. `eta_window_s` reacts
+immediately to a new cost region but is noisy; total and EWMA projections retain earlier history.
+`BATCH_START` and `BATCH_DONE`
 remain exact machine-readable boundaries even when periodic reporting is disabled. The reporter
 adds no atomic operation to dominance scans; an active worker publishes its node cursor only every
 2^20 recursion nodes and all other counters update once per completed target.

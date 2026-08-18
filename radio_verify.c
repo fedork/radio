@@ -1922,6 +1922,8 @@ static void print_batch_progress(Batch *b, size_t *last_done, double *last_time,
            *ewma_rate, nodes, nodes / (elapsed > 0 ? elapsed : 1));
     if (total_rate > 0) printf("eta_total_s=%.0f ", (b->ntasks - done) / total_rate);
     else printf("eta_total_s=unknown ");
+    if (window_rate > 0) printf("eta_window_s=%.0f ", (b->ntasks - done) / window_rate);
+    else printf("eta_window_s=unknown ");
     if (*ewma_rate > 0) printf("eta_ewma_s=%.0f\n", (b->ntasks - done) / *ewma_rate);
     else printf("eta_ewma_s=unknown\n");
 
