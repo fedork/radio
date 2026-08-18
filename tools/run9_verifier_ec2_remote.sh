@@ -269,7 +269,7 @@ run_phase run9-progress-bench "$RSS_GIB" bench.out bench.err \
     env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=bench" VERIFY_THREADS="$THREADS" \
         VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
         "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" \
-        7 0 1 3 4 4 "$BENCH_STRIDE" 0 7
+        7 3 1 3 4 4 "$BENCH_STRIDE" 0 7
 "$SOURCE_DIR/tools/check_provenance.py" bench.out > bench-provenance.txt
 grep -Eq '^TOTAL verified [0-9]+, unverified 0, budget 0,' bench.out
 bench_done=$(awk '/^BATCH_DONE / {for(i=1;i<=NF;i++) if($i ~ /^completed=/) {split($i,a,"[=/]"); print a[2]}}' bench.out | tail -n 1)
@@ -292,7 +292,7 @@ run_phase run9-progress-verify-k7 "$RSS_GIB" verify-k7.out verify-k7.err \
     env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify-k7" VERIFY_THREADS="$THREADS" \
         VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
         "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" \
-        7 0 1 3 0 999 1 0 7
+        7 3 1 3 0 999 1 0 7
 "$SOURCE_DIR/tools/check_provenance.py" verify-k7.out > verify-k7-provenance.txt
 grep '^TOTAL verified ' verify-k7.out | tail -n 1 > verify-k7.total
 grep -Eq "^TOTAL verified $K7_FACTS, unverified 0, budget 0," verify-k7.total
@@ -301,7 +301,7 @@ set_stage VERIFY_LOWER
 run_phase run9-progress-verify-lower "$RSS_GIB" verify-lower.out verify-lower.err \
     env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify-lower" VERIFY_THREADS="$THREADS" \
         VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
-        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" 6
+        "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" 6 3
 "$SOURCE_DIR/tools/check_provenance.py" verify-lower.out > verify-lower-provenance.txt
 grep '^TOTAL verified ' verify-lower.out | tail -n 1 > verify-lower.total
 grep -Eq "^TOTAL verified $LOWER_FACTS, unverified 0, budget 0," verify-lower.total
@@ -311,7 +311,7 @@ run_phase run9-progress-verify-upper "$RSS_GIB" verify-upper.out verify-upper.er
     env RADIO_RUN_CONTEXT="run_id=$RUN_ID; stage=verify-upper" VERIFY_THREADS="$THREADS" \
         VERIFY_PROGRESS_SECONDS="$PROGRESS_SECONDS" stdbuf -oL -eL \
         "$SOURCE_DIR/tools/run_with_provenance.py" "./$BINARY" "$WORK/run9-sanitized.cert" \
-        9 0 1 3 0 999 1 0 8
+        9 3 1 3 0 999 1 0 8
 "$SOURCE_DIR/tools/check_provenance.py" verify-upper.out > verify-upper-provenance.txt
 grep '^TOTAL verified ' verify-upper.out | tail -n 1 > verify-upper.total
 grep -Eq "^TOTAL verified $UPPER_FACTS, unverified 0, budget 0," verify-upper.total

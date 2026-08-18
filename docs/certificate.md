@@ -94,8 +94,8 @@ down, using only the split semantics and the proved Singleton Majorization, Unit
 and Subgraph Monotonicity theorems. It has verified the full `Sa(113)` k=9 ladder—304,105 negative
 facts across k=2..8—with zero unverified.
 
-Two end-to-end run9 coloring attempts were stopped on 2026-08-18 after establishing that the
-current checker is not economical at this scale. The instrumented sixteen-core run completed only
+Two end-to-end run9 coloring attempts were stopped on 2026-08-18 after establishing that those
+checker builds were not economical at this scale. The instrumented sixteen-core run completed only
 119,649/2,505,858 k=7 targets in 11,460.1 seconds, despite 105,605,161,144 recursion nodes and zero
 unresolved/budget outcomes; the older fourteen-worker run had spent about 12h28m at the same
 barrier. Neither produced a colored certificate or replay verdict. This does not change the
@@ -107,7 +107,8 @@ records are in
 
 Full coloring is deferred until the certificate design changes. The current checker independently
 searches split space for every negative fact; top-down coloring decides which such searches to run
-but does not make them cheap. The next prototype should have the solver record a compact coverage
+but does not itself make them cheap. A subsequently optimized ordinary, non-coloring audit is a
+separate bounded attempt; the next certificate prototype should still have the solver record a compact coverage
 proof—ranges or subboxes of tests annotated with the rejecting outcome and cited lower-level fact—so
 the independent checker validates coverage and citations instead of reconstructing the proof by
 search. The readable text envelope remains appropriate; binary packing should remain an internal
@@ -204,7 +205,14 @@ pairwise forward checking through 512 options reduced the five-root control from
 4,690,828 recursion nodes and from 21.00 to 5.34 seconds. Pair rows have a 128-MiB-per-worker
 fail-open ceiling. Complete run9 k=6 and k=7 antichain passes reproduced 229,341 and 2,507,270
 minimal facts in 3.8 and 49.8 seconds locally. The complete 120,302-record Sa(113) replay retained
-its established 2,491,283,058 nodes and closed with zero gaps.
+its established 2,491,283,058 nodes and closed with zero gaps under the then-current group order.
+
+A later missing control changed only the order in which parent parts are enumerated: descending
+segment mass, then descending long side. On twenty roots spread across the dominant run9 k=7
+four-part level it reduced 41,945,991 canonical-order nodes to 5,336,038. The complete Sa(113)
+replay again verified all 120,302 records with zero gaps, now in 330,226,371 nodes and 25.10 seconds
+on twelve workers instead of 2,491,283,058 nodes and 119.19 seconds. This traversal permutation is
+now the default; the former order and two failed alternatives remain selectable controls.
 
 These measurements justify a bounded ordinary audit of the existing run9 facts, not a return to
 coloring. The dedicated pipeline first times 9,995 representative k=7 four-part facts and aborts if

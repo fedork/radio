@@ -16,7 +16,8 @@ the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correc
 `n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
 proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
 separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
-attempts were stopped after measuring that independent proof search is slower than the solver).
+attempts were stopped; a new kd-indexed ordinary audit is in its bounded sample gate without
+reviving coloring, while a measured mass-descending part order is ready for its clean rerun).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -323,13 +324,24 @@ Do not run `gh auth switch`.
 ## Running now
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
-reported UNSOLVABLE. The only active research job is the k=8 Pareto-prefix census on shared AWS
-instance `i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 05:07:48 UTC it remained healthy
+reported UNSOLVABLE. The k=8 Pareto-prefix census remains active on shared AWS instance
+`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 05:07:48 UTC it remained healthy
 at one core and 8,903.2 MiB RSS, with 113.7 GiB host memory available and no swap. It had all 815
 second-cut blocks represented, 48 of 70 freshly recomputed blocks, 1,688 targets, 1,893 endpoints
 and 991 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
 the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact rather than that
 stale object.
+
+An ordinary run9 audit is also active on separate on-demand `c8a.4xlarge` instance
+`i-066a6cd0b7f66d581`, run `20260818T055255Z`, from clean commit `cbc3ead`. It does no coloring.
+Regression, raw hash, normalization and byte round-trip passed; its deterministic 9,995-fact k=7
+sample gate began at 2026-08-18 05:53:58 UTC. The first complete minute verified 198/9,995 facts
+with zero gaps at 3.300/s, 1,472% CPU, 1,359.6 MiB RSS and zero swap. Do not extrapolate that first
+canonical slice: the complete sample automatically aborts if its full-level projection exceeds
+seven days. This frozen run explicitly uses the former canonical-n part order and is the before
+measurement; it will not be mutated. A newly measured descending-segment-mass order is the intended
+clean rerun. If accepted, k=7, k<=6 and k=8..9 are retained separately. Live status:
+`tools/run9_verifier_progress_status.sh 20260818T055255Z`.
 
 Both optional run9 coloring attempts were intentionally interrupted on 2026-08-18 with exit 130,
 after their supervisors uploaded final diagnostics. The old fourteen-worker shared-host build had
@@ -671,6 +683,17 @@ from 21.00 to 5.34 seconds. Pair rows have a 128-MiB-per-worker fail-open ceilin
 k=6/k=7 antichain passes reproduce 229,341/2,507,270 minimal facts in 3.8/49.8 seconds. A twelve-
 worker complete Sa(113) guard again closed all 120,302 records and exactly 2,491,283,058 nodes, with
 zero gaps.
+
+The missing traversal control was segment mass in the opposite direction from the rejected
+mass-ascending experiment: enumerate parent parts by descending mass, then descending long side.
+This is a sound permutation of the same Cartesian product. On twenty roots spread across all
+2,398,799 k=7 four-part facts it reduced canonical-n search from 41,945,991 nodes / 44.88 seconds
+to 5,336,038 / 7.48 seconds. A 100-root spread sample closed 100/100 with zero gaps in 30,978,940
+nodes / 40.58 seconds. Most importantly, a complete twelve-worker Sa(113) replay again verified
+all 120,302 records with no gaps, while dropping from 2,491,283,058 nodes / 119.19 seconds to
+330,226,371 / 25.10 seconds. The new order is now the local production default; every supported
+order agrees on the committed closed multi-part regression fixture, and a forced-kd ASan+UBSan run
+closed five run9 roots without an error.
 
 This improvement justifies one bounded ordinary run9 audit without reviving coloring. The remote
 pipeline first verifies a deterministic 9,995-fact k=7 sample and aborts if it projects above seven

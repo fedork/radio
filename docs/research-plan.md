@@ -378,14 +378,18 @@ Disposition and next design work:
    injection matching. Together with bounded 512-option pairwise forward checking, the five-root
    k=7 control fell from 21.00 seconds / 9,158,686 nodes to 5.34 seconds / 4,690,828 nodes. Complete
    k=6 and k=7 antichain passes reproduce 229,341 and 2,507,270 minima in 3.8 and 49.8 seconds.
+   A subsequent descending-segment-mass part order reduced a twenty-root level-spread sample from
+   41,945,991 to 5,336,038 nodes and a complete Sa(113) replay from 2,491,283,058 to 330,226,371
+   nodes, with all 120,302 records still verified and no gaps.
    Soundness, memory caps and the Sa(113) guard are in
    [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt);
 7. **One bounded ordinary run9 audit is now justified, without coloring.** The dedicated pipeline
    first verifies a deterministic 9,995-fact k=7 sample and refuses the multi-day phase if it
    projects beyond seven days. It then retains k=7, k<=6 and k=8..9 as separate checkpoints on a
    right-sized on-demand host. Spot remains inappropriate until the dominant level has a restart
-   cursor. This is an empirical completion attempt, not a claim that search repetition is the ideal
-   certificate design;
+   cursor. The first frozen sample uses the former canonical-n order as a before measurement; a
+   clean mass-descending rerun is the intended audit. This is an empirical completion attempt, not
+   a claim that search repetition is the ideal certificate design;
 8. keep readable text as the durable envelope, but make the solver emit split-space coverage if the
    bounded audit is still uneconomic: compact ranges/subboxes annotated with the outcome and
    lower-level fact (or theorem) that rejects them. The checker should validate an auditable cover

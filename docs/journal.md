@@ -1895,7 +1895,7 @@ node counts.
 | pairwise narrowing as CSP forward checking | 1.25x fewer nodes, **1.12x** wall |
 | combined, k=4 of the k=9 ladder | 123.4 s -> **91.2 s** |
 | subtree DP on the prefix state | **net 2.4x LOSS** — abandoned |
-| group ordering: ascending / fewest-options-first | 3.8x / 1.09x **worse** than canonical descending |
+| group ordering: mass-ascending / fewest-options-first | 3.8x / 1.09x **worse** than canonical descending |
 
 - **Bucketing the fact set by part count is irrelevant.** The direct-mapped memo intercepts
   99.996% of refutation queries (4.30 G hits, 7,646 misses); only 2.1 M reach the index.
@@ -7141,3 +7141,45 @@ right-sized choice. The long k=7 level has no restart cursor, so on-demand is ju
 not. If the measured gate still fails, explicit solver-emitted split-space coverage remains the
 next design rather than buying a larger instance. Full local commands, hashes and controls are in
 `evidence/verifier_kd_index_2026-08-18.txt`.
+
+The clean implementation commit `cbc3eade963ca93e9986be614f6c91557c762fda` was pushed before
+launch. Run `20260818T055255Z` then started on on-demand `c8a.4xlarge` instance
+`i-066a6cd0b7f66d581`; the exact source bundle SHA-256 is
+`9d89857e4449b51f7d0283d9bf178d4bb96b6fd66c9f4912fb2ef8cd670e0a07`. Remote regression, raw
+hash, normalization and byte round-trip passed before the sample. Its first complete minute closed
+198/9,995 sampled four-part facts with zero gaps at 3.300/s, 1,472% CPU, 1,359.6 MiB RSS and no
+swap. That local-window extrapolation is about 8.4 days and is not the decision: the canonical
+sample spans the whole level, and the committed supervisor will apply the seven-day gate only to
+its complete measured wall. Live data is under
+`s3://radio-sa193-393287594714/run9-verifier-progress/20260818T055255Z/`.
+
+### The missing group-order control is the largest verifier win
+
+The first EC2 gate froze canonical descending long-side order, as it should: changing code under a
+running benchmark would have destroyed provenance. While it ran, the layout proposal prompted the
+control that the 2026-08-04 experiment had omitted. That experiment tried segment mass ascending
+and fewest-options-first; it never tried **segment mass descending**. Sorting parent parts by
+descending `n*m`, then descending `n`, is only a traversal permutation of the same Cartesian
+product. Equal parts stay adjacent, complement symmetry still fixes one global flip, and all
+assignments are visited.
+
+The direction matters dramatically. On twenty k=7 four-part roots selected evenly across all
+2,398,799 such run9 facts, canonical-n order took 41,945,991 nodes / 44.88 seconds on one M4 Pro
+core. Mass-descending took 5,336,038 / 7.48 seconds: 7.86x fewer nodes and 5.99x less wall.
+Mass-ascending took 52,998,146 nodes / 42.49 seconds on a five-root spread control, so this is not a
+generic sorting effect. A 100-root spread sample then verified 100/100 with zero gaps in 30,978,940
+nodes / 40.58 seconds. Increasing the forward-check cutoff from 512 to 1,024 left the twenty-root
+canonical control at exactly 41,945,991 nodes and essentially unchanged wall, so that change was
+rejected.
+
+The cross-level guard was stronger. A new twelve-worker full Sa(113) replay verified every one of
+120,302 records with zero unresolved/budget results. Its search fell from 2,491,283,058 nodes /
+119.19 seconds under canonical-n order to 330,226,371 / 25.10 seconds under mass-descending. A
+forced-kd ASan+UBSan build also verified five run9 roots without an error. The regression now runs
+all four supported group orders on one closed multi-part fixture and rejects invalid selectors.
+
+Mass-descending is therefore the production default for the clean rerun. The active
+`20260818T055255Z` instance remains an immutable canonical-order before measurement and will be
+allowed to reach its committed sample gate. Only after its final upload is checked and its exact
+instance is terminated should a new clean source bundle launch. This separation costs less than an
+hour of instance time and makes the speedup, provenance and operational decision auditable.

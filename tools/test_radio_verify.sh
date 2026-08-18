@@ -26,6 +26,19 @@ grep -Eq '^BATCH_START phase=verify k=all targets=11 threads=2 progress_seconds=
 grep -Eq '^BATCH_DONE phase=verify k=all completed=11/11 verified=11 unverified=0 budget=0 nodes=6 ' \
     "$work_dir/parallel.out"
 
+# Part enumeration order is a performance choice, not a proof rule.  Keep every supported
+# ordering on the same closed multi-part fixture so a new default cannot silently change verdicts.
+for order in 0 1 2 3; do
+    VERIFY_THREADS=1 VERIFY_MEMO_BITS=18 \
+        "$work_dir/radio_verify" "$fixture" 2 "$order" > "$work_dir/order-$order.out"
+    grep -Eq 'TOTAL verified 11, unverified 0, budget 0,' "$work_dir/order-$order.out"
+done
+if "$work_dir/radio_verify" "$fixture" 2 4 > "$work_dir/invalid-order.out" 2>&1; then
+    echo 'invalid group order was accepted' >&2
+    exit 1
+fi
+grep -Eq '^group order must be 0\.\.3$' "$work_dir/invalid-order.out"
+
 for workers in 1 2; do
     TOPDOWN=2 MINIMIZE_BEFORE_COLOR=1 VERIFY_THREADS=$workers VERIFY_MEMO_BITS=18 \
         CERT_OUT="$work_dir/colored-$workers.cert" \
@@ -78,4 +91,4 @@ if VERIFY_PROGRESS_SECONDS=invalid "$work_dir/radio_verify" "$fixture" 2 \
 fi
 grep -Eq 'VERIFY_PROGRESS_SECONDS must be in 0\.\.86400' "$work_dir/invalid-progress.out"
 
-echo 'radio_verify regression: serial, parallel, coloring, block/kd minimalization, progress and text replay OK'
+echo 'radio_verify regression: serial, parallel, group orders, coloring, block/kd minimalization, progress and text replay OK'

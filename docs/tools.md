@@ -56,6 +56,12 @@ worker owns its recursion state, memo and lazy live/pair tables. The default per
 with worker count so aggregate direct-memo capacity stays near the single-thread `2^24` entries;
 override it with `VERIFY_MEMO_BITS` only for a measured comparison.
 
+Parent parts are enumerated by descending segment mass, then descending long side. This is only a
+Cartesian-product traversal order; it does not omit assignments. It reduced a twenty-root spread
+sample of the dominant run9 k=7 four-part level from 41,945,991 to 5,336,038 recursion nodes. Pass
+`group_order=0` after `MAX_K` for the former canonical-long-side control; modes 1 and 2 retain the
+mass-ascending and fewest-options controls.
+
 The default static dominance index keeps the canonical fact array unchanged and builds a separate
 read-only `(part count,largest segment product,total mass)` permutation. Its hot structure-of-arrays
 columns contain total mass plus packed sorted n, m and top-four segment-product profiles. Those are
@@ -85,6 +91,11 @@ and
 [`../evidence/verifier_block_pareto_2026-08-17.txt`](../evidence/verifier_block_pareto_2026-08-17.txt),
 with the production hierarchy in
 [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
+
+With the mass-descending part order, the full 120,302-record Sa(113) replay remained gap-free and
+fell from the prior 2,491,283,058 nodes / 119.19 seconds to 330,226,371 nodes / 25.10 seconds on
+twelve workers. Group order changes proof-search cost and cited witnesses, so node equality with
+the old order is not expected; complete verdict agreement is the correctness control.
 
 The durable input/output format is text, and is deliberately simpler than a raw log:
 

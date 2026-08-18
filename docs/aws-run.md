@@ -9,14 +9,14 @@ diagnostics and the remaining census on the original shared instance; the findin
 | | |
 |---|---|
 | shared instance | `i-0005d74f985c52ae1`, `r7iz.4xlarge` (16 vCPU, 128 GB), us-west-2b, on-demand |
-| dedicated verifier | `i-01f8c56b7a53a1178`, run `20260818T014906Z`: **terminated 2026-08-18** after final uploads were hash-checked; its 30-GiB root volume was `DeleteOnTermination=true` |
+| dedicated verifier | `i-066a6cd0b7f66d581`, run `20260818T055255Z`, on-demand `c8a.4xlarge`: canonical-order audit sample gate active as the before measurement; mass-descending rerun pending |
 | active Sa solvers | none — run3, run8 and run9 all completed 16/16 roots |
-| active jobs | shared host: `pareto_k8_aws` only; both `run9_verify` processes were intentionally stopped |
+| active jobs | shared host: `pareto_k8_aws`; dedicated host: optimized `run9_verify_p` audit (no coloring) |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
-| active memory guards | shared host: 20 GiB census; its joint/idle guards remain live |
-| completion | the census supervisor finalizes to S3; do not stop its host before that upload is checked |
+| active memory guards | shared host: 20 GiB census; dedicated verifier: 24 GiB per phase and 128 MiB pair rows per worker |
+| completion | each supervisor finalizes to S3; do not stop either host before its upload is checked |
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
@@ -72,6 +72,25 @@ input and color log were streamed back and matched that manifest. Instance
 approximate on-demand compute cost from launch through finalization was **$2.79**. Exact identifiers,
 bootstrap lessons, snapshots and final hashes are in
 [`../evidence/verifier_progress_2026-08-17.txt`](../evidence/verifier_progress_2026-08-17.txt).
+
+At **2026-08-18 05:53:00 UTC**, ordinary audit run `20260818T055255Z` launched on
+on-demand `c8a.4xlarge` instance `i-066a6cd0b7f66d581`. Its clean source commit is
+`cbc3eade963ca93e9986be614f6c91557c762fda`; source-bundle SHA-256 is
+`9d89857e4449b51f7d0283d9bf178d4bb96b6fd66c9f4912fb2ef8cd670e0a07`; and its live prefix is
+`s3://radio-sa193-393287594714/run9-verifier-progress/20260818T055255Z/`. This run deliberately
+does no coloring. Remote regression, raw-source hash, normalization and byte round-trip passed.
+It then entered a deterministic 9,995-fact sample across the k=7 four-part level. At the first
+complete minute it had verified 198 facts with zero gaps at 3.300/s, 1,472% CPU, 1,359.6 MiB RSS
+and zero swap. That one-minute projection is about 8.4 days and is not the gate result: canonical
+cost varies, so the pipeline waits for the complete sample and automatically refuses the full k=7
+phase if its measured projection exceeds seven days. If accepted, k=7, k<=6 and k=8..9 become
+separately retained checkpoints. The seven-day phase cap, nine-day host stop and 24-GiB RSS guard
+bound the attempt. This frozen source explicitly uses the former canonical-n part order. A later
+local control found that descending segment mass, then descending long side reduces a twenty-root
+level-spread sample from 41,945,991 to 5,336,038 nodes and a complete Sa(113) replay from
+2,491,283,058 to 330,226,371 nodes, with zero gaps. The original gate remains unmodified as a
+before measurement; its replacement will launch only from a clean commit. Spot is not used because
+k=7 has no intra-level restart cursor.
 
 Neither interrupted run was promoted to a GitHub release. The 106-MB normalized input is a derived
 duplicate of the durable run9 raw proof source, and no completed proof object resulted. The small,

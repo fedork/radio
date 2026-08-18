@@ -46,10 +46,11 @@
 //   TOPDOWN=6 ROOTS=roots.cert MINIMIZE_BEFORE_COLOR=1 CERT_OUT=proof.cert \
 //       tools/run_with_provenance.py ./radio_verify <log> 6
 //
-// Group order 0 (canonical descending) is the best of the three tried: ascending is 3.8x more
-// nodes, fewest-options-first 1.09x. Option order WITHIN a group is provably irrelevant for a
-// fact that verifies - the whole tree is enumerated, and the node set depends on the prefix as
-// a set of assignments, not on the order they are tried in.
+// Group order 3 (descending segment mass, then long side) is the production default. On twenty
+// run9 k=7 roots spread across the four-part level it reduced canonical-n order from 41,945,991 to
+// 5,336,038 nodes. Mass-ascending and fewest-options-first are retained as controls. Option order
+// WITHIN a group is provably irrelevant for a fact that verifies: the whole tree is enumerated,
+// and the node set depends on the prefix as a set of assignments, not on their iteration order.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1792,7 +1793,7 @@ static int g_fcen = 1, g_fcmin = 3;
 static int g_minp = 0, g_maxp = 999, g_stride = 1, g_mink = 1;
 static long long sel = 0;                 /* serial compatibility path; parallel selects centrally */
 static int g_bench = 0;
-static int g_order = 0;                  /* 0 desc (canonical) 1 asc 2 fewest-options-first */
+static int g_order = 3;                  /* 0 n-desc, 1 mass-asc, 2 fewest options, 3 mass-desc */
 static TLS long long np_nodes[MAXP + 1], np_facts[MAXP + 1];
 static TLS long long cost_hist[24], cost_sum, budget_out;
 static TLS Fact g_perm;
@@ -1817,9 +1818,10 @@ static int verify(const Level *below, const Fact *s, int k) {
             int v = ord[i];
             for (j = i - 1; j >= 0; j--) {
                 int a = ord[j], better;
-                if (g_order == 1) better = (s->p[a].n * s->p[a].m > s->p[v].n * s->p[v].m);
-                else better = (ln[a] > ln[v]) || (ln[a] == ln[v] &&
-                               s->p[a].n * s->p[a].m > s->p[v].n * s->p[v].m);
+                int ma = s->p[a].n * s->p[a].m, mv = s->p[v].n * s->p[v].m;
+                if (g_order == 1) better = ma > mv;
+                else if (g_order == 2) better = (ln[a] > ln[v]) || (ln[a] == ln[v] && ma > mv);
+                else better = (ma < mv) || (ma == mv && s->p[a].n < s->p[v].n);
                 if (!better) break;
                 ord[j + 1] = a;
             }
@@ -2487,6 +2489,9 @@ int main(int argc, char **argv) {
     memo_bits = default_memo_bits(threads);
     { char *e = getenv("VERIFY_MEMO_BITS"); if (e) memo_bits = atoi(e); }
     if (argc > 3) g_order = atoi(argv[3]);
+    if (g_order < 0 || g_order > 3) {
+        fprintf(stderr, "group order must be 0..3\n"); return 2;
+    }
     { char *e = getenv("BENCH_K"); if (e) g_bench = atoi(e); }
     { char *e = getenv("NODECAP"); if (e) g_nodecap = atoll(e); }
     { char *e = getenv("TIMECAP"); if (e) g_timecap = atof(e); }

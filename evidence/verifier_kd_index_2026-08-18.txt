@@ -107,6 +107,40 @@ from the private release
 
 https://github.com/fedork/radio-data/releases/tag/verifier-pipeline-2026-08-17
 
+## Part-ordering result after the first launch
+
+The first clean EC2 launch deliberately froze the then-default group order: canonical descending
+long side (`group_order=0`). While that sample was running, a missing control suggested by the
+intended physical layout was tested: enumerate the parent segments by **descending segment mass,
+then descending long side**. This is only a permutation of a Cartesian product. Parts are a
+multiset, equal parts remain adjacent, complement symmetry attaches to whichever part is first,
+and every surviving assignment is still enumerated. It changes neither an admissibility condition
+nor a citation.
+
+This was the largest verifier improvement in the sequence. All rows are one-worker Apple M4 Pro
+measurements with `VERIFY_MEMO_BITS=20`; setup and the one-time kd build are excluded from wall:
+
+    corpus                         canonical-n nodes/wall       mass-desc nodes/wall
+    hard root                         2,400,534 / 3.93 s             137,420 / 0.28 s
+    five representative roots         4,690,828 / 6.04 s           2,361,170 / 2.95 s
+    20 level-spread roots             41,945,991 / 44.88 s          5,336,038 / 7.48 s
+    100 level-spread roots                       --                30,978,940 / 40.58 s
+
+The twenty roots were selected at equal positions across all 2,398,799 four-part k=7 facts, rather
+than from one cheap canonical prefix. Mass-descending reduced their recursion tree 7.86x and wall
+5.99x. Raising the pair cutoff again from 512 to 1,024 changed neither their 41,945,991 canonical-
+order nodes nor their wall materially (44.88 versus 44.72 seconds), so that extra memory was
+rejected. Mass-ascending and fewest-options-first controls took 52,998,146 / 42.49 seconds and
+8,229,456 / 10.39 seconds on a five-root spread sample; choosing the opposite direction is not a
+generic "sort helps" effect.
+
+The complete Sa(113) colored replay is the cross-level control. With the new default it again
+verified all 120,302 records with zero unresolved/budget outcomes, but fell from 2,491,283,058 to
+330,226,371 nodes and from 119.19 to 25.10 seconds on the same twelve-worker machine. Forced-kd
+AddressSanitizer + UndefinedBehaviorSanitizer verification of five run9 roots also closed 5/5 with
+zero gaps. `tools/test_radio_verify.sh` now runs every supported group order on the same closed
+multi-part fixture and rejects out-of-range order selectors.
+
 ## Correctness gates and disposition
 
 `tools/test_radio_verify.sh` now forces a two-fact-leaf kd build and requires its same-level
@@ -116,11 +150,15 @@ also passed both ordinary two-worker verification and the synthetic antichain. W
 `-Wall -Wextra -Wpedantic` builds passed. The provenance-complete Sa(113) output passed
 `tools/check_provenance.py`.
 
-The final local warning-clean production build used source SHA-256
+The warning-clean canonical-order launch build used source SHA-256
 `49b5233008f71ec2beb2b4d69bcaf06bedf780facf7fde746555dd46f9eb2dea`, build ID
 `40036898365b3711ae655886aaa853dd25b5d6b26e4f63f098a04363949da8af`, and binary SHA-256
-`1b45ecb28604d8c94a6e675cdbe9ddb5d9c50cf2d09168d99354eae75ae978b6`. The eventual EC2 build
-will carry the clean committed source identity separately.
+`1b45ecb28604d8c94a6e675cdbe9ddb5d9c50cf2d09168d99354eae75ae978b6`. The warning-clean local
+mass-descending build used source SHA-256
+`33d648e8de0e8af2b40f15d7860fbd62f0b223043670df8c37172b1494706d67`, build ID
+`fc58daec7292bbc61a8f54708308a4fd725c7b56ff6d6599538a29ceb3750f7b`, and binary SHA-256
+`b7f206ec6bf0edd8b9a058e57ea78975708c0c7673c939633e0a2bb1a300f68c`. The EC2 rerun will carry
+the clean committed identity separately.
 
 This result does not retract the proof-carrying design: explicit split-space coverage is still the
 preferred way to make checking proportional to proof size. It does justify one bounded full audit
@@ -130,3 +168,13 @@ coloring. It normalizes and byte-round-trips the retained raw log, checks a dete
 fact sample, refuses the expensive phase if that sample projects above seven days, then verifies
 k=7, k<=6 and k=8..9 as three separately retained checkpoints. A multi-day level has no restart
 cursor, so the production launch uses the right-sized on-demand 16-vCPU host rather than Spot.
+
+The exact canonical-order gate launch is run `20260818T055255Z`, instance
+`i-066a6cd0b7f66d581`, clean
+commit `cbc3eade963ca93e9986be614f6c91557c762fda`, source-bundle SHA-256
+`9d89857e4449b51f7d0283d9bf178d4bb96b6fd66c9f4912fb2ef8cd670e0a07`, and S3 prefix
+`s3://radio-sa193-393287594714/run9-verifier-progress/20260818T055255Z/`. Regression, raw hash,
+normalization and byte round-trip passed. The sample's first complete minute closed 198/9,995
+facts with zero gaps at 3.300/s; the complete sample, not that early canonical slice, controls the
+seven-day gate. This frozen launch is retained as the before measurement; it will not be mutated to
+pick up the subsequently discovered mass-descending order.
