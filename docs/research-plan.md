@@ -396,11 +396,22 @@ Disposition and next design work:
    CACHE_ONLY k-1 children and no recursive solving or writes. Its AWS gate rejects the full run if
    either projected wall exceeds 24 hours or projected CPU exceeds the complete 419,353.1-second
    cold solver. The gate closed 9,995/9,995 with zero gaps in 81.200 wall / 1,293.979 CPU seconds,
-   projecting 19,488 wall / 310,555 CPU seconds; full k=7 is now running. It uses the complete
-   normalized certificate because the colored Sa(113) control is missing nine required supports.
+   projecting 19,488 wall / 310,555 CPU seconds. The full replay then verified all 3,126,190 claims
+   with zero gaps across retained k=7, k<=6 and k=8..9 checkpoints. Its capped phases took 20,845
+   wall seconds; worker epochs used 318,771.171 CPU seconds, 76.015% of the complete solver, and
+   peak RSS was 1.24 GB. The exact payload is release-verified under
+   [`sa193-frozen-refute-2026-08-18`](https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18).
+   It uses the complete normalized certificate because the colored Sa(113) control is missing nine required supports.
    Architecture, controls and exact measurements are in
    [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt);
-8. keep readable text as the durable envelope, but make the solver emit split-space coverage if the
+8. **Next measured optimization:** keep readable text as the durable envelope and instrument the
+   frozen child-query path. The completed k=7 epoch averaged 15.985 active cores on sixteen workers,
+   while a twelve-worker Sa(113) profile put 34.7% of runnable samples directly in full-star
+   majorization. Test L1 -> explicit/trie -> theorem ordering in the frozen epoch, a compact exact
+   fact hash, L1 associativity/size, and `RB_TRIGGER` only after counters report exact, dominance,
+   theorem and reachability hit rates. Then serialize a contiguous derived cache image so repeated
+   and distributed shards do not each pay the roughly 290-second cache load. This is a constant-
+   factor programme; separately make the solver emit split-space coverage if the
    bounded audit is still uneconomic: compact ranges/subboxes annotated with the outcome and
    lower-level fact (or theorem) that rejects them. The checker should validate an auditable cover
    and exact citations, not rediscover it. Start with one retained hard k=7 fact and require checker

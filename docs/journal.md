@@ -7254,12 +7254,60 @@ four-part projection is 19,488 wall / 310,555 CPU seconds: 5.41 hours and 74.06%
 cold solver's 419,353.1 CPU seconds. Both automatic gates passed, and full k=7 began at 07:47:30
 UTC. The 8-GiB RSS cap, 24-hour phase cap, 36-hour host stop and separately uploaded level
 checkpoints bound the unattended run. Live cache, freeze, batch, ETA and oldest-active-root state
-is available from `tools/run9_refute_status.sh 20260818T074026Z`. Full commands and comparisons are
+was available from `tools/run9_refute_status.sh 20260818T074026Z`. Full commands and comparisons are
 in `evidence/verifier_frozen_trie_2026-08-18.txt`. The retained full-k=7 process rebuilt the cache
 in 291.931 seconds, froze 772 tables / 383,875 options in 0.112 seconds with checksum
 `828a877ab5649882`, and entered its exact 2,576,885-claim worker batch. At its first 60-second
 checkpoint it had completed 82,863 with zero gaps. At 180 seconds it had completed 188,695 with
 zero gaps and all displayed active roots were four-part, confirming that the expensive region was
 advancing rather than merely the cheap prefix. RSS was 1,203.7 MiB with 28.9 GiB host memory
-available and no swap. The completed four-part sample, not the short mixed-region ETA, remains the
-forecast.
+available and no swap. At that checkpoint the completed four-part sample, not the short
+mixed-region ETA, controlled the forecast; the completed result follows below.
+
+## 2026-08-18 — complete frozen replay archived; child-query path is next
+
+Run `20260818T074026Z` completed normally. The k=7 checkpoint verified 2,576,885/2,576,885 claims
+with zero gaps in 3,437,350,318,801 accepted prefixes. Its worker epoch took 19,811.819 wall and
+316,683.839 CPU seconds; the capped phase, including the 291.931-second serial cache build, took
+20,113 seconds and peaked at 1.24 GB RSS. The lower checkpoint verified 546,744/546,744 in
+129.665 wall / 2,072.754 CPU seconds and the upper checkpoint verified 2,561/2,561 in 0.914 wall /
+14.578 CPU seconds, also with zero gaps. Across the three retained phases, all 3,126,190 claims
+closed in 20,845 capped wall seconds (5h47m25s). Worker epochs used 318,771.171 CPU seconds, or
+76.015% of the proof-producing solver's 419,353.1 seconds. Thus the measured end result passes the
+user's “verifier must not be slower than the solver” baseline, with the deliberate qualification
+that it shares the solver core and is validation rather than implementation-independent proof.
+
+Every S3 object named by the final manifest was downloaded and hash-checked. The exact payload,
+including the full normalized certificate, all raw outputs, binary and source provenance, guards,
+benchmark and inner manifest, was packaged as a 15,605,760-byte tar with SHA-256
+`40d6b2aad35e7b7319c9b5558e645f11440eaccdb6377547cbc52b4604e7da06`. Private release
+[`sa193-frozen-refute-2026-08-18`](https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18)
+was then independently downloaded, decompressed, byte-counted and SHA-256 checked by
+`tools/artifacts.sh verify`. Only after both checks, stopped instance `i-0cb3783e937115ff1` was
+terminated. Its sole root volume `vol-0dfe51cb88d605ffd` had `DeleteOnTermination=true`; the shared
+census host was not touched. A subsequent AWS lookup returned `InvalidVolume.NotFound`, confirming
+that the verifier volume was deleted.
+
+The completed measurements change the optimization priority. K=7 worker CPU divided by wall is
+15.985 on sixteen workers, so task dispatch, load balance and shared-memory synchronization are
+already effectively saturated. Replacing C, adding read/write locks or making smaller batches
+would not reduce the 318,771 CPU seconds. An eight-second 1-ms macOS sample of a current-HEAD,
+twelve-worker full normalized Sa(113) replay covered 73,224 runnable worker samples: 25,425
+(34.7%) landed directly in `star_expansion_majorization_can_solve`, and 44,535 in the surrounding
+`canSolveB_ctx` body. Frozen CACHE_ONLY children currently try worker L1, then full-star
+majorization, then the immutable negative trie. Because a frozen trie negative is already a valid
+lower-level citation, the first measured variant should be L1 -> explicit/trie -> theorem fallback,
+without changing ordinary solver order.
+
+Add counters before changing it: L1 hits/collisions, explicit exact hits, dominance hits, theorem
+fallbacks, and aggregate reachability roots/build time/tests/prunes. Then test a compact flat hash
+of explicit facts, L1 size/associativity, and `RB_TRIGGER` on the retained 9,995-root gate. A
+read-only layout bucketed by `(k, part count, total pair mass, each part's pair mass, long side)` is
+still plausible, but should compete against a contiguous flattening of the current trie after the
+hit mix is known. Store explicit facts first; do not eagerly materialize the full implied closure.
+Three phase processes also spent 878.207 seconds rebuilding the same cache, so a shared process with
+separate checkpoint batches is an easy ten-minute startup saving, and a serialized derived cache
+image is the right prerequisite for cheap distributed/spot shards. Those are constant-factor and
+latency improvements. The independent-verifier direction remains solver-emitted split-space ranges
+with exact lower-fact citations, so checking scales with the cover rather than 3.463 trillion
+enumerated prefixes.

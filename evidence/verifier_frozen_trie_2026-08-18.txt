@@ -127,8 +127,81 @@ independent checker's 341.32-second mass-descending gate.  Both automatic gates 
 which meets the stated requirement rather than merely moving the independent checker's bottleneck.
 
 The retained full-k=7 process rebuilt the cache in 291.931 seconds and froze 772 tables / 383,875
-options in 0.112 seconds, publishing split checksum 828a877ab5649882.  Its exact batch size is
-2,576,885 claims on sixteen workers.  At 180 seconds it had completed 188,695 with zero gaps and
-all reported active roots were four-part, so the dominant region—not only the cheap prefix—is
-advancing.  The process used 1,203.7 MiB RSS with 28.9 GiB host memory available and no swap.  Its
-short mixed-region ETA is still deliberately not used in place of the completed four-part gate.
+options in 0.112 seconds, publishing split checksum 828a877ab5649882.  Its exact batch closed all
+2,576,885 claims with zero gaps:
+
+  accepted prefixes: 3,437,350,318,801
+  worker epoch:       19,811.819 wall s, 316,683.839 CPU s
+  capped phase:       20,113 wall s (5 h 35 m 13 s), 1.24 GB peak RSS
+  mean parallelism:   15.985 CPU/wall across 16 workers
+
+The lower checkpoint rebuilt the cache in 289.669 seconds and verified all 546,744 k<=6 claims in
+25,600,183,889 prefixes, 129.665 worker-wall / 2,072.754 CPU seconds.  Its capped phase was 427
+seconds with 1.14 GB peak RSS.  The upper checkpoint rebuilt the cache in 296.607 seconds and
+verified all 2,561 k=8..9 claims in 136,105,690 prefixes, 0.914 worker-wall / 14.578 CPU seconds.
+Its capped phase was 305 seconds with 1.11 GB peak RSS.  Therefore:
+
+  result:             3,126,190 verified, 0 gaps, exit 0
+  worker epochs:      318,771.171 CPU s (76.015% of run9's 419,353.1 CPU s)
+  capped phases:      20,845 wall s (5 h 47 m 25 s)
+  accepted prefixes: 3,463,086,608,380
+
+The exact S3 final manifest was downloaded and checked.  A self-contained 15,605,760-byte tar has
+SHA-256 40d6b2aad35e7b7319c9b5558e645f11440eaccdb6377547cbc52b4604e7da06 and contains the normalized
+certificate, raw outputs, source bundle, binary, provenance, guards, benchmark and inner manifest.
+It is durably stored in the private GitHub release:
+
+  https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18
+
+`tools/artifacts.sh verify sa193-frozen-refute-2026-08-18` independently downloaded, decompressed,
+byte-counted and hash-checked the release.  Instance i-0cb3783e937115ff1 was then terminated; its
+only volume vol-0dfe51cb88d605ffd had DeleteOnTermination=true.  The shared census instance was not
+touched.  A subsequent AWS lookup returned InvalidVolume.NotFound, confirming deletion.
+
+Post-run optimization profile
+-----------------------------
+
+Parallel scheduling is not the limiting factor.  The dominant epoch's CPU/wall ratio is 15.985
+on sixteen workers, as are the lower and upper epochs to three decimal places.  Per-root atomic
+dispatch, the progress thread and load balance therefore have little useful headroom; a language
+rewrite or finer locking would not reduce the measured CPU work.
+
+A current-HEAD `-O3 -g -fno-omit-frame-pointer` Sa(113) control replayed the complete 304,105-claim
+normalized corpus on twelve M4 Pro workers.  It closed with zero gaps in 1,272,552,775 prefixes,
+11.517 wall / 119.222 CPU seconds.  An eight-second, 1-ms `sample` window covered 73,224 runnable
+worker samples.  The collapsed top-of-stack counts were:
+
+  canSolveB_ctx                              44,535  (60.8%)
+  star_expansion_majorization_can_solve      25,425  (34.7%)
+  other running frames                         3,264   (4.5%)
+
+The theorem cost is actionable.  A CACHE_ONLY child currently probes its worker L1, then—on a
+miss—runs full-star majorization before the immutable negative trie.  During a frozen epoch a trie
+negative is already a sufficient lower-level citation, so the first controlled variant should use
+L1 -> explicit-exact/trie -> theorem fallback.  Do not change ordinary solver ordering with it.
+Add per-worker counters first: L1 queries/hits/collisions, exact-fact hits, dominance hits, theorem
+hits and misses.  A flat read-only exact hash of the 3.126 million explicit claims is likely the
+best limited denormalization experiment; it avoids eagerly materializing the full implied closure.
+Also test a larger or two-way worker L1 only after its hit distribution is known.  The proposed
+read-only order `(k, part count, total pair mass, each part's pair mass, long side)` is a credible
+structure-of-arrays range index; benchmark it against a simple contiguous flattening of the current
+trie rather than assuming the extra keys win.
+
+The next search-work experiment is aggregate reachability telemetry: roots armed, build time,
+tests and prunes by part count.  Tune RB_TRIGGER on the retained 9,995-root four-part gate rather
+than inheriting the solver's ten-million-prefix threshold blindly.  This can reduce the 3.437
+trillion dominant prefixes; cache micro-optimizations cannot.
+
+Pre-verification minimalization is sound and easy but bounded in value.  The established k=7
+antichain has 2,507,270 facts versus 2,576,885 inputs, only 69,615 (2.702%) fewer; all-level cache
+loading marked 275,570 of 3,126,190 insertions redundant.  Record redundant claims as theorem-
+derived from verified minima instead of re-enumerating them, but do not expect this alone to move
+the dominant runtime materially.
+
+Three process launches spent 878.207 seconds rebuilding the same trie.  A single process with
+separately checkpointed batches would save about ten minutes immediately.  A contiguous,
+serializable derived cache/split image would make repeated benchmarks and distributed shards start
+cheaply and improve locality while keeping the readable certificate authoritative.  Distributed
+root shards are otherwise straightforward and spot-friendly, but they reduce latency rather than
+aggregate CPU.  The asymptotically stronger independent verifier remains an explicit split-space
+cover whose ranges cite lower-level facts; it should not re-enumerate trillions of prefixes.

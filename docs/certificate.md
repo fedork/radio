@@ -242,8 +242,22 @@ run9 uses all 3,126,190 normalized claims. The deterministic local run9 gate clo
 126.337 verification seconds and projects 8.43 hours on twelve local workers. AWS run
 `20260818T074026Z` closed the same gate in 81.200 wall / 1,293.979 CPU seconds, projecting 19,488
 wall / 310,555 CPU seconds. Both its 24-hour wall gate and 419,353-CPU-second solver-cost gate
-passed, and full k=7 is running. Details are in
+passed. The completed three-phase replay verified all 3,126,190 claims with zero gaps in 20,845
+capped wall seconds; its worker epochs used 318,771.171 CPU seconds, 76.015% of the complete cold
+solver. Peak RSS was 1.24 GB. The exact output is archived in the private release
+[`sa193-frozen-refute-2026-08-18`](https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18).
+Details are in
 [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt).
+
+The completed run also narrows the next optimization. Its k=7 worker CPU divided by wall was
+15.985 on sixteen workers, so shared-memory scheduling is already saturated. In a separate
+twelve-worker Sa(113) sample, 25,425 of 73,224 runnable 1-ms samples (34.7%) landed directly in
+`star_expansion_majorization_can_solve`. Frozen CACHE_ONLY children currently pay that theorem on
+an L1 miss before probing the immutable negative trie. The first controlled change should therefore
+be a frozen-only L1 -> explicit/trie -> theorem order, preceded by hit-rate counters. A compact
+exact-fact hash, larger/set-associative worker L1, and aggregate reachability counters are the next
+bounded experiments. A serialized contiguous trie is primarily a startup/distribution improvement;
+explicit split-space coverage remains the route to an independently asymptotically cheaper checker.
 
 ### Live completed-target telemetry (2026-08-17)
 

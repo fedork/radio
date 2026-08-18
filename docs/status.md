@@ -17,7 +17,7 @@ the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correc
 proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
 separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
 attempts and the slower kd-indexed ordinary audit were stopped; a frozen, solver-core,
-read-only/refute-only replay passed its wall/CPU gate and is verifying full k=7).
+read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -39,7 +39,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **`canSolveB_ctx` is not general permission to call the mutable solver concurrently.** | The context owns the accepted-prefix clock, exact L1 and reachability scratch, but ordinary solving still mutates the dominance trie/arenas, lazy split catalog, learned `s[4]`/`s[5]`/`FAST` metadata, and `sbb_to_min_k`. `radio_refute.c` is the narrow safe exception: it prepares cache and split metadata serially, checks their frozen checksum/allocation counts, permits only root enumeration plus k-1 CACHE_ONLY reads, and publishes no results. A thread pool around ordinary solving would still have C data races; see [parallel-solver.md](parallel-solver.md). |
-| **Do not use the current Sa(113) colored certificate as proof.** | The independent checker reported its 120,302 records closed, but the frozen solver-core refuter exposes nine uncovered splits while closing all 304,105 normalized facts. The first gap is `Sb(15:8,8:5,8:5)@5`; the discrepancy in `radio_verify.c` coloring/replay is undiagnosed. Coloring stays deferred and full normalized input is mandatory for the active replay. |
+| **Do not use the current Sa(113) colored certificate as proof.** | The independent checker reported its 120,302 records closed, but the frozen solver-core refuter exposes nine uncovered splits while closing all 304,105 normalized facts. The first gap is `Sb(15:8,8:5,8:5)@5`; the discrepancy in `radio_verify.c` coloring/replay is undiagnosed. Coloring stays deferred and full normalized input is mandatory for any replay. |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **The old `m=5` formula and `BBBD` profile stop being optimal after `k=8`.** | Li--Wu--Triesch prove the piecewise correction: add 1 at `k=9,10` and add 2 from `k=11`; hence `n(9,5)=481` and `n(10,5)=985`.  The old word is still a valid lower construction, not an equality.  Their displayed intermediate equations (69)–(70) have apparent index/off-by-one inconsistencies, so cite the theorem and use the recomputed assembly in [the exact m=5 calibration](theorems/m5-pareto-assembly.md), not those displays. |
 | **Do not report that the eventual `m=5` strategy “requires six atomization levels.”** | The first eventual hard leaf `P_7=(127,119,119,118,111)@7` has sharp exact and embedded depth **three**.  Six is instead the first nonnegative scalar inventory for one depth that could exactify `P_r` uniformly for all large `r`; the 64-piece component identities do not yet pack into one synchronized tree.  The paper needs only majorization and proves no aligned `AABD` profile.  Its `k>=11` theorem does rule out later changes in the numerical frontier. See [the exactification analysis](theorems/m5-pareto-assembly.md#exactifying-the-decisive-majorized-leaf). |
@@ -312,10 +312,10 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 16 tags, 47 assets plus a manifest per tag,
-about 471 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
-reproduction metadata; `verifier-pipeline-2026-08-17` contains the complete Sa(66)/Sa(113)
-benchmark and certificates. `check-index` is green.
+Artifact store `fedork/radio-data` (private): 17 tags, 48 assets plus a manifest per tag,
+about 486 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
+certificate and all three solver-core replay checkpoints. `check-index` is green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -326,10 +326,10 @@ Do not run `gh auth switch`.
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
 reported UNSOLVABLE. The k=8 Pareto-prefix census remains active on shared AWS instance
-`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 07:51:22 UTC it remained healthy
-at one core and 8,927.0 MiB RSS, with 113.6 GiB host memory available and no swap. It had all 815
+`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 14:21:54 UTC it remained healthy
+at one core and 9,041.7 MiB RSS, with 113.5 GiB host memory available and no swap. It had all 815
 second-cut blocks represented, 48 of 70 freshly recomputed blocks, 1,688 targets, 1,893 endpoints
-and 1,033 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
+and 1,070 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
 the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact rather than that
 stale object.
 
@@ -339,19 +339,20 @@ The mass-descending independent audit is no longer active. Run `20260818T062429Z
 repeating more search than the original solver. It was stopped deliberately with exit 130; its
 final manifest was hash-checked and instance `i-0b81cd58d3ba14f0c` was terminated.
 
-The replacement frozen solver-core refuter is active on dedicated on-demand `c8a.4xlarge` instance
-`i-0cb3783e937115ff1`, run `20260818T074026Z`, from clean commit `e040290`. It loads the complete
-3,126,190-fact normalized certificate into the production dominance trie, prepares split metadata
-serially, and then publishes an immutable epoch to sixteen worker-local search contexts. Roots
+The replacement frozen solver-core refuter completed on dedicated on-demand `c8a.4xlarge` instance
+`i-0cb3783e937115ff1`, run `20260818T074026Z`, from clean commit `e040290`. It loaded the complete
+3,126,190-fact normalized certificate into the production dominance trie, prepared split metadata
+serially, and published an immutable epoch to sixteen worker-local search contexts. Roots
 bypass their own cache entry; children are theorem/CACHE_ONLY queries at k-1; a miss is an exposed
-gap rather than recursive solving. The 9,995-fact gate closed with zero gaps in 81.200 wall /
-1,293.979 CPU seconds and projects the dominant level at 19,488 wall / 310,555 CPU seconds—5.41
-hours and 74.06% of the complete cold solver's CPU. Both gates passed, and full k=7 began at
-2026-08-18 07:47:30 UTC. At its 180-second batch checkpoint it had completed 188,695 claims with
-zero gaps and showed active four-part roots. RSS was 1,203.7 MiB with no swap. This confirms that
-the dominant region is advancing; use the completed four-part gate, not the short mixed-region
-ETA, for the forecast. Live status:
-`tools/run9_refute_status.sh 20260818T074026Z`.
+gap rather than recursive solving. All three checkpoints closed: 2,576,885 k=7 claims, 546,744
+k<=6 claims and 2,561 k=8..9 claims, all with zero gaps. Their worker epochs consumed 318,771.171
+CPU seconds, 76.015% of the complete cold solver's 419,353.1 seconds. The capped phases took
+20,113 + 427 + 305 = 20,845 wall seconds (5h47m25s) and peaked at 1.24 GB RSS. The exact S3
+manifest and the private GitHub release round trip both pass SHA-256 verification. The release is
+[`sa193-frozen-refute-2026-08-18`](https://github.com/fedork/radio-data/releases/tag/sa193-frozen-refute-2026-08-18).
+The dedicated instance was terminated after verification; its sole root volume had
+`DeleteOnTermination=true` and is confirmed deleted. This is a solver-core validation replay, not an independent proof
+implementation; the proof-safe cold run9 remains the proof source.
 
 The canonical-order before run `20260818T055255Z` passed the same sample with zero gaps in
 23,697,303,379 nodes / 1,627.30 seconds. Its superseded full phase was immediately stopped through
@@ -877,17 +878,27 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Let the k=8 Pareto-prefix census finish and preserve the frozen solver-core run9 replay.** Never
-   stop the shared census instance before its final output is archived. The refuter uses a separate
-   right-sized host, does no coloring, and must pass both wall and solver-CPU gates on its 9,995-fact
-   sample before entering full k=7. Preserve every completed level log before terminating that
-   host. Do not restart either coloring pipeline or the superseded independent ordinary audit.
+0. **Let the k=8 Pareto-prefix census finish.** Never stop the shared census instance before its
+   final output is archived. The frozen solver-core run9 replay is complete, release-verified and
+   its dedicated host is terminated. Do not restart either coloring pipeline or the superseded
+   independent ordinary audit.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
-2. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
+2. **Optimize the frozen verifier's child-query path before changing its parallel model.** The
+   completed k=7 epoch averaged 15.985 cores across sixteen workers, so scheduling and locks are not
+   the bottleneck. A twelve-worker Sa(113) sample profile put 34.7% of runnable samples directly in
+   full-star majorization, which currently runs on an L1 miss before the immutable negative trie.
+   First instrument exact/L1/trie/theorem hit rates, then test a frozen-only L1 -> exact/trie ->
+   theorem lookup order and a compact explicit-fact hash. Separately aggregate reachability build,
+   test and prune counts and tune `RB_TRIGGER` on the retained 9,995-root gate. Only after those
+   controls should the derived cache become a contiguous serializable image for cheap startup and
+   distributed shards. Explicit split-space coverage remains the route to an independently cheap
+   verifier.
+
+3. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
    cache as a frozen read view plus worker-local overlay, then separate immutable split geometry
    from learned cut metadata. Extract and regression-test a resumable serial pass-2 prefix cursor
    before scheduling limited-width batches. The ownership contract is in
@@ -898,7 +909,7 @@ facts are real, but the warm upward-closed prefix cache already contains the sub
 former added zero marginal rejections on the A+B monster, and the latter regressed negatives. Full
 star expansion is different: it is an arbitrary-part-count global theorem and is now deployed.
 
-3. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
+4. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
    bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
    finding an `R_1` or `R_2` witness is already known not to do that. Current `main` takes 26.6
    solve seconds and 37,899 top-level splits after the exact-L1 change. Keep any deeper check
@@ -906,11 +917,11 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
    adding solver code: retain several parent-conditioned Pareto upgrades and inequivalent splits,
    preserve lineage labels through equal components, and measure whether one branch survives at the
    next recursive node.  One greedy low-k path is already known to fail.
-4. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
+5. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.  These are direct H2
    construction attempts, not a resumption of the parked assembly programme.
-5. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
-6. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
+6. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
+7. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
    here needing no compute at all. An exchange argument is the natural shape; the surviving
    obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).
