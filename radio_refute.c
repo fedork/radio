@@ -20,6 +20,8 @@
  *   REFUTE_MIN_K, REFUTE_MAX_K, REFUTE_MIN_PARTS, REFUTE_MAX_PARTS,
  *   REFUTE_STRIDE, REFUTE_OFFSET, REFUTE_THREADS, REFUTE_PROGRESS_SECONDS.
  * Build with -DRADIO_REFUTE_ENABLE_L1 only for the rejected exact-L1 benchmark control.
+ * Build with -DRADIO_REFUTE_ENABLE_COLORING to emit the actually cited k-1 support facts:
+ *   ./radio_refute level-k.cert level-(k-1).selection
  */
 
 #include <pthread.h>
@@ -33,10 +35,14 @@
 #ifndef RADIO_REFUTE_ENABLE_L1
 #define RADIO_DISABLE_CACHE_L1
 #endif
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+#define RADIO_CACHE_CITATIONS
+#endif
 #include "radiobase.c"
 
 #define CERT_HEADER "radio-negative-certificate-v1"
 #define LEVEL_CERT_HEADER "radio-negative-level-certificate-v2"
+#define COLOR_SELECTION_HEADER "radio-negative-color-selection-v1"
 #define MAX_CERT_PARTS 40
 #define LINE_BYTES (1u << 16)
 
@@ -711,16 +717,68 @@ static void expand_claim(const ClaimLevel *L, const Claim *c, int *parts) {
     for (int i = 0; i < c->np; i++) parts[i] = (int)stored[i];
 }
 
-static void print_claim(FILE *fp, int k, const Claim *c) {
-    const ClaimLevel *L = &claims[k];
+static void print_state(FILE *fp, const ClaimLevel *L, const Claim *c) {
     const uint16_t *parts = claim_part_data(L, c);
-    fprintf(fp, "k=%d Sb(", k);
+    fputs("Sb(", fp);
     for (int i = 0; i < c->np; i++) {
         if (i) fputc(',', fp);
         fputs(sbb_to_str[parts[i]], fp);
     }
     fputc(')', fp);
 }
+
+static void print_claim(FILE *fp, int k, const Claim *c) {
+    fprintf(fp, "k=%d ", k);
+    print_state(fp, &claims[k], c);
+}
+
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+static size_t color_bit_words(size_t facts) {
+    return (facts + 63) / 64;
+}
+
+static size_t color_count_used(const uint64_t *bits, size_t words) {
+    size_t used = 0;
+    for (size_t q = 0; q < words; q++) used += (size_t)__builtin_popcountll(bits[q]);
+    return used;
+}
+
+static int write_color_selection(const char *path, const uint64_t *bits, size_t words,
+                                 size_t audited, unsigned long long citation_hits) {
+    int support_level = certificate_support_level;
+    ClaimLevel *support = support_level > 0 ? &claims[support_level] : NULL;
+    size_t support_count = support != NULL ? support->n : 0;
+    size_t used = color_count_used(bits, words);
+    FILE *fp = fopen(path, "w");
+    if (fp == NULL) {
+        fprintf(stderr, "cannot create color selection %s\n", path);
+        return -1;
+    }
+    fprintf(fp, "%s\n", COLOR_SELECTION_HEADER);
+    fprintf(fp, "parent-level %d\n", certificate_level);
+    fprintf(fp, "selected-level %d\n", support_level);
+    fprintf(fp, "source-claims %zu\n", claims[certificate_level].n);
+    fprintf(fp, "audited %zu\n", audited);
+    fprintf(fp, "support %zu\n", support_count);
+    fprintf(fp, "used %zu\n", used);
+    fprintf(fp, "citation-hits %llu\n", citation_hits);
+    for (size_t q = 0; q < support_count; q++) {
+        if (!(bits[q >> 6] & (UINT64_C(1) << (q & 63)))) continue;
+        fprintf(fp, "use %zu ", q + 1);
+        print_state(fp, support, &support->v[q]);
+        fputc('\n', fp);
+    }
+    if (fclose(fp) != 0) {
+        fprintf(stderr, "cannot finish color selection %s\n", path);
+        return -1;
+    }
+    printf("COLOR_SELECTION parent_level=%d selected_level=%d support=%zu used=%zu "
+           "citation_hits=%llu path=%s\n",
+           certificate_level, support_level, support_count, used, citation_hits, path);
+    fflush(stdout);
+    return 0;
+}
+#endif
 
 static void load_negative_cache(size_t total) {
     size_t done = 0;
@@ -771,6 +829,9 @@ static void load_level_support_cache(void) {
             int pairs = 0;
             expand_claim(L, &L->v[q], parts);
             for (int i = 0; i < L->v[q].np; i++) pairs += sb_pairs[parts[i]];
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+            radio_cache_citation_set_insert_source((uint32_t)q + 1);
+#endif
             cache(parts, L->v[q].np, FALSE, certificate_support_level, pairs);
             done++;
             if (done % 100000 == 0 || done == total) {
@@ -784,6 +845,9 @@ static void load_level_support_cache(void) {
             }
         }
     }
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    radio_cache_citation_set_insert_source(0);
+#endif
     cache_replay_depth--;
     printf("CACHE_DONE claims=%zu support_level=%d wall_s=%.3f branches=%lld "
            "branch_bytes=%lld fronts=%lld front_bytes=%lld redundant=%lld\n",
@@ -844,6 +908,11 @@ typedef struct {
     unsigned long long prefixes;
     size_t verified;
     size_t gaps;
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    uint64_t *citation_bits;
+    size_t citation_facts;
+    unsigned long long citation_hits;
+#endif
 } WorkerArg;
 
 static void report_gap(const Task *t, int verdict) {
@@ -869,6 +938,9 @@ static void *verify_worker(void *vp) {
     Batch *b = a->batch;
     radio_search_context ctx;
     radio_search_context_init(&ctx);
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    radio_cache_citations_attach(&ctx, a->citation_bits, a->citation_facts);
+#endif
     for (;;) {
         size_t q = atomic_fetch_add_explicit(&b->next, 1, memory_order_relaxed);
         Task *t;
@@ -903,6 +975,9 @@ static void *verify_worker(void *vp) {
         atomic_fetch_add_explicit(&b->completed, 1, memory_order_release);
         atomic_store_explicit(&b->progress[a->slot].task, SIZE_MAX, memory_order_release);
     }
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    a->citation_hits = ctx.cache_citation_hits;
+#endif
     radio_search_context_destroy(&ctx);
     return NULL;
 }
@@ -1034,6 +1109,14 @@ static void *progress_worker(void *vp) {
 
 int main(int argc, char **argv) {
     const char *path;
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    const char *color_output;
+    size_t citation_facts, citation_words, citation_word_stride;
+    uint64_t *prep_citation_bits = NULL;
+    uint64_t *worker_citation_bits = NULL;
+    uint64_t *merged_citation_bits = NULL;
+    unsigned long long prep_citation_hits = 0;
+#endif
     int min_k, max_k, min_parts, max_parts, threads;
     long stride, offset;
     double progress_seconds;
@@ -1056,10 +1139,32 @@ int main(int argc, char **argv) {
     long long frozen_cache_branches, frozen_cache_fronts;
     uint64_t split_checksum_before, split_checksum_after;
 
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    if (argc != 3) {
+        fprintf(stderr, "usage: %s level-certificate.cert color-selection.txt\n", argv[0]);
+        return 2;
+    }
+    color_output = argv[2];
+    {
+        /* Reserve the destination before doing expensive work.  Refuse to overwrite a prior
+           selection, and leave at worst an empty/partial file which the strict parser rejects. */
+        FILE *reservation = fopen(color_output, "wx");
+        if (reservation == NULL) {
+            fprintf(stderr, "cannot reserve new color selection %s: %s\n",
+                    color_output, strerror(errno));
+            return 2;
+        }
+        if (fclose(reservation) != 0) {
+            fprintf(stderr, "cannot reserve new color selection %s\n", color_output);
+            return 2;
+        }
+    }
+#else
     if (argc != 2) {
         fprintf(stderr, "usage: %s certificate.cert\n", argv[0]);
         return 2;
     }
+#endif
     path = argv[1];
     min_k = (int)env_long("REFUTE_MIN_K", 1, 1, MAX_K);
     max_k = (int)env_long("REFUTE_MAX_K", MAX_K, 1, MAX_K);
@@ -1076,6 +1181,12 @@ int main(int argc, char **argv) {
 
     init();
     total_claims = read_certificate(path);
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    if (!level_certificate) {
+        fprintf(stderr, "coloring requires a self-contained level-v2 certificate\n");
+        return 2;
+    }
+#endif
     printf("INPUT certificate=%s format=%s claims=%zu filters=k%d..%d,np%d..%d,"
            "stride=%ld,offset=%ld threads=%d progress_seconds=%.1f",
            path, level_certificate ? "level-v2" : "full-v1", total_claims,
@@ -1096,10 +1207,13 @@ int main(int argc, char **argv) {
     else load_negative_cache(total_claims);
     frozen_cache_branches = alloc_count;
     frozen_cache_fronts = front_alloc_count;
+#ifndef RADIO_REFUTE_ENABLE_COLORING
     if (level_certificate && certificate_support_level > 0)
         free_claim_level(certificate_support_level);
+#endif
 
     for (int k = min_k; k <= max_k; k++) {
+        if (level_certificate && k != certificate_level) continue;
         size_t eligible = 0;
         for (size_t q = 0; q < claims[k].n; q++) {
             int np = claims[k].v[q].np;
@@ -1121,6 +1235,7 @@ int main(int argc, char **argv) {
     {
         size_t w = 0;
         for (int k = min_k; k <= max_k; k++) {
+            if (level_certificate && k != certificate_level) continue;
             size_t eligible = 0;
             for (size_t q = 0; q < claims[k].n; q++) {
                 Claim *c = &claims[k].v[q];
@@ -1144,7 +1259,31 @@ int main(int argc, char **argv) {
         }
     }
 
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    citation_facts = certificate_support_level > 0
+        ? claims[certificate_support_level].n : 0;
+    citation_words = color_bit_words(citation_facts);
+    citation_word_stride = citation_words ? citation_words : 1;
+    prep_citation_bits = (uint64_t *)calloc(citation_word_stride, sizeof(*prep_citation_bits));
+    merged_citation_bits = (uint64_t *)calloc(
+        citation_word_stride, sizeof(*merged_citation_bits));
+    if ((size_t)threads > SIZE_MAX / citation_word_stride) {
+        fprintf(stderr, "coloring worker bitset size overflow\n");
+        return 2;
+    }
+    worker_citation_bits = (uint64_t *)calloc(
+        (size_t)threads * citation_word_stride, sizeof(*worker_citation_bits));
+    if (prep_citation_bits == NULL || merged_citation_bits == NULL
+            || worker_citation_bits == NULL) {
+        fprintf(stderr, "out of memory allocating color citation bitsets\n");
+        return 2;
+    }
+#endif
+
     radio_search_context_init(&prep_ctx);
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    radio_cache_citations_attach(&prep_ctx, prep_citation_bits, citation_facts);
+#endif
     freeze_start = monotonic_seconds();
     printf("FREEZE_START selected=%zu\n", selected);
     fflush(stdout);
@@ -1182,6 +1321,9 @@ int main(int argc, char **argv) {
             }
         }
     }
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    prep_citation_hits = prep_ctx.cache_citation_hits;
+#endif
     radio_search_context_destroy(&prep_ctx);
     free(needed);
     printf("FREEZE_DONE tables=%zu options=%zu wall_s=%.3f\n",
@@ -1219,6 +1361,10 @@ int main(int argc, char **argv) {
         atomic_init(&b.progress[i].started_ns, 0);
         args[i].batch = &b;
         args[i].slot = i;
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+        args[i].citation_bits = worker_citation_bits + (size_t)i * citation_word_stride;
+        args[i].citation_facts = citation_facts;
+#endif
     }
     for (size_t q = 0; q < selected; q++) b.total_k[tasks[q].k]++;
     pthread_mutex_init(&b.progress_mu, NULL);
@@ -1277,6 +1423,27 @@ int main(int argc, char **argv) {
     printf("TOTAL verified %zu, gaps %zu, prefixes %llu\n",
            atomic_load(&b.verified), atomic_load(&b.gaps),
            (unsigned long long)atomic_load(&b.prefixes));
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    if (atomic_load(&b.gaps) == 0) {
+        unsigned long long citation_hits = prep_citation_hits;
+        memcpy(merged_citation_bits, prep_citation_bits,
+               citation_words * sizeof(*merged_citation_bits));
+        for (int i = 0; i < threads; i++) {
+            uint64_t *worker = worker_citation_bits + (size_t)i * citation_word_stride;
+            citation_hits += args[i].citation_hits;
+            for (size_t q = 0; q < citation_words; q++)
+                merged_citation_bits[q] |= worker[q];
+        }
+        if (write_color_selection(color_output, merged_citation_bits, citation_words,
+                                  selected, citation_hits) != 0)
+            return 2;
+    } else {
+        printf("COLOR_SELECTION skipped=yes reason=gaps path=%s\n", color_output);
+        if (unlink(color_output) != 0)
+            fprintf(stderr, "cannot remove invalid color selection %s: %s\n",
+                    color_output, strerror(errno));
+    }
+#endif
     fflush(stdout);
 
     pthread_cond_destroy(&b.progress_cv);
@@ -1285,6 +1452,11 @@ int main(int argc, char **argv) {
     free(args);
     free(b.progress);
     free(tasks);
+#ifdef RADIO_REFUTE_ENABLE_COLORING
+    free(merged_citation_bits);
+    free(worker_citation_bits);
+    free(prep_citation_bits);
+#endif
     for (int k = 0; k <= MAX_K; k++) free_claim_level(k);
     free(certificate_split_hints);
     return atomic_load(&b.gaps) == 0 ? 0 : 1;

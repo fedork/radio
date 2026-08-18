@@ -1,0 +1,120 @@
+Frozen-trie citation coloring and local gate (2026-08-18)
+================================================================
+
+Purpose
+-------
+
+Color the already-efficient solver-core refuter without returning to the independent checker which
+made coloring slower than the solver.  A build with RADIO_REFUTE_ENABLE_COLORING audits one level-k
+v2 certificate, records every attributed k-1 cache rejection, and emits a strict readable selection.
+The selection is then checked against the original v1 record index and state text while generating
+the next self-contained level file.  This makes coloring a top-down sequence of the same read-only
+audits, not a separate proof search.
+
+Implementation contract
+-----------------------
+
+* Every retained negative Pareto terminal carries the 1-based source-support record which inserted
+  it.  Source ids sit behind the packed front points, so the comparison scan touches them only on a
+  successful cache match.  A dominated support record which never survives in the trie cannot be
+  cited.
+* Split-table preparation and every worker have private dense citation bitsets.  There are no shared
+  writes or atomic increments in the hot path; the driver ORs the bitsets after a zero-gap epoch.
+  `citation-hits` is the summed lookup count, while output uses only the sound zero/nonzero marker.
+* Eager split preparation is included.  This can conservatively retain a fact consulted while
+  preparing a table whose options are later pruned, but it cannot omit a fact which supplied a DEAD
+  split decision.  Coloring is reachability compression, not a minimal-set claim.
+* A selection records parent/selected levels, source/audited/support/used counts, total citation
+  hits, and ordered `use INDEX Sb(...)` lines.  The generator requires a complete parent audit,
+  verifies each index and copied state against the full v1 level, keeps complete lower support, and
+  regenerates dictionary and split-hint sections.  Empty use terminates the chain.  Existing output
+  is never overwritten, and a gap never leaves a valid selection.
+
+Regression and sanitizer gates
+------------------------------
+
+`tools/test_radio_refute.sh` builds ordinary, rejected-L1-control and coloring variants.  Its
+nonempty fixture verifies `Sb(4:4,4:2)@3`, deterministically selects only the first of two k=2 facts,
+builds and verifies the filtered k=2 file, and terminates at `used 0`.  One- and two-worker selection
+files are byte-identical.  Mismatched copied state, partial/empty handoff, v1 coloring input and an
+existing output destination all fail closed.  The complete regression passed after the final edit.
+
+An AddressSanitizer+UndefinedBehaviorSanitizer build loaded all 388,317 run9 k=6 support records,
+exercising the attributed-front growth path, and verified one k=7 claim with no finding:
+
+    CACHE_DONE ... fronts=433099 front_bytes=15099464 redundant=156927
+    TOTAL verified 1, gaps 0, prefixes 0
+    COLOR_SELECTION ... support=388317 used=33 citation_hits=441
+
+Its build id was `920da20fe6d6c6f4d5e57825e422458b3dab7d1b60aaa4084103214f8f1e7671`.
+A two-worker ThreadSanitizer run of the nonempty fixture also passed with an empty diagnostic stream,
+`TOTAL verified 1, gaps 0, prefixes 1`, and `used=1 citation_hits=1`.
+
+Dominant k=7 matched local gate
+--------------------------------
+
+Both final-source binaries used Apple clang -O3, pthreads, MAX_K=10 and MAX_N=194.  Environment was
+12 workers, k=7 only, four parts only, stride 240/offset 0, against the 9,995-state level-v2 sample.
+The colored run was executed first, reversing the earlier exploratory pair's order.
+
+                         ordinary             coloring
+    build id             95f016c14d6c...      172cfbecb150...
+    cache wall           3.162 s              3.448 s
+    front allocations    251,077              433,099
+    front bytes          4,428,648             15,099,464
+    freeze wall          0.063 s              0.064 s
+    worker wall          79.490 s              82.363 s
+    worker CPU           929.906 s             967.790 s
+    verified/gaps        9,995 / 0             9,995 / 0
+    accepted prefixes    13,403,862,290        13,403,862,290
+
+Coloring therefore added 3.61% worker wall and 4.07% worker CPU in this matched final-source pair.
+It selected 209,189 of 388,317 support facts from 4,881,149,078 attributed lookup hits.  The
+7,479,772-byte selection was byte-identical to the earlier 12-worker colored run despite scheduling
+and rebuild differences (SHA-256 below).  This clears the launch gate: coloring leaves the search
+tree unchanged and its overhead is small compared with the multi-hour k=7 audit itself.
+
+Full-corpus top handoff
+-----------------------
+
+The final coloring binary then audited the actual complete k=9 file locally.  It loaded all 2,545
+k=8 support facts in 0.245 seconds, froze 16 tables / 99,456 options in 0.023 seconds, verified all
+16 top claims with zero gaps, and selected 2,151 support facts from 123,600 citations.  The resulting
+53,185-byte readable selection passed strict source-index/state validation and generated a
+53,288,979-byte k=8 certificate containing exactly 2,151 claims plus complete 2,576,885-fact k=7
+support.  This is an integration gate, not yet a completed colored replay.
+
+SHA-256 inventory
+-----------------
+
+Final source:
+
+    radio_refute.c                         09cc15d7c4af218b263ad96d4bb562f01743fde31b732466bdcd64c474123175
+    radiobase.c                            0bfbd660b06724dc9ad72cc49caf7226f675040aeb12fae7b8499f101ef9a7a0
+
+Matched final logs and selection:
+
+    color.out                              760320ebc45ef9f21e3be9f793430e7e4c7f6aec772b689c80a221691866c3d0
+    color.err                              75469c6a971eef5d72da68dc414a8fdf2eb9729288418ecaa5ffef0116a20bf0
+    normal.out                             c8e51f3aaff92c422bc4acb1f49f87f6e134d51076724fe6dc632aacca54c636
+    normal.err                             d9e4014e508b2a83032428f9c4795a97bee48fdc645b5e239763848a363fbec6
+    k6.selection                           7e68d6143463a937fec7b842666c8cb0f8cd94dd3d5a2aa095a6738863c4fe5f
+
+Full-corpus top handoff:
+
+    k9.out                                 e0b149040dde87dff5cb674f02e4749ff4da56e22ded205801e9bae8bdb5179c
+    k9.err                                 b2437521b59c47b4346a23956546f94764c09efd698fcdfeadc014bd2939a55f
+    k8.selection                           24ce353c4860d80b9efcb4bea4c8073d4867d4e9c17ec3c32d90d803fb7d7655
+    run9-k8.cert                           72dc050f0374d2653bbef31a15d96c7695fd4691dee4c26249a1c82062133fba
+
+Sanitizers:
+
+    asan-ubsan run.out                     b78b194efed17ed2009a03cec11a0017d29d00192e5ffe9cb202b555c5570a9d
+    asan-ubsan run.err                     fba6f77daa7488ba61fc58fcff5e14f1e584c87d64feb8eb93a3d71977ff6a1b
+    tsan run.out                           996f58529322951b27630089d1b47236eea0c7e0ed42cda1fe052b0bec0ac7d3
+    tsan run.err                           e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+The large local selection/certificate are reproducible scratch artifacts and are not committed.
+The AWS runner uploads every completed per-level certificate, selection, verifier log, provenance
+check and checksum immediately; S3 is live staging, with any completed durable bundle to be moved
+to the private `fedork/radio-data` GitHub release store under the repository artifact policy.

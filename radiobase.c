@@ -123,6 +123,11 @@ typedef struct radio_search_context {
     uint64_t work_clock;
     cache_l1_entry *cache_l1;
     radio_reachability_state *reachability;
+#ifdef RADIO_CACHE_CITATIONS
+    uint64_t *cache_citation_bits;
+    size_t cache_citation_count;
+    unsigned long long cache_citation_hits;
+#endif
 #ifdef MEASURE_CACHE_L1
     unsigned long long cache_l1_queries;
     unsigned long long cache_l1_eligible;
@@ -144,6 +149,30 @@ void radio_search_context_init(radio_search_context *ctx) {
 }
 
 void radio_search_context_destroy(radio_search_context *ctx);
+
+#ifdef RADIO_CACHE_CITATIONS
+/* Frozen-certificate coloring needs only reachability, not a globally contended reference count.
+   Every worker writes its own dense bitset and the driver ORs them after the immutable epoch. */
+static void radio_cache_citations_attach(radio_search_context *ctx, uint64_t *bits,
+                                         size_t fact_count) {
+    ctx->cache_citation_bits = bits;
+    ctx->cache_citation_count = fact_count;
+    ctx->cache_citation_hits = 0;
+}
+
+static inline __attribute__((always_inline)) void radio_cache_citation_record(
+    radio_search_context *ctx, uint32_t source) {
+    if (ctx->cache_citation_bits == NULL) return;
+    if (source == 0 || (size_t)source > ctx->cache_citation_count) {
+        printf("\ninvalid frozen-cache citation source %u/%zu\n",
+               source, ctx->cache_citation_count);
+        exit(19);
+    }
+    size_t bit = (size_t)source - 1;
+    ctx->cache_citation_bits[bit >> 6] |= UINT64_C(1) << (bit & 63);
+    ctx->cache_citation_hits++;
+}
+#endif
 
 /* Deterministic accepted-prefix budgeting is the repository default.  RADIO_CPU_BUDGET retains a
    matched fallback for controlled comparisons and archaeology. */
@@ -468,6 +497,33 @@ typedef struct {
     front_point sbb[];
 } front_vector;
 
+#ifdef RADIO_CACHE_CITATIONS
+/* A coloring build keeps source ids behind the packed sbb array.  Lookups therefore retain the
+   ordinary cache-friendly part scan and touch the wider source array only after a match. */
+static uint32_t cache_citation_insert_source;
+
+static size_t front_vector_source_offset(uint32_t cap) {
+    size_t end = sizeof(front_vector) + (size_t)cap * sizeof(front_point);
+    return (end + _Alignof(uint32_t) - 1) & ~((size_t)_Alignof(uint32_t) - 1);
+}
+
+static size_t front_vector_bytes(uint32_t cap) {
+    return front_vector_source_offset(cap) + (size_t)cap * sizeof(uint32_t);
+}
+
+static uint32_t *front_vector_sources(front_vector *v) {
+    return (uint32_t *)(void *)((char *)v + front_vector_source_offset(v->cap));
+}
+
+static void radio_cache_citation_set_insert_source(uint32_t source) {
+    cache_citation_insert_source = source;
+}
+#else
+static size_t front_vector_bytes(uint32_t cap) {
+    return sizeof(front_vector) + (size_t)cap * sizeof(front_point);
+}
+#endif
+
 typedef struct {
     uint32_t positive;
     uint32_t negative;
@@ -650,7 +706,7 @@ static uint32_t alloc_front_vector(uint32_t a, uint32_t b) {
         }
     }
     uint32_t cap = 4;
-    size_t bytes = sizeof(front_vector) + (size_t)cap * sizeof(front_point);
+    size_t bytes = front_vector_bytes(cap);
     front_vector *v = (front_vector *)malloc(bytes);
     if (v == NULL) {
         printf("\nout of memory allocating Pareto front\n");
@@ -660,17 +716,32 @@ static uint32_t alloc_front_vector(uint32_t a, uint32_t b) {
     v->cap = cap;
     v->sbb[0] = (front_point)a;
     v->sbb[1] = (front_point)b;
+#ifdef RADIO_CACHE_CITATIONS
+    front_vector_sources(v)[0] = 0;
+    front_vector_sources(v)[1] = 0;
+#endif
     front_handles[handle] = v;
     front_alloc_count++;
     front_alloc_size += (long long)bytes;
     return FRONT_VECTOR_TAG | handle;
 }
 
+#ifdef RADIO_CACHE_CITATIONS
+static uint32_t alloc_negative_front(uint32_t sbb, uint32_t source) {
+    uint32_t descriptor = alloc_front_vector(sbb, sbb);
+    front_vector *v = front_vector_for(descriptor);
+    v->len = 1;
+    v->cap = 4;
+    front_vector_sources(v)[0] = source;
+    return descriptor;
+}
+#endif
+
 static void release_front_vector(uint32_t descriptor) {
     if (!(descriptor & FRONT_VECTOR_TAG)) return;
     uint32_t handle = descriptor & FRONT_HANDLE_MASK;
     front_vector *v = front_vector_for(descriptor);
-    size_t bytes = sizeof(front_vector) + (size_t)v->cap * sizeof(front_point);
+    size_t bytes = front_vector_bytes(v->cap);
     free(v);
     front_alloc_count--;
     front_alloc_size -= (long long)bytes;
@@ -683,13 +754,21 @@ static front_vector *grow_front_vector(uint32_t descriptor) {
     front_vector *old = front_vector_for(descriptor);
     uint32_t oldcap = old->cap;
     uint32_t newcap = oldcap * 2;
-    size_t oldbytes = sizeof(front_vector) + (size_t)oldcap * sizeof(front_point);
-    size_t newbytes = sizeof(front_vector) + (size_t)newcap * sizeof(front_point);
+    size_t oldbytes = front_vector_bytes(oldcap);
+    size_t newbytes = front_vector_bytes(newcap);
     front_vector *v = (front_vector *)realloc(old, newbytes);
     if (v == NULL) {
         printf("\nout of memory growing Pareto front\n");
         exit(1);
     }
+#ifdef RADIO_CACHE_CITATIONS
+    /* The source array begins after capacity, so growing the packed point area moves it. */
+    uint32_t len = v->len;
+    size_t old_sources = front_vector_source_offset(oldcap);
+    size_t new_sources = front_vector_source_offset(newcap);
+    memmove((char *)v + new_sources, (char *)v + old_sources,
+            (size_t)len * sizeof(uint32_t));
+#endif
     v->cap = newcap;
     front_handles[handle] = v;
     front_alloc_size += (long long)(newbytes - oldbytes);
@@ -770,22 +849,51 @@ static int front_has_greater_equal(uint32_t descriptor, int sbb) {
     return 0;
 }
 
-static int front_has_lesser_equal(uint32_t descriptor, int sbb) {
+static int front_find_lesser_equal(uint32_t descriptor, int sbb, uint32_t *source_out) {
+    if (source_out != NULL) *source_out = 0;
     if (descriptor == 0) return 0;
     if (!(descriptor & FRONT_VECTOR_TAG)) return part_greater_equal(sbb, (int)descriptor);
     front_vector *v = front_vector_for(descriptor);
-    for (uint32_t i = 0; i < v->len; i++)
-        if (part_greater_equal(sbb, (int)v->sbb[i])) return 1;
+    for (uint32_t i = 0; i < v->len; i++) {
+        if (part_greater_equal(sbb, (int)v->sbb[i])) {
+#ifdef RADIO_CACHE_CITATIONS
+            if (source_out != NULL) *source_out = front_vector_sources(v)[i];
+#endif
+            return 1;
+        }
+    }
     return 0;
+}
+
+static int front_has_lesser_equal(uint32_t descriptor, int sbb) {
+    return front_find_lesser_equal(descriptor, sbb, NULL);
 }
 
 static int add_front_descriptor(uint32_t *field, int positive, int sbb) {
     uint32_t descriptor = *field;
+#ifdef RADIO_CACHE_CITATIONS
+    if (!positive && cache_citation_insert_source == 0) {
+        printf("\nnegative cache insertion has no citation source\n");
+        exit(19);
+    }
+#endif
     if (descriptor == 0) {
+#ifdef RADIO_CACHE_CITATIONS
+        if (!positive) {
+            *field = alloc_negative_front((uint32_t)sbb, cache_citation_insert_source);
+            return 1;
+        }
+#endif
         *field = (uint32_t)sbb;
         return 1;
     }
     if (!(descriptor & FRONT_VECTOR_TAG)) {
+#ifdef RADIO_CACHE_CITATIONS
+        if (!positive) {
+            printf("\ncolored negative cache contains an unattributed direct front\n");
+            exit(19);
+        }
+#endif
         int old = (int)descriptor;
         int old_covers_new = positive ? part_greater_equal(old, sbb)
                                       : part_greater_equal(sbb, old);
@@ -801,6 +909,9 @@ static int add_front_descriptor(uint32_t *field, int positive, int sbb) {
     }
 
     front_vector *v = front_vector_for(descriptor);
+#ifdef RADIO_CACHE_CITATIONS
+    uint32_t *sources = front_vector_sources(v);
+#endif
     for (uint32_t i = 0; i < v->len; i++) {
         int old = (int)v->sbb[i];
         int old_covers_new = positive ? part_greater_equal(old, sbb)
@@ -812,15 +923,32 @@ static int add_front_descriptor(uint32_t *field, int positive, int sbb) {
         int old = (int)v->sbb[i];
         int new_covers_old = positive ? part_greater_equal(sbb, old)
                                       : part_greater_equal(old, sbb);
-        if (!new_covers_old) v->sbb[w++] = v->sbb[i];
+        if (!new_covers_old) {
+            v->sbb[w] = v->sbb[i];
+#ifdef RADIO_CACHE_CITATIONS
+            sources[w] = sources[i];
+#endif
+            w++;
+        }
     }
     if (w == 0) {
+#ifdef RADIO_CACHE_CITATIONS
+        if (!positive) {
+            v->sbb[0] = (front_point)sbb;
+            sources[0] = cache_citation_insert_source;
+            v->len = 1;
+            return 1;
+        }
+#endif
         release_front_vector(descriptor);
         *field = (uint32_t)sbb;
         return 1;
     }
     if (w == v->cap) v = grow_front_vector(descriptor);
     v->sbb[w++] = (front_point)sbb;
+#ifdef RADIO_CACHE_CITATIONS
+    front_vector_sources(v)[w - 1] = positive ? 0 : cache_citation_insert_source;
+#endif
     v->len = w;
     return 1;
 }
@@ -1057,7 +1185,8 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
     if (updated == 0 && cache_replay_depth != 0) redundant_cache_replays++;
 }
 
-static inline __attribute__((always_inline)) int checkCacheTrie(int *sb, int size, int k) {
+static inline __attribute__((always_inline)) int checkCacheTrie_ctx(
+    radio_search_context *ctx, int *sb, int size, int k) {
     uint32_t node = sb_cache_root[k];
     for (int i = 0; i < size; i++) {
         uint32_t tag = node & NODE_TAG_MASK;
@@ -1076,13 +1205,25 @@ static inline __attribute__((always_inline)) int checkCacheTrie(int *sb, int siz
             if (i == size - 1) positive = node & NODE_INLINE_MASK;
         }
         int sbb = sb[i];
-        if (front_has_lesser_equal(negative, sbb)) return FALSE;
+        uint32_t source = 0;
+        if (front_find_lesser_equal(negative, sbb, &source)) {
+#ifdef RADIO_CACHE_CITATIONS
+            radio_cache_citation_record(ctx, source);
+#else
+            (void)ctx;
+#endif
+            return FALSE;
+        }
         if (i == size - 1 && front_has_greater_equal(positive, sbb)) return TRUE;
         if (b == NULL) return MAYBE;
         if ((uint32_t)sbb >= b->width) return MAYBE;
         node = b->slot[sbb];
     }
     return MAYBE;
+}
+
+static inline __attribute__((always_inline)) int checkCacheTrie(int *sb, int size, int k) {
+    return checkCacheTrie_ctx(&radio_default_search_context, sb, size, k);
 }
 
 static inline __attribute__((always_inline)) uint32_t cache_l1_hash(const int *sb, int size,
@@ -1840,7 +1981,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 #endif
     //check cache
     if (!frozen_refute) {
-        ck = checkCacheTrie(tmp, size, k);
+        ck = checkCacheTrie_ctx(ctx, tmp, size, k);
         cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
     }
     //	printf("got from cache %d\n", ck);
