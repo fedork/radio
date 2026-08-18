@@ -2261,11 +2261,13 @@ static double run_batch(VerifyTask *tasks, size_t ntasks, int threads, int memo_
         args[i].batch = &b; args[i].slot = i;
     }
     if (progress_k >= 0)
-        printf("BATCH_START phase=%s k=%d targets=%zu threads=%d progress_seconds=%.1f\n",
-               phase, progress_k, ntasks, threads, g_progress_seconds);
+        printf("BATCH_START phase=%s k=%d targets=%zu threads=%d progress_seconds=%.1f "
+               "group_order=%d\n",
+               phase, progress_k, ntasks, threads, g_progress_seconds, g_order);
     else
-        printf("BATCH_START phase=%s k=all targets=%zu threads=%d progress_seconds=%.1f\n",
-               phase, ntasks, threads, g_progress_seconds);
+        printf("BATCH_START phase=%s k=all targets=%zu threads=%d progress_seconds=%.1f "
+               "group_order=%d\n",
+               phase, ntasks, threads, g_progress_seconds, g_order);
     fflush(stdout);
     if (g_progress_seconds > 0) {
         pthread_mutex_init(&b.progress_mu, NULL);
@@ -2532,8 +2534,8 @@ int main(int argc, char **argv) {
     if (getenv("ROOTS")) nread += read_input_file(getenv("ROOTS"), fidx, 1);
     { int nr = 0;
       for (k = 0; k <= MAXK; k++) nr += rootn[k];
-      printf("inputs %s: %lld records parsed (%d explicit roots), threads=%d memo=2^%d/worker\n",
-             argv[1], nread, nr, threads, memo_bits); }
+      printf("inputs %s: %lld records parsed (%d explicit roots), threads=%d memo=2^%d/worker "
+             "group_order=%d\n", argv[1], nread, nr, threads, memo_bits, g_order); }
     fflush(stdout);
 
     /* dedup each level, then freeze */

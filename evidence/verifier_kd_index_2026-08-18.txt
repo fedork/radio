@@ -155,9 +155,9 @@ The warning-clean canonical-order launch build used source SHA-256
 `40036898365b3711ae655886aaa853dd25b5d6b26e4f63f098a04363949da8af`, and binary SHA-256
 `1b45ecb28604d8c94a6e675cdbe9ddb5d9c50cf2d09168d99354eae75ae978b6`. The warning-clean local
 mass-descending build used source SHA-256
-`33d648e8de0e8af2b40f15d7860fbd62f0b223043670df8c37172b1494706d67`, build ID
-`fc58daec7292bbc61a8f54708308a4fd725c7b56ff6d6599538a29ceb3750f7b`, and binary SHA-256
-`b7f206ec6bf0edd8b9a058e57ea78975708c0c7673c939633e0a2bb1a300f68c`. The EC2 rerun will carry
+`e98240c075d731b6e8150c9502152391e04e1d3fd48bc262c9935afacf479471`, build ID
+`7f46b6e0fd4d0b14de3fc75fcbf5bf89faffc8c2661eb90c4d5cc21609888ea9`, and binary SHA-256
+`5e1484e29f9e859e5c07cf93be32db01e7f3b5bd6c312883ba2c2361eb86c53b`. The EC2 rerun will carry
 the clean committed identity separately.
 
 This result does not retract the proof-carrying design: explicit split-space coverage is still the

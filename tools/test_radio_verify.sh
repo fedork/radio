@@ -21,7 +21,7 @@ VERIFY_THREADS=2 VERIFY_MEMO_BITS=18 \
 
 grep -Eq 'TOTAL verified 11, unverified 0, budget 0, nodes 6' "$work_dir/serial.out"
 grep -Eq 'TOTAL verified 11, unverified 0, budget 0, nodes 6' "$work_dir/parallel.out"
-grep -Eq '^BATCH_START phase=verify k=all targets=11 threads=2 progress_seconds=0\.0$' \
+grep -Eq '^BATCH_START phase=verify k=all targets=11 threads=2 progress_seconds=0\.0 group_order=3$' \
     "$work_dir/parallel.out"
 grep -Eq '^BATCH_DONE phase=verify k=all completed=11/11 verified=11 unverified=0 budget=0 nodes=6 ' \
     "$work_dir/parallel.out"
