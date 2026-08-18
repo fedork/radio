@@ -18,8 +18,8 @@ proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(1
 separate resumed k=8 Pareto-prefix census remains live, while both optional full-run9 coloring
 attempts and the slower kd-indexed ordinary audit were stopped; a frozen, solver-core,
 read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived;
-its level-local successor now passes a substantially faster k7 gate and awaits a same-type AWS
-cost check before any complete replay).
+its level-local successor passed the same-type AWS cost gate and is now running a complete,
+uncolored eight-level replay).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -356,13 +356,20 @@ The dedicated instance was terminated after verification; its sole root volume h
 `DeleteOnTermination=true` and is confirmed deleted. This is a solver-core validation replay, not an independent proof
 implementation; the proof-safe cold run9 remains the proof source.
 
-The next frozen-refuter implementation is local and tested but has not begun another full replay.
-Its per-level v2 input makes the dependency explicit: k6 support is loaded before k7 split hints and
-claims, and no unrelated level enters the trie. The generated run9 k7 file is 63,781,183 readable
-bytes / 7,983,524 bytes at `zstd -19`; its source remains the release above. The final systematic
-local k7 gate verified 9,995/9,995 with zero gaps in 79.672 worker wall / 934.528 CPU seconds after
-a 3.099-second support-cache build. Peak capped-run RSS was 0.30 GB. This is a performance gate, not
-a new proof or a complete k7 replay; exact A/B controls are in
+The complete uncolored level-local replay is active on dedicated on-demand `c8a.4xlarge` instance
+`i-04126f6d3016378a9`, run `20260818T194508Z`, from clean commit `0f34041`. Its eight populated
+level-v2 files cover every one of the 3,126,190 normalized claims at k=2..9; each carries only its
+complete k-1 support, checked split hints and target claims. The exact 1,643,619-byte source bundle
+has SHA-256 `beb62def6dba281ff1c387c97f70bd0400f8007a99b455b74e784dd8195a654c`.
+The same-host 9,995-root k7 gate closed with zero gaps in 53.582 worker wall / 854.158 CPU seconds
+and projects 12,860 wall / 204,998 CPU seconds for the four-part band, safely below the cold
+solver's 419,353.1 CPU seconds. Full k7 began normally: after its first 60 worker seconds it had
+verified 140,144/2,576,885 claims with zero gaps and 15,623,138,715 accepted prefixes. This early
+rate is still in the cheap three-part prefix and is not the completion forecast. RSS was 298.6 MiB,
+29.7 GiB host memory remained available, and swap was zero. Each completed level is compressed,
+hashed and uploaded immediately. Live state is `tools/run9_refute_status.sh 20260818T194508Z` and
+the durable prefix is `s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`.
+This active replay is validation, not a new proof; exact A/B controls are in
 [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
 The canonical-order before run `20260818T055255Z` passed the same sample with zero gaps in
@@ -898,18 +905,15 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
-2. **Gate the level-local frozen verifier on same-type AWS k7 hardware.** The optimization controls
-   are complete locally. A strict one-file-per-level certificate now carries an explicit part
-   dictionary, complete k-1 support, checked split-part hints and level-k claims; only k-1 enters the
-   trie. On the retained 9,995-root k7 gate this cut cache construction from 263.457 to about 3.1
-   local seconds. Exact endpoint-only star majorization reduced matched worker CPU 28.69%, and
-   compiling L1 out of the verifier reduced it another 11.29%; the mutable solver still keeps L1.
-   The final local gate closed in 79.672 wall / 934.528 CPU seconds with zero gaps and projects 5.30
-   wall hours for the four-part band. Run the same gate on a right-sized short-lived instance;
-   authorize a complete k7 replay only if projected CPU remains below the proof solver. Then collect
-   per-root reachability benefit for optional hints. Do not add a global exact hash without a
-   measured first-touch hit case. Explicit split-space coverage remains the route to an
-   independently cheap verifier. See
+2. **Let the complete uncolored level-local replay finish and archive it.** Run
+   `20260818T194508Z` passed the same-type gate and is now in its dominant k7 phase. Do not stop its
+   dedicated instance. Check each independently uploaded level checkpoint and the final manifest,
+   compare measured CPU with the proof-producing solver, then publish the retained bundle. Keep
+   coloring separate: it is optional compression, would change the measured hot path, and the
+   existing colored Sa(113) support set has nine known gaps under this refuter. Only revisit it after
+   citation/closure semantics are resolved. Then collect per-root reachability benefit for optional
+   hints. Do not add a global exact hash without a measured first-touch hit case. Explicit
+   split-space coverage remains the route to an independently cheap verifier. See
    [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
 3. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result

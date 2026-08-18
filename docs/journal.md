@@ -7375,3 +7375,45 @@ complete k7 replay only if that projection remains below the proof-producing sol
 hash is deferred absent evidence that first-touch exact hits repay another universal probe.
 Per-root reachability benefit is the next useful hint measurement. Full commands, build/log hashes
 and controls are in `evidence/verifier_level_v2_2026-08-18.txt`.
+
+## 2026-08-18 — complete uncolored level-v2 replay launched
+
+The short gate was no longer the useful stopping point: the local controls had already isolated the
+dominant k7 implementation, so the user authorized a complete replay. Coloring is deliberately a
+separate future experiment. It is optional certificate compression, adds usage tracking to the hot
+path, and the previously colored Sa(113) support set has nine known gaps under the frozen refuter.
+Combining it with this run would therefore confound both the correctness baseline and the measured
+cost. No coloring or usage markers are enabled here.
+
+Commit `0f34041e3e29a801d47133c5ad03844ad4d307f2` packages each populated claim level k=2..9
+as its own human-readable v2 certificate, checks that their claim counts sum to 3,126,190, and runs
+each against only its complete k-1 support. The dominant k7 phase runs first; every completed level
+is compressed, hashed and uploaded immediately, so a later failure cannot erase prior checkpoints.
+The live status distinguishes durable checkpoint coverage from current-level progress and retains
+cache construction, split freeze, current rate, ETA, active roots, memory and swap. All repository
+checks, the refuter regression, full eight-level local generation and small k2/k9 integration
+replays passed before deployment. Generated counts were 2, 137, 33,042, 125,246, 388,317,
+2,576,885, 2,545 and 16 claims respectively.
+
+Run `20260818T194508Z` launched at 19:45:13 UTC on dedicated on-demand `c8a.4xlarge` instance
+`i-04126f6d3016378a9`. On-demand is intentional: the projected multi-hour k7 phase has no internal
+claim checkpoint, so a spot interruption would discard the dominant work; completed levels are
+checkpointed only between processes. The exact 1,643,619-byte source bundle has SHA-256
+`beb62def6dba281ff1c387c97f70bd0400f8007a99b455b74e784dd8195a654c`. All eight level
+certificates were generated and uploaded. The k7 file contains 388,317 k6 support facts and
+2,576,885 claims; its raw/zstd-10 sizes are 63,781,183/12,566,615 bytes.
+
+The sixteen-worker 9,995-root k7 calibration closed with zero gaps in 53.582 worker wall /
+854.158 CPU seconds. It projects 12,860 wall / 204,998 CPU seconds for the 2,398,799 four-part
+band, well below the proof-producing solver's 419,353.1 CPU seconds, so both automatic guards
+passed and the full replay continued. K7 loaded its 388,317 support facts in 3.122 seconds, froze
+772 tables / 383,875 options in 0.096 seconds and published split checksum `3752300250bf6532`.
+At its first 60-second report it had verified 140,144/2,576,885 claims with zero gaps and
+15,623,138,715 accepted prefixes. CPU utilization was about 14.77 cores, RSS 298.6 MiB, host
+memory available 29.7 GiB and swap zero. The displayed 1,043-second ETA is not a forecast for the
+whole phase because these first roots are the cheap three-part prefix; the completed four-part gate
+is the defensible forecast.
+
+Live state is `tools/run9_refute_status.sh 20260818T194508Z`; artifacts are under
+`s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`. The separate shared census
+instance `i-0005d74f985c52ae1` remained running and was not touched.
