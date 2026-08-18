@@ -50,10 +50,10 @@ offered=$("${aws_cmd[@]}" ec2 describe-instance-type-offerings --region "$REGION
     Name=instance-type,Values="$TYPE" --query 'length(InstanceTypeOfferings)' --output text)
 [[ "$offered" == 1 ]] || { echo "$TYPE is not offered in us-west-2b" >&2; exit 70; }
 
-bundle=$(mktemp "/tmp/radio-verifier-${short}.XXXXXX.tar.zst")
-userdata=$(mktemp "/tmp/radio-verifier-userdata.XXXXXX.sh")
+bundle=$(mktemp "/tmp/radio-verifier-${short}.XXXXXX")
+userdata=$(mktemp "/tmp/radio-verifier-userdata.XXXXXX")
 trap 'rm -f -- "$bundle" "$userdata"' EXIT
-git archive --format=tar "$commit" | zstd -T0 -10 -o "$bundle"
+git archive --format=tar "$commit" | zstd -T0 -10 -f -o "$bundle"
 bundle_sha=$(sha256_file "$bundle")
 prefix="run9-verifier-progress/$RUN_ID"
 source_key="$prefix/source-radio-$short.tar.zst"
