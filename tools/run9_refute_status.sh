@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot status for the dedicated frozen-trie verifier.
+# One-shot status for the dedicated complete, uncolored level-v2 replay.
 set -euo pipefail
 
 REGION=us-west-2
@@ -25,7 +25,7 @@ fi
 read -r instance state itype launched discovered <<<"$row"
 [[ -n "$RUN_ID" ]] || RUN_ID=$discovered
 prefix="run9-frozen-refute/$RUN_ID"
-printf 'run9 frozen refuter  run_id=%s instance=%s state=%s type=%s launched=%s\n' \
+printf 'run9 complete uncolored replay  run_id=%s instance=%s state=%s type=%s launched=%s\n' \
     "$RUN_ID" "$instance" "$state" "$itype" "$launched"
 if "${aws_cmd[@]}" s3 ls "s3://$BUCKET/$prefix/STATUS" >/dev/null 2>&1; then
     "${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/STATUS" - --no-progress

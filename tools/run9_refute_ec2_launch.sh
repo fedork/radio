@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch one dedicated, on-demand c8a host for the frozen-trie run9 audit.
+# Launch one dedicated, on-demand c8a host for the complete uncolored run9 replay.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,6 +30,7 @@ sha256_file() {
 }
 required=(radio_refute.c radiobase.c tools/build_radio.py tools/check_provenance.py \
           tools/run_with_provenance.py tools/capped_run.sh tools/test_radio_refute.sh \
+          tools/make_refute_level_certificate.py tools/star_majorization_regression.c \
           tools/testdata/radio_verify_v1.cert tools/testdata/radio_refute_gap_v1.cert \
           tools/run9_refute_ec2_remote.sh)
 for file in "${required[@]}"; do git ls-files --error-unmatch -- "$file" >/dev/null; done
