@@ -37,6 +37,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
+| **`canSolveB_ctx` is not yet permission to call the solver concurrently.** | The context owns the accepted-prefix clock, exact L1 and reachability scratch, but the dominance trie/arenas, lazy split catalog and learned `s[4]`/`s[5]`/`FAST` metadata, and `sbb_to_min_k` still mutate process-global storage. A thread pool around the new entry point would have C data races. Freeze those into a read epoch and publish worker results only at batch boundaries; see [parallel-solver.md](parallel-solver.md). |
 | **Fits with fewer than ~4 data points are meaningless.** | The Pareto data thins out fast: m ≥ 33 has a single k value. A profile or closed form fitted there is unconstrained. |
 | **The old `m=5` formula and `BBBD` profile stop being optimal after `k=8`.** | Li--Wu--Triesch prove the piecewise correction: add 1 at `k=9,10` and add 2 from `k=11`; hence `n(9,5)=481` and `n(10,5)=985`.  The old word is still a valid lower construction, not an equality.  Their displayed intermediate equations (69)–(70) have apparent index/off-by-one inconsistencies, so cite the theorem and use the recomputed assembly in [the exact m=5 calibration](theorems/m5-pareto-assembly.md), not those displays. |
 | **Do not report that the eventual `m=5` strategy “requires six atomization levels.”** | The first eventual hard leaf `P_7=(127,119,119,118,111)@7` has sharp exact and embedded depth **three**.  Six is instead the first nonnegative scalar inventory for one depth that could exactify `P_r` uniformly for all large `r`; the 64-piece component identities do not yet pack into one synchronized tree.  The paper needs only majorization and proves no aligned `AABD` profile.  Its `k>=11` theorem does rule out later changes in the numerical frontier. See [the exactification analysis](theorems/m5-pareto-assembly.md#exactifying-the-decisive-majorized-leaf). |
@@ -302,6 +303,13 @@ track is independently checked by `tools/check_atom_profile_certificate.py` and
 `tools/check_atom_profile_tree.py`; `tools/check_dc_tree_lift.py` exhausts fixed projected lifts and
 searches alternative skeletons.  `tools/atom_profile_regression.sh` ties the certificates together.
 
+The parallel-solver prerequisite now has an explicit `radio_search_context`: recursive work
+budgeting, exact L1 and joint reachability are worker-owned while `canSolveB` remains a compatible
+default-context wrapper. The 1,038-answer serial gate, work/CPU scheduler regressions,
+reachability regressions and ASan+UBSan checks pass. This deliberately stops before concurrency;
+the remaining shared mutation boundary and limited-width epoch plan are in
+[parallel-solver.md](parallel-solver.md).
+
 Artifact store `fedork/radio-data` (private): 16 tags, 47 assets plus a manifest per tag,
 about 471 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `verifier-pipeline-2026-08-17` contains the complete Sa(66)/Sa(113)
@@ -319,10 +327,12 @@ reported UNSOLVABLE. Two follow-ups now share AWS instance `i-0005d74f985c52ae1`
 k=8 Pareto-prefix census and the independent run9 certificate coloring/replay. Do not stop it until
 both supervisors finish and upload their final artifacts.
 
-At 2026-08-17 00:52 UTC the census had closed all 815 second-cut blocks and emitted 1,688 targets,
-but no endpoint or full-state record. It was healthy at one core and 8,892,056 KiB RSS with no
-swap. Its S3 `STATUS` object is still the launch snapshot; use the live output or final artifact,
-not that stale object, for progress. Exact operational paths are in [aws-run.md](aws-run.md).
+At 2026-08-18 00:12 UTC the census still had all 815 second-cut blocks represented, including 48 of
+70 freshly recomputed blocks, and had emitted 1,688 targets but no endpoint or full-state record.
+It was healthy at one core and 8,861.5 MiB RSS. The concurrent fourteen-worker verifier was healthy
+in run9 coloring's `k=7` barrier at 1,399% CPU and 1,296.6 MiB RSS; the host had 112.4 GiB available
+and no swap. The census S3 `STATUS` object is still the launch snapshot; use the live output or final
+artifact, not that stale object, for progress. Exact operational paths are in [aws-run.md](aws-run.md).
 
 | prefix / build | freshness | last reported state |
 |---|---|---|
@@ -611,7 +621,7 @@ seconds. Coloring verified the sixteen `k=9` roots and all 2,151 minimal `k=8` t
 2,506,515 `k=7` facts, or 99.97% of its minimal level. The earlier 190x painting reduction from the
 superseded 2023 corpus therefore does not transfer to run9. The verifier is now coloring that
 full-scale `k=7` batch; the existing census still holds its own full core and the host has no swap.
-At the bounded 2026-08-17 23:38:44 UTC query it remained healthy after 7h03m49s at 1399% CPU and
+At the bounded 2026-08-18 00:12:08 UTC query it remained healthy after 7h37m13s at 1399% CPU and
 1,296.6 MiB RSS, with 112.4 GiB host memory available. This is process health, not intra-level
 proof progress.
 
@@ -803,12 +813,18 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
+2. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
+   cache as a frozen read view plus worker-local overlay, then separate immutable split geometry
+   from learned cut metadata. Extract and regression-test a resumable serial pass-2 prefix cursor
+   before scheduling limited-width batches. The ownership contract is in
+   [parallel-solver.md](parallel-solver.md).
+
 The pair/triple/quad deployment and limited-discrepancy FAST passes remain **rejected**. Their offline
 facts are real, but the warm upward-closed prefix cache already contains the subset information; the
 former added zero marginal rejections on the A+B monster, and the latter regressed negatives. Full
 star expansion is different: it is an arbitrary-part-count global theorem and is now deployed.
 
-2. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
+3. For further P6 work, use `Sb(29:6,19:9,13:12,36:3)` in 6 as the residual positive control. A new
    bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
    finding an `R_1` or `R_2` witness is already known not to do that. Current `main` takes 26.6
    solve seconds and 37,899 top-level splits after the exact-L1 change. Keep any deeper check
@@ -816,11 +832,11 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
    adding solver code: retain several parent-conditioned Pareto upgrades and inequivalent splits,
    preserve lineage labels through equal components, and measure whether one branch survives at the
    next recursive node.  One greedy low-k path is already known to fail.
-3. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
+4. `./run_radio_canon_search_generic.sh 4 9 457 7` and `... 447 8` — unique forced predictions
    of the profile model; minutes each, and a hit is a self-verifying proof.  These are direct H2
    construction attempts, not a resumption of the parked assembly programme.
-4. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
-5. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
+5. `... 432 9` — discriminates the remaining `m=9` profile row (432) from its closed form (431).
+6. The **Extremal Split Lemma** — the whole remaining gap in conjecture (u1), and the only item
    here needing no compute at all. An exchange argument is the natural shape; the surviving
    obligations are listed in
    [conjectures.md](conjectures.md#where-the-proof-gets-stuck).

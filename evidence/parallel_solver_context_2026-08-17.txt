@@ -1,0 +1,116 @@
+Parallel-solver context prerequisite — 2026-08-17
+==================================================
+
+Scope
+-----
+
+This is an engine refactor/regression record, not mathematical evidence for a new Sa/Sb verdict and
+not a claim that canSolveB is thread-safe.  The baseline is repository commit
+1b1258fa32f8fb445745b072f49cf91971c8016b; the implementation commit is
+923de5eeee23ddcafe9c9a15ce8805c1c2ae4a08.  The changed-source hashes tested before commit were:
+
+  bb28bc3261ac8f26e97f352177af972ade843e50d1fe7e285ad00ae18d58a3a4  radiobase.c
+  625f33b8f6fc90b8b2aa9210bee74ef66d9bfa51a6dddbe0b553bca1c8977c5f  tools/search_context_regression.c
+  29fadfc71c207f7da1aa4d2022699bfa16427bc00383b7416ea539234aa2ace9  tools/search_context_regression.sh
+  c560bd7fc500bfcc2d80d51edeb9e2c309d1c8b3668646714da21410f393a2c3  tools/rb_root_probe.c
+
+Implemented boundary
+--------------------
+
+canSolveB_ctx passes one radio_search_context through every recursive B-state call.  The context
+owns the accepted-prefix work clock, exact L1, joint-suffix reachability workspace/counters and
+negative-verdict counter.  canSolveB is the compatibility wrapper over a default context.
+
+The dominance trie/arenas, split catalog plus s[4]/s[5]/FAST metadata, and sbb_to_min_k remain
+mutable process globals.  Concurrent recursive calls are therefore intentionally not enabled.
+
+Exact serial comparison
+-----------------------
+
+Baseline and changed builds:
+
+  tools/build_radio.py -O3 -DMAX_K=5 -DMAX_N=24 \
+      tools/split_regression.c -o SPLIT_REGRESSION
+  SPLIT_REGRESSION | rg '^CHECK' > checks.txt
+
+Baseline build id:
+  f06836f6ee1a20ea491648a13c53c9d8cd7a2cbaefc6b6fa8899c4d49e264c5b
+Changed build id:
+  b8c23d18a9993da1bea112795f0127e468672423288684c62d74c178f1269d5a
+
+Both emitted:
+
+  CHECK_SUMMARY 1038
+  2cf020540919d6fe2f8da20636ecceb8f8d14ccc4d5a3cd599ac0a91e99eade2  checks.txt
+
+cmp returned zero.  Seven alternating process runs were also timed.  Both means rounded to
+0.002857 seconds real; this corpus is too short for a performance inference.
+
+Exact cache-query comparison
+----------------------------
+
+The baseline split-regression output was converted with parse_out.sh.  The documented
+cache_query_regression driver was compiled once against git-show baseline radiobase.c and once
+against the changed engine at MAX_K=5, MAX_N=24, then run at level 5.  Build ids:
+
+  old a7fe003ce149bc4de2674eb65ce4c5bbc75dfee5911deb9ee5fa2beab0d7e4dd
+  new ab9161f74e5b05d921cab2fe0fb365d7eafdf63105e0900c178d6184859179ce
+
+Both reported:
+
+  QUERIES total=508722 true=74493 false=228 maybe=434001
+  993500e0d96e311eb98a0ab9f4e917451fa49015545aaa93f9dd873a9a1a8456  verdicts.bin
+
+cmp returned zero.
+
+Focused regressions
+-------------------
+
+All returned zero:
+
+  tools/search_context_regression.sh
+    search context regression passed (work and CPU schedulers)
+
+  tools/work_budget_regression.sh
+    work budget regression passed
+
+  tools/deadline_regression.c, deterministic-work and RADIO_CPU_BUDGET builds
+    deadline regression passed
+
+  tools/rb_contraction_regression.sh
+    rb contraction regression passed
+
+  tools/rb_pliability_regression.sh
+    rb pliability regression passed
+
+  tools/rb_suffix_profile_regression.sh
+    rb suffix profile regression passed
+
+MEASURE_CACHE_L1 and the combined RADIO_RB_PROFILE_DIAGNOSTIC + RADIO_RB_PLIABLE_CUTOFF
+configurations also compiled successfully.
+
+Sanitizers
+----------
+
+The context regression and forced-reachability negative were built with:
+
+  -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
+
+Both ran with halt_on_error=1 and passed.  Leak detection is unavailable in the macOS ASan runtime;
+the context regression explicitly destroys both nondefault contexts.  Build ids:
+
+  context       e4bad3a77141daec9fd0452c2a2081c5981571a38bfd638527791620edc79c8f
+  reachability  8a5d33a4420aa85e292b0c8dd7a69ad7940f2bf3c19b7c07b6aa17cd0dc018f6
+
+Live-job inventory
+------------------
+
+No AWS process was changed.  A bounded status query at 2026-08-17 23:54 UTC found:
+
+  run9 verifier: COLOR k=7, PID 484457, 14 workers, 1399% CPU,
+                 elapsed 7h19m30s, 1296.6 MiB RSS
+  Pareto census: PID 1926155, 99.9% CPU, elapsed 339225s, 8860.6 MiB RSS
+  host:          112.4 GiB available, zero swap
+
+No local radio solver, verifier, capped wrapper or one-off search process was left running.  The
+unrelated pre-existing `Python -m src.app` process was not touched.

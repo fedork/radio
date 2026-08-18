@@ -159,13 +159,29 @@ milestones rather than percentages of wall time and refuses to invent an intra-l
 | `(n1:n2)` pair -> `sbb` integer id; level-keyed split tables built lazily | `init`, `ensure_splits` |
 | Four stored split orderings (`BY_SP0/1/2`, `BY_MAGIC3`); the `_DESC` three are derived by reversed subscript | `ensure_splits`, `ORDER_BASE` |
 | Result cache: exact-prefix trie with maximal-positive/minimal-negative Pareto fronts in its last part | `cacheCanSolve`, `cacheCantSolve`, `checkCache` |
-| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, deterministic accepted-prefix budget, shared short-state allowance and geometric long-state probes | `canSolveB`, `radio_budget_charge_split` |
+| Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, deterministic accepted-prefix budget, shared short-state allowance and geometric long-state probes | `canSolveB_ctx`; `canSolveB` is its default-context wrapper |
 | Joint suffix reachability; suppression of prefix contraction once it rejects | `rb_dead`, `rb_tainted_contraction` |
 | Unit-group stripping before search | start of `canSolveB` |
 | Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
 | `Sa` recursion | `canSolveA` |
 | Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` |
 | Warm the cache from a previous run's parsed output | `parse_file` |
+
+### Search contexts and parallel boundary
+
+`radio_search_context` now owns the mutable state that naturally belongs to one recursive worker:
+the accepted-prefix clock, exact L1, joint-suffix reachability allocation/counters, and negative
+verdict count. Call `radio_search_context_init`, use `canSolveB_ctx`, then call
+`radio_search_context_destroy`; ordinary drivers continue to use `canSolveB` and reproduce the
+prior serial behavior. `tools/search_context_regression.sh` checks independent contexts under both
+the deterministic work scheduler and historical CPU scheduler. `tools/split_regression.c` remains
+the exact old/new verdict gate.
+
+This API does **not** yet authorize concurrent recursive solver calls. The dominance trie/arenas,
+lazy split catalog and its learned `s[4]`/`s[5]`/`FAST` fields, and `sbb_to_min_k` remain
+process-global mutable state. They must become an immutable batch epoch plus worker-local overlay
+before pthread workers are safe. The ownership map, publication protocol and limited-width queue
+design are in [parallel-solver.md](parallel-solver.md).
 
 ### Split-table allocation
 

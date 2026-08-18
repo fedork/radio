@@ -378,17 +378,26 @@ Next, in order:
    per-fact candidates, so a two-level summary is measurable if verifier wall remains important.
    Keep readable text as the durable source and retain the exact matcher.
 
-The parallel-solver follow-up should reuse the scheduling lesson without forcing the solver into
-level-synchronous breadth first search. Keep the cheap heuristic pass depth first; replace the
-deadline-driven exhaustive tail with a limited-width queue of coarse split-prefix batches. Use
-per-`k` immutable cache epochs plus short exact-result publication, not read/write locks held across
-recursion. First refactor the current globals into explicit worker/search contexts and reproduce
-the serial regressions; a language rewrite is not the first experiment. The mutable solver already
-canonicalizes each segment by mass then long side. Putting length and total mass ahead of that is
-most credible in the frozen epoch: otherwise positive and negative monotonicity require opposite
-range searches or eager duplication across buckets. Keep the deployed last-segment Pareto fronts
-as the mutable baseline, and denormalize hot exact answers or read-only indexes rather than a full
-implied-fact closure.
+The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
+context through the complete recursive tree; its deterministic work clock, exact L1 and joint
+reachability workspace are worker-owned. The legacy entry point wraps a default context, the
+1,038-answer serial corpus is byte-identical, both budget schedulers pass, and sanitizer coverage is
+clean. Full commands and hashes are in
+[`../evidence/parallel_solver_context_2026-08-17.txt`](../evidence/parallel_solver_context_2026-08-17.txt).
+This is not yet a thread-safe solver: the dominance trie, lazy split catalog with learned cut
+metadata, and minimum-`k` memo remain mutable process globals.
+
+Next, introduce a frozen read-only result-cache view plus worker-local exact-result overlay, then
+separate immutable split geometry from mutable cut metadata. Only after that gate should the
+exhaustive tail become a limited-width queue of coarse split-prefix batches. Keep the cheap
+heuristic pass depth first; use per-`k` immutable cache epochs plus short exact-result publication,
+not read/write locks held across recursion. The mutable solver already canonicalizes each segment
+by mass then long side. Putting length and total mass ahead of that is most credible in the frozen
+epoch: otherwise positive and negative monotonicity require opposite range searches or eager
+duplication across buckets. Keep the deployed last-segment Pareto fronts as the mutable baseline,
+and denormalize hot exact answers or read-only indexes rather than a full implied-fact closure. The
+ownership and publication contract is in [parallel-solver.md](parallel-solver.md); a language
+rewrite is not the next experiment.
 
 ## Ordering
 

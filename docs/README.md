@@ -12,6 +12,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [conjectures.md](conjectures.md) | What is predicted, and the experiment that would settle each |
 | [research-plan.md](research-plan.md) | Goals and what to work on next |
 | [tools.md](tools.md) | The solver, its drivers, and the verification tools |
+| [parallel-solver.md](parallel-solver.md) | Frozen-cache epochs, worker ownership and limited-width batching plan |
 | [data.md](data.md) | Index of bulk artifacts and how to fetch them |
 | [journal.md](journal.md) | Running log. History, not fact. |
 | [theorems/](theorems/) | Proofs |

@@ -6947,3 +6947,45 @@ query it remained healthy in the old-index k=7 coloring barrier after 7h03m49s a
 No local verifier, canonical search, wrapper or one-off analysis process remained. The next default
 work is still to let that replay finish and archive it; parallel-solver batching remains a separate
 design track.
+
+## 2026-08-17 — first parallel-solver ownership boundary delivered
+
+The parallel-solver track now has its first code prerequisite rather than only a scheduling sketch.
+`canSolveB_ctx` carries a `radio_search_context` through every recursive B-state call. The context
+owns the deterministic accepted-prefix clock, exact-state L1, joint-suffix reachability allocation
+and counters, and its negative-verdict count. `canSolveB` is now a compatibility wrapper over one
+default context, so every existing driver retains its interface. Context-aware minimum-`k` and FAST
+split preparation keep recursive scheduling charges on the same context. The reachability probe was
+updated to name its default workspace explicitly.
+
+The serial gate is exact. Before editing, `tools/split_regression.c` emitted 1,038 `CHECK` records
+with SHA-256 `2cf020540919d6fe2f8da20636ecceb8f8d14ccc4d5a3cd599ac0a91e99eade2`;
+the refactored engine reproduced the same file byte for byte. `tools/work_budget_regression.sh`,
+work-clock and CPU-clock builds of `tools/deadline_regression.c`, and the contraction, pliability
+and per-suffix reachability regressions all pass. Builds with `MEASURE_CACHE_L1` and the combined
+reachability diagnostic switches compile. New `tools/search_context_regression.sh` checks both
+schedulers, proves that a finite recursive query charges only its selected context, and checks
+distinct L1 and reachability backing stores. Address+UndefinedBehaviorSanitizer runs pass for that
+test and for a forced-reachability negative. A parsed-cache old/new comparison also emitted
+508,722 identical verdict bytes (74,493 true, 228 false, 434,001 maybe), SHA-256
+`993500e0d96e311eb98a0ab9f4e917451fa49015545aaa93f9dd873a9a1a8456`. Seven tiny serial-corpus
+timings rounded to the same 0.002857-second mean for old and new; this corpus is useful for
+correctness but too short for a performance claim.
+
+Build ids, source hashes, commands and exact outputs are retained in
+[`../evidence/parallel_solver_context_2026-08-17.txt`](../evidence/parallel_solver_context_2026-08-17.txt).
+
+This change deliberately does **not** launch pthread workers. The remaining state map found three
+real shared writers: the result dominance trie and arenas; the lazy split catalog and its learned
+`s[4]`, `s[5]` and `FAST` fields; and `sbb_to_min_k`. Printing and definitive fact publication also
+need coordinator ordering. Threading the new entry point today would therefore be undefined C, not
+a parallel prototype. The next implementation unit is a frozen result-cache read view with a
+worker-local exact overlay, followed by immutable split geometry/metadata and a resumable serial
+pass-2 prefix cursor. Only then should a bounded queue schedule coarse prefixes. The complete
+ownership and publication contract is now durable in [parallel-solver.md](parallel-solver.md).
+
+The live AWS work was left untouched. At the bounded 23:54 UTC check, the fourteen-worker run9
+verifier was healthy in the full `k=7` coloring barrier after 7h19m30s at 1,399% CPU and 1,296.6 MiB
+RSS. The separate census remained healthy at one core and 8,860.6 MiB RSS; the host had 112.4 GiB
+available and no swap. Neither process had reached a new proof barrier, so no completion or ETA was
+inferred. No local solver, verifier, capped wrapper or one-off search process was started.
