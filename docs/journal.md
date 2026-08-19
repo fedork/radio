@@ -7634,3 +7634,100 @@ silent kind.
   columns still matched the correct run exactly. A downstream sound filter masking an upstream error
   is precisely why each column was checked against an independently written script rather than
   trusted because the bottom line looked right.
+
+## 2026-08-18 — both run9 level-v2 replays closed; top-down coloring does not pay
+
+Both replays launched earlier in the day finished while the split-choice work was running. Both
+returned `exit_status=0` with zero gaps, both are archived as `run9-level-replay-2026-08-18`, and
+the interesting result is a negative one about certificate compression.
+
+### The complete uncolored replay
+
+`20260818T194508Z`, commit `0f34041`, dedicated `c8a.4xlarge` `i-04126f6d3016378a9`:
+`TOTAL verified 3126190, gaps 0 (eight independent level-v2 checkpoints)`.
+
+| level | claims | prefixes | CPU s |
+|---|---|---|---|
+| 2 | 2 | 3 | 0.001 |
+| 3 | 137 | 6,663 | 0.002 |
+| 4 | 33,042 | 131,223,471 | 9.354 |
+| 5 | 125,246 | 5,162,225,989 | 315.900 |
+| 6 | 388,317 | 20,084,360,716 | 1,294.419 |
+| 7 | 2,576,885 | 3,225,431,432,303 | 209,710.501 |
+| 8 | 2,545 | 55,649,275 | 5.390 |
+| 9 | 16 | 0 | 0.002 |
+
+The claims sum to exactly 3,126,190, and split as 546,744 at k<=6 plus 2,576,885 at k=7 plus 2,561
+at k=8..9 — the same decomposition the 2026-08-18 frozen refuter reported, now reproduced by eight
+*independently checkpointed* level files. Total 211,335.569 CPU seconds, **50.40%** of the cold
+proof solver's 419,353.1. k=7 alone is 99.2% of that cost.
+
+### The top-down colored replay, and why coloring loses
+
+`20260818T205010Z`, commit `e206766`, `i-0901e2b2c266f7db2`:
+`TOP_DOWN_COLOR verified_top=16 levels=8 audited=2846568 terminal_level=2 terminal_used=0 gaps=0`.
+
+| level | corpus | audited | retained | used -> next | citation hits | CPU s |
+|---|---|---|---|---|---|---|
+| 9 | 16 | 16 | 100.0% | 2,151 | 123,600 | 0.002 |
+| 8 | 2,545 | 2,151 | 84.5% | 2,508,278 | 41,460,414 | 5.804 |
+| 7 | 2,576,885 | 2,508,278 | **97.3%** | 230,725 | 1,183,136,753,919 | 217,675.837 |
+| 6 | 388,317 | 230,725 | 59.4% | 80,634 | 4,231,130,295 | 898.766 |
+| 5 | 125,246 | 80,634 | 64.4% | 24,635 | 623,165,108 | 203.327 |
+| 4 | 33,042 | 24,635 | 74.6% | 127 | 14,822,307 | 8.888 |
+| 3 | 137 | 127 | 92.7% | 2 | 662 | 0.002 |
+| 2 | 2 | 2 | 100.0% | 0 | 0 | 0.001 |
+
+Each level's `used` count is the next level's `audited`, the chain terminates with an explicit
+`used 0` at k=2, and the audited counts total 2,846,568.
+
+**The compression is 8.94%** — 3,126,190 claims down to 2,846,568 — and it is in the wrong place.
+The dominant k=7 level is **97.3% cited**: the proof genuinely needs almost every one of its
+2,576,885 k=7 facts. What compresses is k=6 (59.4% retained) and k=5 (64.4%), which together are
+0.5% of the cost.
+
+So the colored replay spent **218,792.627 CPU seconds against the complete replay's 211,335.569 —
+3.5% *more* to verify 8.94% fewer claims.** Per level the trade is visible: coloring is genuinely
+cheaper at k=6 (0.69x) and k=5 (0.64x), but at k=7 it audits 97.3% of the claims *and* pays
+citation-tracing overhead, coming out at 1.04x. The 1.18 trillion k=7 citation hits are what that
+overhead buys.
+
+**Conclusion: top-down coloring is not a useful compression of the run9 certificate.** The
+underlying structural fact is the valuable part and is worth keeping even though the engineering
+did not pay off: *the run9 negative certificate is very close to minimal at the level that costs
+anything.* There is no large dead-weight subset to strip. Do not spend more on coloring this
+certificate; the earlier retired independent-checker coloring design and this
+citation-tracing design have now both been measured, and the ceiling is a property of the proof,
+not of either implementation.
+
+### What was checked before archiving
+
+- `exit.status` 0 and `final.sha256` verify for both runs: 53/53 and 12/12 entries.
+- Every per-level manifest verifies: 40/40 uncolored, 40/40 colored.
+- All eight uncolored certificates decompress to hashes matching `level-certificates.sha256`, at
+  byte sizes matching `level-certificates.meta` exactly (256 / 2,736 / 668,482 / 3,296,510 /
+  10,746,713 / 63,781,183 / 53,306,691 / 45,616; 126 MB raw).
+- All sixteen verify/color logs pass `tools/check_provenance.py`.
+- **An independent subset check**, written here rather than trusted from the run: resolving every
+  `claim` record through each certificate's *own* part table, each colored level's claim set is a
+  subset of the corresponding complete level's, and both cite the same source corpus hash
+  `3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`. The resolved counts reproduce
+  `color-chain.tsv` exactly.
+
+That last check needed care and is worth recording as a trap: certificate `part`, `fact`, `claim`
+and `split` records are **indices into the individual file's own part table**, and a colored
+certificate carries a *smaller* table (176 parts versus 181 at k=5), so the indices are renumbered.
+Comparing the raw `fact`/`claim` lines between two certificates therefore reports spurious
+differences — it initially showed four levels as non-subsets. Indices must be resolved to `n:m`
+values before any cross-certificate comparison.
+
+Both remain solver-core validation and certificate compression, not independent proof
+implementations; proof-safe cold run9 is still the proof source. Neither retroactively rehabilitates
+the old Sa(113) colored certificate, whose nine uncovered splits are a separate unfixed discrepancy.
+
+### Cost and disposition
+
+The two replays cost about 3.8 and 3.9 wall hours on dedicated on-demand `c8a.4xlarge`, roughly
+$16-17 combined. Both instances auto-stopped on their idle guards, so neither billed compute past
+completion. Both are now archived and hash-verified, so both instances and their root volumes are
+ready to terminate.

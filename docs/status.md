@@ -18,9 +18,10 @@ proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(1
 separate resumed k=8 Pareto-prefix census remains live, while both old independent full-run9
 coloring attempts and the slower kd-indexed ordinary audit were stopped; a frozen, solver-core,
 read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived;
-its level-local successor passed the same-type AWS cost gate and is now running a complete,
-uncolored eight-level replay; a separate citation-tracing build passed a matched k=7 gate and is
-now running the requested top-down colored replay; separately, the completed k=7 choice corpus was
+its level-local successor and a separate citation-tracing colored build have both now **finished**
+with zero gaps and are archived and re-verified, and they settle the compression question
+negatively — the certificate is only 8.94% compressible and its dominant k=7 level is 97.3% cited,
+so coloring cost 3.5% more CPU than the complete replay; separately, the completed k=7 choice corpus was
 found to survive only in local scratch and is now archived, and its single-solution layer has been
 measured — split choice is recursive, not geometric, so scalar split scores are refuted while stacked
 sound necessary conditions multiply).
@@ -339,10 +340,12 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 18 tags, 53 assets plus a manifest per tag,
-about 488 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+Artifact store `fedork/radio-data` (private): 19 tags, 55 assets plus a manifest per tag,
+about 562 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
-certificate and all three solver-core replay checkpoints; `pareto-census-k7-2026-08-13` contains the
+certificate and all three solver-core replay checkpoints; `run9-level-replay-2026-08-18` contains
+both finished level-v2 replays, uncolored and colored, with every manifest and certificate
+re-verified before archival; `pareto-census-k7-2026-08-13` contains the
 k=7 choice corpus and its three independent replays. `check-index` is green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
@@ -390,12 +393,13 @@ has SHA-256 `beb62def6dba281ff1c387c97f70bd0400f8007a99b455b74e784dd8195a654c`.
 The same-host 9,995-root k7 gate closed with zero gaps in 53.582 worker wall / 854.158 CPU seconds
 and projected 12,860 wall / 204,998 CPU seconds for the four-part band, safely below the cold
 solver's 419,353.1 CPU seconds. At 2026-08-18T23:36:50Z it reported `exit_status=0` and
-`TOTAL verified 3126190, gaps 0` across all eight independent level-v2 checkpoints. Each completed
-level was compressed, hashed and uploaded as it closed. The instance had already
-**auto-stopped** by 2026-08-19T00:40Z, so it is no longer billing compute; its root volume and the
-final manifest still need the usual verify-then-terminate disposition, which is **not yet done**.
-Final state is `tools/run9_refute_status.sh 20260818T194508Z` and the durable prefix is
-`s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`.
+`TOTAL verified 3126190, gaps 0` across all eight independent level-v2 checkpoints. Per-level claims
+were 2 / 137 / 33,042 / 125,246 / 388,317 / 2,576,885 / 2,545 / 16 at k=2..9, summing exactly to the
+corpus, for 211,335.569 CPU seconds — **50.40%** of the cold proof solver, with k=7 alone 99.2% of
+that. It is **archived and verified** as `run9-level-replay-2026-08-18`: `final.sha256` 53/53,
+per-level manifests 40/40, all eight certificates decompressing to their manifest hashes at the exact
+`level-certificates.meta` byte sizes, and all eight logs passing `check_provenance`. Instance
+`i-04126f6d3016378a9` auto-stopped on its idle guard and is ready to terminate.
 This replay is validation, not a new proof; exact A/B controls are in
 [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
@@ -426,13 +430,27 @@ replay's 3,126,190, and an explicit `used 0` terminal at k=2. All eight level ce
 bundle are staged under
 `s3://radio-sa193-393287594714/run9-colored-refute/20260818T205010Z/`.
 
-**Both replay instances have auto-stopped** (`i-04126f6d3016378a9`, `i-0901e2b2c266f7db2`), so
-neither bills compute, but their root volumes still exist and **neither has been archived to a
-release or terminated**. That is the next action on this front: promote both certificate chains from
-S3 staging into a `fedork/radio-data` tag with a `docs/data.md` row, then terminate. Until the
-colored chain is archived and independently re-checked it remains solver-core validation and
-certificate compression, not an independent proof, and it does **not** retroactively rehabilitate the
-old Sa(113) colored certificate — that trap stands.
+**Top-down coloring does not pay, and that is now measured rather than hoped.** The compression is
+only **8.94%** (3,126,190 claims to 2,846,568) and it lands in the wrong place: the dominant k=7
+level is **97.3% cited**, while what compresses is k=6 (59.4% retained) and k=5 (64.4%), together
+0.5% of the cost. The colored replay therefore spent **218,792.627 CPU seconds against the complete
+replay's 211,335.569 — 3.5% *more* to verify 8.94% fewer claims**, because at k=7 it audits nearly
+every claim *and* pays citation tracing (1.18 trillion k=7 citation hits). Per level it is cheaper at
+k=6 (0.69x) and k=5 (0.64x) but 1.04x at k=7. The durable finding is structural, not about either
+implementation: **the run9 negative certificate is close to minimal at the only level that costs
+anything**, so there is no large dead-weight subset to strip. Both coloring designs — the retired
+independent checker and this citation tracer — have now been measured; do not spend more on coloring
+this certificate.
+
+Both replays are **archived and verified** as `run9-level-replay-2026-08-18`. For the colored chain,
+each level's `used` count is the next level's `audited`, the chain terminates with an explicit
+`used 0` at k=2, and an independent check written against the archived files — resolving every
+`claim` through each certificate's own part table — confirms every colored level's claim set is a
+subset of the corresponding complete level's, sharing source hash `3ad5877a...`. Both instances
+(`i-04126f6d3016378a9`, `i-0901e2b2c266f7db2`) auto-stopped, never billed compute past completion,
+and are ready to terminate. Both remain solver-core validation and certificate compression, not
+independent proof implementations, and neither retroactively rehabilitates the old Sa(113) colored
+certificate — that trap stands.
 Live state is `tools/run9_color_refute_status.sh 20260818T205010Z`; staging is
 `s3://radio-sa193-393287594714/run9-colored-refute/20260818T205010Z/`. This is still solver-core
 validation and certificate compression, not a new independent proof. The local matched gate and
