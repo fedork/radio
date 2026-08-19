@@ -16,8 +16,24 @@ split and verifies that the hint set and counts agree with the claims.
 
 With ``--selection``, level-k claims are restricted to the cited support records emitted by a
 successful coloring audit of level k+1.  Selection indices are checked against both the complete
-source level and the human-readable state copied into the selection file; level-(k-1) support
-remains complete so the resulting certificate is independently replayable.
+source level and the human-readable state copied into the selection file.
+
+``--support-selection`` additionally restricts the level-(k-1) *support* to the facts a coloring
+audit of level k actually cited.  Applying both yields the transitive citation set: since a level-k
+audit's ``used`` count is by construction the level-(k-1) claim count, the trimmed levels form one
+nested chain.
+
+Why trimming the support is sound.  The support is consulted only through CACHE_ONLY dominance
+queries.  A query that previously hit a retained fact still hits it; a query that previously missed
+still misses; and a query that hit a *removed* fact cannot exist, because answering a query is
+exactly what marks a fact cited.  Rebuilding the Pareto front from a subset can therefore only drop
+facts that never answered anything -- including ones that were already redundant in the full front.
+The refuter is also self-checking here: over-trimming produces reported gaps, never a false pass.
+
+What a trimmed certificate is not.  It is self-contained and replayable for *its own* claims, but it
+is no longer the complete corpus at that level, so it cannot verify claims outside its own set, and a
+zero-gap replay of it is not an independent re-proof of the original result -- it re-verifies the
+same claims with less support.  Keep the untrimmed levels as the archival form.
 """
 
 from __future__ import annotations
@@ -211,19 +227,40 @@ def write_level(
     selection: ColorSelection | None = None,
     selection_path: Path | None = None,
     selection_sha256: str | None = None,
+    support_selection: ColorSelection | None = None,
+    support_selection_path: Path | None = None,
+    support_selection_sha256: str | None = None,
 ) -> None:
     if selection is not None and selection.selected_level != level:
         raise ValueError(
             f"selection targets level {selection.selected_level}, not requested level {level}"
         )
     support_level = level - 1
+    if support_selection is not None and support_selection.selected_level != support_level:
+        raise ValueError(
+            f"support selection targets level {support_selection.selected_level}, "
+            f"not support level {support_level}"
+        )
     support_count = support_refs = claim_count = claim_refs = 0
     source_level_count = 0
+    source_support_count = 0
     matched_selection: set[int] = set()
+    matched_support_selection: set[int] = set()
     all_parts: set[Part] = set()
     root_uses: Counter[Part] = Counter()
     for record_level, state in iter_v1(source_path):
         if record_level == support_level:
+            source_support_count += 1
+            if support_selection is not None:
+                expected = support_selection.states.get(source_support_count)
+                if expected is None:
+                    continue
+                if state != expected:
+                    raise ValueError(
+                        f"support selection use {source_support_count} state "
+                        f"does not match source"
+                    )
+                matched_support_selection.add(source_support_count)
             support_count += 1
             support_refs += len(state)
             all_parts.update(state)
@@ -251,6 +288,22 @@ def write_level(
         missing = selection.states.keys() - matched_selection
         if missing:
             raise ValueError(f"selection records not found in source: {sorted(missing)[:5]}")
+    if support_selection is not None:
+        if source_support_count != support_selection.support:
+            raise ValueError(
+                f"support selection support count {support_selection.support} does not match "
+                f"source level-{support_level} count {source_support_count}"
+            )
+        missing = support_selection.states.keys() - matched_support_selection
+        if missing:
+            raise ValueError(
+                f"support selection records not found in source: {sorted(missing)[:5]}"
+            )
+        if support_count != support_selection.used:
+            raise ValueError(
+                f"retained support {support_count} does not match "
+                f"support selection used {support_selection.used}"
+            )
     if not claim_count:
         if selection is not None and selection.used == 0:
             raise ValueError("color selection is empty; the top-down chain is complete")
@@ -268,6 +321,14 @@ def write_level(
             f"# selection {selection_path.name} sha256={selection_sha256} "
             f"parent-level={selection.parent_level} used={selection.used}\n"
         )
+    if support_selection is not None:
+        assert support_selection_path is not None and support_selection_sha256 is not None
+        out.write(
+            f"# support-selection {support_selection_path.name} "
+            f"sha256={support_selection_sha256} "
+            f"parent-level={support_selection.parent_level} "
+            f"used={support_selection.used}\n"
+        )
     out.write(f"level {level}\n")
     out.write(f"parts {len(sorted_parts)}\n")
     for part in sorted_parts:
@@ -275,8 +336,13 @@ def write_level(
 
     out.write(f"support {support_level} {support_count} {support_refs}\n")
     if support_count:
+        source_support_index = 0
         for record_level, state in iter_v1(source_path):
             if record_level == support_level:
+                source_support_index += 1
+                if (support_selection is not None
+                        and source_support_index not in support_selection.states):
+                    continue
                 emit_state(out, "fact", state, ids)
 
     out.write(f"split-hints {len(split_hints)}\n")
@@ -300,7 +366,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--selection",
         type=Path,
-        help="color selection emitted by a successful level-(k+1) audit",
+        help="color selection emitted by a successful level-(k+1) audit; restricts level-k claims",
+    )
+    parser.add_argument(
+        "--support-selection",
+        type=Path,
+        help="color selection emitted by a successful level-k audit; restricts level-(k-1) support "
+             "to the cited facts. Produces a trimmed, non-archival certificate -- see the module "
+             "docstring for the soundness argument and the limits",
     )
     parser.add_argument("-o", "--output", type=Path, help="output file (default: stdout)")
     return parser.parse_args(argv)
@@ -314,17 +387,31 @@ def main(argv: list[str] | None = None) -> int:
     if args.output is not None and args.output.resolve() == args.input.resolve():
         print("input and output paths must differ", file=sys.stderr)
         return 2
-    if args.selection is not None:
-        if args.selection.resolve() == args.input.resolve():
-            print("certificate input and selection paths must differ", file=sys.stderr)
+    for label, path in (("selection", args.selection),
+                        ("support selection", args.support_selection)):
+        if path is None:
+            continue
+        if path.resolve() == args.input.resolve():
+            print(f"certificate input and {label} paths must differ", file=sys.stderr)
             return 2
-        if args.output is not None and args.output.resolve() == args.selection.resolve():
-            print("selection and output paths must differ", file=sys.stderr)
+        if args.output is not None and args.output.resolve() == path.resolve():
+            print(f"{label} and output paths must differ", file=sys.stderr)
             return 2
+    if (args.selection is not None and args.support_selection is not None
+            and args.selection.resolve() == args.support_selection.resolve()):
+        print("selection and support-selection paths must differ", file=sys.stderr)
+        return 2
     try:
         source_sha256 = input_sha256(args.input)
         selection = read_color_selection(args.selection) if args.selection is not None else None
         selection_sha256 = input_sha256(args.selection) if args.selection is not None else None
+        support_selection = (
+            read_color_selection(args.support_selection)
+            if args.support_selection is not None else None
+        )
+        support_selection_sha256 = (
+            input_sha256(args.support_selection) if args.support_selection is not None else None
+        )
         if args.output is None:
             write_level(
                 sys.stdout,
@@ -334,6 +421,9 @@ def main(argv: list[str] | None = None) -> int:
                 selection=selection,
                 selection_path=args.selection,
                 selection_sha256=selection_sha256,
+                support_selection=support_selection,
+                support_selection_path=args.support_selection,
+                support_selection_sha256=support_selection_sha256,
             )
         else:
             with args.output.open("w", encoding="utf-8", newline="\n") as out:
@@ -345,6 +435,9 @@ def main(argv: list[str] | None = None) -> int:
                     selection=selection,
                     selection_path=args.selection,
                     selection_sha256=selection_sha256,
+                    support_selection=support_selection,
+                    support_selection_path=args.support_selection,
+                    support_selection_sha256=support_selection_sha256,
                 )
     except (OSError, UnicodeError, ValueError) as exc:
         print(f"{args.input}: {exc}", file=sys.stderr)

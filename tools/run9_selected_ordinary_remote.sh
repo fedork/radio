@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Run the ORDINARY (uncolored) level-v2 refuter over the post-coloring selected input.
 #
+# SUPERSEDED for new work by tools/run9_level_chain_verify_remote.sh, which takes the chain and its
+# expected counts from an uploaded manifest instead of pinning one input set inline. This file is
+# kept only because run 20260819T013030Z was launched from it and its exact content is that run's
+# provenance.
+#
 # This is an A/B measurement, not a new proof. Three points, all on c8a.4xlarge with 16 threads:
 #
 #   complete input + ordinary verifier   211,335.569 CPU s   (run 20260818T194508Z)

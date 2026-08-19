@@ -96,6 +96,29 @@ if tools/make_refute_level_certificate.py "$color_source" --level 1 \
 fi
 grep -Eq 'color selection is empty; the top-down chain is complete' "$work_dir/empty-color.out"
 
+# --support-selection trims level-(k-1) support to the facts a level-k audit cited. The level-3
+# audit cited exactly one level-2 fact, so the trimmed level-3 certificate must carry that one fact
+# and must still close with zero gaps -- that is the whole soundness claim, so assert it directly
+# rather than trusting the argument.
+tools/make_refute_level_certificate.py "$color_source" --level 3 \
+    --support-selection "$work_dir/color-k2-1.selection" -o "$work_dir/trim-support-k3.cert"
+grep -Fxq 'support 2 1 2' "$work_dir/trim-support-k3.cert"
+grep -Eq '^# support-selection color-k2-1\.selection sha256=[0-9a-f]{64} parent-level=3 used=1$' \
+    "$work_dir/trim-support-k3.cert"
+REFUTE_THREADS=2 REFUTE_PROGRESS_SECONDS=0 REFUTE_MIN_K=3 REFUTE_MAX_K=3 \
+    tools/run_with_provenance.py "$work_dir/radio_refute" "$work_dir/trim-support-k3.cert" \
+    > "$work_dir/trim-support-k3.out" 2> "$work_dir/trim-support-k3.err"
+grep -Eq '^TOTAL verified 1, gaps 0,' "$work_dir/trim-support-k3.out"
+
+# A support selection must target level k-1: pointing one at the wrong level has to fail closed.
+if tools/make_refute_level_certificate.py "$color_source" --level 2 \
+        --support-selection "$work_dir/color-k2-1.selection" -o "$work_dir/bad-support.cert" \
+        > "$work_dir/bad-support.out" 2>&1; then
+    echo 'support selection for the wrong level was unexpectedly accepted' >&2
+    exit 1
+fi
+grep -Eq 'support selection targets level 2, not support level 1' "$work_dir/bad-support.out"
+
 sed 's/use 1 Sb(2:2,2:2)/use 1 Sb(4:1,2:2)/' "$work_dir/color-k2-1.selection" \
     > "$work_dir/bad-color-state.selection"
 if tools/make_refute_level_certificate.py "$color_source" --level 2 \
