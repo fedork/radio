@@ -455,11 +455,29 @@ claims for 1.8% more prefix work, i.e. the retained cited claims look harder per
 coloring dropped. An early rate is not a whole-phase forecast, so this is a signal, not a result; if it
 holds, the selected input is not cheaper and the coloring negative is complete. Live state is
 `tools/run9_selected_ordinary_status.sh 20260819T013030Z`; staging is
-`s3://radio-sa193-393287594714/run9-selected-ordinary/20260819T013030Z/`. **Still unexplored, and the
-only place a large win could come from:** each colored level keeps *complete* lower support, so k=7
-still loads all 388,317 k=6 facts though only 230,725 are cited; restricting it would shrink the
-dominance trie ~40% for the phase making 1.18 trillion lookups. That needs a
-`make_refute_level_certificate.py` change and a written soundness argument first.
+`s3://radio-sa193-393287594714/run9-selected-ordinary/20260819T013030Z/`.
+
+**Trimming claims cannot help, and the measurement now says so directly.** The selected chain's k=7
+prefix total is 3,220,215,775,519 against the complete replay's 3,225,431,432,303 — **0.16% less
+search work for 2.7% fewer claims**. The dropped claims were nearly free.
+
+**The support is the only real lever, and run `20260819T020000Z` is queued to test it.**
+`make_refute_level_certificate.py --support-selection` now trims level-(k-1) support to the cited
+facts; combined with `--selection` that gives the transitive citation set, and because a level-k
+audit's `used` count is by construction the level-(k-1) claim count, the trimmed levels form one
+nested chain (verified level by level). At k=7 the support drops **388,317 to 230,725, 40.6% fewer
+facts**. Unlike the claims trim this does not reduce prefix count — it shrinks the dominance front
+each of the 1.18 trillion citation lookups scans, attacking cost per lookup. Soundness argument is in
+the tool's docstring; the refuter regression asserts it directly (the level-3 audit cited one level-2
+fact, so its trimmed certificate must carry that fact and still close with zero gaps), and
+regenerating the archived colored k5 certificate through the modified generator is byte-identical.
+The run is **chained on the same host** behind the selected run so all four points share a machine
+with the baseline, then powers the instance down — instance-initiated shutdown is `stop`, not
+`terminate`, and no idle guard is running, so the shutdown is explicit. Watch it with
+`tools/run9_level_chain_verify_remote.sh`'s uploaded `STATUS` under
+`s3://radio-sa193-393287594714/run9-trimmed-ordinary/20260819T020000Z/`. A zero-gap close also
+confirms the trimming argument at full scale; reported gaps would refute it, which is the designed
+failure mode rather than a silent one.
 
 Both replays are **archived and verified** as `run9-level-replay-2026-08-18`. For the colored chain,
 each level's `used` count is the next level's `audited`, the chain terminates with an explicit

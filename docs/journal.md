@@ -7806,3 +7806,51 @@ which is the only place a large speedup could come from. It looks sound — the 
 construction every fact actually consulted, so hits stay hits and misses stay misses — but it needs a
 change to `tools/make_refute_level_certificate.py`, which currently keeps full support on purpose, and
 a written soundness argument before it is worth running. Not started.
+
+### Trimmed to the transitive citation set (queued behind the selected run)
+
+The selected-input run answered a narrower question than it looked. Its k=7 prefix total is
+3,220,215,775,519 against the complete replay's 3,225,431,432,303 — **0.16% less search work for 2.7%
+fewer claims**. The claims coloring dropped were nearly free, so trimming *claims* cannot buy
+anything. At matched elapsed times the selected run is 13-14% behind on claims but 4% *ahead* on
+prefixes, confirming the retained cited claims are the harder ones.
+
+That leaves the support as the only real lever, which is what
+`--support-selection` now does. Because a level-k audit's `used` count is by construction the
+level-(k-1) claim count, the trimmed chain is one nested sequence, verified level by level:
+
+| level | claims | support complete | support trimmed | retained |
+|---|---|---|---|---|
+| 9 | 16 | 2,545 | 2,151 | 84.5% |
+| 8 | 2,151 | 2,576,885 | 2,508,278 | 97.3% |
+| 7 | 2,508,278 | 388,317 | **230,725** | **59.4%** |
+| 6 | 230,725 | 125,246 | 80,634 | 64.4% |
+| 5 | 80,634 | 33,042 | 24,635 | 74.6% |
+| 4 | 24,635 | 137 | 127 | 92.7% |
+| 3 | 127 | 2 | 2 | 100% |
+| 2 | 2 | 0 | 0 | — |
+
+The k=7 phase is the whole cost and its support drops **40.6%**. Unlike the claims trim, this does not
+reduce prefix count — it reduces the size of the dominance front each of the 1.18 trillion citation
+lookups scans, so it attacks cost per lookup rather than the number of lookups. That is the first
+change in this sequence that can plausibly move the total.
+
+Two checks before spending anything: regenerating the archived colored k5 certificate through the
+modified generator is **byte-identical**, and the refuter regression now asserts the soundness claim
+directly — the level-3 audit cited exactly one level-2 fact, so its trimmed certificate must carry
+that one fact and still close with zero gaps, and a support selection aimed at the wrong level must
+fail closed.
+
+Run `20260819T020000Z` is **queued on the same instance** behind the selected run rather than given
+its own host, so the third and fourth points share a machine with the 211,335.569-second baseline.
+A chainer waits for the predecessor's `exit.status`, refuses to start if it is non-zero, runs the
+trimmed chain through `tools/run9_level_chain_verify_remote.sh`, then powers the instance down;
+instance-initiated shutdown behaviour was confirmed to be `stop`, not `terminate`, so the volume
+survives. No idle guard was running, which is why the shutdown is explicit — otherwise the host would
+bill indefinitely after the last run. Inputs and a `level/claims/sha256` manifest are staged under
+`s3://radio-sa193-393287594714/run9-trimmed-ordinary/20260819T020000Z/input/`, and the runner checks
+each download against the manifest *and* against the certificate's own declared claim count.
+
+If the trimmed chain closes with zero gaps, that is also empirical confirmation of the trimming
+soundness argument at full scale. If it reports gaps, the argument is wrong and the trim is unsound —
+the run is designed so that is the visible outcome rather than a silent one.
