@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-18** (the published exact `m=5` result is now reconstructed
+don't know it. Last refreshed **2026-08-19** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
 for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
@@ -442,13 +442,38 @@ anything**, so there is no large dead-weight subset to strip. Both coloring desi
 independent checker and this citation tracer — have now been measured; do not spend more on coloring
 this certificate.
 
+**A third A/B point is running to separate instrumentation cost from claim reduction.** Run
+`20260819T013030Z` on the kept instance `i-04126f6d3016378a9` puts the *ordinary* verifier over the
+*selected* input, completing the table: complete+ordinary 211,335.569, selected+colored 218,792.627,
+selected+ordinary in flight, predicted ~205,111. It reuses the baseline `run9_refute` binary and
+`/root/source` unchanged — coloring is a compile-time `#ifdef`, so that binary is exactly the ordinary
+one — meaning the input file is the only difference. The seven cheap levels closed as a gate at exactly
+their selected claim counts with zero gaps, totalling 1,044.052 CPU s against the complete replay's
+1,625.067. **An early k=7 counter-signal:** at 60 seconds this run had done 113,683 claims over
+15,896,943,271 prefixes where the complete replay did 140,144 claims over 15,623,138,715 — 19% fewer
+claims for 1.8% more prefix work, i.e. the retained cited claims look harder per claim than the ones
+coloring dropped. An early rate is not a whole-phase forecast, so this is a signal, not a result; if it
+holds, the selected input is not cheaper and the coloring negative is complete. Live state is
+`tools/run9_selected_ordinary_status.sh 20260819T013030Z`; staging is
+`s3://radio-sa193-393287594714/run9-selected-ordinary/20260819T013030Z/`. **Still unexplored, and the
+only place a large win could come from:** each colored level keeps *complete* lower support, so k=7
+still loads all 388,317 k=6 facts though only 230,725 are cited; restricting it would shrink the
+dominance trie ~40% for the phase making 1.18 trillion lookups. That needs a
+`make_refute_level_certificate.py` change and a written soundness argument first.
+
 Both replays are **archived and verified** as `run9-level-replay-2026-08-18`. For the colored chain,
 each level's `used` count is the next level's `audited`, the chain terminates with an explicit
 `used 0` at k=2, and an independent check written against the archived files — resolving every
 `claim` through each certificate's own part table — confirms every colored level's claim set is a
 subset of the corresponding complete level's, sharing source hash `3ad5877a...`. Both instances
 (`i-04126f6d3016378a9`, `i-0901e2b2c266f7db2`) auto-stopped, never billed compute past completion,
-and are ready to terminate. Both remain solver-core validation and certificate compression, not
+and never billed compute past completion. `i-0901e2b2c266f7db2` (colored) is now **terminated** and
+its volume `vol-0bdc1e36eea39386c` is confirmed deleted, after checking that its disk held nothing
+unarchived — every file was in the release, a decompressed twin of an archived `.zst`, transient run
+state, or `run9.cert`, which is archived in `sa193-frozen-refute-2026-08-18` and whose SHA-256 was
+verified here to equal the `3ad5877a...` source hash every level certificate cites.
+`i-04126f6d3016378a9` is deliberately **kept running** for the third A/B point above. Both replays
+remain solver-core validation and certificate compression, not
 independent proof implementations, and neither retroactively rehabilitates the old Sa(113) colored
 certificate — that trap stands.
 Live state is `tools/run9_color_refute_status.sh 20260818T205010Z`; staging is

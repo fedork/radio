@@ -7731,3 +7731,78 @@ The two replays cost about 3.8 and 3.9 wall hours on dedicated on-demand `c8a.4x
 $16-17 combined. Both instances auto-stopped on their idle guards, so neither billed compute past
 completion. Both are now archived and hash-verified, so both instances and their root volumes are
 ready to terminate.
+
+## 2026-08-19 — third A/B point: ordinary verifier over the post-coloring selected input
+
+The coloring measurement left one cell empty. Coloring was measured on the *selected* input with
+citation tracing on; the complete input was measured with tracing off. That conflates instrumentation
+overhead with the benefit of verifying fewer claims. Run `20260819T013030Z` fills it in:
+
+| input | verifier | CPU s |
+|---|---|---|
+| complete (3,126,190 claims) | ordinary | 211,335.569 |
+| selected (2,846,568 claims) | colored | 218,792.627 |
+| selected (2,846,568 claims) | ordinary | **this run** |
+
+Predicted ~205,111 CPU s by scaling each level's measured cost by its claim reduction, i.e. about 3%
+under the complete replay — because k=7 is 99.2% of the cost and coloring removed only 2.7% of its
+claims. The interesting outcome would be a result at or above 211,335: that would mean the claims
+coloring dropped were the cheap ones.
+
+It reuses the exact `run9_refute` binary and `/root/source` tree from the finished uncolored run
+rather than rebuilding, so the input file is the only difference from the baseline. Selected level
+certificates come from the colored run's S3 prefix, which outlives its terminated instance, and each
+of the eight downloads is checked against a pinned SHA-256. `tools/run9_selected_ordinary_remote.sh`
+and `tools/run9_selected_ordinary_status.sh` drive and observe it.
+
+**Cheap levels closed first as a gate**, all at exactly their selected claim counts with zero gaps:
+
+| level | claims | CPU s selected | CPU s complete | ratio |
+|---|---|---|---|---|
+| 6 | 230,725 | 838.543 | 1,294.419 | 0.65 |
+| 5 | 80,634 | 192.453 | 315.900 | 0.61 |
+| 4 | 24,635 | 7.871 | 9.354 | 0.84 |
+| 8 | 2,151 | 5.179 | 5.390 | 0.96 |
+| 3 / 9 / 2 | 145 | 0.006 | 0.005 | — |
+
+Seven levels total 1,044.052 CPU s against the complete replay's 1,625.067 — a 581-second saving,
+tracking the prediction closely (k=5 came in at 192 against 203 predicted, k=6 at 839 against 769).
+
+**An early counter-signal at k=7, worth flagging rather than trusting.** At its first 60-second
+report this run had verified 113,683 claims over 15,896,943,271 accepted prefixes; the complete
+replay's first 60 seconds did 140,144 claims over 15,623,138,715 prefixes. So 19% fewer claims for
+1.8% more prefix work in the same wall time — the retained, actually-cited claims look *harder per
+claim* than the ones coloring dropped, exactly the failure mode predicted above. This is the cheap
+early region and the repo's own note is that an early rate is not a whole-phase forecast, so it is
+not a result yet; but if it holds, the selected input will not be meaningfully cheaper and may be
+more expensive, which would make the coloring negative complete: the compression neither pays for
+its instrumentation nor for itself.
+
+Health at launch: 1,482% CPU, 301.9 MiB RSS, 29.8 GiB host memory available, swap zero, all displayed
+active roots four-part. k=7 has no intra-level checkpoint, so expect roughly 3.5 wall hours; the
+`capped_run.sh` guard is 86,400 s wall and 8 GiB RSS. Cost about $3.
+
+Instance `i-0901e2b2c266f7db2` (colored) was **terminated** first, after confirming its disk held
+nothing unarchived: every file was either in `run9-level-replay-2026-08-18`, a decompressed twin of an
+archived `.zst`, transient run state (`stage`, `*.pid`, `current.expected`), or `run9.cert` — which is
+archived in `sa193-frozen-refute-2026-08-18` and whose SHA-256 was checked here to equal
+`3ad5877a2ffa3bcf04c3403a147ae075e406b4313cce83eb0761fdd563725116`, the exact source hash cited by
+every level certificate, closing the provenance chain. Its volume `vol-0bdc1e36eea39386c` is confirmed
+deleted. Comparing remote file lists to the archive needed basename matching, because S3 nests the
+certificates under `certificates/` and `levels/` while the instance keeps them flat; a full-path diff
+falsely reported 21 and 86 files as unarchived.
+
+The kept instance `i-04126f6d3016378a9` is the uncolored run's own host, chosen because coloring is a
+**compile-time** `#ifdef RADIO_REFUTE_ENABLE_COLORING`, so its `run9_refute` is exactly the ordinary
+binary that produced the 211,335.569-second baseline. Same binary, same host, same instance type,
+only the input differs.
+
+### Still open: the variant with real upside
+
+Each colored level file deliberately keeps *complete* lower support, so k=7 still loads all 388,317
+k=6 facts even though the chain shows only 230,725 were ever cited. Restricting the support to the
+cited set would shrink the dominance trie about 40% for the phase that makes 1.18 trillion lookups,
+which is the only place a large speedup could come from. It looks sound — the retained set is by
+construction every fact actually consulted, so hits stay hits and misses stay misses — but it needs a
+change to `tools/make_refute_level_certificate.py`, which currently keeps full support on purpose, and
+a written soundness argument before it is worth running. Not started.
