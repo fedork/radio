@@ -1,0 +1,105 @@
+k=8 Pareto-prefix census — progress and completion-time measurement, 2026-08-19
+Instance i-0005d74f985c52ae1, run 20260814T0132Z, solver PID 1926155 (pareto_k8_aws).
+All figures below read from /root/pareto-census-k8-20260814T0132Z/out.txt via read-only SSM
+probes, plus tools/pareto_census_status.sh snapshots. Status: measured.
+
+WHY THIS FILE. The census is in its final map_endpoints() sweep, which emits exactly one
+CENSUS FULL_STATE per endpoint and then CENSUS END. That makes the endpoint count a true
+progress denominator, and it is the only phase of this run for which an ETA is well posed.
+The naive mean-rate ETA is wrong by a factor of ~2.5 and is refuted below, so the derivation
+is recorded rather than just the answer.
+
+OBSERVATIONS (UTC)
+2026-08-17 00:52     44,833,189 B out.txt; 815/815 second blocks, prefix summary, 1,688
+                     targets; NO ENDPOINT and NO FULL_STATE record => full-state phase
+                     had not yet begun (source: docs/journal.md handoff entry).
+2026-08-18 21:02:48  full_states=1087, RSS 9,130.4 MiB (source: docs/journal.md).
+2026-08-18 21:22:11  elapsed 416,486 s, full_states=1087, full_winners=36,378,
+                     549,383 lines / 73.16 MiB, RSS 9,141.0 MiB.
+2026-08-18 21:32:57  elapsed 417,132 s, full_states=1087, full_winners=36,378,
+                     549,811 lines / 73.22 MiB, RSS 9,146.3 MiB.
+2026-08-19 13:48:56  elapsed 475,691 s, full_states=1746, full_winners=48,943,
+                     639,155 lines / 85.88 MiB, RSS 9,396.1 MiB, host 113.2 GiB available,
+                     no swap, disk 193.1 GiB free.
+2026-08-19 13:50:58  full_state_emitted=1746, full_summary_done=1745.
+2026-08-19 13:53:11  emitted=1747, done=1746  (U001747 enters flight)
+  .. 7 samples 5 min apart ..
+2026-08-19 14:23:48  emitted=1747, done=1746  (unchanged through the whole window)
+2026-08-19 14:24:45  emitted=1747, done=1746; utime 477,761 s / stime 71 s => CPU-bound at
+                     ~100% of one core, so the endpoint is grinding, not stalled on I/O.
+                     still_solving_lines=4,069, unchanged since 13:50:58 and with an
+                     identical tail line: no single exact query is over the print threshold.
+
+POSITION AT 2026-08-19 14:24:45 UTC
+  endpoints_total   1893
+  FULL_STATE        1747 emitted, FULL_SUMMARY 1746 complete
+  in flight         U001747  k=6 parts=4 units=0 mass=578  19:10,24:7,34:4,42:2
+                    (>= 1,894 s elapsed, against a 659-endpoint mean of 89.8 s)
+  remaining         146 unstarted + 1 in flight
+  END records       0
+
+THE NAIVE ETA IS REFUTED. 659 endpoints closed in the 59,205 s between the 21:22:11 and
+13:48:56 snapshots = 89.8 s/endpoint, which extrapolates to 3.7 h for the 148 left. Two
+directly observed endpoints refute the model that produces it:
+  U001087  prefixes=15.9M, exact_queries=2,975, in flight across the 21:02:48, 21:22:11 and
+           21:32:57 snapshots => >= 1,809 s.
+  U001747  >= 1,894 s and still running; its mass band's largest observed prefix count is
+           44.7M.
+A prefix-only model at the maximum admissible 4.061e-6 s/prefix predicts 65 s for U001087
+and <= 182 s for U001747 — short by 28x and >= 10x. Cost is therefore dominated by exact
+solver queries, not by enumeration prefixes, and the blended 89.8 s/endpoint mean is an
+artifact of a window that was 73% high-mass endpoints.
+
+COST MODEL. Fit cost = a*prefixes + b*exact_queries on the one window whose duration is
+known exactly (endpoints 1087..1745, 59,205 s):
+  59,205 = a * 14.579e9 + b * 70,717
+Non-negativity alone bounds b <= 0.8372 s/query and a <= 4.061e-6 s/prefix. U001087 gives
+b >= 1,809/2,975 = 0.61 s/query. So b lies in [0.61, 0.837] and a on the line
+a = (59,205 - 70,717 b)/14.579e9.
+
+Band composition of that window, showing why the blend misleads — 97% of the prefixes sit in
+the high-mass band while 70% of the queries sit below mass 600:
+  band          n    prefixes    exact_queries
+  >=600       479    14.164e9    21,280
+  575-599      11     0.187e9     3,391
+  550-574      15     0.128e9    18,370
+  525-549      16     0.068e9    16,375
+  500-524      17     0.018e9     7,703
+  475-499       9     0.008e9     1,728
+  450-474      13     0.005e9     1,569
+  <450         99     0.001e9       301
+
+REMAINING WORK, predicted from per-mass-bucket means over the 1,745 completed endpoints:
+  band        n remaining   mean exq   predicted exq
+  625-649        71            49.4      3,507
+  600-624        13            84.4      1,097
+  575-599         8           328.5      2,628
+  550-574        15         1,100.7     16,511
+  525-549        10         1,023.4     10,234
+  500-524        12           453.1      5,437
+  475-499        13           192.0      2,496
+  425-449         2            21.5         43
+  400-424         2             9.5         19
+  275-299         1             1.2          1
+  total         147                      41,973   (prefixes 2.735e9)
+The remaining set is loaded with exactly the query-expensive bands: 63 of 147 are below mass
+600, against 234 of the 1,745 already done.
+
+ETA = a*2.735e9 + b*41,972 along the fitted line:
+  b=0.61  a=1.102e-6   28,617 s   7.95 h   -> 2026-08-19 22:22 UTC
+  b=0.70  a=0.666e-6   31,200 s   8.67 h   -> 2026-08-19 23:05 UTC
+  b=0.837 a=0          35,131 s   9.76 h   -> 2026-08-20 00:10 UTC
+Central estimate 2026-08-19 ~23:05 UTC, range 22:20 UTC to 00:10 UTC, plus 5-15 min for the
+wrapper to zstd the ~86 MB output, run the analyzer and upload to S3.
+
+COHERENCE CHECK. The same (a,b) pairs imply a duration for endpoints 1..1086 (29.495e9
+prefixes, 85,405 queries) of 84,606 s / 79,414 s / 71,484 s respectively, putting the start of
+the full-state phase at 2026-08-17 21:52, 23:18 or 2026-08-18 01:29 UTC. All three postdate
+the 2026-08-17 00:52 observation of zero endpoint records, so the model family is consistent
+with the one independent timing constraint available.
+
+KNOWN OPTIMISM. U001747 has already spent >= 1,894 s where the model gives its band a mean of
+328 queries, i.e. ~230 s at b=0.70. Per-endpoint query counts inside the 550-574 band range
+from 476 to 2,975 on completed endpoints, so the 15 remaining there (3.2 h of the estimate at
+b=0.70) carry most of the variance. Treat 7.95 h as a floor rather than the low end of a
+symmetric interval.

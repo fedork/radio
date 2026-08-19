@@ -7976,3 +7976,46 @@ zero-gap replay is solver-core validation rather than an independent second impl
 used the coloring run, but its validity does not depend on coloring being correct — coloring only
 proposed the subset. The complete corpus (`run9.cert`, `3ad5877a...`) and the complete level chain are
 retained deliberately, because the trimmed chain cannot answer anything outside its own claim set.
+
+## 2026-08-19 — the k=8 census ETA: the blended endpoint rate is the wrong denominator
+
+A status check on the shared k=8 Pareto-prefix census (instance `i-0005d74f985c52ae1`, run
+`20260814T0132Z`). The run is healthy and in its final `map_endpoints` sweep, which emits exactly one
+`CENSUS FULL_STATE` per endpoint and then `CENSUS END`, so for the first time in this run the
+progress denominator is exact: 1,747 of 1,893 endpoints emitted at 2026-08-19 14:24:45 UTC, 1,746
+complete, one core, 9,396.1 MiB RSS, 113.2 GiB host memory available, no swap.
+
+**The obvious ETA is wrong and worth recording as such.** 659 endpoints closed in the 59,205 s
+between two status snapshots — 89.8 s each, extrapolating to 3.7 h for the 148 remaining. That number
+is refuted by direct observation, not by argument: I sampled the counter every five minutes for half
+an hour and it never moved, because endpoint `U001747` alone has consumed >= 1,894 s. Endpoint
+`U001087` behaved the same way earlier, sitting in flight across three snapshots for >= 1,809 s. A
+prefix-only cost model at the largest admissible rate predicts 65 s for `U001087`; it used >= 1,809 s.
+Refuted by 28x.
+
+**What actually costs time.** Fitting `cost = a*prefixes + b*exact_queries` on the one window with a
+known duration bounds `b` to 0.61-0.837 s per exact solver query, with enumeration prefixes almost
+free by comparison. The measured window was 73% high-mass endpoints, which hold 97% of the prefixes
+but only 30% of the queries — so its blended mean describes a population the remainder does not
+belong to. Of the 147 endpoints left, 63 are below mass 600, where mean query counts run 10-20x
+higher (1,101 at mass 550-574 against 49 at 625-649); only 234 of the 1,745 already done were in that
+region. Re-predicting from per-mass-bucket means gives 41,972 remaining queries and 2.735e9 prefixes,
+hence **7.95-9.76 h, central 2026-08-19 ~23:05 UTC**, plus 5-15 min of compress/analyse/upload.
+
+The estimate cross-checks: the same `(a,b)` pairs place the start of the full-state phase between
+2026-08-17 21:52 and 2026-08-18 01:29 UTC, all of which postdate the 2026-08-17 00:52 observation of
+zero endpoint records — the one independent timing constraint available. It is nonetheless optimistic
+at the low end, since `U001747` has already outrun its own band's mean by ~8x, and the 15 remaining
+endpoints at mass 550-574 carry 3.2 h of the estimate with a 476-2,975 spread in query count. Treat
+7.95 h as a floor.
+
+Full derivation, observation log and band tables in
+[../evidence/pareto_census_k8_eta_2026-08-19.txt](../evidence/pareto_census_k8_eta_2026-08-19.txt).
+Cost of this measurement: four read-only SSM probes and a 30-minute sampler, no solver time, no
+change to the running job. The durable lesson is method, not the number: when a phase's items are
+heterogeneous, a mean rate over a window with a different mix is not a forecast, and the cheap way to
+find out is to sample the counter and see whether it moves at all.
+
+Process inventory at handoff: the census is the only research binary running anywhere; it was not
+touched. The local 30-minute sampler (`/tmp/census_sampler.sh`) and its waiter both exited. No local
+solver, refuter, one-off Python search or orphan `Python -`/`python3 -` process remains.

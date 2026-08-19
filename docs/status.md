@@ -363,12 +363,21 @@ Do not run `gh auth switch`.
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
 reported UNSOLVABLE. The k=8 Pareto-prefix census remains active on shared AWS instance
-`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-18 21:02:48 UTC it remained healthy
-at one core and 9,130.4 MiB RSS, with 113.4 GiB host memory available and no swap. It had all 815
-second-cut blocks represented, 48 of 70 freshly recomputed blocks, 1,688 targets, 1,893 endpoints
-and 1,087 full-state records, but no final `CENSUS END` record. The census S3 `STATUS` object is still
-the launch snapshot; use `tools/pareto_census_status.sh` or the final artifact rather than that
-stale object.
+`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-19 14:24:45 UTC it was healthy at one core
+(utime 477,761 s against 477,840 s elapsed) and 9,396.1 MiB RSS, with 113.2 GiB host memory
+available, no swap and 193.1 GiB disk free. It has all 815 second-cut blocks represented, 48 of 70
+freshly recomputed blocks, 1,688 targets, 1,893 endpoints and 48,943 full winners, and is in the
+final `map_endpoints` sweep at **1,747 of 1,893 `FULL_STATE` records** (1,746 complete) with no
+final `CENSUS END` record. The census S3 `STATUS` object is still the launch snapshot; use
+`tools/pareto_census_status.sh` or the final artifact rather than that stale object.
+
+**Expected completion 2026-08-19 ~23:05 UTC, range 22:20 UTC to 2026-08-20 00:10 UTC**, plus 5-15
+min for the wrapper to compress, analyse and upload. Do not use the 89.8 s/endpoint mean rate to
+project this: it gives 3.7 h and is refuted by two directly observed endpoints that ran >= 30 min
+each. Cost is dominated by exact solver queries at 0.61-0.837 s each, not by enumeration prefixes,
+and 63 of the 147 remaining endpoints sit below mass 600 where query counts are 10-20x higher —
+against 234 of the 1,745 already done. Derivation, band tables and the coherence check are in
+[../evidence/pareto_census_k8_eta_2026-08-19.txt](../evidence/pareto_census_k8_eta_2026-08-19.txt).
 
 The mass-descending independent audit is no longer active. Run `20260818T062429Z` reached
 251,131/2,576,885 k=7 claims (73,045 four-part), with zero gaps, after 2,160 seconds and
