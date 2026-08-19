@@ -119,6 +119,38 @@ if tools/make_refute_level_certificate.py "$color_source" --level 2 \
 fi
 grep -Eq 'support selection targets level 2, not support level 1' "$work_dir/bad-support.out"
 
+# check_level_chain.py is the solver-free half of certificate checking: structure and inductive
+# closure. The k1/k2 pair from the same source is a closed two-level chain.
+tools/check_level_chain.py "$work_dir/closed-k1-v2.cert" "$work_dir/closed-k2-v2.cert" \
+    > "$work_dir/chain-ok.out" 2>&1
+grep -Fq 'chain is internally consistent, inductively closed and terminating' "$work_dir/chain-ok.out"
+
+# Negative control: pairing level 2 with a *claims-filtered* level 1 leaves level 2 citing facts that
+# level 1 no longer proves, which must be reported as a dangling reference rather than passed.
+tools/make_refute_level_certificate.py "$closed" --level 1 -o "$work_dir/closed-k1-full.cert"
+python3 - "$work_dir/closed-k1-full.cert" "$work_dir/closed-k1-short.cert" <<'PY'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+lines = open(src).read().splitlines()
+out, dropped = [], 0
+for line in lines:
+    if line.startswith("claim ") and dropped == 0:
+        dropped = 1
+        continue
+    if line.startswith("claims "):
+        f = line.split()
+        out.append(f"claims {f[1]} {int(f[2])-1} {int(f[3])-1}")
+        continue
+    out.append(line)
+open(dst, "w").write("\n".join(out) + "\n")
+PY
+if tools/check_level_chain.py "$work_dir/closed-k1-short.cert" "$work_dir/closed-k2-v2.cert" \
+        > "$work_dir/chain-bad.out" 2>&1; then
+    echo 'check_level_chain accepted a chain with a dangling support fact' >&2
+    exit 1
+fi
+grep -Eq 'FAIL support-only [1-9]' "$work_dir/chain-bad.out"
+
 sed 's/use 1 Sb(2:2,2:2)/use 1 Sb(4:1,2:2)/' "$work_dir/color-k2-1.selection" \
     > "$work_dir/bad-color-state.selection"
 if tools/make_refute_level_certificate.py "$color_source" --level 2 \

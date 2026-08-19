@@ -7935,3 +7935,44 @@ Run 3: 12,665.313 wall seconds. Run 4: 12,627.213. About 7.0 wall hours combined
 `run9-level-replay-2026-08-18`. One spurious `STATUS` mismatch in each run was a flaw in
 `run9_level_chain_verify_remote.sh`, which rewrote `STATUS` after hashing it; fixed by finalizing
 `STATUS` before the manifest is built.
+
+### The trimmed chain is adopted as the Sa(193) certificate of record
+
+Performance was the wrong reason to want it and that is now settled, but minimality is a good reason,
+so the trimmed chain becomes the artifact we hand out. Two properties were checked first, because
+count agreement is not closure.
+
+**Inductive closure, as resolved states.** For every level, the support set is *exactly* the claim set
+one level down — zero set difference at all seven boundaries, not merely equal cardinalities — and
+level 2 carries no support, so the induction terminates instead of dangling. The top level is exactly
+the sixteen single-part states `Sb(97:96)` through `Sb(112:81)`, every one summing to 193. So each
+claim is refuted using facts that are themselves claims proved one level lower, down to a level
+proved outright.
+
+`tools/check_level_chain.py` now performs this check with no solver involved, alongside per-level
+internal consistency (declared counts against actual records, part indices in range, reference totals,
+duplicate detection). It passes on the trimmed chain and — as a control that tests the tool rather
+than the input — also on the complete chain, which is closed for the same structural reason. A
+deliberately mixed chain (trimmed k=7 with complete k=8) fails with the right diagnosis: 68,607
+support facts at level 8 not proved at level 7. The regression in `tools/test_radio_refute.sh` locks
+both the positive and the dangling-reference negative.
+
+**A size claim I had to correct before recording it.** The first comparison showed the trimmed chain
+40.60% smaller compressed, which is wrong: I had compressed the trimmed certificates at `zstd -19`
+while the complete ones came from the run at a lower level. Recompressing both at `-19` gives
+**8.82%** (17,155,540 to 15,642,637 bytes), consistent with 8.23% raw and 8.94% fewer claims. The
+40.60% figure was a compression-level artifact and coincidentally close to the unrelated 40.6% support
+figure, which is exactly how such a number survives unchallenged.
+
+Released as `sa193-certificate-2026-08-19` with the eight certificates, the per-level verification
+evidence from run `20260819T020000Z` (all 2,846,568 claims, zero gaps), a hash manifest and a README.
+`docs/sa193-certificate.md` is the standing description, including the two-halves checking recipe:
+`check_level_chain.py` for structure without a solver, and the frozen refuter per level for semantics.
+
+The classification is unchanged and stated explicitly in that document: cold run9 remains the proof
+*source*; this is a compact checkable replay artifact. The refuter shares the solver core, so a
+zero-gap replay is solver-core validation rather than an independent second implementation, and
+`check_level_chain.py` is solver-independent but checks structure only. The trimmed chain's derivation
+used the coloring run, but its validity does not depend on coloring being correct — coloring only
+proposed the subset. The complete corpus (`run9.cert`, `3ad5877a...`) and the complete level chain are
+retained deliberately, because the trimmed chain cannot answer anything outside its own claim set.

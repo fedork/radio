@@ -79,7 +79,13 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   so the provenance survives the 1.8 GB of logs.
 - **Sa sequence, k = 1..10** — proven maximal. `Sa(192)` has independently verified witness
   trees; proof-safe cold run9 exhaustively rejects all sixteen first-test possibilities for
-  `Sa(193)`.
+  `Sa(193)`. The **certificate of record** for the `Sa(193)` refutation is now the trimmed
+  eight-level chain `sa193-certificate-2026-08-19`: 2,846,568 claims, 15.6 MB compressed, inductively
+  closed, structurally checkable without a solver by
+  `tools/check_level_chain.py --expect-top-sum 193`. See
+  [sa193-certificate.md](sa193-certificate.md). Cold run9 remains the proof *source*; the certificate
+  is the compact replay artifact, and it cannot answer anything outside its own claim set — the
+  complete corpus is retained for that.
 - **Three theorems plus the lift-box lemma** — Singleton Majorization, Unit-Group Elimination and
   Subgraph Monotonicity are proved; so is the new geometric core of recursive Pareto lifting. The
   latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
@@ -340,8 +346,8 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 20 tags, 57 assets plus a manifest per tag,
-about 578 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+Artifact store `fedork/radio-data` (private): 21 tags, 58 assets plus a manifest per tag,
+about 594 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
 certificate and all three solver-core replay checkpoints; `run9-level-replay-2026-08-18` contains
 both finished level-v2 replays, uncolored and colored, with every manifest and certificate
