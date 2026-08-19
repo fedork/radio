@@ -7854,3 +7854,84 @@ each download against the manifest *and* against the certificate's own declared 
 If the trimmed chain closes with zero gaps, that is also empirical confirmation of the trimming
 soundness argument at full scale. If it reports gaps, the argument is wrong and the trim is unsound —
 the run is designed so that is the visible outcome rather than a silent one.
+
+## 2026-08-19 — the coloring/compression programme is closed: the compression was mostly illusory
+
+Both queued A/B runs finished with `exit_status=0` and zero gaps, completing the four-point table.
+Points 1, 3 and 4 share one host (`i-04126f6d3016378a9`) and one binary (`run9_refute` at `0f34041`),
+so only their inputs differ; point 2 used the colored build `e206766` on the now-terminated
+`i-0901e2b2c266f7db2`, which makes it the least comparable row.
+
+| # | input | claims | k=7 support | verifier | CPU s | vs #1 |
+|---|---|---|---|---|---|---|
+| 1 | complete | 3,126,190 | 388,317 | ordinary | 211,335.569 | 1.0000 |
+| 2 | selected | 2,846,568 | 388,317 | colored | 218,792.627 | 1.0353 |
+| 3 | selected | 2,846,568 | 388,317 | ordinary | 202,592.331 | **0.9586** |
+| 4 | trimmed | 2,846,568 | **230,725** | ordinary | 201,982.710 | **0.9557** |
+
+Decomposed: citation-tracing instrumentation costs **+8.0%** (#2/#3, cross-host so approximate);
+trimming claims buys **-4.14%** (#3/#1); trimming the support a further **-0.30%** (#4/#3); everything
+together **-4.43%**.
+
+### The 40.6% support reduction was 99.7% illusory
+
+This is the finding. The k=7 cache-build lines explain the whole outcome:
+
+| | support loaded | branches | fronts | front bytes | redundant | build wall |
+|---|---|---|---|---|---|---|
+| #3 | 388,317 | 14,733 | 251,077 | 4,428,648 | **156,927** | 3.121 s |
+| #4 | 230,725 | 14,358 | 245,355 | 4,326,304 | **0** | 2.187 s |
+
+Of the 388,317 facts in the complete support, **156,927 were already discarded as redundant** during
+Pareto-front construction, so only `388,317 - 156,927 = 231,390` ever entered the structure. The
+cited set is 230,725. The difference is **665 facts, 0.29%**.
+
+So the dominance front was already doing the trimming, for free, at load time. Coloring spent
+13,616 wall seconds and 217,675 CPU seconds to rediscover a set the loader derives in three seconds.
+The resulting structures shrank only 2.3-2.5% (branches 14,733 to 14,358; fronts 251,077 to 245,355),
+and the entire measurable saving is 0.93 seconds of cache build out of ~201,000 CPU seconds. `redundant`
+going to exactly 0 is the tell: after trimming, nothing is left to discard.
+
+#3 and #4 report the identical `split_checksum=02f5ed6cbfc31d94` and identical prefix totals
+(3,220,215,775,519), confirming their claim sets and split preparation match exactly, so the 0.30% is
+a clean isolation of the support effect and not a difference in work.
+
+### Why even the claims trim's saving is not what it looks like
+
+At k=7, #1 to #3 drops CPU 209,710.501 to 201,548.279 (-3.9%) while prefix work falls only
+3,225,431,432,303 to 3,220,215,775,519 (**-0.16%**). The search is essentially identical. What changed
+is the split-table working set: 772 tables / 383,875 options becomes 692 / 355,174, and the prefix
+rate rises 245,866,280/s to 255,596,243/s (**+4.0%**). So the gain is locality in split preparation,
+not less searching — and it therefore says nothing about certificate size being a cost driver.
+
+### Conclusion: certificate compression cannot speed verification here
+
+Verification cost is **prefix enumeration**, not fact lookup. k=7 does 3.22 trillion accepted prefixes
+against 1.18 trillion citation hits — 0.37 lookups per prefix — and cutting the dominance front by
+40.6% (nominally) or 0.29% (actually) moves the total by 0.30%. Compressing the certificate attacks
+the wrong term. Both coloring designs have now been measured end to end, and the ceiling is a property
+of the proof and the engine, not of either implementation.
+
+**Do not revisit certificate coloring or compression as a performance measure.** The available
+compression is 8.94% of claims and 0.29% of genuinely-live k=7 support; obtaining it costs 8.0% and
+using it saves 4.4%, of which the support half is 0.30%. If verification throughput ever matters
+again, the target is prefix enumeration.
+
+### The trimming soundness argument is confirmed at full scale
+
+Run 4 verified all 2,846,568 claims with **zero gaps** while carrying 40.6% less k=7 support, which is
+the empirical confirmation the argument needed: hits stayed hits, misses stayed misses. Its
+`input.summary` independently records what was actually loaded per level (level 7: claims 2,508,278,
+support 230,725), so the experiment demonstrably tested what it claims. `--support-selection` is
+therefore sound and available, but with the above it has no performance use; its remaining value is as
+a way to *measure* how much of a certificate is live.
+
+### Cost and disposition
+
+Run 3: 12,665.313 wall seconds. Run 4: 12,627.213. About 7.0 wall hours combined on one on-demand
+`c8a.4xlarge`, roughly $5. The chainer stopped the host on completion as designed. Both runs'
+`final.sha256` verify (37/38 and 38/39 entries present locally); the two absences are the reused
+`run9_refute` binary and its sidecar, which live on the instance and are already archived in
+`run9-level-replay-2026-08-18`. One spurious `STATUS` mismatch in each run was a flaw in
+`run9_level_chain_verify_remote.sh`, which rewrote `STATUS` after hashing it; fixed by finalizing
+`STATUS` before the manifest is built.

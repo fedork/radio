@@ -189,14 +189,16 @@ total_wall=$(awk -F '\t' 'NR>1 && $3 != "NA" {s+=$3} END {printf "%.3f", s}' tim
 } > verify.total
 printf 'COMPLETE\n' > stage
 printf '0\n' > exit.status
+# Finalize STATUS *before* hashing: an earlier version rewrote it afterwards, so its manifest entry
+# could never match and every verification reported one spurious STATUS mismatch.
+write_status
 : > final.sha256
 for f in "$BINARY" "$BINARY.provenance" run.meta STATUS manifest.tsv input.summary timings.tsv \
         verify.total exit.status verify-k*.total verify-k*-provenance.txt \
         verify-k*.out.zst verify-k*.err.zst; do
     [[ -f "$f" ]] && sha256sum "$f" >> final.sha256
 done
-for f in final.sha256 verify.total timings.tsv exit.status manifest.tsv input.summary; do
+for f in final.sha256 verify.total timings.tsv exit.status manifest.tsv input.summary STATUS; do
     aws s3 cp "$f" "s3://$BUCKET/$PREFIX/$f" --no-progress
 done
-write_status
 cat verify.total

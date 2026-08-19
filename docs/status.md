@@ -340,8 +340,8 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 19 tags, 55 assets plus a manifest per tag,
-about 562 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+Artifact store `fedork/radio-data` (private): 20 tags, 57 assets plus a manifest per tag,
+about 578 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
 certificate and all three solver-core replay checkpoints; `run9-level-replay-2026-08-18` contains
 both finished level-v2 replays, uncolored and colored, with every manifest and certificate
@@ -457,27 +457,38 @@ holds, the selected input is not cheaper and the coloring negative is complete. 
 `tools/run9_selected_ordinary_status.sh 20260819T013030Z`; staging is
 `s3://radio-sa193-393287594714/run9-selected-ordinary/20260819T013030Z/`.
 
-**Trimming claims cannot help, and the measurement now says so directly.** The selected chain's k=7
-prefix total is 3,220,215,775,519 against the complete replay's 3,225,431,432,303 — **0.16% less
-search work for 2.7% fewer claims**. The dropped claims were nearly free.
+**All four points are now measured and the programme is closed.** Points 1, 3 and 4 share one host and
+one binary, so only their inputs differ; point 2 used the colored build on a different host and is the
+least comparable row.
 
-**The support is the only real lever, and run `20260819T020000Z` is queued to test it.**
-`make_refute_level_certificate.py --support-selection` now trims level-(k-1) support to the cited
-facts; combined with `--selection` that gives the transitive citation set, and because a level-k
-audit's `used` count is by construction the level-(k-1) claim count, the trimmed levels form one
-nested chain (verified level by level). At k=7 the support drops **388,317 to 230,725, 40.6% fewer
-facts**. Unlike the claims trim this does not reduce prefix count — it shrinks the dominance front
-each of the 1.18 trillion citation lookups scans, attacking cost per lookup. Soundness argument is in
-the tool's docstring; the refuter regression asserts it directly (the level-3 audit cited one level-2
-fact, so its trimmed certificate must carry that fact and still close with zero gaps), and
-regenerating the archived colored k5 certificate through the modified generator is byte-identical.
-The run is **chained on the same host** behind the selected run so all four points share a machine
-with the baseline, then powers the instance down — instance-initiated shutdown is `stop`, not
-`terminate`, and no idle guard is running, so the shutdown is explicit. Watch it with
-`tools/run9_level_chain_verify_remote.sh`'s uploaded `STATUS` under
-`s3://radio-sa193-393287594714/run9-trimmed-ordinary/20260819T020000Z/`. A zero-gap close also
-confirms the trimming argument at full scale; reported gaps would refute it, which is the designed
-failure mode rather than a silent one.
+| # | input | claims | k=7 support | verifier | CPU s | vs #1 |
+|---|---|---|---|---|---|---|
+| 1 | complete | 3,126,190 | 388,317 | ordinary | 211,335.569 | 1.0000 |
+| 2 | selected | 2,846,568 | 388,317 | colored | 218,792.627 | 1.0353 |
+| 3 | selected | 2,846,568 | 388,317 | ordinary | 202,592.331 | 0.9586 |
+| 4 | trimmed | 2,846,568 | 230,725 | ordinary | 201,982.710 | 0.9557 |
+
+Citation tracing costs **+8.0%**; trimming claims buys **-4.14%**, trimming support a further
+**-0.30%**, all of it **-4.43%**. Both new runs closed with zero gaps over all 2,846,568 claims.
+
+**The 40.6% support reduction was 99.7% illusory** — this is the finding. Of the 388,317 complete k=7
+support facts, **156,927 were already discarded as redundant** during Pareto-front construction, so
+only 231,390 ever entered the structure against the cited 230,725: a true live reduction of **665
+facts, 0.29%**. The dominance front was already doing the trimming for free at load time, and
+`redundant` dropping to exactly 0 in the trimmed run is the tell. Structures shrank 2.3-2.5% and the
+whole measurable saving is 0.93 s of cache build out of ~201,000 CPU s. #3 and #4 share
+`split_checksum=02f5ed6cbfc31d94` and identical prefix totals, so that 0.30% cleanly isolates the
+support effect. Even the claims trim's saving is misread as compression: at k=7 prefix work fell only
+**0.16%** while the prefix *rate* rose 4.0% as the split tables shrank 772 to 692 — locality in split
+preparation, not less search.
+
+**Verification cost is prefix enumeration, not fact lookup** (3.22 trillion prefixes against 1.18
+trillion citation hits, 0.37 lookups per prefix), so compressing the certificate attacks the wrong
+term. **Do not revisit certificate coloring or compression as a performance measure**; both designs
+are now measured end to end and the ceiling is a property of the proof and the engine. If verification
+throughput matters again, the target is prefix enumeration. `--support-selection` is sound and
+retained, but its use is *measuring* how much of a certificate is live, not speeding anything up.
+Archived and verified as `run9-verifier-ab-2026-08-19`; the chainer stopped the host as designed.
 
 Both replays are **archived and verified** as `run9-level-replay-2026-08-18`. For the colored chain,
 each level's `used` count is the next level's `audited`, the chain terminates with an explicit
