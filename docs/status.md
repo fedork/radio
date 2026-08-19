@@ -20,7 +20,10 @@ coloring attempts and the slower kd-indexed ordinary audit were stopped; a froze
 read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived;
 its level-local successor passed the same-type AWS cost gate and is now running a complete,
 uncolored eight-level replay; a separate citation-tracing build passed a matched k=7 gate and is
-now running the requested top-down colored replay).
+now running the requested top-down colored replay; separately, the completed k=7 choice corpus was
+found to survive only in local scratch and is now archived, and its single-solution layer has been
+measured — split choice is recursive, not geometric, so scalar split scores are refuted while stacked
+sound necessary conditions multiply).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -51,6 +54,8 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not maximize a free D-width with full-star majorization—or an approximate mixed frontier—alone.** | Full-star majorization is only a static upper bound; synchronized choices in the mixed child can lower the exact maximum. The exact pair `Sb(11:2,11:2,9:2,3:2)@4` (unsolvable) / `Sb(11:2,10:2,9:2,3:2)@4` (solvable) exhibits the gap, as does the assembly target `Sb(50:4,39:6)@6`. `assembly-rank ... complete=YES` means the necessary-bound ranking is complete, not that its top candidate works. A `mixed-frontier` result with `complete=NO` omits part of the antichain, while `exact=NO` describes only the bounded singletonization predicate. Neither certifies a global exact optimum; the mixed-frontier optimizer deliberately refuses both incomplete and bounded-depth inputs. See [conjectures.md](conjectures.md#excess-q-pareto-assembly-as-a-variable-d-slice-working-hypothesis-2026-08-14). |
 | **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Exact cover now excludes rank 1180 through depth four; this is still bounded, so depth five and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one finite depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 | **The excess-`q` Pareto assembly is parked, not a pending global formula.** | Its corrected four-segment reduction and exact `m=5` calibration are durable, but the sufficiently-large-`q` postulate, completeness of the outer-family list, and stabilization of the synchronized D frontier are unproved. `m=5` already needs competing outer triples and a piecewise D solution; the height-6 rank-1180 question concerns only one restricted aligned slice. Do not restart finite normalization/rank searches unless a new theorem or construction addresses one of those global gaps. |
+| **Do not read the choice census's `complete=` as a structural candidate count.** | `enumerate_rec` prunes with `CACHE_ONLY` lookups against a warm dominance cache, so `complete` — and therefore `full_complete_candidates` — depends on cache history, not on the state. It reads as a median of 2 candidates at k=7 single-class endpoints; the cache-free count under sound filters (information cap plus the four-rectangle proven frontier) is a median of **13,276**. Quote `complete` as search effort, never as the size of the choice problem. Measured 2026-08-18; see [journal.md](journal.md). |
+| **Do not re-attempt a scalar score over split geometry.** | Refuted 2026-08-18 on all 153 four-part single-class k=7 endpoints. Ranking the majorization-feasible candidates by each of 19 geometric features puts the winner at best at the **5th percentile** (tightness, median rank 659; `dev` 0.098), with **one endpoint in 153** reaching the top ten. Filtering to `R_1` first does not rescue it. This is the same wall the 2026-08-08 tightness claim and the 2026-08-09 fitted score hit, now measured on the complete single-solution corpus: there is no local signal to fit or to transfer. Spend effort on cheap sound *necessary conditions* instead — their selectivity multiplies. |
 
 ## Goals
 
@@ -290,6 +295,25 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   certificates are independently checked by `tools/atom_profile_regression.sh`, and the depth-four
   cover logs by `tools/check_atom_profile_cover_log.py`; see
   [the atom-lineage note](theorems/atom-lineage.md).  No Pareto datum changes.
+- **Split choice is recursive, not geometric (measured 2026-08-18).** The k=7 choice census has
+  **183 of 610** endpoints with a single winning automorphism class (30.0%; 153 of them four-part),
+  the partial k=8 census **262 of 1,092** (24.0%, all four-part), plus 198 unique k=7 second-cut
+  states. On that corpus no scalar geometric feature locates the winner — see the trap above. What
+  does work is stacking cheap *sound necessary* conditions, whose selectivity multiplies
+  super-multiplicatively. On the first 25 four-part single-class k=7 endpoints, against 2,089,596
+  candidates feasible under information cap plus the four-rectangle proven frontier:
+  `R_0` full-star majorization on all three children alone gives **16.1x**, cross-part pair
+  solvability on all three children alone **6.9x**, and both together **140.4x** (111x if they were
+  independent), at 100% winner recall throughout — still 276 candidates per winner, so this
+  sharpens the search without solving the choice problem. The cross-part pair condition is **absent
+  from the solver**: `radiobase.c`'s `s[4]`/`s[5]` loop is per-part and intra-part only. Its oracle
+  is the exact `k=4` two-part table from `refsolve.py` (1,478 states, 231 unsolvable). The
+  **140.4x is against my own enumerator, not against `radiobase.c`** — not a solver speedup claim.
+  The depth-1 relaxation `R_1` adds 5.8x with full recall but costs 30-80 s per endpoint, and the
+  `R_d` ladder converges to exact solving. **Pairs are the right stopping point**: extending the
+  cross-part condition to triples adds only 1.71x and 1.65x on the first two endpoints, for
+  hundreds of seconds each. All four measurements are reproducible with
+  `tools/split_choice_rules.py`.
 - **A second solver exists.** `tools/refsolve.py`, written from [problem.md](problem.md) alone,
   no shared code with `radiobase.c`, reproduces the proven columns for k = 1..6 exactly. Slow —
   k ≤ 6 only — but auditable, which is what settles structural questions.
@@ -315,10 +339,11 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 17 tags, 48 assets plus a manifest per tag,
-about 486 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+Artifact store `fedork/radio-data` (private): 18 tags, 53 assets plus a manifest per tag,
+about 488 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
-certificate and all three solver-core replay checkpoints. `check-index` is green.
+certificate and all three solver-core replay checkpoints; `pareto-census-k7-2026-08-13` contains the
+k=7 choice corpus and its three independent replays. `check-index` is green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -357,21 +382,21 @@ The dedicated instance was terminated after verification; its sole root volume h
 `DeleteOnTermination=true` and is confirmed deleted. This is a solver-core validation replay, not an independent proof
 implementation; the proof-safe cold run9 remains the proof source.
 
-The complete uncolored level-local replay is active on dedicated on-demand `c8a.4xlarge` instance
+The complete uncolored level-local replay **finished** on dedicated on-demand `c8a.4xlarge` instance
 `i-04126f6d3016378a9`, run `20260818T194508Z`, from clean commit `0f34041`. Its eight populated
 level-v2 files cover every one of the 3,126,190 normalized claims at k=2..9; each carries only its
 complete k-1 support, checked split hints and target claims. The exact 1,643,619-byte source bundle
 has SHA-256 `beb62def6dba281ff1c387c97f70bd0400f8007a99b455b74e784dd8195a654c`.
 The same-host 9,995-root k7 gate closed with zero gaps in 53.582 worker wall / 854.158 CPU seconds
-and projects 12,860 wall / 204,998 CPU seconds for the four-part band, safely below the cold
-solver's 419,353.1 CPU seconds. Full k7 remains healthy: at 4,200 batch seconds it had verified
-954,616/2,576,885 claims (37.0453%) with zero gaps and 935,928,162,367 accepted prefixes. Its latest
-window was 253.266 claims/s, all displayed active roots were four-part, CPU was 1,596%, RSS 385.3
-MiB, 29.7 GiB host memory remained available, and swap was zero. Cost changes with canonical task
-order, so the displayed ETA remains a throughput projection rather than a completion promise. Each completed level is compressed,
-hashed and uploaded immediately. Live state is `tools/run9_refute_status.sh 20260818T194508Z` and
-the durable prefix is `s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`.
-This active replay is validation, not a new proof; exact A/B controls are in
+and projected 12,860 wall / 204,998 CPU seconds for the four-part band, safely below the cold
+solver's 419,353.1 CPU seconds. At 2026-08-18T23:36:50Z it reported `exit_status=0` and
+`TOTAL verified 3126190, gaps 0` across all eight independent level-v2 checkpoints. Each completed
+level was compressed, hashed and uploaded as it closed. The instance had already
+**auto-stopped** by 2026-08-19T00:40Z, so it is no longer billing compute; its root volume and the
+final manifest still need the usual verify-then-terminate disposition, which is **not yet done**.
+Final state is `tools/run9_refute_status.sh 20260818T194508Z` and the durable prefix is
+`s3://radio-sa193-393287594714/run9-frozen-refute/20260818T194508Z/`.
+This replay is validation, not a new proof; exact A/B controls are in
 [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
 
 The requested top-down colored replay is active in parallel on separate on-demand
@@ -390,10 +415,24 @@ automatic guards passed. The first real checkpoint then verified all 16 k9 roots
 with zero gaps and selected 2,508,278/2,576,885 k7 facts from 41,460,414 citations; both checkpoints
 were compressed, hashed and uploaded. The dominant k7 phase is now running 2,508,278 targets on
 all sixteen workers after loading its 388,317-fact k6 support in 3.210 seconds and freezing 692
-tables / 355,174 options in 0.090 seconds. Its first 60-second report had already verified
-112,031/2,508,278 claims (4.4665%) with zero gaps and 14,691,829,604 accepted prefixes. CPU was
-1,470%, RSS 318.4 MiB, host memory available 29.7 GiB and swap zero; the displayed active roots
-were four-part. This early cheap-prefix rate and 1,284-second ETA are not a whole-phase forecast.
+tables / 355,174 options in 0.090 seconds. Its k7 phase passed 2,443,493/2,508,278 claims
+(97.4172%) with zero gaps at 13,500 batch seconds and 3,182,063,023,008 accepted prefixes; the early
+1,284-second ETA was not a whole-phase forecast, the phase took roughly ten times that. The run then
+**finished** with `exit_status=0` and
+`TOP_DOWN_COLOR verified_top=16 levels=8 audited=2846568 terminal_level=2 terminal_used=0 gaps=0`.
+So the top-down colored chain closes: eight levels, 2,846,568 audited claims against the complete
+replay's 3,126,190, and an explicit `used 0` terminal at k=2. All eight level certificates
+(`run9-k2..k9.cert.zst`), the per-level selections, the binary, its provenance and the exact source
+bundle are staged under
+`s3://radio-sa193-393287594714/run9-colored-refute/20260818T205010Z/`.
+
+**Both replay instances have auto-stopped** (`i-04126f6d3016378a9`, `i-0901e2b2c266f7db2`), so
+neither bills compute, but their root volumes still exist and **neither has been archived to a
+release or terminated**. That is the next action on this front: promote both certificate chains from
+S3 staging into a `fedork/radio-data` tag with a `docs/data.md` row, then terminate. Until the
+colored chain is archived and independently re-checked it remains solver-core validation and
+certificate compression, not an independent proof, and it does **not** retroactively rehabilitate the
+old Sa(113) colored certificate — that trap stands.
 Live state is `tools/run9_color_refute_status.sh 20260818T205010Z`; staging is
 `s3://radio-sa193-393287594714/run9-colored-refute/20260818T205010Z/`. This is still solver-core
 validation and certificate compression, not a new independent proof. The local matched gate and

@@ -7489,3 +7489,148 @@ replay was at 954,616/2,576,885 k7 claims with zero gaps, 1,596% CPU, 385.3 MiB 
 colored replay was at 112,031/2,508,278 with zero gaps. Shared census `pareto_k8_aws` remained at one
 core and 9,130.4 MiB RSS with 113.4 GiB available, 1,087 full-state records and no `CENSUS END`.
 No local refuter, solver, one-off Python search or orphan `Python -`/`python3 -` process remained.
+
+## 2026-08-18 — the single-solution split-choice corpus: sound filters measured, scalar rules refuted
+
+The question was whether the single-solution cases of the k=7 and k=8 choice censuses yield a sharp
+rule for finding a winning split when one exists. They yield a clean measurement, and the answer for
+*local* rules is no.
+
+### The k=7 corpus existed only in local scratch; it is now archived
+
+`docs/data.md` had no row for it and neither S3 nor the release store held it. The completed corpus
+and its replays were sitting in `~/radio-scratch/pareto-lift/.artifacts/pareto-census/final/`, which
+is exactly how the K=9 Pareto walk was lost. `final/k7.out` is canonical and reproduces the
+2026-08-13 entry exactly: 32 roots, 450 first cuts, 2,956 second-cut lineages, 563 targets, 819
+upgrade nodes, 610 endpoints, 7,396 raw endpoint winners, 3,227 automorphism classes,
+`representation_blocked=0`.
+
+Its three replays — `k7_frontier_replay`, `k7_frontier_independent`, `k7_probe16_replay` — agree with
+it on **every semantic count** and differ only in search effort (`full_complete_candidates`
+9,283 / 9,360 / 9,726 / 9,361; `full_prefixes` 171,759,828 / 171,875,686 / 175,638,694 /
+171,876,485). All four pass `tools/check_provenance.py`. Archived as
+`pareto-census-k7-2026-08-13` (1.5 M, SHA-256
+`ccdaed0f81157479a1f6f0415b852e59a287f216a3029a21c675b74c90fb4bbf`); `verify` round-trips.
+
+### Single-solution states are common, and concentrated in the four-part band
+
+| corpus | endpoints | single automorphism class | part counts of those |
+|---|---|---|---|
+| k=7 (complete) | 610 | **183** (30.0%) | 2-part 3, 3-part 27, 4-part 153 |
+| k=8 (partial snapshot) | 1,092 closed | **262** (24.0%) | all 4-part |
+
+k=7 also has 198 unique second-cut states. Raw labelled winners per single-class endpoint are 2 at
+k=7 (161 endpoints) or 4 (22); at k=8, 2 (248), 4 (12) or 8 (2). So "one solution" means one class,
+normally the split and its complement.
+
+The k=8 figures come from a read-only snapshot of the still-running shared census, taken at
+2026-08-19T00:25:35Z: 558,293 lines, 77,858,732 bytes, SHA-256
+`27bb441e1c43f471f2fa415608a912ec0f845c2323e7f76b68e4d5529323473e`, staged under the census S3
+prefix as `snapshots/k8_census_snap_20260819T002535Z.txt.zst`. Only endpoints whose `FULL_SUMMARY`
+is present *and* whose winner count matches it were used (1,092 of 1,093). The census host was not
+otherwise touched.
+
+### The census's own candidate counts are a cache artifact, not a structural measurement
+
+`FULL_SUMMARY complete=` looked encouraging — median 2 complete candidates at k=7 single-class
+endpoints, median 6 at k=8 — but `cache_pruned` uses `CACHE_ONLY` lookups against a warm dominance
+cache, so `complete` depends on cache history. Re-measured with **cache-free sound filters only**
+(information cap plus the four-rectangle proven-frontier condition of Subgraph Monotonicity), the
+153 four-part single-class k=7 endpoints have a median of **13,276** feasible candidates, p90 24,624,
+max 37,714, 2,162,996 in total — against 2 winners each. The warm cache, not any structural rule,
+is what currently closes that five-order-of-magnitude gap.
+
+### A sound cache-free filter ladder, measured (first 25 four-part single-class endpoints)
+
+Winner labels are exact: `FULL_WIN` is the complete verdict set, so no solver call is needed to
+label a candidate, and every filter below is a *necessary* condition, so recall must be 100%.
+
+| stage | candidates | cut vs cap+frontier |
+|---|---|---|
+| information cap + four-rectangle proven frontier | 2,089,596 | — |
+| + `R_0` full-star majorization on all three children | 129,916 | 16.1x |
+| + cross-part pair solvability on all three children | 300,694 | 6.9x |
+| + **both** | **14,878** | **140.4x** |
+
+Recall was 54/54 winners at every stage, as required. The two filters are **super-multiplicative**:
+16.1 x 6.9 = 111x if independent, 140.4x measured. Precision of the combination is still only
+0.363% — 276 candidates per winner.
+
+The pair oracle is the exact 2-part table at the child level `k=4`, built with the independent
+`tools/refsolve.py`: 1,478 states, 1,247 solvable, 231 unsolvable. refsolve reproduced the proven
+one-part `k=4` frontier exactly as a self-check, so its agreement with the C solver's winner labels
+is evidence, not assumption.
+
+The cross-part pair condition is **not in the solver**. `radiobase.c`'s `s[4]`/`s[5]` loop
+(around line 2223) tests `s` at size 1, `s+3` at size 1 and `s+1` at size 2 — one part, and the two
+mixed rectangles *of that same part*. It is per-part and intra-part only, matching the 2026-08-09
+note that the cross-part filter was the genuinely new constraint.
+
+**This 140.4x is measured against my own cap+frontier enumerator, not against `radiobase.c`.** Per
+the standing benchmark trap it is not a solver speedup claim; a production A/B has not been run.
+
+Pushing to the depth-1 relaxation `R_1` (`tools/bundled_majorization.py relax`) cut a further 5.8x
+with full recall, reaching a median of 517 survivors on 18 endpoints — but at 30-80 s per endpoint.
+The `R_d` ladder converges to exact solving, so it buys selectivity with the cost it was meant to
+avoid.
+
+**The three-part strengthening does not pay.** Extending the cross-part condition from pairs to
+triples adds only **1.71x** and **1.65x** on the first two endpoints (1,062 -> 622 and 1,360 -> 822
+survivors), at 437 and 528 cumulative seconds and 522/747 distinct triples solved. A *complete*
+`k=4` three-part table by refsolve exceeded 10 minutes and was abandoned for lazy memoization, which
+is what makes the per-endpoint cost so high. So the useful selectivity in the subset-closure
+direction is concentrated in the pair condition; going deeper costs like solving, for well under 2x.
+Pairs are the right stopping point.
+
+### Refuted: no scalar geometric feature identifies the winning split
+
+Over all **153** four-part single-class k=7 endpoints, ranking the `R_0`-feasible candidates by each
+of 19 features and recording the winner's absolute first-hit rank:
+
+| rule | median rank | median fraction of set | top-10 | top-1% |
+|---|---|---|---|---|
+| max child mass nearest cap (tightness) | 659 | **0.050** | 1/153 | 21/153 |
+| `dev` = sum \|a·m − b·n\| ascending | 1,258 | 0.098 | 1/153 | 12/153 |
+| `dev` then tightness | 1,193 | 0.094 | 1/153 | 13/153 |
+| child-mass spread, majorization margins, mixed-child mass/parts/distinctness, rectangle deficits, all-or-nothing count | 1,692–12,465 | 0.147–0.935 | 0–2/153 | 0–9/153 |
+
+Random ordering gives median fraction ~0.5 (~0.25 with two winners). Tightness at 0.050 is real but
+an order of magnitude short of a rule, and **one endpoint in 153** puts the winner in the top ten.
+Filtering to `R_1` first does not rescue it: the best ordering there reaches median rank 75 of 517
+with zero top-1 hits.
+
+This supersedes any residual hope from the 2026-08-08 tightness entry. That entry's 137/137 came
+from witness trees in the `sat>=0.95` band and was already retracted on 2026-08-09 at 22.7%; the
+measurement above quantifies what survives — tightness is the best single scalar signal available and
+it puts the winner at the 5th percentile, not the front. It is consistent with the 2026-08-09 fitted
+score failing to transfer from k=5 to k=6, and explains why: there is no local signal to transfer.
+
+### Consequence for the programme
+
+Splitting a critical four-part state is not a classification problem over split geometry. The
+information distinguishing the winner is recursive, which is why the cache and the `R_d` ladder work
+and scoring does not. The productive direction is therefore **cheap sound necessary conditions**
+whose selectivity multiplies — the cross-part pair table is one such, is absent from the solver, and
+is a table lookup — rather than further tuning of split orderings.
+
+### Cost
+
+All measurements were local Python against the retained corpus, single-core, minutes each: the
+153-endpoint `R_0` sweep 223 s, the 25-endpoint pair/majorization ladder about 8 min, the 18-endpoint
+`R_1` sweep 914 s, the exact `k=4` pair table 43 s, the lazily-memoized triple probe about 9 min for
+two endpoints. No solver was run and no AWS job was disturbed.
+
+Everything above is reproducible from the archived corpus with `tools/split_choice_rules.py`
+(`single` / `table` / `ladder` / `rank`). Writing it exposed two bugs worth remembering, both of the
+silent kind.
+
+- Building the pair oracle with `itertools.combinations` omits the 52 two-part states whose two
+  components are *identical* — and a child, the mixed child especially, repeats components
+  constantly. Every lookup on those states then misses and the filter quietly under-prunes. It must
+  be `combinations_with_replacement`: the table is 1,478 states, not 1,426.
+- A candidate split is bounded by its *children's* capacity `3^(k-1)`, not by the endpoint state's
+  own `3^k`. Using the parent bound inflated the cap+frontier column by 2.4x (193,536 instead of
+  81,812 on `U000067`) — and `r0` re-imposes the correct cap internally, so the `+r0` and `+both`
+  columns still matched the correct run exactly. A downstream sound filter masking an upstream error
+  is precisely why each column was checked against an independently written script rather than
+  trusted because the bottom line looked right.
