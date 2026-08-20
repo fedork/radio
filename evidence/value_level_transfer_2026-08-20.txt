@@ -1,0 +1,101 @@
+A level-held-out value model V(S,k): one invalid experiment, then a working one, 2026-08-20
+Status: measured.  Scripts in tools/ml/ (value_cert_load.py, value_gen_states.py,
+value_level_transfer.py); needs numpy + scikit-learn in .venv.
+
+The question from [ml-guided-search.md](../docs/ml-guided-search.md): does a permutation-invariant,
+scale-normalized model of solvability transfer to a level it was not trained on?  Answer: yes,
+AUC 0.9921 at k=4 -> k=5 against a 0.9974 same-level ceiling -- but only after the first attempt at
+measuring it turned out to be worthless, which is the more useful half of this note.
+
+=====================================================================================
+1. THE INVALID EXPERIMENT, AND WHY IT LOOKED FINE
+=====================================================================================
+Design: negatives from the Sa(193) certificate chain (2,846,568 `(state,k) -> unsolvable` claims,
+decoded per level), positives from the two censuses (endpoints are solvable at their residual k, and
+every child of a winner is solvable at k-1).  Train on k<=5, test on k=6.
+
+  test k=6: 232,618 states, 1,893 solvable
+  gradient boosting   AUC 0.9458      logistic  AUC 0.9432
+  permuted-label control  AUC 0.5163     <- passes
+  best cheap baseline (mass/cap)  AUC 0.8702
+
+A clean permuted-label control and a beaten baseline.  It is still meaningless.
+
+**The two label sources occupy disjoint mass bands.**  At k=6 the census positives run 0.742-0.875
+of cap and the certificate negatives 0.827-0.959; taking the central 90% of each, the overlap band is
+**empty**.  On the four-part subpopulation `headroom = 1 - mass/cap` alone scores AUC 0.9784, which
+is the entire result.  The model is a mass threshold, and what it separates is *which corpus a state
+came from* -- maximal endpoints of k=8 root lineages against refuted states of the Sa(193) lineage --
+not solvable from unsolvable.
+
+**The tell was there and I nearly under-weighted it.**  A frontier-pair control -- single-part states
+`(n1:m)` solvable and `(n1+1:m)` unsolvable from `data/pareto_sb.csv`, differing by one coin and
+identical in every crude statistic -- gave **47% pair accuracy, i.e. chance**, while the headline AUC
+said 0.946.  When a matched-pair probe disagrees with an aggregate AUC, believe the probe.
+
+Worth keeping: a permuted-label control does *not* catch this.  Shuffling labels destroys the
+source signal along with everything else, so it comes back at chance and looks reassuring.  Only an
+explicit comparability check between the label populations catches it.
+
+=====================================================================================
+2. THE ORACLE IS CHEAP, BUT ONLY IF MAX_N IS SIZED HONESTLY
+=====================================================================================
+`radio_one` decides one state and exits 0 solvable / 1 unsolvable / 2 MAYBE.  Measured on this Mac:
+
+  built -DMAX_K=6 -DMAX_N=400   205 s per invocation
+  built -DMAX_K=5 -DMAX_N=120   0.2 s per invocation
+
+That is not solve time.  `init()` runs before the argument check and its static tables scale with
+MAX_N, so a generously padded MAX_N costs three and a half minutes per query and buys nothing.  At
+MAX_N sized to the states actually being asked about, the solve itself is 0.0 s at k=4 and k=5 and
+the whole cost is process startup.  Sized correctly, 4,400 labelled states took about three minutes
+across eight parallel workers.
+
+=====================================================================================
+3. THE VALID EXPERIMENT: MATCHED SAMPLING, ORACLE LABELS
+=====================================================================================
+Fix: draw both classes from one sampler.  Random four-part states with mass in [0.70, 1.02] of cap
+and side-sum <= 112, deduplicated, 2,200 per level, each labelled by `radio_one`.  No MAYBEs at these
+levels.
+
+  train k=4: 2,200 states, 59.8% solvable
+  test  k=5: 2,200 states, 50.9% solvable
+
+  model                                   AUC
+  mass/cap (lower = solvable)           0.8770     <- cheap baseline
+  per-part Pareto deficit (sound)       0.8773     <- cheap baseline
+  logistic regression   (k=4 -> k=5)    0.9921
+  gradient boosting     (k=4 -> k=5)    0.9761
+  PERMUTED-LABEL CONTROL                0.5234
+  gradient boosting, within k=5 (5-fold)0.9974     <- same-level ceiling, not a transfer claim
+
+So the value model transfers across the level boundary and lands within 0.005 AUC of what a model
+trained *on the test level itself* achieves.  That is the premise of the recursive design holding up:
+`sqrt(3^k)` normalization makes solvability approximately level-invariant on this sampler.
+
+Logistic regression again beats gradient boosting, the same signature seen in the cut-ranker work --
+the decision surface is smooth and low-dimensional, not data-starved.
+
+ON THE PART THAT IS NOT ALREADY FREE.  Dropping every state the sound bounds decide by themselves
+(information cap, per-part Pareto bound) leaves 1,751 of 2,200 undecided, 64.0% solvable:
+
+  mass/cap                              0.9372
+  gradient boosting (k=4 -> k=5)        0.9596
+
+Still ahead, by much less.  Most of the headline gap over the baselines is on states the cheap sound
+bounds already settle for free, which is the honest way to read the 0.9921.
+
+=====================================================================================
+4. WHAT THIS DOES AND DOES NOT LICENSE
+=====================================================================================
+* Transfer is demonstrated for k=4 -> k=5, the cheapest possible pair.  The levels that matter are
+  6, 7 and above, where solve cost is not 0.0 s and MAYBE verdicts start appearing and have to be
+  handled as a third label rather than dropped.
+* The sampler is synthetic -- random four-part states in a mass band.  A real search meets states
+  drawn by its own recursion, which is a different distribution, and the invalid experiment above is
+  exactly what distribution mismatch does to a measurement.
+* AUC is not the objective.  Nothing here has been put in front of the solver, and the thing to beat
+  is a table lookup: the per-part Pareto bound gets AUC 0.8773 for the price of one array index.
+  A value model earns its place only on end-to-end CPU seconds.
+* Positives and negatives here are balanced by construction.  In a real search the class ratio is
+  wildly skewed and calibration, not ranking, is what a search would consume.

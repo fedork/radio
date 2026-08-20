@@ -8283,3 +8283,58 @@ quality. A negative result there is worth recording with its cost.
 
 Also cleaned two stale next-step items: both level replays finished and were archived days ago but
 were still listed as running, and the numbering had collided.
+
+## 2026-08-20 (evening) — the value model transfers across levels; the first attempt to show it did not
+
+Ran the level-held-out experiment from [ml-guided-search.md](ml-guided-search.md). It works, but the
+first version of the measurement was worthless and that is the part worth reading.
+
+**The invalid experiment.** Negatives from the certificate chain (decoded per level: 2 / 127 / 24,635
+/ 80,634 / 230,725 / 2,508,278 / 2,151 unsolvable states at k=2..8), positives from the censuses
+(endpoints are solvable at their residual k; children of winners at k-1). Train k<=5, test k=6. It
+gave AUC 0.9458 with a permuted-label control at 0.5163 and a beaten mass baseline at 0.8702 — all
+the boxes ticked. It is still meaningless: **the two label sources occupy disjoint mass bands.** At
+k=6 the census positives run 0.742-0.875 of cap and the certificate negatives 0.827-0.959, and the
+central-90% overlap between them is *empty*. `headroom` alone scores 0.9784 on the matched four-part
+subpopulation. The classifier separates which corpus a state came from, not whether it is solvable.
+
+Two things to keep from that. A permuted-label control does **not** catch source confounding — it
+destroys the source signal along with the label signal and comes back at chance, looking reassuring.
+What caught it was a matched-pair probe: single-part states from `pareto_sb.csv` differing by exactly
+one coin, `(n1:m)` solvable against `(n1+1:m)` unsolvable, on which the model scored **47%** — chance
+— while the headline AUC said 0.946. When a matched-pair probe disagrees with an aggregate metric,
+the probe is right. Both are now traps in [status.md](status.md).
+
+**An oracle cost that nearly derailed this.** `radio_one` took 205 s per invocation and I briefly
+concluded the oracle was unaffordable. It was not solve time: `init()` runs before the argument check
+and its static tables scale with `MAX_N`, so the same query costs 205 s built at `-DMAX_N=400` and
+**0.2 s** at `-DMAX_N=120`, with the solve itself at 0.0 s for k=4 and k=5. Sized honestly, 4,400
+labelled states took about three minutes over eight workers. Also a trap now, because the failure
+mode is to abandon a viable design over a build flag.
+
+**The valid experiment.** Draw both classes from one sampler — random four-part states, mass in
+[0.70, 1.02] of cap, side-sum <= 112, 2,200 per level — and label every one with `radio_one`. Train
+k=4 (59.8% solvable), test k=5 (50.9% solvable):
+
+  mass/cap                          AUC 0.8770        per-part Pareto deficit  AUC 0.8773
+  logistic regression  k=4 -> k=5   AUC 0.9921        gradient boosting        AUC 0.9761
+  permuted-label control            AUC 0.5234        within-k=5 5-fold        AUC 0.9974
+
+So the value function transfers across a level boundary to within 0.005 AUC of a model trained on the
+test level itself. That is the design premise holding: `sqrt(3^k)` normalization makes solvability
+approximately level-invariant, at least on this sampler. Logistic regression beats gradient boosting
+again — the same smooth low-dimensional signature as the cut ranker, and more evidence that data
+volume is not the constraint anywhere in this programme.
+
+**The honest discount.** Most of the gap over the baselines sits on states the cheap sound bounds
+already decide. Restricting to the 1,751 of 2,200 that the information cap and the per-part Pareto
+bound leave undecided, the model gives 0.9596 against mass at 0.9372. Real, much smaller, and that is
+the number that would have to survive contact with the solver — where the thing to beat costs one
+array index.
+
+Next is k=5 -> k=6 with MAYBE as a third label rather than dropped, and then end-to-end CPU seconds
+rather than AUC. Full detail in
+[../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt);
+scripts are `tools/ml/value_*.py`.
+
+Process inventory: no AWS compute; the oracle workers all exited; nothing running locally.
