@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-19** (the published exact `m=5` result is now reconstructed
+don't know it. Last refreshed **2026-08-20** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
 for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
@@ -346,13 +346,14 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 21 tags, 58 assets plus a manifest per tag,
-about 594 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+Artifact store `fedork/radio-data` (private): 22 tags, 60 assets plus a manifest per tag,
+about 605 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
 certificate and all three solver-core replay checkpoints; `run9-level-replay-2026-08-18` contains
 both finished level-v2 replays, uncolored and colored, with every manifest and certificate
-re-verified before archival; `pareto-census-k7-2026-08-13` contains the
-k=7 choice corpus and its three independent replays. `check-index` is green.
+re-verified before archival; `pareto-census-k8-2026-08-19` and `pareto-census-k7-2026-08-13`
+contain the k=8 and k=7 choice corpora, the latter with its three independent replays.
+`check-index` is green.
 Deliberately **not** archived: ~18 GB of unreliable 2023 `out*` — see the decision in
 [data.md](data.md).
 
@@ -362,22 +363,27 @@ Do not run `gh auth switch`.
 ## Running now
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
-reported UNSOLVABLE. The k=8 Pareto-prefix census remains active on shared AWS instance
-`i-0005d74f985c52ae1`; do not stop that host. At 2026-08-19 14:24:45 UTC it was healthy at one core
-(utime 477,761 s against 477,840 s elapsed) and 9,396.1 MiB RSS, with 113.2 GiB host memory
-available, no swap and 193.1 GiB disk free. It has all 815 second-cut blocks represented, 48 of 70
-freshly recomputed blocks, 1,688 targets, 1,893 endpoints and 48,943 full winners, and is in the
-final `map_endpoints` sweep at **1,747 of 1,893 `FULL_STATE` records** (1,746 complete) with no
-final `CENSUS END` record. The census S3 `STATUS` object is still the launch snapshot; use
-`tools/pareto_census_status.sh` or the final artifact rather than that stale object.
+reported UNSOLVABLE. **The k=8 Pareto-prefix census is finished, archived and its host is gone.** It
+exited 0 at 2026-08-19 22:34:43 UTC after 5.87 days on shared `r7iz.4xlarge` `i-0005d74f985c52ae1`,
+emitting a `CENSUS END` record and a self-consistent corpus: 55 roots, 817 first cuts (344 strict),
+815 second-cut blocks, 7,146 second winners, 1,688 targets, 2,435 upgrade nodes, and 1,893
+`ENDPOINT` = 1,893 `FULL_STATE` = 1,893 `FULL_SUMMARY` with 50,494 `FULL_WIN`, matching its `STATUS`
+exactly. `representation_blocked=0`, so no result was lost to `MAX_N`. Archived and round-trip
+verified as [`pareto-census-k8-2026-08-19`](https://github.com/fedork/radio-data/releases/tag/pareto-census-k8-2026-08-19);
+the raw log passes `tools/check_provenance.py` and its SHA-256 matches the one `run.meta` recorded on
+the host. Instance terminated 2026-08-20 00:22:20 UTC and volume `vol-045c828c1f0ab2c2e` confirmed
+deleted, after an inventory established that every file on the disk had an S3 counterpart. Its
+123 M `input.tar.zst` and a redundant progress snapshot stay in S3 only — see
+[data.md](data.md) for why and how to promote them.
 
-**Expected completion 2026-08-19 ~23:05 UTC, range 22:20 UTC to 2026-08-20 00:10 UTC**, plus 5-15
-min for the wrapper to compress, analyse and upload. Do not use the 89.8 s/endpoint mean rate to
-project this: it gives 3.7 h and is refuted by two directly observed endpoints that ran >= 30 min
-each. Cost is dominated by exact solver queries at 0.61-0.837 s each, not by enumeration prefixes,
-and 63 of the 147 remaining endpoints sit below mass 600 where query counts are 10-20x higher —
-against 234 of the 1,745 already done. Derivation, band tables and the coherence check are in
+**The ETA method is worth keeping; the obvious one is not.** The blended 89.8 s/endpoint mean
+projected 3.7 h and was wrong by 2.2x, because the measured window was 73% high-mass endpoints and
+the remainder was not. Modelling cost as exact solver queries at 0.61-0.837 s each — enumeration
+prefixes being nearly free — predicted 7.95-9.76 h; the run took 8.17 h, implying 0.63 s/query and
+landing 5.8% below the central estimate. Derivation, band tables and the outcome are in
 [../evidence/pareto_census_k8_eta_2026-08-19.txt](../evidence/pareto_census_k8_eta_2026-08-19.txt).
+The general trap: **a mean rate over a window whose item mix differs from the remaining work is not a
+forecast**, and the cheap test is to sample the progress counter and see whether it moves at all.
 
 The mass-descending independent audit is no longer active. Run `20260818T062429Z` reached
 251,131/2,576,885 k=7 claims (73,045 four-part), with zero gaps, after 2,160 seconds and
@@ -516,7 +522,8 @@ its volume `vol-0bdc1e36eea39386c` is confirmed deleted, after checking that its
 unarchived — every file was in the release, a decompressed twin of an archived `.zst`, transient run
 state, or `run9.cert`, which is archived in `sa193-frozen-refute-2026-08-18` and whose SHA-256 was
 verified here to equal the `3ad5877a...` source hash every level certificate cites.
-`i-04126f6d3016378a9` is deliberately **kept running** for the third A/B point above. Both replays
+`i-04126f6d3016378a9` is now **stopped**, its A/B points complete and archived, and it is the last
+radio-tagged instance in the account; terminating it needs the same disk check its sibling got. Both replays
 remain solver-core validation and certificate compression, not
 independent proof implementations, and neither retroactively rehabilitates the old Sa(113) colored
 certificate — that trap stands.
@@ -1052,10 +1059,13 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Let the k=8 Pareto-prefix census finish.** Never stop the shared census instance before its
-   final output is archived. The frozen solver-core run9 replay is complete, release-verified and
-   its dedicated host is terminated. Do not restart either retired independent-checker coloring
-   pipeline or the superseded independent ordinary audit.
+0. **Analyse the finished k=8 choice corpus.** The census is complete, archived as
+   `pareto-census-k8-2026-08-19` and its host is terminated, so this is now a data question, not a
+   scheduling one: 1,893 endpoints, 50,494 raw winners and 24,330 automorphism classes are waiting
+   to be read against the k=7 result. One radio-tagged instance remains — stopped
+   `i-04126f6d3016378a9`, whose own work is archived and which needs only a disk check before
+   termination. Do not restart either retired independent-checker coloring pipeline or the
+   superseded independent ordinary audit.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are

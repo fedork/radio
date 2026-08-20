@@ -8019,3 +8019,50 @@ find out is to sample the counter and see whether it moves at all.
 Process inventory at handoff: the census is the only research binary running anywhere; it was not
 touched. The local 30-minute sampler (`/tmp/census_sampler.sh`) and its waiter both exited. No local
 solver, refuter, one-off Python search or orphan `Python -`/`python3 -` process remains.
+
+## 2026-08-20 — the k=8 census closed, archived, and its host torn down
+
+The census exited 0 at 2026-08-19 22:34:43 UTC after 5.87 days, and the shared `r7iz.4xlarge`
+`i-0005d74f985c52ae1` that had carried every `Sa(193)` run since 2026-08-05 is now terminated with
+its volume confirmed deleted. The compute for this whole programme is wound down; one stopped
+instance remains, `i-04126f6d3016378a9`, whose own output is already archived.
+
+**The corpus.** 55 roots, 817 first cuts of which 344 strict, 815 second-cut blocks, 7,146 second
+winners, 1,688 targets, 2,435 upgrade nodes, 1,893 endpoints, 50,494 raw endpoint winners and 24,330
+automorphism classes. The internal cross-checks all close: `ENDPOINT` = `FULL_STATE` = `FULL_SUMMARY`
+= 1,893 exactly, `FULL_WIN` matches the `STATUS` counter, `CENSUS END` is present and
+`representation_blocked=0`, so nothing was silently dropped for want of `MAX_N`. The exact oracle
+answered 29,366,073,123 hits against 878,206,368,508 misses over 11,655,466 facts. Archived and
+round-trip verified as `pareto-census-k8-2026-08-19`; the raw log passes `check_provenance` and its
+SHA-256 equals the one the host itself recorded in `run.meta`, which is the check that matters —
+it ties the bytes in the release to the bytes the solver wrote.
+
+**The ETA held, and the method is the durable part.** Yesterday's projection was 7.95-9.76 h with a
+central 8.67 h; the run took 8.17 h, implying 0.63 s per exact solver query against a predicted
+0.61-0.837 range, 5.8% below centre. The naive blended rate of 89.8 s/endpoint would have said 3.7 h
+and been wrong by 2.2x. The reason is worth restating because it generalises past this run: the
+measured window was 73% high-mass endpoints, which hold 97% of the enumeration prefixes but only 30%
+of the exact queries, while the remaining work was 43% low-mass where the ratio inverts. A mean rate
+over a window whose item mix differs from the remaining work is not a forecast. The cheap diagnostic
+that exposed it was not analysis but sampling the progress counter every five minutes and noticing
+it never moved.
+
+**Teardown discipline.** I inventoried the disk rather than trusting the record, which took one SSM
+call: 6.9 GiB used, no process running, and every artifact — nine `Sa(193)` run directories, four
+verifier directories, the census work directory — had an S3 counterpart, with `run9` and `run8`
+additionally in `sa193-cold-2026-08-16`. Only then did I terminate. Two things worth writing down
+for whoever winds down the rest. Terminating an instance does not touch S3, so the distinction that
+matters at teardown is *volume-only* versus *anywhere else*, not archived-versus-not. And
+`s3://radio-sa193-393287594714/` is now the **only** copy of the run3/run/run2/run4-7 raw logs,
+which were never promoted to the release store — deleting that bucket is therefore a real decision,
+not cleanup.
+
+**Deliberately not archived** into the release: the census `input.tar.zst` (123 M compressed, 934 M
+raw of `exact.cache`, `dominance.cache`, `root_winners.out` and superseded local checkpoints), and a
+9.2 M intermediate progress snapshot which I verified byte-for-byte to be a 558,293-line prefix of
+the final log. Both stay in S3; the input bundle's per-file SHA-256 list travels inside the archived
+metadata tar, so it can be promoted later and checked. Cost of the whole session: four read-only SSM
+probes, one inventory, ~10 minutes of instance uptime to run it, and no solver time.
+
+Process inventory at handoff: no research binary is running anywhere, on AWS or locally. The local
+sampler and its waiter exited. No `Python -`/`python3 -` orphan remains.
