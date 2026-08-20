@@ -55,8 +55,15 @@ The archived caches are text logs replayed through `parse_file`:
   exact.cache       515,080,944 bytes   11,661,763 facts
   dominance.cache   419,264,669 bytes   10,204,438 facts
 
-Measured replay rate: **304 facts/s** in the file's own order, so the full 21.9M facts is roughly
-**20 hours**.  That is the replay path, not init.
+Measured replay rate on a stratified 1-in-117 sample: **304 facts/s** in file order, 685 sorted.
+
+**Treat those as an upper bound on cost, not an estimate.**  A stratified sample deliberately breaks
+the locality of the file: consecutive facts in the real corpus are related and subsume each other,
+while sampled ones each land in an emptier trie and expand more.  Redundancy in the sample was 1.4%;
+in a sequential full load it will be much higher and the rate correspondingly better.  The full-file
+rate has not been measured and the honest position is that it is somewhere between one and nine
+hours.  The composition of the sample was at least right: the corpus is 98.4% negative
+(exact.cache 185,540 positive / 11,476,223 negative; dominance.cache 218,350 / 9,986,088).
 
 WHERE THE TIME GOES, measured rather than guessed.  Neither insert is a plain trie write: a positive
 fact is propagated down to every state it dominates (`cacheCanSolve` recurses over all lesser parts)
@@ -93,7 +100,30 @@ the states you actually ask about, and it is small.  A MAYBE is never journalled
 a fact.
 
 =====================================================================================
-4. PROTOCOL NOTES THAT MATTER
+4. BINARY SNAPSHOT — an alternative to replaying facts
+=====================================================================================
+`snapshot <path>` serializes the cache structure; `restore <path>` or `--restore=<path>` reloads it
+linearly, which is O(structure) rather than O(facts x closure).
+
+Getting it right means walking four descriptor forms: a branch (slots 0 and 1 are *front*
+descriptors, 2.. are child nodes), a front record (two front descriptors), an inline node (two
+packed sbb values), and inside a front descriptor either a vector handle or an inline value.
+Handles are made canonical by discovery order -- a fresh process allocates 1,2,3,... so writing in
+visit order and remapping every descriptor reproduces identical handles.  The header carries the
+build id and MAX_K/MAX_N/MAX_SBB/sizeof(front_point); a mismatch is **refused**, because the sbb
+numbering depends on MAX_N and a cross-build restore would be silently wrong.
+
+ROUND TRIP, the test that matters.  Loading 16,099 facts built 225,146 branches, 404,821 records
+and 466,552 vectors.  Dump 247 ms / 43,616,050 bytes; restore into a fresh process 212 ms; **300
+queries returned identical verdicts either way**.
+
+CAUTION ON SIZE, not yet resolved.  43.6 MB of structure for 16,099 facts is 2.7 KB per fact.  If
+that ratio held to the full 21.9M corpus the snapshot would be tens of GB.  It will not hold --
+closures overlap more and more as facts accumulate -- but by how much is unmeasured, and it is the
+first thing the full run should report.
+
+=====================================================================================
+5. PROTOCOL NOTES THAT MATTER
 =====================================================================================
 * **Stream separation.**  `radiobase.c` and `canSolveB` print to stdout, which would corrupt a line
   protocol.  The oracle duplicates the original stdout for responses and repoints the C library's

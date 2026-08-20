@@ -8419,3 +8419,38 @@ deliberately over-wide fact was skipped rather than fatal, and both verdicts rou
 journal in loadable form.
 
 Process inventory: no AWS compute; all oracle and build processes stopped; nothing running locally.
+
+## 2026-08-20 (later) — binary cache snapshots, and a load estimate I had inflated
+
+**The estimate was wrong in the direction Fedor said.** My 304 facts/s came from a stratified
+1-in-117 sample, which deliberately destroys the property that makes a real load cheap: consecutive
+facts in the corpus are related and subsume one another, while sampled facts each land in an emptier
+trie and expand more. Redundancy in the sample was 1.4%; in a sequential full load it will be far
+higher. The composition of the sample was at least right — the corpus is 98.4% negative — but the
+rate is an upper bound on cost, not an estimate, and the real figure is somewhere between one and
+nine hours. Recorded as such rather than defended.
+
+**Snapshots are implemented.** `snapshot <path>` serializes the cache structure and `restore <path>`
+reloads it linearly, O(structure) instead of O(facts x closure). The work was in getting the
+descriptor walk right: four forms, and any of them mishandled gives a silently wrong cache. A branch
+holds *front* descriptors in slots 0 and 1 and child nodes from slot 2; a front record holds two
+front descriptors; an inline node packs two sbb values into the low bits; and a front descriptor is
+itself either a vector handle or an inline value. Handles are canonicalised by discovery order,
+since a fresh process allocates 1,2,3,... — so writing structures in visit order and remapping every
+descriptor reproduces identical handles on load.
+
+The guard that matters: the header carries the build id and MAX_K/MAX_N/MAX_SBB/sizeof(front_point),
+and a mismatch is refused. The sbb numbering depends on MAX_N, so a cross-build restore would be
+silently wrong, which in this repo means false verdicts.
+
+Round-trip on 16,099 facts: 225,146 branches / 404,821 records / 466,552 vectors, dumped in 247 ms
+to 43,616,050 bytes, restored into a fresh process in 212 ms, and **300 queries returned identical
+verdicts either way**. That equality is the acceptance test; the timings alone would not be.
+
+**One unresolved number.** 43.6 MB of structure for 16,099 facts is 2.7 KB per fact. That ratio
+cannot hold to 21.9M facts — closures overlap increasingly as facts accumulate — but nobody knows by
+how much, and a naive extrapolation says tens of GB. Measuring it is the first job of the full-corpus
+run, and it is also what decides the instance size, so the run should report structure counts and RSS
+before anything else.
+
+Process inventory: no AWS compute; all local oracle processes stopped.

@@ -147,6 +147,197 @@ static void respond_verdict(int r, int k, double ms, int *sb, int size) {
     fflush(resp);
 }
 
+
+/* ---- binary snapshot -------------------------------------------------------------------------
+   Replaying facts re-derives the dominance closure the original run already computed, which is why
+   it is slow.  A snapshot instead serializes the cache structure itself and reloads it linearly.
+
+   The descriptor space has four forms and all of them have to be walked correctly or the reload is
+   silently wrong: a branch (slots 0 and 1 are front descriptors, 2.. are child nodes), a front
+   record (two front descriptors), an inline node (two packed sbb values), and, inside a front
+   descriptor, either a front vector handle or an inline value.
+
+   Handles are made canonical by discovery order: a fresh process allocates 1,2,3,... so writing the
+   structures in visit order and remapping every descriptor reproduces identical handles on load.
+
+   A snapshot is only valid for the identical build -- the sbb numbering depends on MAX_N -- so the
+   header carries the build id and a mismatch is refused rather than loaded. */
+
+#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v1"
+
+static uint32_t *snap_bmap, *snap_rmap, *snap_vmap;
+static uint32_t *snap_blist, *snap_rlist, *snap_vlist;
+static uint32_t snap_bn, snap_rn, snap_vn;
+
+static void snap_visit_front(uint32_t fd) {
+    if (!(fd & FRONT_VECTOR_TAG)) return;
+    uint32_t h = fd & FRONT_HANDLE_MASK;
+    if (!h || h >= front_handles_len || snap_vmap[h]) return;
+    snap_vmap[h] = ++snap_vn;
+    snap_vlist[snap_vn] = h;
+}
+
+static void snap_visit_node(uint32_t nd) {
+    uint32_t tag = nd & NODE_TAG_MASK;
+    if (tag == NODE_BRANCH_TAG) {
+        uint32_t h = nd & NODE_HANDLE_MASK;
+        if (!h || h >= branch_handles_len || snap_bmap[h]) return;
+        snap_bmap[h] = ++snap_bn;
+        snap_blist[snap_bn] = h;
+        branch_array *b = branch_handles[h];
+        snap_visit_front(b->slot[0]);
+        snap_visit_front(b->slot[1]);
+        for (uint32_t i = 2; i < b->width; i++)
+            if (b->slot[i]) snap_visit_node(b->slot[i]);
+    } else if (tag == NODE_RECORD_TAG) {
+        uint32_t h = nd & NODE_HANDLE_MASK;
+        if (!h || h >= front_records_len || snap_rmap[h]) return;
+        snap_rmap[h] = ++snap_rn;
+        snap_rlist[snap_rn] = h;
+        snap_visit_front(front_records[h].positive);
+        snap_visit_front(front_records[h].negative);
+    }
+}
+
+static uint32_t snap_remap_front(uint32_t fd) {
+    if (!(fd & FRONT_VECTOR_TAG)) return fd;
+    return FRONT_VECTOR_TAG | snap_vmap[fd & FRONT_HANDLE_MASK];
+}
+
+static uint32_t snap_remap_node(uint32_t nd) {
+    uint32_t tag = nd & NODE_TAG_MASK;
+    if (tag == NODE_BRANCH_TAG) return NODE_BRANCH_TAG | snap_bmap[nd & NODE_HANDLE_MASK];
+    if (tag == NODE_RECORD_TAG) return NODE_RECORD_TAG | snap_rmap[nd & NODE_HANDLE_MASK];
+    return nd;
+}
+
+static void snap_put(FILE *f, uint32_t v) { fwrite(&v, sizeof v, 1, f); }
+static uint32_t snap_get(FILE *f) { uint32_t v = 0; if (fread(&v, sizeof v, 1, f) != 1) v = 0; return v; }
+
+static void snapshot_dump(const char *path) {
+    FILE *f = fopen(path, "wb");
+    if (!f) { respond("ERR cannot write %s", path); return; }
+    double t0 = now_ms();
+    snap_bmap = (uint32_t *)calloc(branch_handles_len + 1, sizeof(uint32_t));
+    snap_rmap = (uint32_t *)calloc(front_records_len + 1, sizeof(uint32_t));
+    snap_vmap = (uint32_t *)calloc(front_handles_len + 1, sizeof(uint32_t));
+    snap_blist = (uint32_t *)calloc(branch_handles_len + 1, sizeof(uint32_t));
+    snap_rlist = (uint32_t *)calloc(front_records_len + 1, sizeof(uint32_t));
+    snap_vlist = (uint32_t *)calloc(front_handles_len + 1, sizeof(uint32_t));
+    if (!snap_bmap || !snap_rmap || !snap_vmap || !snap_blist || !snap_rlist || !snap_vlist) {
+        respond("ERR out of memory building snapshot maps"); fclose(f); return;
+    }
+    snap_bn = snap_rn = snap_vn = 0;
+    for (int k = 0; k <= MAX_K; k++) snap_visit_node(sb_cache_root[k]);
+
+    fprintf(f, "%s\n%s\n%d %d %d %zu\n", SNAP_MAGIC, RADIO_BUILD_ID,
+            MAX_K, MAX_N, MAX_SBB, sizeof(front_point));
+    snap_put(f, snap_bn); snap_put(f, snap_rn); snap_put(f, snap_vn);
+    for (uint32_t i = 1; i <= snap_bn; i++) snap_put(f, branch_handles[snap_blist[i]]->width);
+    for (uint32_t i = 1; i <= snap_vn; i++) snap_put(f, front_handles[snap_vlist[i]]->len);
+    for (uint32_t i = 1; i <= snap_bn; i++) {
+        branch_array *b = branch_handles[snap_blist[i]];
+        snap_put(f, snap_remap_front(b->slot[0]));
+        snap_put(f, snap_remap_front(b->slot[1]));
+        for (uint32_t j = 2; j < b->width; j++) snap_put(f, snap_remap_node(b->slot[j]));
+    }
+    for (uint32_t i = 1; i <= snap_rn; i++) {
+        snap_put(f, snap_remap_front(front_records[snap_rlist[i]].positive));
+        snap_put(f, snap_remap_front(front_records[snap_rlist[i]].negative));
+    }
+    for (uint32_t i = 1; i <= snap_vn; i++) {
+        front_vector *v = front_handles[snap_vlist[i]];
+        fwrite(v->sbb, sizeof(front_point), v->len, f);
+    }
+    for (int k = 0; k <= MAX_K; k++) snap_put(f, snap_remap_node(sb_cache_root[k]));
+    fwrite(sa_can, sizeof(sa_can[0]), MAX_N + 1, f);
+    fwrite(sa_cant, sizeof(sa_cant[0]), MAX_N + 1, f);
+    long bytes = ftell(f);
+    fclose(f);
+    free(snap_bmap); free(snap_rmap); free(snap_vmap);
+    free(snap_blist); free(snap_rlist); free(snap_vlist);
+    snap_bmap = snap_rmap = snap_vmap = snap_blist = snap_rlist = snap_vlist = NULL;
+    respond("OK snapshot %s branches=%u records=%u vectors=%u bytes=%ld ms=%.0f",
+            path, snap_bn, snap_rn, snap_vn, bytes, now_ms() - t0);
+}
+
+/* Allocate a front vector of an exact capacity, mirroring alloc_front_vector's handle discipline
+   so that a fresh process hands out 1,2,3,... in call order. */
+static uint32_t snap_alloc_vector(uint32_t cap) {
+    if (front_handles_len >= front_handles_cap) {
+        uint32_t newcap = front_handles_cap ? front_handles_cap * 2 : 1024;
+        front_handles = (front_vector **)grow_handle_table(
+            front_handles, front_handles_cap, newcap, sizeof(*front_handles), "front");
+        front_handles_cap = newcap;
+    }
+    uint32_t handle = front_handles_len++;
+    front_vector *v = (front_vector *)malloc(front_vector_bytes(cap));
+    if (!v) { printf("\nout of memory loading snapshot front\n"); exit(1); }
+    v->len = 0; v->cap = cap;
+    front_handles[handle] = v;
+    front_alloc_count++;
+    front_alloc_size += cap;
+    return FRONT_VECTOR_TAG | handle;
+}
+
+static void snapshot_load(const char *path) {
+    if (branch_handles_len > 1 || front_records_len > 1 || front_handles_len > 1) {
+        respond("ERR snapshot must be loaded into a fresh oracle, before any facts or queries");
+        return;
+    }
+    FILE *f = fopen(path, "rb");
+    if (!f) { respond("ERR cannot open %s", path); return; }
+    double t0 = now_ms();
+    char magic[64] = {0}, build[128] = {0};
+    int mk = 0, mn = 0, ms_ = 0; size_t fp = 0;
+    if (!fgets(magic, sizeof magic, f) || strncmp(magic, SNAP_MAGIC, strlen(SNAP_MAGIC))) {
+        respond("ERR %s is not a cache snapshot", path); fclose(f); return;
+    }
+    if (!fgets(build, sizeof build, f)) { respond("ERR truncated snapshot"); fclose(f); return; }
+    build[strcspn(build, "\n")] = 0;
+    if (fscanf(f, "%d %d %d %zu\n", &mk, &mn, &ms_, &fp) != 4) {
+        respond("ERR truncated snapshot header"); fclose(f); return;
+    }
+    if (strcmp(build, RADIO_BUILD_ID) || mk != MAX_K || mn != MAX_N || ms_ != MAX_SBB ||
+        fp != sizeof(front_point)) {
+        respond("ERR snapshot is from a different build (%s k=%d n=%d sbb=%d); refusing",
+                build, mk, mn, ms_);
+        fclose(f); return;
+    }
+    uint32_t bn = snap_get(f), rn = snap_get(f), vn = snap_get(f);
+    uint32_t *widths = (uint32_t *)calloc(bn + 1, sizeof(uint32_t));
+    uint32_t *vlens = (uint32_t *)calloc(vn + 1, sizeof(uint32_t));
+    if ((bn && !widths) || (vn && !vlens)) { respond("ERR out of memory"); fclose(f); return; }
+    for (uint32_t i = 1; i <= bn; i++) widths[i] = snap_get(f);
+    for (uint32_t i = 1; i <= vn; i++) vlens[i] = snap_get(f);
+    for (uint32_t i = 1; i <= bn; i++) alloc_branch(widths[i]);
+    for (uint32_t i = 1; i <= rn; i++) alloc_front_record(0, 0);
+    for (uint32_t i = 1; i <= vn; i++) snap_alloc_vector(vlens[i] ? vlens[i] : 1);
+    for (uint32_t i = 1; i <= bn; i++) {
+        branch_array *b = branch_handles[i];
+        for (uint32_t j = 0; j < b->width; j++) b->slot[j] = snap_get(f);
+    }
+    for (uint32_t i = 1; i <= rn; i++) {
+        front_records[i].positive = snap_get(f);
+        front_records[i].negative = snap_get(f);
+    }
+    for (uint32_t i = 1; i <= vn; i++) {
+        front_vector *v = front_handles[i];
+        v->len = vlens[i];
+        if (v->len && fread(v->sbb, sizeof(front_point), v->len, f) != v->len) {
+            respond("ERR truncated snapshot fronts"); fclose(f); return;
+        }
+    }
+    for (int k = 0; k <= MAX_K; k++) sb_cache_root[k] = snap_get(f);
+    if (fread(sa_can, sizeof(sa_can[0]), MAX_N + 1, f) != (size_t)(MAX_N + 1) ||
+        fread(sa_cant, sizeof(sa_cant[0]), MAX_N + 1, f) != (size_t)(MAX_N + 1)) {
+        respond("ERR truncated snapshot Sa tables"); fclose(f); return;
+    }
+    fclose(f); free(widths); free(vlens);
+    respond("OK restored %s branches=%u records=%u vectors=%u ms=%.0f",
+            path, bn, rn, vn, now_ms() - t0);
+}
+
 int main(int argc, char **argv) {
     init();
 
@@ -159,6 +350,7 @@ int main(int argc, char **argv) {
     if (dup2(2, 1) < 0) { perror("dup2"); return 20; }
 
     for (int i = 1; i < argc; i++) {
+        if (!strncmp(argv[i], "--restore=", 10)) { snapshot_load(argv[i] + 10); continue; }
         if (!strncmp(argv[i], "--journal=", 10)) {
             journal = fopen(argv[i] + 10, "a");
             if (!journal) { respond("ERR cannot open journal %s", argv[i] + 10); return 21; }
@@ -192,6 +384,8 @@ int main(int argc, char **argv) {
             continue;
         }
         if (!strncmp(line, "load ", 5)) { load_cache(line + 5); continue; }
+        if (!strncmp(line, "snapshot ", 9)) { snapshot_dump(line + 9); continue; }
+        if (!strncmp(line, "restore ", 8)) { snapshot_load(line + 8); continue; }
         if (!strncmp(line, "journal ", 8)) {
             if (journal) fclose(journal);
             journal = fopen(line + 8, "a");

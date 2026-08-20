@@ -568,6 +568,13 @@ Never record a `MAYBE` as a negative — that is exactly how the 2023 corpus acq
 **It grows forever.** The result cache is never freed; that is the point, but wrap an unattended
 session in `tools/capped_run.sh`.
 
+**Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
+reloads it linearly instead of re-deriving every dominance closure. A snapshot is refused unless the
+build id and `MAX_K`/`MAX_N`/`MAX_SBB` match exactly, because the sbb numbering depends on `MAX_N`.
+Round-trip verified: 16,099 facts dumped in 247 ms and restored in 212 ms with identical verdicts on
+300 queries. Snapshot size at that scale is 2.7 KB per input fact, which is the number the first
+full-corpus run needs to check.
+
 ## Cache files
 
 Solver output can be fed back in to skip work already done. `parse_out.sh` converts a raw
