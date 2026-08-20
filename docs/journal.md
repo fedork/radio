@@ -8189,3 +8189,47 @@ gitignored `.venv`; the three checks and everything under `tools/` proper stay d
 `tools/ml/README.md` says so.
 
 Process inventory: no AWS compute; nothing running locally.
+
+## 2026-08-20 (later) — exact ranks, and why "top-5 guaranteed" is out of reach this way
+
+Asked whether the ranker could be sharpened to a rule that names one cut, or five guaranteed to
+contain a winner. Answering it forced a correction and then produced a clean negative.
+
+**The correction.** My "median 7 tries" was 7 out of the 6,000 *sampled* candidates, not out of the
+real set. The per-part Pareto bound is separable per part, so the stage-2 candidate set can be
+enumerated outright: median **54,014** at k=7, roughly 3e6 at k=8. True ranks are therefore ~10x and
+~500x those sampled counts. The 428x ratio is scale-free and survives; the absolute number did not.
+Sampled costs mean nothing until scaled by (true set size / sample size), and I published one that
+had not been.
+
+**Exact ranks**, all 153 forced four-part k=7 states, model trained on k=8 only, no sampling:
+
+  blind search        median 27,007
+  logistic ranker     median    193   top-5  2.6%   worst  8,834
+  R_0 then ranker     median     76   top-5  3.3%   worst  1,533
+
+`R_0` full-star majorization on all three children kept the winner in 60 of 60 states, as a sound
+filter must, and removed 8x of the candidates. It is the only component here carrying a guarantee,
+and what it guarantees is retention, not smallness.
+
+**So top-5 is roughly 15x short on the median and 300x short on the tail**, and the tail is what a
+guarantee needs. Adding the cross-part pair condition (6.9x elsewhere) plausibly reaches a median
+around 10 and does nothing obvious for the worst case.
+
+**The reason is structural, not a modelling failure.** The R_d ladder already told us: R_0 is 8x
+here, R_1 adds 5.8x at 30-80 s per endpoint, and R_d converges to exact solving. The winner is
+defined by its children's solvability, not by the parent's shape, so a shallow scale-normalized
+feature map cannot climb that ladder however much corpus it is given — which is consistent with the
+learning curve being flat from 26 states.
+
+**What is achievable, and is probably what was actually wanted:** a *complete* search with small
+expected cost. Sound filters, which cannot drop the winner, then the learned ordering, then full
+enumeration as fallback. Expected solver calls at k=7 fall from ~27,000 to ~76 while the algorithm
+stays complete. The guarantee comes from the fallback, not the model. A guarantee proper would have
+to come from a theorem — the mixed-largest law is the theorem-shaped candidate — or from exhaustive
+verification over the domain of use, which for k=9 does not exist.
+
+`tools/ml/exact_topk.py` and `tools/ml/filter_then_rank.py` reproduce the two tables. One trap worth
+recording: I first ran the R_0 filter one level too low and it rejected every candidate including
+every winner. A sound filter that removes the winner is always a bug in the caller, never a result —
+the 0/60 survival rate is what caught it.

@@ -31,9 +31,15 @@ Metric: rank candidates by score, try until a winner is hit.  Blind order costs 
   gradient boosting, 26 features              11           272.8x      4.1x     10%
   PERMUTED-LABEL CONTROL                    1908             1.6x      0.5x      1%
 
-A median of SEVEN candidates tried before hitting the winner, out of 6,000 sound-filtered ones.
 The permuted-label control -- identical pipeline, labels shuffled -- collapses to 1.6x, which is
 what rules out leakage; a result this large should not be believed without it.
+
+**CORRECTION (same day).**  "median cost 7" is 7 out of the 6,000 SAMPLED candidates, not 7 out of
+the real candidate set.  The stage-2 set is far larger -- median 54,014 at k=7 and roughly 3e6 at
+k=8 -- so the true rank is about 10x and 500x those figures respectively.  The 428x *ratio* is
+scale-free and stands; the absolute count did not, and section 6 replaces it with exact ranks
+computed by enumerating the candidate set outright.  Sampled costs must be scaled by
+(true set size / sample size) before they mean anything.
 
 Note the worst case: 6.5x.  This is a RANKER, not a filter.  It cannot prune (no recall guarantee),
 but reordering the search costs nothing and never loses completeness.  That is the honest use.
@@ -116,3 +122,40 @@ strictly as scoped to the forced-vs-unforced contrast.
 * Median is not worst case.  A search using this must still be prepared to enumerate.
 * The negatives are uniformly sampled from the stage-2 set.  A solver enumerating in a structured
   order faces a differently-ordered, not differently-composed, candidate set.
+
+=====================================================================================
+6. EXACT RANKS, NO SAMPLING — and the distance to a "top-5 guaranteed" rule
+=====================================================================================
+The per-part Pareto bound is separable per part, so the stage-2 candidate set can be enumerated
+outright rather than sampled.  Doing that for all 153 forced four-part k=7 endpoints, with the model
+trained on k=8 only (different state, different level):
+
+  candidate set size (cap + per-part Pareto): median 54,014, min 7,684, max 130,262
+
+  pipeline                median rank   top-1   top-5   top-20  top-100    worst
+  blind search                 27,007      -       -        -        -    130,262
+  logistic ranker                 193    0.0%    2.6%    12.4%    36.6%      8,834
+  boosted ranker                  292    0.0%    3.9%    11.8%    30.7%     20,747
+  R_0 filter then rank             76      -     3.3%    23.3%    55.0%      1,533
+
+R_0 (full-star majorization on all three children) is *sound*: it kept the winner in 60 of 60 states
+tested, as it must, while removing 8x of the candidates.  That is the only part of this pipeline that
+carries a guarantee, and what it guarantees is retention, not smallness.
+
+DISTANCE TO THE GOAL.  A "top-5 always contains a winner" rule needs median rank <= 5 and, for the
+guarantee, WORST rank <= 5.  Best pipeline here is median 76 and worst 1,533: about 15x short on the
+median and 300x short on the tail.  Adding the cross-part pair condition (measured elsewhere at 6.9x)
+would plausibly bring the median to ~10; it does nothing obvious for the tail.
+
+WHY THE TAIL IS THE HARD PART, AND WHY THIS IS NOT AN ML LIMITATION.  The repo's own R_d ladder says
+the information that determines the winner converges to exact solving: R_0 is 8x here, R_1 adds 5.8x
+at 30-80 s per endpoint, and R_d converges to the solver.  A shallow scale-normalized feature map
+cannot beat that ladder, because the winner is defined by its children's solvability rather than by
+the parent's shape.  No amount of corpus fixes that.
+
+WHAT IS ACHIEVABLE INSTEAD.  A *complete* search with a small expected cost: sound filters (which
+cannot drop the winner) -> learned ordering -> full enumeration as fallback.  That never misses a
+winner and cuts expected solver calls from ~27,000 to ~76 at k=7.  The guarantee comes from the
+fallback, not from the model.  If a guarantee proper is wanted, it has to come from a theorem -- the
+mixed-largest law is the theorem-shaped candidate in this corpus -- or from exhaustive verification
+over the domain of application, which for k=9 does not exist yet.

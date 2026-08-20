@@ -424,10 +424,17 @@ Counting this as a 624-example problem is the wrong frame: the unit is (state, c
 census enumerates every winner so unrecorded cap-feasible cuts are clean negatives, and that gives
 26,876 positives against ~1e7 candidates per state.
 
-- Trained on the k=7 corpus **only** and tested on 120 forced k=8 states with 6,000 sound-filtered
-  candidates each, a logistic regression finds the winner after a **median of 7 tries (428x better
-  than blind)**, worst case 6.5x. A permuted-label control on the identical pipeline gives 1.6x,
-  which is what rules out leakage. It transfers across levels, so it is not memorising states.
+- Trained on the k=7 corpus **only** and tested on forced k=8 states, a logistic regression ranks
+  the winner **428x better than blind**, worst case 6.5x. A permuted-label control on the identical
+  pipeline gives 1.6x, which is what rules out leakage. It transfers across levels, so it is not
+  memorising states. **Quote the ratio, not a candidate count**: an earlier "median 7 tries" was 7
+  of 6,000 *sampled* candidates against a real set of ~3e6, and is superseded by the exact ranks
+  below.
+- **Exact ranks, by enumerating the candidate set rather than sampling it** (the per-part Pareto
+  bound is separable, so this is cheap). All 153 forced four-part k=7 states, median 54,014
+  candidates: blind 27,007, ranker **193**, sound `R_0` then ranker **76**, worst case 1,533.
+  Top-5 recall is 3.3%. **A "top-5 always contains a winner" rule is ~15x short on the median and
+  ~300x short on the tail**, and adding the pair condition addresses only the median.
 - **The corpus is not the constraint.** Performance is flat from 26 training states to 534, and
   plain logistic regression beats gradient boosting — both signatures of a smooth low-dimensional
   surface rather than a data-starved one. The feature set binds, not the sample size.
