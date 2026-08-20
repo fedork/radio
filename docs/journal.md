@@ -8338,3 +8338,40 @@ rather than AUC. Full detail in
 scripts are `tools/ml/value_*.py`.
 
 Process inventory: no AWS compute; the oracle workers all exited; nothing running locally.
+
+## 2026-08-20 (night) — a warm-cache oracle, and why priming it is not worth doing
+
+Built `radio_oracle.c`: pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from
+stdin until told to quit, keeping every fact it learns. Launcher `run_radio_oracle.sh`, client
+`tools/oracle_client.py`, documented in [tools.md](tools.md), numbers in
+[../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt).
+
+**Throughput.** 2,200 four-part k=5 states, started cold: 37.3 s wall, of which ~37 s is init and
+**243 ms is the 2,200 queries** — 0.11 ms each. Per query that is ~1,800x faster than the cheapest
+one-shot `radio_one` build and ~340,000x faster than a correctly sized one, where the same batch
+would be about 22 hours. The verdicts — 1,120 solvable, 1,080 unsolvable — are *identical* to those
+from running `radio_one` once per state earlier, which is a two-driver cross-check on every state.
+
+**Sizing, measured rather than assumed.** MAX_K=9 with MAX_N=300 inits in 37 s at 0.64 GB. The
+binding constraint is not the queries: replaying a cache fact wider than the static tables is not
+bounds-checked, and the archived census caches reach a side-sum of **258**, so anything below that
+cannot be primed with them. Cost is also not a clean function of MAX_N — MAX_N=400 at MAX_K=6 costs
+205 s while MAX_N=485 at MAX_K=9 costs 146 s — so a candidate sizing has to be measured. Both facts
+are now traps in [status.md](status.md).
+
+**Priming is the expensive part and mostly should not be done.** The archived caches are text logs
+replayed through `parse_file`: 11,661,763 exact facts and 10,204,438 dominance facts. Measured replay
+rate is about **700 facts/s**, so all 21.9M is roughly **8.7 hours** — I started it, watched it reach
+about 1% in six minutes, and stopped it. The replay path is the bottleneck, not init. Since a cold
+oracle did 2,200 queries in 243 ms anyway, the recommendation is to start cold and let the
+in-process cache warm itself, priming only for a session that will outlive the load, and then from a
+filtered subset. By level the exact cache is almost all k=4..6 (891k / 8.15M / 2.61M) with only
+7,686 facts at k=7 and 255 at k=8, so a k-band filter is easy and would cut the load by most of it.
+
+One design detail worth keeping: `radiobase.c` and `canSolveB` print progress to stdout, which would
+corrupt a line protocol. The oracle duplicates the original stdout for its response stream and
+repoints the C library's stdout at stderr *after* the provenance banner, so retained response output
+still passes `check_provenance.py` while every later print goes to stderr. Any future stdin-driven
+driver needs the same treatment.
+
+Process inventory: no AWS compute; oracle and build processes all stopped; nothing running locally.

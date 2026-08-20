@@ -489,7 +489,8 @@ Two behaviours to be aware of:
 | driver | use it for | cost |
 |---|---|---|
 | `radio_canon_search_generic.c` | **Prefer this for new `k=9` results.** Finds a tree that terminates in canonical `U_k` singleton states, which is a self-contained proof. Produced the `473:6`, `480:5`, `496:4` trees. | minutes |
-| `radio_one.c` | One question: is this state solvable in `k`? | varies wildly |
+| `radio_oracle.c` | **Prefer this whenever you want more than a handful of verdicts.** A persistent warm-cache oracle: pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin until told to `quit`, keeping every fact it learns. Start it with `./run_radio_oracle.sh`; drive it from `tools/oracle_client.py`. | seconds to start, then sub-millisecond per cached query |
+| `radio_one.c` | One question: is this state solvable in `k`? Pays full `init()` per process, so use `radio_oracle.c` for batches. | varies wildly |
 | `radio_pareto.c` | Walk the Sb frontier for any `k` as a staircase: `<k> <n1> <n2> [cache]`. Generic replacement for `radioSbPareto.c`. Reproduces the proven k=6 column exactly; a k=8 walk is the standard heavy benchmark. | minutes to days |
 | `radio_full.c` | Every top-level split plus a solvability matrix. Thorough and **much** more expensive than `radio_one` - the killed `k=9` runs used this. | hours to never |
 | `radio.c` | Walks the `Sa` ladder upward, printing `can/can't solve Sa(n) in k`. Produced `out_radio_1.txt`. | days |
@@ -526,6 +527,37 @@ same claim. The right check is that the output *verifies*, not that it matches:
 ./radio_canon_search_generic 3 8 248 3 | grep -E '@[0-9]+ (\[canonical|--\[)' > /tmp/t.tree
 tools/check_witness.py /tmp/t.tree
 ```
+
+## The warm oracle
+
+`radio_one` answers one question per process, and the process cost is not the solve. `init()` runs
+**before** the argument check and its static tables scale with `MAX_N`, so the same query costs
+205 s built at `-DMAX_N=400` and 0.2 s at `-DMAX_N=120`. Replaying the archived caches costs minutes
+more. Anything that wants thousands of verdicts — labelling a dataset, ranking splits, poking at a
+frontier — has to amortise that, which is what `radio_oracle.c` is for.
+
+```
+./run_radio_oracle.sh                 # build if needed, prime, then read queries on stdin
+python3 tools/oracle_client.py ./radio_oracle_k9_n300 .artifacts/oracle-cache/*.cache   # smoke test
+```
+
+**Sizing is a one-time decision.** `MAX_N` must cover the largest side-sum you will ask about *and*
+the largest present in any cache you prime with — replaying a wider fact is not checked. The
+archived census caches reach **258** and Sa(193) states reach 193, so the default is `MAX_N=300`,
+`MAX_K=9`. Measured on an M-series Mac: init 37 s, 0.64 GB resident. Cost climbs steeply above
+that, so do not pad it.
+
+**Stream separation.** `radiobase.c` and `canSolveB` print progress to stdout, which would corrupt a
+line protocol. The oracle keeps a duplicate of the original stdout for responses and points the C
+library's stdout at stderr after the provenance banner, so the banner stays with the response stream
+(retained output still passes `check_provenance.py`) and all later chatter goes to stderr.
+
+**`MAYBE` is not a refutation.** The per-query budget defaults to finite, because an unbounded query
+would hang the daemon. `budget 0` removes the deadline and accepts that some states never return.
+Never record a `MAYBE` as a negative — that is exactly how the 2023 corpus acquired 37 false ones.
+
+**It grows forever.** The result cache is never freed; that is the point, but wrap an unattended
+session in `tools/capped_run.sh`.
 
 ## Cache files
 

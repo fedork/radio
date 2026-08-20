@@ -56,6 +56,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Exact cover now excludes rank 1180 through depth four; this is still bounded, so depth five and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one finite depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 | **The excess-`q` Pareto assembly is parked, not a pending global formula.** | Its corrected four-segment reduction and exact `m=5` calibration are durable, but the sufficiently-large-`q` postulate, completeness of the outer-family list, and stabilization of the synchronized D frontier are unproved. `m=5` already needs competing outer triples and a piecewise D solution; the height-6 rank-1180 question concerns only one restricted aligned slice. Do not restart finite normalization/rank searches unless a new theorem or construction addresses one of those global gaps. |
 | **Never train solvable-vs-unsolvable on two different corpora.** | Certificate negatives and census positives occupy *disjoint* mass bands at k=6 (positives 0.742-0.875 of cap, negatives 0.827-0.959; the central-90% overlap is empty), so any classifier scores AUC 0.946 by learning which corpus a state came from. A permuted-label control does **not** catch this — it destroys the source signal too and returns a reassuring 0.516. What caught it was a matched-pair probe: single-part states differing by one coin scored 47%, chance. Draw both classes from one sampler and label with `radio_one`. Measured 2026-08-20; see [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt). |
+| **Size the oracle's `MAX_N` for the caches, not just the queries.** | Replaying a cache fact wider than the static tables is not bounds-checked. The archived census caches reach a side-sum of 258, so a `radio_oracle` built below that cannot safely be primed with them. `MAX_K=9, MAX_N=300` is the measured default: init 37 s, 0.64 GB. Cost is not a simple function of `MAX_N` — `MAX_N=400/MAX_K=6` costs 205 s while `MAX_N=485/MAX_K=9` costs 146 s — so measure a candidate sizing rather than reason about it. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Size `MAX_N` to the states you are asking about.** | `init()` runs before `radio_one`'s argument check and its static tables scale with `MAX_N`: the same query costs **205 s** built at `-DMAX_N=400` and **0.2 s** at `-DMAX_N=120`, where the solve itself is 0.0 s. A padded `MAX_N` buys nothing and can make a cheap oracle look unusable. Measured 2026-08-20. |
 | **Do not read the choice census's `complete=` as a structural candidate count.** | `enumerate_rec` prunes with `CACHE_ONLY` lookups against a warm dominance cache, so `complete` — and therefore `full_complete_candidates` — depends on cache history, not on the state. It reads as a median of 2 candidates at k=7 single-class endpoints; the cache-free count under sound filters (information cap plus the four-rectangle proven frontier) is a median of **13,276**. Quote `complete` as search effort, never as the size of the choice problem. Measured 2026-08-18; see [journal.md](journal.md). |
 | **Do not re-attempt a scalar score over split geometry.** | Refuted 2026-08-18 on all 153 four-part single-class k=7 endpoints. Ranking the majorization-feasible candidates by each of 19 geometric features puts the winner at best at the **5th percentile** (tightness, median rank 659; `dev` 0.098), with **one endpoint in 153** reaching the top ten. Filtering to `R_1` first does not rescue it. This is the same wall the 2026-08-08 tightness claim and the 2026-08-09 fitted score hit, now measured on the complete single-solution corpus: there is no local signal to fit or to transfer. Spend effort on cheap sound *necessary conditions* instead — their selectivity multiplies. |
@@ -1121,7 +1122,16 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Take the value model to k=6 and then into the solver.** The level-transfer premise now has
+0. **Use the warm oracle for everything that needs many verdicts.** `radio_oracle.c` is new: it
+   pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin. Measured at
+   **MAX_K=9, MAX_N=300** (init 37 s, 0.64 GB): 2,200 k=5 states in 243 ms of query time, **0.11 ms
+   each**, verdicts identical to per-process `radio_one` on all 2,200. Start with
+   `./run_radio_oracle.sh`, drive with `tools/oracle_client.py`, details in
+   [tools.md](tools.md) and [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt).
+   **Start it cold** — priming the archived caches runs at ~700 facts/s, so all 21.9M is ~8.7 h,
+   while the in-process cache warms itself for free.
+
+1. **Take the value model to k=6 and then into the solver.** The level-transfer premise now has
    evidence: with matched oracle-labelled sampling, a scale-normalized value model trained on k=4
    predicts k=5 solvability at **AUC 0.9921**, against a 0.9974 same-level ceiling and 0.8773 for
    the best cheap sound bound; permuted control 0.5234. On the 1,751 of 2,200 states the sound
@@ -1130,7 +1140,7 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    Next: k=5 -> k=6 with MAYBE handled as a third label, then judge it on end-to-end CPU against a
    table lookup, not on AUC. **Trap that cost the first attempt:** see the trap table.
 
-1. **Make the predictor recursive.** The flat-feature ranker stalled at median rank 76 of 54,014,
+2. **Make the predictor recursive.** The flat-feature ranker stalled at median rank 76 of 54,014,
    and the learning curve says that is a feature-set limit, not a data limit — what decides the
    winner lives one level down. Design note: [ml-guided-search.md](ml-guided-search.md). Three
    things it turns on: the training corpus already exists (the certificate chain is 2,846,568
@@ -1143,7 +1153,7 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    is a *level*-held-out value model, judged on end-to-end CPU seconds against the cheap sound
    filters it would displace, not on AUC.
 
-2. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
+3. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
@@ -1151,11 +1161,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    are terminated and their volumes deleted. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
-3. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
+4. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
-4. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
+5. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
    cache as a frozen read view plus worker-local overlay, then separate immutable split geometry
    from learned cut metadata. Extract and regression-test a resumable serial pass-2 prefix cursor
    before scheduling limited-width batches. The ownership contract is in
