@@ -1,0 +1,172 @@
+Single-solution endpoint cuts: the k=8 and k=7 choice censuses compared, 2026-08-20
+Status: measured. Reproduce in ~4 s with
+
+  tools/analyze_single_solution_cuts.py --k8 <k8.out> --k7 <k7.out>
+
+on `pareto-census-k8-2026-08-19:pareto_census_k8.out` and
+`pareto-census-k7-2026-08-13:pareto_census_k7.out`.  Equivalence semantics are imported from
+`tools/analyze_pareto_prefix_census.py`, not reimplemented.  Validation: this pipeline reproduces
+the archived k=7 analyzer exactly (183 single-class endpoints, 153 of them four-part).
+
+DEFINITIONS.  An endpoint is a maximal residual state; the census records every winning split as a
+FULL_WIN.  Quotienting splits by the state's exact automorphisms — identical-component permutation,
+square-shore exchange, global complementation — gives *classes*.  "Single-solution" = exactly one
+class.  A root_k=8 census has endpoints at residual k=6 (cap 3^6=729); root_k=7 at k=5 (cap 243).
+A split's three children are selected (a:b), mixed (a:m-b and n-a:b), complement (n-a:m-b).
+
+CONTROL DISCIPLINE.  Every single-vs-multi comparison below uses *all* classes of the
+multi-solution endpoints.  Using one representative class per endpoint biases the comparison and
+was corrected after it changed the sliver numbers.
+
+=====================================================================================
+1. POPULATIONS  (final k=8 figures; these supersede the partial 262/1,092)
+=====================================================================================
+                        k=8 (residual 6)      k=7 (residual 5)
+  endpoints             1,893                 610
+  by parts              11 / 96 / 1,786       9 / 67 / 534      (2- / 3- / 4-part)
+  raw winners           50,494                7,396
+  automorphism classes  24,330                3,227
+  single-class          505  (26.7%)          183  (30.0%)
+  single & four-part    471                   153
+
+"Single solution" almost always means one cut *up to complementation*: 450 of the 471 four-part
+k=8 forced endpoints have exactly 2 raw winners, 19 have 4, 2 have 8.  At k=7, 131 have 2 and 22
+have 4.
+
+=====================================================================================
+2. THE ONE SHARP LAW: THE MIXED CHILD IS ALWAYS STRICTLY THE LARGEST
+=====================================================================================
+                            k=8              k=7
+  winning classes           23,881           2,995
+  mixed strictly largest    100.0%           100.0%      (0 violations, 0 ties)
+  margin over runner-up     min 18, med 35   min 3, med 11
+  uniform random splits     80.5%            77.0%
+  random AND cap-feasible   59.0%            57.1%
+
+This is the strongest result here and it is not geometry.  Among random splits that already satisfy
+the information bound on all three children it is close to a coin flip, yet every one of the 26,876
+winning splits in both corpora has it, with a strictly positive margin.  So it is a property of
+*solvability*, not of the cap.
+
+Plausible mechanism, not a proof: the mixed child spreads its mass over up to twice as many parts,
+so at equal mass it is the easiest of the three to solve; solvable splits therefore push mass into
+it.  Per part the identity x^2 - 4sc = [a(m-b) - (n-a)b]^2 >= 0 gives x_i >= 2*sqrt(s_i c_i), which
+points the same way but does not sum to the global claim.
+
+CONJECTURE, worth testing before use: every winning split of a state near the information bound has
+mixed strictly largest.  If it survives, it is a zero-cost necessary condition that removes ~41% of
+cap-feasible candidates.  It is measured only on maximal endpoint states at residual k=5 and k=6;
+do not assume it at other k or for non-maximal states without checking.
+
+Related, unexplained level asymmetry: at k=8 no child ever reaches the child cap — 0 of 23,881
+classes, largest child seen 242 of 243 — while at k=7 it happens in 632 of 2,995 classes (81 exactly).
+
+=====================================================================================
+3. WHAT THE FORCED CUTS LOOK LIKE
+=====================================================================================
+Part-cut archetypes, exclusive categories in this test order: whole-part (take all or none of the
+part), sliver (a*b=0 or (n-a)(m-b)=0 — the part feeds only two of the three outcomes),
+proportional (a*m = b*n exactly, i.e. the diagonal cut), generic.
+
+                        k=8 single   k=8 multi    k=7 single   k=7 multi
+  whole-part               3.2%         2.3%         6.7%         5.3%
+  sliver                  33.4%        27.9%        41.7%        39.4%
+  proportional             3.2%         2.8%         4.3%         4.1%
+  generic                 60.2%        67.0%        47.4%        51.3%
+  part-cuts counted        1,884       93,640          612       11,368
+
+DIAGONAL CUTS ARE RARE AND CARRY NO SIGNAL.  Counting every exactly-proportional cut including those
+that are also whole-part or sliver: 6.4% of k=8 forced part-cuts, 10.9% at k=7; median normalized
+defect |a*m - b*n|/(n*m) is 0.083 and 0.119.  Single and multi are indistinguishable on it.
+
+SLIVERS ARE THE ONE REAL ENRICHMENT, and only at k=8: 33.4% vs 27.9%, z = +5.3.  At k=7 the same
+comparison is 41.7% vs 39.4%, z = +1.1, not significant.  Per class the shift is clearer than the
+aggregate — three-sliver cuts are 3.4% of forced classes against 0.3% of multi classes, an 11x
+enrichment:
+  slivers per class, k=8   single {0: 10.6%, 1: 48.6%, 2: 37.4%, 3: 3.4%}
+                           multi  {0: 12.5%, 1: 63.8%, 2: 23.4%, 3: 0.3%}
+
+SHAPE DOES NOT DETERMINE THE CUT.  236 distinct part shapes at k=8, 90 seen at least 8 times, and
+only 3 have a single forced cut.  The most concentrated are near-whole-part slivers — 15:8 -> 14:8
+(68% of 28 sightings, only 3 distinct cuts), 15:9 -> 14:9 (61% of 31), 19:7 -> 17:7 (62% of 24); at
+k=7, 9:5 -> 9:5 (67% of 21), 10:7 -> 5:4 (62% of 16).  Popular shapes such as 18:11 (39 sightings)
+still take 8 different cuts.  This extends the existing "split choice is recursive, not geometric"
+finding from winner-location to the forced-endpoint population.
+
+=====================================================================================
+4. NOTHING SCALAR SEPARATES FORCED FROM UNFORCED
+=====================================================================================
+  state occupancy mass/cap   k=8 single med 0.867  vs multi 0.866
+                             k=7 single med 0.885  vs multi 0.876
+  child-mass spread          k=8 single min 29 med 42  vs multi min 29 med 42
+  diagonality                indistinguishable (above)
+
+Symmetry does not explain it either — the obvious worry, that automorphism-rich states trivially
+collapse to one class, is refuted.  k=8 four-part endpoints by state symmetry:
+  repeats=0 squares=0   1,674 states   442 single   26.4%
+  repeats=0 squares=1      84 states    25 single   29.8%
+  repeats=1 squares=0      25 states     2 single    8.0%
+  repeats=1 squares=1       3 states     2 single   66.7%
+States with a repeated component are if anything *less* likely to be forced.  (The last two cells
+are too small to carry weight; the first two are the population.)
+
+=====================================================================================
+5. CONNECTION BETWEEN LEVELS: NONE, FOR THE FOUR-PART STATES
+=====================================================================================
+The levels meet: a k=8 endpoint sits at k=6, so its children sit at k=5 — exactly where the k=7
+census's own endpoints live.  Asking how often a forced k=8 cut lands on a state the k=7 census
+already knows:
+
+  k=8 endpoint shape   children   identical to a k=7 endpoint
+  2-part (11 states)         33   16   (48.5%)   7 of them k=7 single-solution
+  3-part (96 states)        288   99   (34.4%)  84 of them k=7 single-solution
+  4-part (1,786 states)   5,358    2   ( 0.0%)   2 of them k=7 single-solution
+
+Restricted to the 471 forced four-part endpoints the user asked about: **1 of 1,413 children**, and
+under dominance rather than identity, still 1.  The single hit is k=8 U001149,
+state 40:4,30:5,50:2,54:1 mass 464, forced cut 20:2,9:0,27:2,31:1, whose selected child
+20:2,27:2,31:1 is k=7 endpoint U000023 — which is itself single-solution.
+
+THIS IS NOT A SIZE ARTIFACT.  942 of the 1,413 children pass both necessary conditions for
+dominance (mass <= 221, the largest k=7 endpoint; parts <= 4, the most any k=7 endpoint has).  Every
+selected and complement child qualifies; only the mixed child is excluded, and it always is, because
+it always has more than 4 parts.  So two thirds of the children are eligible and still essentially
+none land.
+
+THE CAUSE IS SHAPE.  At the shared k=5 level the two populations barely overlap:
+                             parts per state          aspect n/m (p25/med/p75)
+  k=7 census endpoints       {2: 9, 3: 67, 4: 534}    1.83 / 3.20 / 8.50
+  k=8 forced selected child  {2: 6, 3: 274, 4: 191}   1.50 / 2.29 / 4.40
+  k=8 forced complement      {2: 18, 3: 383, 4: 70}   1.75 / 2.29 / 4.67
+The k=7 endpoints are thin and mostly four-part; the k=5 states arising inside forced k=6 solutions
+are squat and mostly three-part.  Thin parts cannot contain squat ones, so dominance fails on the
+short side.  The k=7 census's endpoint family is *not* an upper set for k=5 solvable states — it
+enumerates what is maximal in k=7 root lineages, which is a different region.  Consistent with that,
+k=8 children reach mass 242 while no k=7 endpoint exceeds 221.
+
+=====================================================================================
+6. WHERE THE LEVELS DO AGREE: THE POPULATION IS SELF-SIMILAR
+=====================================================================================
+Individual states do not correspond, but the shape *distribution* does, once lengths are scaled by
+sqrt(cap) (the cap triples per level, so lengths should scale by sqrt(3) = 1.732):
+
+                              k=8 (sqrt cap 27.00)     k=7 (sqrt cap 15.59)
+  n / sqrt(cap)      median          0.741                    0.770
+  m / sqrt(cap)      median          0.296                    0.257
+  part size n*m/cap  p25/med/p75     0.173 / 0.211 / 0.257    0.165 / 0.206 / 0.267
+  state occupancy    median          0.867                    0.885
+
+Each part takes about a fifth of the information budget at both levels, and four of them fill
+85-88% of it.  That is the level connection that does exist: not state-to-state, but a fixed
+normalized geometry that both censuses reproduce.
+
+=====================================================================================
+7. WHAT I DID NOT ESTABLISH
+=====================================================================================
+* The mixed-largest law is measured, not proved, and only on residual k=5 and k=6 maximal endpoints.
+* The sliver enrichment is significant at k=8 (z=+5.3) and not at k=7 (z=+1.1).  One level is not
+  a replication; treat it as a lead.
+* No feature here predicts *which* endpoints are forced.  Occupancy, spread, diagonality and
+  symmetry are all flat between the forced and unforced populations.
+* The cross-level comparison uses core states; the census tracks a unit reserve separately and
+  those units are excluded from both sides.

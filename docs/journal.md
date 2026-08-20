@@ -8066,3 +8066,67 @@ probes, one inventory, ~10 minutes of instance uptime to run it, and no solver t
 
 Process inventory at handoff: no research binary is running anywhere, on AWS or locally. The local
 sampler and its waiter exited. No `Python -`/`python3 -` orphan remains.
+
+## 2026-08-20 — forced cuts in the completed k=8 corpus: one sharp law, and no level connection
+
+With the k=8 census finished I extracted every single-solution four-part endpoint from both censuses
+and looked for structure. `tools/analyze_single_solution_cuts.py` does the whole thing in about four
+seconds from the two archived logs; it imports the equivalence semantics from
+`analyze_pareto_prefix_census.py` rather than reimplementing them, and it reproduces the archived
+k=7 analyzer exactly (183 single-class, 153 four-part), which is what licenses the new k=8 numbers.
+Full tables in [../evidence/single_solution_cuts_2026-08-20.txt](../evidence/single_solution_cuts_2026-08-20.txt).
+
+**Final counts.** k=8: 1,893 endpoints, 50,494 winners, 24,330 classes, **505 single-class (26.7%)**
+of which 471 four-part — superseding the partial 262 of 1,092. k=7: 183 of 610 (30.0%), 153
+four-part. "Single solution" nearly always means one cut up to complementation: 450 of the 471
+forced k=8 endpoints have exactly two raw winners.
+
+**The one sharp law: the mixed child is always strictly the largest.** 26,876 of 26,876 winning
+classes across both corpora, no ties, margin at least 18 at k=8 and 3 at k=7. I nearly filed this as
+geometry until the control: uniform random splits have it 80.5% of the time, and random splits that
+*already satisfy the information bound on all three children* only 59.0%. So the cap does not imply
+it — solvability does. The mechanism is presumably that the mixed child spreads its mass over up to
+twice as many parts and so is the easiest of the three at equal mass, which pushes solvable splits
+to load it; the per-part identity `x^2 - 4sc = [a(m-b) - (n-a)b]^2 >= 0` points the same way but
+does not sum to the global claim. If it survives testing at other k it is a zero-cost necessary
+condition that discards ~41% of cap-feasible candidates. **It is a conjecture measured on maximal
+endpoints at residual k=5 and k=6 only.**
+
+**The levels do not connect, and the reason is shape.** This was the question I most expected to
+pay off: a k=8 endpoint sits at k=6, so its children sit at k=5, exactly where the k=7 census's
+endpoints live. Of the 1,413 children of the 471 forced four-part k=8 cuts, **one** is a k=7
+endpoint — the same answer under dominance as under identity. It is not a size artifact; 942 of the
+1,413 pass both necessary conditions (mass <= 221, parts <= 4). The two populations are simply
+different regions of the k=5 space: k=7 endpoints are thin (aspect median 3.20) and 87% four-part,
+while the k=5 states arising inside forced k=6 solutions are squat (2.29) and mostly three-part, so
+containment fails on the short side. The k=7 census's endpoint family is not an upper set for k=5
+solvable states — it enumerates what is maximal in *k=7 root lineages*. Corroborating that, k=8
+children reach mass 242 where no k=7 endpoint exceeds 221. The exception is instructive: for the
+degenerate endpoints the picture inverts completely, 48.5% of 2-part and 34.4% of 3-part k=8
+children *are* k=7 endpoints. Thin lineages meet; four-part ones do not.
+
+**Where the levels do agree is in aggregate geometry.** Scaled by `sqrt(cap)`, the two corpora have
+the same normalized shape distribution: part size `n*m/cap` median 0.211 at k=8 against 0.206 at k=7,
+quartiles 0.173/0.257 against 0.165/0.267. Each part takes about a fifth of the information budget
+at both levels and four of them fill 85-88% of it. That is a real self-similarity under the sqrt(3)
+length scaling, and it coexists with the state-level disjointness above.
+
+**Negative results, which is most of it.** Nothing scalar separates forced from unforced endpoints:
+occupancy 0.867 vs 0.866, child spread identical, diagonality identical. Diagonal cuts turn out to be
+rare rather than canonical — only 6.4% of forced k=8 part-cuts are exactly proportional. I also
+checked the obvious deflationary explanation, that single-class states are just automorphism-rich
+states whose cuts collapse, and it is refuted in the right direction: k=8 four-part endpoints with a
+repeated component are single-class in 8.0% of cases against 26.4% for asymmetric ones. The only
+enrichment that survives a control is sliver cuts — parts feeding just two of the three outcomes —
+at 33.4% vs 27.9%, z=+5.3 at k=8; but the same comparison at k=7 gives z=+1.1, so one level is not a
+replication and it stays a lead. Popular cuts exist but shape does not force them: of 236 distinct
+k=8 part shapes, 3 have a single forced cut, and the most concentrated (15:8 -> 14:8, 68% of 28
+sightings) are near-whole-part slivers.
+
+A methodological note worth keeping: the first version of the sliver comparison took one
+representative class per multi-solution endpoint, which is an arbitrary choice that biased the
+control; over all 23,410 multi classes the numbers moved. When the treatment group is defined by
+having exactly one of something, the control has to use all of them.
+
+Process inventory: no AWS compute remains — both radio-tagged hosts are terminated and their volumes
+deleted. Nothing running locally.

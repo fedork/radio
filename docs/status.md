@@ -302,9 +302,10 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   certificates are independently checked by `tools/atom_profile_regression.sh`, and the depth-four
   cover logs by `tools/check_atom_profile_cover_log.py`; see
   [the atom-lineage note](theorems/atom-lineage.md).  No Pareto datum changes.
-- **Split choice is recursive, not geometric (measured 2026-08-18).** The k=7 choice census has
-  **183 of 610** endpoints with a single winning automorphism class (30.0%; 153 of them four-part),
-  the partial k=8 census **262 of 1,092** (24.0%, all four-part), plus 198 unique k=7 second-cut
+- **Split choice is recursive, not geometric (measured 2026-08-18; k=8 finalised 2026-08-20).** The
+  k=7 choice census has **183 of 610** endpoints with a single winning automorphism class (30.0%;
+  153 of them four-part) and the **completed** k=8 census **505 of 1,893** (26.7%; 3 two-part, 31
+  three-part, 471 four-part), plus 198 unique k=7 second-cut
   states. On that corpus no scalar geometric feature locates the winner — see the trap above. What
   does work is stacking cheap *sound necessary* conditions, whose selectivity multiplies
   super-multiplicatively. On the first 25 four-part single-class k=7 endpoints, against 2,089,596
@@ -384,6 +385,35 @@ landing 5.8% below the central estimate. Derivation, band tables and the outcome
 [../evidence/pareto_census_k8_eta_2026-08-19.txt](../evidence/pareto_census_k8_eta_2026-08-19.txt).
 The general trap: **a mean rate over a window whose item mix differs from the remaining work is not a
 forecast**, and the cheap test is to sample the progress counter and see whether it moves at all.
+
+**The forced-cut analysis of the completed corpus (2026-08-20).** Full numbers, method and
+controls in [../evidence/single_solution_cuts_2026-08-20.txt](../evidence/single_solution_cuts_2026-08-20.txt);
+reproduce in ~4 s with `tools/analyze_single_solution_cuts.py`. The findings:
+
+- **The mixed child is always strictly the largest** — 26,876 of 26,876 winning classes across both
+  censuses, margin at least 18 (k=8) and 3 (k=7). Controls: 80.5%/77.0% for uniform random splits
+  and only 59.0%/57.1% for random splits that already satisfy the information bound. So it is a
+  property of solvability rather than of geometry or the cap, and is the one candidate here for a
+  free necessary condition. **Conjecture, not theorem**, and measured only on maximal endpoints at
+  residual k=5 and k=6.
+- **Levels do not connect state-to-state.** A k=8 endpoint sits at k=6, so its children sit at k=5
+  where the k=7 census's endpoints live — but of the 1,413 children of the 471 forced four-part
+  k=8 cuts, exactly **1** is a k=7 endpoint (under dominance as well as identity). It is not a size
+  artifact: 942 of the 1,413 pass both necessary conditions. The cause is shape — k=7 endpoints are
+  thin (aspect median 3.20) and mostly four-part, the k=5 states inside forced k=6 solutions are
+  squat (2.29) and mostly three-part. The k=7 endpoint family is not an upper set for k=5 solvable
+  states. For the degenerate endpoints the picture inverts: 48.5% of 2-part and 34.4% of 3-part
+  k=8 children *are* k=7 endpoints.
+- **The populations are self-similar in aggregate.** Scaled by `sqrt(cap)`, part size `n*m/cap` has
+  median 0.211 at k=8 against 0.206 at k=7 (p25 0.173/0.165, p75 0.257/0.267): each part takes about
+  a fifth of the information budget at both levels and four of them fill 85-88%.
+- **Nothing scalar separates forced from unforced.** Occupancy (0.867 vs 0.866), child spread and
+  diagonality are flat. Symmetry is refuted as an explanation: k=8 four-part endpoints with a
+  repeated component are single-class in 2 of 25 cases (8.0%) against 442 of 1,674 (26.4%) for the
+  asymmetric ones. The only real enrichment is sliver cuts — parts feeding just two of the three
+  outcomes — at 33.4% vs 27.9% (z=+5.3) at k=8, but only z=+1.1 at k=7, so treat it as a lead.
+- **Diagonal cuts are rare and carry no signal**: 6.4% of forced k=8 part-cuts are exactly
+  proportional, 10.9% at k=7, with single and multi indistinguishable.
 
 The mass-descending independent audit is no longer active. Run `20260818T062429Z` reached
 251,131/2,576,885 k=7 claims (73,045 four-part), with zero gaps, after 2,160 seconds and
@@ -1059,13 +1089,13 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Analyse the finished k=8 choice corpus.** The census is complete, archived as
-   `pareto-census-k8-2026-08-19` and its host is terminated, so this is now a data question, not a
-   scheduling one: 1,893 endpoints, 50,494 raw winners and 24,330 automorphism classes are waiting
-   to be read against the k=7 result. One radio-tagged instance remains — stopped
-   `i-04126f6d3016378a9`, whose own work is archived and which needs only a disk check before
-   termination. Do not restart either retired independent-checker coloring pipeline or the
-   superseded independent ordinary audit.
+0. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
+   acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
+   strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
+   residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
+   loop. Test it on another corpus before using it. No AWS compute remains: both radio-tagged hosts
+   are terminated and their volumes deleted. Do not restart either retired independent-checker
+   coloring pipeline or the superseded independent ordinary audit.
 
 1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
