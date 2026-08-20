@@ -2,15 +2,16 @@
 #
 # Build and start the warm-cache oracle.
 #
-#   ./run_radio_oracle.sh [--max-k K] [--max-n N] [--no-prime] [-- <extra cache files>]
+#   ./run_radio_oracle.sh [--max-k K] [--max-n N] [--no-prime] [--journal FILE] [-- <cache files>]
 #
 # Sizing is a decision you make once, because the process is meant to stay up:
 #
-#   MAX_N must be at least the largest side-sum you will ever ask about, AND at least the largest
-#   side-sum present in any cache you prime with -- replaying a fact wider than the tables is not
-#   checked. The archived census caches reach 258, and Sa(193) states reach 193, so 300 is the
-#   default: it covers both with headroom. Measured cost at MAX_K=9: MAX_N=300 is 37 s to init and
-#   0.64 GB resident. Cost climbs steeply above that, so do not pad it "just in case".
+#   MAX_N must be at least the largest side-sum you will ever ask about. It no longer has to cover
+#   the caches: the loader SKIPS facts it cannot represent and reports how many, so a narrow build
+#   stays usable with a wide cache. 300 covers the archived caches (widest fact 258) and Sa(193)
+#   states (193). Measured at MAX_K=9: MAX_N=300 inits in 37 s at 0.64 GB, MAX_N=485 in 146 s.
+#   Init cost is not a clean function of MAX_N, so measure a candidate rather than reasoning about
+#   it -- and query cost varies enormously with what refutation work a state actually needs.
 #
 #   MAX_K bounds the questions you can ask, not the memory much. 9 covers everything up to the
 #   k=9 frontier.
@@ -22,6 +23,10 @@
 #
 # The oracle grows its result cache forever by design. For an unattended session wrap it:
 #   tools/capped_run.sh --seconds 86400 --rss-gb 32 --label oracle -- ./run_radio_oracle.sh
+#
+# --journal FILE appends every verdict the oracle computes, in the same format the loader reads, so
+# a session's work primes the next one. That is usually a better primer than the archived caches:
+# it is exactly the states you ask about, and it is small.
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -29,12 +34,14 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 MAX_K=9
 MAX_N=300
 PRIME=1
+JOURNAL=""
 EXTRA=()
 while (($#)); do
     case "$1" in
         --max-k) MAX_K="$2"; shift 2 ;;
         --max-n) MAX_N="$2"; shift 2 ;;
         --no-prime) PRIME=0; shift ;;
+        --journal) JOURNAL="$2"; shift 2 ;;
         --) shift; EXTRA=("$@"); break ;;
         *) echo "unknown argument: $1" >&2; exit 64 ;;
     esac
@@ -61,4 +68,6 @@ if ((PRIME)); then
     fi
 fi
 
-exec "$BIN" "${CACHES[@]}" "${EXTRA[@]}"
+ARGS=()
+[[ -n "$JOURNAL" ]] && ARGS+=("--journal=$JOURNAL")
+exec "$BIN" "${ARGS[@]}" "${CACHES[@]}" "${EXTRA[@]}"

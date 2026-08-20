@@ -8375,3 +8375,47 @@ still passes `check_provenance.py` while every later print goes to stderr. Any f
 driver needs the same treatment.
 
 Process inventory: no AWS compute; oracle and build processes all stopped; nothing running locally.
+
+## 2026-08-20 (late) — oracle hardening: skip-don't-fail, journalling, and where the replay time goes
+
+Four follow-ups on the warm oracle, all measured.
+
+**The loader now skips what it cannot represent.** `parse_file` neither bounds-checks fact width nor
+tolerates a malformed line, so a cache wider than `MAX_N` would corrupt the tables silently and a
+stray line kills the process. The oracle parses its own input instead: facts above `MAX_K` or wider
+than `MAX_N` are counted and dropped, and the counts come back in the load reply and in `stats`.
+`MAX_N` is now chosen for the queries alone, not for the widest fact in any cache you might prime
+with.
+
+**A correction on cost.** I had written that init cost "climbs steeply" with `MAX_N` and framed it as
+a scaling law. It is not one: `MAX_N=400/MAX_K=6` inits in 205 s while the *larger*
+`MAX_N=485/MAX_K=9` inits in 146 s. Init and query cost track the work actually required — which
+cache is loaded, how much refutation a state needs — far more than the table dimensions. Two points
+do not make a curve. The trap in [status.md](status.md) now says measure the configuration rather
+than extrapolate.
+
+**Where the replay time actually goes.** Neither cache insert is a plain trie write. `cacheCanSolve`
+propagates a positive fact down to every state it dominates; `cacheCantSolve` propagates a negative
+fact up to every state that dominates it, for every permutation of the parts. Replay redoes the
+closure work the original run already did. Two candidate explanations, one killed and one confirmed:
+
+* *duplicate facts* — **wrong**. Of 99,672 inserts only 1,186 were redundant, 1.4%. Offline pruning
+  of subsumed facts would buy nothing.
+* *insertion order* — **right, partly**. Sorting so each fact subsumes as much as possible before
+  the rest arrive — largest solvable first, smallest unsolvable first — took the same 99,672 facts
+  from **304 to 685 facts/s, 2.25x**, for a pure reordering. That is `tools/sort_cache.py`.
+
+2.25x is free and still leaves ~8.9 hours for the full 21.9M. The actual fix is a **structural
+snapshot**: serialize the trie — roots, the branch arrays behind `branch_handles`, the front arena —
+and reload it linearly, O(structure) rather than O(facts x closure), which should be seconds. I have
+scoped it and deliberately not built it in the same pass as everything else: it touches the
+allocator, and a silently corrupted cache means false verdicts, which is precisely how the 2023
+corpus acquired 37 false negatives. It deserves its own change and its own regression test.
+
+**Journalling replaces priming for most purposes.** `--journal FILE` appends every computed verdict
+in the format the loader reads, so a session's work primes the next one — exactly the states you ask
+about, and small. A MAYBE is never journalled, because it is not a fact. Smoke-tested end to end: a
+deliberately over-wide fact was skipped rather than fatal, and both verdicts round-tripped into the
+journal in loadable form.
+
+Process inventory: no AWS compute; all oracle and build processes stopped; nothing running locally.

@@ -40,12 +40,92 @@
 #include "radiobase.c"
 
 static FILE *resp;
+static FILE *journal;
 static uint64_t query_budget_seconds = 60;
 static long n_query, n_true, n_false, n_maybe;
 static double total_ms;
+static long long n_loaded, n_skipped_wide, n_skipped_k, n_malformed;
+
+static void respond(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 static double now_ms(void) {
     return (double)clock() * 1000.0 / CLOCKS_PER_SEC;
+}
+
+/* Replay a cache file, SKIPPING facts this build cannot represent instead of dying on them.
+   parse_file() exits on a malformed line and does not bounds-check width at all, so a cache wider
+   than MAX_N would corrupt the tables silently.  Skipping keeps a narrow build usable with a wide
+   cache, which is the common case: most facts are small. */
+static void load_cache(const char *path) {
+    FILE *fp = fopen(path, "r");
+    if (!fp) { respond("ERR cannot open %s", path); return; }
+    long long loaded = 0, wide = 0, badk = 0, bad = 0;
+    double t0 = now_ms();
+    char buf[1 << 16];
+    int continuation = 0;
+    cache_replay_depth++;
+    while (fgets(buf, sizeof buf, fp)) {
+        if (continuation || buf[0] == '#') {
+            continuation = strchr(buf, '\n') == NULL;
+            continue;
+        }
+        if (buf[0] != '+' && buf[0] != '-') { if (buf[0] != '\n') bad++; continue; }
+        int can = buf[0] == '+';
+        char *tok = strtok(buf, " \t\n");
+        tok = strtok(NULL, " \t\n");
+        if (!tok) { bad++; continue; }
+        if (*tok == 'a') {
+            char *sn = strtok(NULL, " \t\n"), *sk = strtok(NULL, " \t\n");
+            if (!sn || !sk) { bad++; continue; }
+            int n = atoi(sn), k = atoi(sk);
+            if (k > MAX_K) { badk++; continue; }
+            if (n > MAX_N) { wide++; continue; }
+            cache_a(can, n, k);
+            loaded++;
+            continue;
+        }
+        int sb[64], size = 0; long sides = 0; int ok = 1;
+        while (1) {
+            char *a = strtok(NULL, " \t\n");
+            if (!a) { ok = 0; break; }
+            if (*a == 't') break;
+            char *b = strtok(NULL, " \t\n");
+            if (!b || size >= 64) { ok = 0; break; }
+            int n1 = atoi(a), n2 = atoi(b);
+            sides += n1 + n2;
+            if (sides <= MAX_N) sb[size] = getSbb(n1, n2);
+            size++;
+        }
+        char *sp = ok ? strtok(NULL, " \t\n") : NULL;
+        char *sn = sp ? strtok(NULL, " \t\n") : NULL;
+        char *sk = sn ? strtok(NULL, " \t\n") : NULL;
+        if (!sk || !size) { bad++; continue; }
+        if (atoi(sk) > MAX_K) { badk++; continue; }
+        if (sides > MAX_N) { wide++; continue; }
+        cache(sb, size, can, atoi(sk), atoi(sp));
+        loaded++;
+    }
+    cache_replay_depth--;
+    fclose(fp);
+    n_loaded += loaded; n_skipped_wide += wide; n_skipped_k += badk; n_malformed += bad;
+    double ms = now_ms() - t0;
+    respond("OK loaded %s facts=%lld skipped_wide=%lld skipped_k=%lld malformed=%lld ms=%.0f rate=%.0f/s",
+            path, loaded, wide, badk, bad, ms, ms > 0 ? loaded * 1000.0 / ms : 0.0);
+}
+
+/* Append a computed verdict in the same format load_cache reads, so a session's work becomes the
+   next session's primer.  Only real verdicts are journalled; a MAYBE is not a fact. */
+static void journal_fact(int r, int k, int *sb, int size) {
+    if (!journal || (r != TRUE && r != FALSE)) return;
+    int pairs = 0, n = 0;
+    fprintf(journal, "%c b", r == TRUE ? '+' : '-');
+    for (int i = 0; i < size; i++) {
+        int a = sbb_to_n1[sb[i]], b = sbb_to_n2[sb[i]];
+        fprintf(journal, " %d %d", a, b);
+        pairs += a * b; n += a + b;
+    }
+    fprintf(journal, " t %d %d %d\n", pairs, n, k);
+    fflush(journal);
 }
 
 static void respond(const char *fmt, ...) {
@@ -79,8 +159,13 @@ int main(int argc, char **argv) {
     if (dup2(2, 1) < 0) { perror("dup2"); return 20; }
 
     for (int i = 1; i < argc; i++) {
-        parse_file(argv[i]);
-        respond("OK loaded %s", argv[i]);
+        if (!strncmp(argv[i], "--journal=", 10)) {
+            journal = fopen(argv[i] + 10, "a");
+            if (!journal) { respond("ERR cannot open journal %s", argv[i] + 10); return 21; }
+            respond("OK journal %s", argv[i] + 10);
+            continue;
+        }
+        load_cache(argv[i]);
     }
     respond("ORACLE READY max_k=%d max_n=%d budget=%llu",
             MAX_K, MAX_N, (unsigned long long)query_budget_seconds);
@@ -94,8 +179,11 @@ int main(int argc, char **argv) {
         if (!strncmp(line, "quit", 4)) { respond("OK bye"); break; }
 
         if (!strncmp(line, "stats", 5)) {
-            respond("OK queries=%ld solvable=%ld unsolvable=%ld maybe=%ld total_ms=%.0f",
-                    n_query, n_true, n_false, n_maybe, total_ms);
+            respond("OK queries=%ld solvable=%ld unsolvable=%ld maybe=%ld total_ms=%.0f "
+                    "loaded=%lld skipped_wide=%lld skipped_k=%lld malformed=%lld redundant=%lld",
+                    n_query, n_true, n_false, n_maybe, total_ms,
+                    n_loaded, n_skipped_wide, n_skipped_k, n_malformed,
+                    redundant_cache_replays);
             continue;
         }
         if (!strncmp(line, "budget ", 7)) {
@@ -103,9 +191,11 @@ int main(int argc, char **argv) {
             respond("OK budget=%llu", (unsigned long long)query_budget_seconds);
             continue;
         }
-        if (!strncmp(line, "load ", 5)) {
-            parse_file(line + 5);
-            respond("OK loaded %s", line + 5);
+        if (!strncmp(line, "load ", 5)) { load_cache(line + 5); continue; }
+        if (!strncmp(line, "journal ", 8)) {
+            if (journal) fclose(journal);
+            journal = fopen(line + 8, "a");
+            respond(journal ? "OK journal %s" : "ERR cannot open journal %s", line + 8);
             continue;
         }
 
@@ -142,6 +232,7 @@ int main(int argc, char **argv) {
         n_query++;
         total_ms += ms;
         if (r == TRUE) n_true++; else if (r == FALSE) n_false++; else n_maybe++;
+        journal_fact(r, k, sb, size);
         respond_verdict(r, k, ms, sb, size);
     }
     return 0;

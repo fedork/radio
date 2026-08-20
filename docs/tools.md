@@ -541,11 +541,20 @@ frontier — has to amortise that, which is what `radio_oracle.c` is for.
 python3 tools/oracle_client.py ./radio_oracle_k9_n300 .artifacts/oracle-cache/*.cache   # smoke test
 ```
 
-**Sizing is a one-time decision.** `MAX_N` must cover the largest side-sum you will ask about *and*
-the largest present in any cache you prime with — replaying a wider fact is not checked. The
-archived census caches reach **258** and Sa(193) states reach 193, so the default is `MAX_N=300`,
-`MAX_K=9`. Measured on an M-series Mac: init 37 s, 0.64 GB resident. Cost climbs steeply above
-that, so do not pad it.
+**Sizing is a one-time decision.** `MAX_N` need only cover the largest side-sum you will *ask*
+about: the loader skips facts too wide for the build and reports the count, so a narrow build stays
+usable against a wide cache. Default `MAX_K=9, MAX_N=300` covers the archived caches (widest fact
+258) and Sa(193) states (193), and inits in 37 s at 0.64 GB. **Do not infer a scaling law** —
+`MAX_N=400/MAX_K=6` inits in 205 s while the larger `MAX_N=485/MAX_K=9` inits in 146 s. Cost tracks
+the work actually required, not the table dimensions, so measure the configuration you intend to use.
+
+**Priming, and why you usually should not.** The archived caches replay at 304 facts/s, or 685 after
+`tools/sort_cache.py` reorders them (largest solvable first, smallest unsolvable first — a free
+2.25x). Even sorted, all 21.9M facts is about 8.9 hours. Only 1.4% of inserts are redundant, so this
+is genuine dominance-closure work rather than duplicate facts, and pre-pruning would not help. The
+real fix is a structural snapshot of the trie, which is scoped in the evidence note but not built.
+Meanwhile: start cold, and pass `--journal FILE` so every verdict the session computes is appended
+in loader format and primes the next one.
 
 **Stream separation.** `radiobase.c` and `canSolveB` print progress to stdout, which would corrupt a
 line protocol. The oracle keeps a duplicate of the original stdout for responses and points the C

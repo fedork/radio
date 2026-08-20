@@ -15,14 +15,16 @@ serves queries from stdin, keeping every fact it learns.
   MAX_N=400, MAX_K=6       205 s        (earlier measurement, radio_one)
   MAX_N=120, MAX_K=5       0.2 s        (earlier measurement, radio_one)
 
-**MAX_N must cover the caches, not just the queries.**  Replaying a fact wider than the tables is
-not bounds-checked.  The archived census caches reach a side-sum of **258** and Sa(193) states reach
-193, so MAX_N=300 is the smallest safe default that can also be primed.  MAX_K=9 covers everything
-to the frontier and costs little.  **Chosen default: MAX_K=9, MAX_N=300.**
+MAX_N only has to cover the *queries*.  The loader now skips facts it cannot represent and reports
+the count, so a narrow build stays usable against a wide cache -- `parse_file` neither bounds-checks
+width nor tolerates a malformed line, which is why the oracle parses its own input.  The archived
+census caches reach a side-sum of 258 and Sa(193) states reach 193, so **MAX_K=9, MAX_N=300** is the
+default: it covers both and inits in 37 s.
 
-Cost is not monotone-cheap in MAX_N, so do not pad it.  Note the MAX_N=400/MAX_K=6 point at 205 s
-sits above the MAX_N=485/MAX_K=9 point at 146 s -- the scaling is not a simple function of MAX_N
-alone, which is a reason to measure a candidate sizing rather than reason about it.
+**Do not read these as a scaling law.**  The MAX_N=400/MAX_K=6 point at 205 s sits *above* the
+MAX_N=485/MAX_K=9 point at 146 s.  Init and query cost both depend on the work actually required --
+which states, which cache, how much refutation -- far more than on the table dimensions.  Measure a
+candidate sizing; do not extrapolate one.
 
 =====================================================================================
 2. THROUGHPUT — the point of the exercise
@@ -53,17 +55,42 @@ The archived caches are text logs replayed through `parse_file`:
   exact.cache       515,080,944 bytes   11,661,763 facts
   dominance.cache   419,264,669 bytes   10,204,438 facts
 
-Measured replay rate: **about 700 facts/s**, so the full 21.9M facts is roughly **8.7 hours**.  That
-is the replay path, not init -- 400,000 lines alone took over nine minutes.
+Measured replay rate: **304 facts/s** in the file's own order, so the full 21.9M facts is roughly
+**20 hours**.  That is the replay path, not init.
+
+WHERE THE TIME GOES, measured rather than guessed.  Neither insert is a plain trie write: a positive
+fact is propagated down to every state it dominates (`cacheCanSolve` recurses over all lesser parts)
+and a negative fact up to every state that dominates it (`cacheCantSolve` recurses over all greater
+parts, for every permutation of the parts).  Replay therefore redoes the closure work the original
+run already did.
+
+Two candidate explanations, one right and one wrong:
+
+* *Duplicate facts* -- WRONG.  Of 99,672 inserts only **1,186 were redundant**, 1.4%.  Pre-pruning
+  subsumed facts offline would buy essentially nothing.
+* *Insertion order* -- RIGHT, partly.  Sorting so that each fact subsumes as much as possible before
+  the rest arrive (largest solvable first, smallest unsolvable first) took the same 99,672 facts
+  from **304 facts/s to 685 facts/s, a 2.25x speedup** for a pure reordering.  `tools/sort_cache.py`
+  does it.
+
+2.25x is real and free, and it still leaves ~8.9 hours for the full corpus.  **The actual fix is a
+structural snapshot**: serialize the trie itself -- the roots, the branch arrays behind
+`branch_handles`, and the front arena -- and reload it linearly, which is O(structure) instead of
+O(facts x closure) and should be seconds.  Not implemented here: it touches the allocator, and a
+silently corrupted cache means false verdicts, which is the failure mode that put 37 false negatives
+in the 2023 corpus.  It wants its own change with its own regression test, not a footnote to this one.
 
 By level, the exact cache is almost entirely k=4..6:
 
   k=1 2 | k=2 22 | k=3 1,826 | k=4 891,219 | k=5 8,152,992 | k=6 2,607,761 | k=7 7,686 | k=8 255
 
 RECOMMENDATION.  Start cold and let the oracle warm itself: the in-process cache accumulates across
-queries, which is where the real benefit came from above -- 2,200 queries in 243 ms with no primer
-at all.  Prime only for a long-lived session that will outlive the 8.7 hours, and prefer a filtered
-subset (the k band you actually need) over the whole file.
+queries, which is where the benefit above came from -- 2,200 queries in 243 ms with no primer at all.
+
+Better than priming from the archive: **journal what you compute**.  `--journal FILE` appends every
+verdict in the same format the loader reads, so a session's work primes the next one. It is exactly
+the states you actually ask about, and it is small.  A MAYBE is never journalled, because it is not
+a fact.
 
 =====================================================================================
 4. PROTOCOL NOTES THAT MATTER
