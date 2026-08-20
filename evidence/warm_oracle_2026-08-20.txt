@@ -55,42 +55,53 @@ The archived caches are text logs replayed through `parse_file`:
   exact.cache       515,080,944 bytes   11,661,763 facts
   dominance.cache   419,264,669 bytes   10,204,438 facts
 
-PRIMING DOES NOT SCALE, AND THE FULL CORPUS SHOULD NOT BE LOADED AT ALL.  Loading sequential
-prefixes of exact.cache, MAX_K=9 MAX_N=300, each run dumping a snapshot afterwards:
+PRIMING THE FULL CORPUS: MEASURED ON EC2, AND IT IS FINE.  Everything I previously wrote in this
+section extrapolated from local prefixes and was wrong.  Run `oracle-prime/20260820T165448Z`,
+on-demand r7iz.xlarge (4 vCPU, 32 GiB), commit cdffe46, loaded the whole corpus:
 
-  facts      load time     rate        peak RSS   structure (branches/records/vectors)   snapshot
-   50,000        0.6 s   78,752/s       0.59 GB      124,627 /    562,993 /   263,709    17.2 MB
-  200,000        3.2 s   61,689/s       0.65 GB      356,213 /  1,557,051 /   695,444    54.9 MB
-  800,000    1,164.8 s      687/s       2.75 GB   12,752,501 / 42,025,603 / 7,233,342     2.88 GB
+  facts                 21,866,180   (both caches, sorted, in 88 chunks of 250k)
+  setup                        110 s  (fetch + build + sort + chunk)
+  load                       5,684 s  = 1.58 h,  3,847 facts/s overall
+  redundant inserts     14,084,167   (64.4%)
+  exit status                    0
+  peak host use          ~2 GiB of 32 -- memory was never close to a constraint
 
-Both axes are violently superlinear.  4x the facts from 200k to 800k costs **360x the time** and
-**52x the structure**.  A separate contiguous 800k block taken from the negative-heavy middle of the
-file was killed after exceeding the head-of-file time without finishing, so this table is if
-anything the optimistic case.
+The rate curve is a HUMP, not a slide, which is why every extrapolation failed:
 
-Extrapolating is pointless except to rule the thing out: 21.9M facts is 27x the 800k row on a curve
-that is getting worse, in both hours and bytes.  **Do not try to prime the full corpus.**  Earlier
-notes in this file estimated 8.7 hours from a stratified sample and were wrong in both directions --
-the sample understated the rate on cheap positives (the file's head loads at 60-79k facts/s) and
-badly understated how fast cost explodes once the structure is large.  Two points never described
-this curve; three barely do.
+  c0000    44,484/s        cheap positives, sorted first
+  c0004..9   431-779/s     the expensive band: 36% of total time in five chunks
+  c0032    70,134/s
+  c0072   198,604/s        almost everything now subsumed
+  c0087 1,067,487/s
 
-WHAT TO DO INSTEAD.  Prime from a bounded, targeted subset -- the k band and mass range a given job
-actually queries -- snapshot it once, and reuse the snapshot.  The corpus is 98.4% negative
-(exact.cache 185,540 positive / 11,476,223 negative; dominance.cache 218,350 / 9,986,088) and by
-level almost all k=4..6, so a filter is easy and cuts most of it.  `tools/sort_cache.py` reorders
-whatever subset is chosen for a further 2.25x.
+My local prefix measurements (78,752/s at 50k, 61,689/s at 200k, 687/s at 800k) sampled the rise and
+the collapse and missed the recovery entirely, so a "27x further along a worsening curve" reading
+gave 13-plus hours against an actual 1.58.  Three points fitted to the wrong side of a hump.
 
-Better still for most work: start cold and journal.  A cold oracle answered 2,200 k=5 queries in
-243 ms with no primer at all, and `--journal FILE` makes each session prime the next with exactly
-the states that were actually asked about.
+SNAPSHOT, AND WHY IT IS THE POINT.  The same run dumped a snapshot at the end:
+
+  structure     34,600,337 branches / 120,043,426 records / 26,353,897 vectors
+  dump          6,672,100,991 bytes in 43 s;  667 MiB compressed
+  restore       32.8 s, 2.41 GB resident -- 173x faster than replaying the facts
+  correctness   2,200 independently pre-labelled k=5 states re-queried after restore returned
+                1,120 solvable / 1,080 unsolvable, matching exactly; then 0.10 ms per query
+
+Resident memory is far below the 6.67 GB file because branch slot arrays are sparse: `calloc` leaves
+untouched zero pages unmapped, so most of the file never becomes resident.
+
+COMPATIBILITY, a defect found by using the artifact.  The first version keyed a snapshot on the
+build id, which includes the compiler.  The Linux-built snapshot was therefore refused on this Mac
+for no semantic reason.  Compatibility is now keyed on what actually fixes the layout -- the source
+commit plus MAX_K, MAX_N, MAX_SBB and sizeof(front_point).  A geometry mismatch is refused outright;
+a foreign identity with matching geometry needs the explicit `restore-any` opt-in and warns.
 
 By level, the exact cache is almost entirely k=4..6:
 
   k=1 2 | k=2 22 | k=3 1,826 | k=4 891,219 | k=5 8,152,992 | k=6 2,607,761 | k=7 7,686 | k=8 255
 
-RECOMMENDATION.  Start cold and let the oracle warm itself: the in-process cache accumulates across
-queries, which is where the benefit above came from -- 2,200 queries in 243 ms with no primer at all.
+RECOMMENDATION.  Prime once on a cheap box, snapshot, and restore thereafter: 1.58 h paid once
+against 33 s per start.  Start cold only for throwaway work -- 2,200 queries took 243 ms with no
+primer at all, so a primer is not needed to be useful, just to be complete.
 
 Better than priming from the archive: **journal what you compute**.  `--journal FILE` appends every
 verdict in the same format the loader reads, so a session's work primes the next one. It is exactly

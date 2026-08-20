@@ -548,13 +548,13 @@ usable against a wide cache. Default `MAX_K=9, MAX_N=300` covers the archived ca
 `MAX_N=400/MAX_K=6` inits in 205 s while the larger `MAX_N=485/MAX_K=9` inits in 146 s. Cost tracks
 the work actually required, not the table dimensions, so measure the configuration you intend to use.
 
-**Priming, and why you usually should not.** The archived caches replay at 304 facts/s, or 685 after
-`tools/sort_cache.py` reorders them (largest solvable first, smallest unsolvable first — a free
-2.25x). Even sorted, all 21.9M facts is about 8.9 hours. Only 1.4% of inserts are redundant, so this
-is genuine dominance-closure work rather than duplicate facts, and pre-pruning would not help. The
-real fix is a structural snapshot of the trie, which is scoped in the evidence note but not built.
-Meanwhile: start cold, and pass `--journal FILE` so every verdict the session computes is appended
-in loader format and primes the next one.
+**Priming.** The whole archived corpus — 21,866,180 facts — loads in **1.58 h** on a 32 GiB box
+(measured, run `oracle-prime/20260820T165448Z`). The rate is hump-shaped, from 44,484/s down to
+431/s through an expensive band and back to over a million/s once everything is subsumed, so do not
+try to predict it from a prefix. `tools/sort_cache.py` reorders a cache for a further 2.25x. Better
+than repeating that: restore the snapshot the run produced —
+`s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst`, 667 MiB — in **32.8 s
+at 2.41 GB resident**. Or skip priming and pass `--journal FILE` so each session primes the next.
 
 **Stream separation.** `radiobase.c` and `canSolveB` print progress to stdout, which would corrupt a
 line protocol. The oracle keeps a duplicate of the original stdout for responses and points the C
@@ -569,8 +569,11 @@ Never record a `MAYBE` as a negative — that is exactly how the 2023 corpus acq
 session in `tools/capped_run.sh`.
 
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
-reloads it linearly instead of re-deriving every dominance closure. A snapshot is refused unless the
-build id and `MAX_K`/`MAX_N`/`MAX_SBB` match exactly, because the sbb numbering depends on `MAX_N`.
+reloads it linearly instead of re-deriving every dominance closure. Compatibility is keyed on the source commit plus
+`MAX_K`/`MAX_N`/`MAX_SBB`/`sizeof(front_point)` — what actually fixes the layout. A geometry mismatch
+is refused outright; a foreign identity with matching geometry needs the explicit `restore-any`
+opt-in and warns. Keying on the *build id* was a bug: it made a Linux-built snapshot unusable on
+macOS for no semantic reason.
 Round-trip verified: 16,099 facts dumped in 247 ms and restored in 212 ms with identical verdicts on
 300 queries. Snapshot size at that scale is 2.7 KB per input fact, which is the number the first
 full-corpus run needs to check.

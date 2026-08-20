@@ -160,10 +160,14 @@ static void respond_verdict(int r, int k, double ms, int *sb, int size) {
    Handles are made canonical by discovery order: a fresh process allocates 1,2,3,... so writing the
    structures in visit order and remapping every descriptor reproduces identical handles on load.
 
-   A snapshot is only valid for the identical build -- the sbb numbering depends on MAX_N -- so the
-   header carries the build id and a mismatch is refused rather than loaded. */
+   Compatibility is keyed on what actually determines the layout: the source commit plus MAX_K,
+   MAX_N, MAX_SBB and sizeof(front_point).  The sbb numbering is a function of the source and MAX_N,
+   not of the compiler, so keying on the *build id* was wrong -- it made a snapshot unusable on any
+   host with a different compiler, which is exactly what happened to the first 6.67 GB artifact
+   (built by Linux clang, refused by Apple clang for no semantic reason).  A semantic mismatch is
+   still refused outright; an identity mismatch needs the explicit `restore-any` opt-in. */
 
-#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v1"
+#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v"
 
 static uint32_t *snap_bmap, *snap_rmap, *snap_vmap;
 static uint32_t *snap_blist, *snap_rlist, *snap_vlist;
@@ -230,7 +234,7 @@ static void snapshot_dump(const char *path) {
     snap_bn = snap_rn = snap_vn = 0;
     for (int k = 0; k <= MAX_K; k++) snap_visit_node(sb_cache_root[k]);
 
-    fprintf(f, "%s\n%s\n%d %d %d %zu\n", SNAP_MAGIC, RADIO_BUILD_ID,
+    fprintf(f, "%s2\n%s\n%d %d %d %zu\n", SNAP_MAGIC, RADIO_GIT_COMMIT,
             MAX_K, MAX_N, MAX_SBB, sizeof(front_point));
     snap_put(f, snap_bn); snap_put(f, snap_rn); snap_put(f, snap_vn);
     for (uint32_t i = 1; i <= snap_bn; i++) snap_put(f, branch_handles[snap_blist[i]]->width);
@@ -280,7 +284,7 @@ static uint32_t snap_alloc_vector(uint32_t cap) {
     return FRONT_VECTOR_TAG | handle;
 }
 
-static void snapshot_load(const char *path) {
+static void snapshot_load(const char *path, int allow_foreign) {
     if (branch_handles_len > 1 || front_records_len > 1 || front_handles_len > 1) {
         respond("ERR snapshot must be loaded into a fresh oracle, before any facts or queries");
         return;
@@ -298,12 +302,21 @@ static void snapshot_load(const char *path) {
     if (fscanf(f, "%d %d %d %zu\n", &mk, &mn, &ms_, &fp) != 4) {
         respond("ERR truncated snapshot header"); fclose(f); return;
     }
-    if (strcmp(build, RADIO_BUILD_ID) || mk != MAX_K || mn != MAX_N || ms_ != MAX_SBB ||
-        fp != sizeof(front_point)) {
-        respond("ERR snapshot is from a different build (%s k=%d n=%d sbb=%d); refusing",
-                build, mk, mn, ms_);
+    /* Semantics are non-negotiable: a mismatch here means a different sbb numbering. */
+    if (mk != MAX_K || mn != MAX_N || ms_ != MAX_SBB || fp != sizeof(front_point)) {
+        respond("ERR snapshot geometry k=%d n=%d sbb=%d front=%zu does not match this build "
+                "(k=%d n=%d sbb=%d front=%zu); refusing", mk, mn, ms_, fp,
+                MAX_K, MAX_N, MAX_SBB, sizeof(front_point));
         fclose(f); return;
     }
+    int same = !strcmp(build, RADIO_GIT_COMMIT) || !strcmp(build, RADIO_BUILD_ID);
+    if (!same && !allow_foreign) {
+        respond("ERR snapshot identity %s matches neither this commit (%s) nor this build id; "
+                "geometry does match, so use `restore-any` if you accept it", build,
+                RADIO_GIT_COMMIT);
+        fclose(f); return;
+    }
+    if (!same) respond("WARN restoring foreign snapshot identity %s with matching geometry", build);
     uint32_t bn = snap_get(f), rn = snap_get(f), vn = snap_get(f);
     uint32_t *widths = (uint32_t *)calloc(bn + 1, sizeof(uint32_t));
     uint32_t *vlens = (uint32_t *)calloc(vn + 1, sizeof(uint32_t));
@@ -350,7 +363,8 @@ int main(int argc, char **argv) {
     if (dup2(2, 1) < 0) { perror("dup2"); return 20; }
 
     for (int i = 1; i < argc; i++) {
-        if (!strncmp(argv[i], "--restore=", 10)) { snapshot_load(argv[i] + 10); continue; }
+        if (!strncmp(argv[i], "--restore=", 10)) { snapshot_load(argv[i] + 10, 0); continue; }
+        if (!strncmp(argv[i], "--restore-any=", 14)) { snapshot_load(argv[i] + 14, 1); continue; }
         if (!strncmp(argv[i], "--journal=", 10)) {
             journal = fopen(argv[i] + 10, "a");
             if (!journal) { respond("ERR cannot open journal %s", argv[i] + 10); return 21; }
@@ -385,7 +399,8 @@ int main(int argc, char **argv) {
         }
         if (!strncmp(line, "load ", 5)) { load_cache(line + 5); continue; }
         if (!strncmp(line, "snapshot ", 9)) { snapshot_dump(line + 9); continue; }
-        if (!strncmp(line, "restore ", 8)) { snapshot_load(line + 8); continue; }
+        if (!strncmp(line, "restore ", 8)) { snapshot_load(line + 8, 0); continue; }
+        if (!strncmp(line, "restore-any ", 12)) { snapshot_load(line + 12, 1); continue; }
         if (!strncmp(line, "journal ", 8)) {
             if (journal) fclose(journal);
             journal = fopen(line + 8, "a");

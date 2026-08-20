@@ -8519,3 +8519,52 @@ Launched as `i-0957cf6024c13a1e3`, run `20260820T165448Z`, commit `cdffe46`, art
 `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/`. Status is
 `tools/oracle_prime_status.sh 20260820T165448Z`, which reads the STATUS object the host writes every
 60 s; it costs nothing and does not touch the run. Deliberately not polled from here.
+
+## 2026-08-20 (done) — the full prime takes 1.58 h, and I was wrong three times getting there
+
+Run `oracle-prime/20260820T165448Z`, on-demand r7iz.xlarge (4 vCPU, 32 GiB), commit `cdffe46`,
+exit 0. **All 21,866,180 archived cache facts loaded in 5,684 s = 1.58 h**, 3,847 facts/s overall,
+with 110 s of setup (fetch, build, sort, chunk) and 14,084,167 redundant inserts (64.4%). Fedor said
+an hour or two and was right; I had argued the job should not be attempted.
+
+**The rate curve is a hump, which is why every extrapolation failed.**
+
+  c0000      44,484/s   cheap positives, sorted first
+  c0004..9  431-779/s   the expensive band -- 36% of total time in five of 88 chunks
+  c0032      70,134/s
+  c0072     198,604/s   almost everything now subsumed
+  c0087   1,067,487/s
+
+My local prefix measurements sampled the rise and the collapse and never saw the recovery. From
+50k/200k/800k I read "27x further along a worsening curve" and wrote that the full prime should not
+be attempted; the honest reading of three points on the wrong side of a hump was that I did not know.
+Three separate estimates — 8.7 h from a stratified sample, then 13 h, then infeasible — against
+1.58 h measured. The trap in [status.md](status.md) now says the curve is hump-shaped rather than
+merely that it should not be extrapolated from two points.
+
+**Memory was never the issue.** Peak host use stayed around 2 GiB of 32. Fedor's "not even sure we
+need 64 GB, probably fine with much less" was also right, and by a wide margin; 8 GiB would have
+done.
+
+**The snapshot works, which was the point.** 34,600,337 branches / 120,043,426 records /
+26,353,897 vectors, 6,672,100,991 bytes dumped in 43 s, 667 MiB compressed. Restored locally in
+**32.8 s at 2.41 GB resident** — 173x faster than replaying the facts. Resident is far below the file
+size because branch slot arrays are sparse and `calloc` leaves untouched zero pages unmapped.
+
+Correctness: after restore, the 2,200 k=5 states labelled independently days earlier re-queried to
+1,120 solvable / 1,080 unsolvable — exactly the known answer — at 0.10 ms per query. That end-to-end
+agreement is what makes the artifact usable rather than merely present.
+
+**A defect the artifact itself exposed.** I had keyed snapshot compatibility on the build id, which
+includes the compiler, so the Linux-built snapshot was refused on this Mac for no semantic reason —
+a 6.67 GB file usable only on the machine that made it. Compatibility is now keyed on what actually
+fixes the layout: source commit plus MAX_K, MAX_N, MAX_SBB, sizeof(front_point). Geometry mismatch is
+refused outright; a foreign identity with matching geometry needs the explicit `restore-any` opt-in
+and warns. This is the second time in two days that a guard I wrote for safety was wrong in its
+choice of key.
+
+The snapshot stays in S3 rather than the release store: it is derived, regenerable in 1.58 h from
+archived inputs, and specific to the `MAX_K=9 MAX_N=300` geometry. Recorded in [data.md](data.md).
+
+Instance terminated after all artifacts were in S3 and the snapshot verified locally. No AWS compute
+remains; nothing running locally.

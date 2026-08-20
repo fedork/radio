@@ -56,7 +56,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Exact cover now excludes rank 1180 through depth four; this is still bounded, so depth five and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one finite depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 | **The excess-`q` Pareto assembly is parked, not a pending global formula.** | Its corrected four-segment reduction and exact `m=5` calibration are durable, but the sufficiently-large-`q` postulate, completeness of the outer-family list, and stabilization of the synchronized D frontier are unproved. `m=5` already needs competing outer triples and a piecewise D solution; the height-6 rank-1180 question concerns only one restricted aligned slice. Do not restart finite normalization/rank searches unless a new theorem or construction addresses one of those global gaps. |
 | **Never train solvable-vs-unsolvable on two different corpora.** | Certificate negatives and census positives occupy *disjoint* mass bands at k=6 (positives 0.742-0.875 of cap, negatives 0.827-0.959; the central-90% overlap is empty), so any classifier scores AUC 0.946 by learning which corpus a state came from. A permuted-label control does **not** catch this — it destroys the source signal too and returns a reassuring 0.516. What caught it was a matched-pair probe: single-part states differing by one coin scored 47%, chance. Draw both classes from one sampler and label with `radio_one`. Measured 2026-08-20; see [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt). |
-| **Cache-load cost is violently superlinear; never extrapolate it from two points.** | Loading sequential prefixes of the archived cache: 50k facts at 78,752/s, 200k at 61,689/s, 800k at **687/s** — 4x the facts for 360x the time, and structure from 54.9 MB to 2.88 GB. I estimated 8.7 h for the full corpus from a stratified sample and was wrong in *both* directions. Prime from a bounded subset and snapshot it; do not load 21.9M facts. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
+| **Cache-load cost is hump-shaped; never extrapolate it.** | Loading the archived corpus, the rate goes 44,484/s at the start, down to 431/s through an expensive band, then up to 1,067,487/s once almost everything is subsumed. Local prefixes sampled the rise and the collapse and missed the recovery, so I predicted 13+ hours for a load that took **1.58 h** (21,866,180 facts, 3,847/s overall, 36% of the time in five of 88 chunks). Two points were wrong and three were wrong; only the run settled it. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Do not extrapolate solver cost from table dimensions.** | `MAX_N=400/MAX_K=6` inits in 205 s while the *larger* `MAX_N=485/MAX_K=9` inits in 146 s. Init and query cost track the work a state actually needs — which cache is loaded, how much refutation is required — not the table sizes. Measure the candidate configuration; a scaling law inferred from two points will be wrong. The oracle's loader skips facts too wide for the build instead of failing, so `MAX_N` is chosen for the queries alone. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Size `MAX_N` to the states you are asking about.** | `init()` runs before `radio_one`'s argument check and its static tables scale with `MAX_N`: the same query costs **205 s** built at `-DMAX_N=400` and **0.2 s** at `-DMAX_N=120`, where the solve itself is 0.0 s. A padded `MAX_N` buys nothing and can make a cheap oracle look unusable. Measured 2026-08-20. |
 | **Do not read the choice census's `complete=` as a structural candidate count.** | `enumerate_rec` prunes with `CACHE_ONLY` lookups against a warm dominance cache, so `complete` — and therefore `full_complete_candidates` — depends on cache history, not on the state. It reads as a median of 2 candidates at k=7 single-class endpoints; the cache-free count under sound filters (information cap plus the four-rectangle proven frontier) is a median of **13,276**. Quote `complete` as search effort, never as the size of the choice problem. Measured 2026-08-18; see [journal.md](journal.md). |
@@ -367,19 +367,13 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**One job: the oracle-prime full-corpus load.** On-demand `r7iz.xlarge` (4 vCPU, 32 GiB, high clock;
-the load is single-threaded) `i-0957cf6024c13a1e3`, run `20260820T165448Z`, commit `cdffe46`. It
-loads all 21.9M archived cache facts — sorted, in 250k-line chunks so progress is per chunk rather
-than an assumed rate — and dumps a binary snapshot. Check it with
-`tools/oracle_prime_status.sh 20260820T165448Z`; it reads a STATUS object the host writes every 60 s
-and does not touch the run. Artifacts land in
-`s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/`, the snapshot as `cache.snap.zst`.
-
-Guards: the run aborts at 28 GiB resident rather than swapping the host, and a 24 h systemd hard
-stop bounds it regardless. On-demand rather than Spot because the load has no intra-run checkpoint.
-**This run exists because three local extrapolations disagreed** — 78,752 facts/s at 50k, 61,689/s
-at 200k, 687/s at 800k — so the answer is measured rather than predicted. If it aborts on the memory
-cap that is itself the result.
+**Nothing is running.** The oracle-prime full-corpus load finished: run `20260820T165448Z` on
+`i-0957cf6024c13a1e3` loaded 21,866,180 facts in **1.58 h**, exit 0, and dumped a 6.67 GB snapshot
+(667 MiB compressed). Restore verified locally at **32.8 s / 2.41 GB resident**, with 2,200
+independently labelled states re-queried to exactly the expected verdicts. The snapshot is a derived
+artifact reproducible in 1.58 h from archived inputs, so it stays in S3 at
+`s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst` rather than the release
+store — see [data.md](data.md).
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
 reported UNSOLVABLE. **The k=8 Pareto-prefix census is finished, archived and its host is gone.** It
@@ -1144,10 +1138,8 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    `./run_radio_oracle.sh`, drive with `tools/oracle_client.py`, details in
    [tools.md](tools.md) and [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt).
    **Start it cold and journal what you compute**; `snapshot`/`restore` a bounded subset if you
-   need a primer. **Do not try to prime the full corpus** — measured on sequential prefixes, 50k
-   facts load at 78,752/s, 200k at 61,689/s and 800k at **687/s**, with the structure going from
-   54.9 MB to 2.88 GB over that last 4x. Both axes are violently superlinear and 21.9M is 27x
-   further along a worsening curve.
+   need a primer. **A fully primed snapshot now exists** — all 21,866,180 archived facts, loaded in
+   1.58 h, restoring in 32.8 s at 2.41 GB resident, 173x faster than replaying facts.
 
 1. **Take the value model to k=6 and then into the solver.** The level-transfer premise now has
    evidence: with matched oracle-labelled sampling, a scale-normalized value model trained on k=4
