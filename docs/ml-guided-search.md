@@ -1,14 +1,16 @@
 # A recursive learned predictor: design note
 
 Written 2026-08-20, after the flat-feature ranker topped out; revised the same day once the value
-model and the oracle were measured. Status: **the substrate is built and measured; the recursive
-predictor itself is not written.** Every number below has a source in `evidence/`; anything proposed
-rather than measured says so.
+model and the oracle were measured, and again the same day once the recursive predictor itself was
+built and measured. Status: **the substrate, the level-held-out value model, and the recursive
+cut-scorer are all built and measured; wiring a prototype into the solver's split loop is the
+remaining step.** Every number below has a source in `evidence/`; anything proposed rather than
+measured says so.
 
 ## Read this first if you are picking the thread up
 
 The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
-verdicts sooner. Four things are already in place, and one thing is not.
+verdicts sooner. Five things are already in place; wiring one of them into the solver is not.
 
 **Built and measured.**
 
@@ -17,12 +19,16 @@ verdicts sooner. Four things are already in place, and one thing is not.
 | warm oracle, stdin protocol | `radio_oracle.c`, `tools/oracle_client.py` | 0.11 ms/query; verdicts identical to `radio_one` on 2,200 states |
 | full-corpus snapshot | `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst` | 21.9M facts, restores in **32.8 s** at 2.41 GB |
 | learned cut ranker | `tools/ml/cut_ranker.py` | median rank **76 of 54,014** with `R_0`; 428x better than blind |
-| level-transfer value model | `tools/ml/value_level_transfer.py` | **AUC 0.9921** trained k=4, tested k=5 |
+| level-transfer value model | `tools/ml/value_level_transfer.py`, extended by `tools/ml/recursive_value.py` | **AUC 0.99+** transfers train-k<=6/test-k=7, not just the original k=4->k=5 pair |
+| recursive cut scorer | `tools/ml/recursive_value.py` | scoring a split by `min(V(child))`, with **zero split-label supervision**, reaches **120x** selectivity vs a directly-supervised flat ranker's 130.5x, on the identical 153 real forced k7 endpoints |
 | corpus analysis | `tools/analyze_single_solution_cuts.py` | the forced-cut structure of both censuses |
 
-**Not built: the recursive predictor.** Everything above predicts at one level from the parent's
-shape. The remaining work is the value/policy pair applied at every level, which is what the rest of
-this note designs.
+**Not done: wiring a prototype into the solver's split loop.** The recursive scorer above is
+measured offline (selectivity against the same sampled stage-2 candidates `cut_ranker.py` uses),
+not yet in front of `canSolveB`'s actual split loop, and only at children-at-k=6 (scoring real k7
+endpoint splits) — not yet children-at-k=7. Full results, including two traps that broke the data
+pipeline before either question could be answered, in
+[../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
 
 **Start the oracle before anything else.** It removes the reason the earlier experiments were
 awkward — labels used to cost 200 ms and a process each:
@@ -54,6 +60,13 @@ either way. Journal every session so the next one starts warmer.
 * **Most of the learned gain sits where the sound bounds already decide.** On the 1,751 of 2,200
   states they leave undecided, the value model is 0.9596 against 0.9372 for mass alone. Real, much
   smaller, and that is the honest number to carry forward.
+* **Recursion works, and standalone AUC does not predict which model survives it.** Scoring a split
+  by `min(V(child))` with a value model that never saw a single split label reaches 120x selectivity
+  against a flat ranker trained directly on winning splits (130.5x) — on the same real, held-out
+  census endpoints. But the *better*-AUC model (gradient boosting, 0.996 vs logistic's 0.986 at the
+  k=7 holdout) collapses to 2.3x once composed and shifted onto real data; only the end-to-end,
+  composed metric caught this. Measured 2026-08-20; see
+  [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
 
 ## Why the flat ranker stalled, and why recursion is the fix
 
@@ -151,19 +164,34 @@ One network pass per part, then a DP, gives the k best feasible splits with no e
 
 ## First experiment, and how it should be judged
 
-Smallest thing carrying real signal:
+Smallest thing carrying real signal — **done 2026-08-20**, full numbers and two data-pipeline traps
+in [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt):
 
-1. Train `V(S,k)` as a DeepSets over parts on the certificate chain plus census positives, with
-   `sqrt(3^k)` normalization.
-2. Hold out a **level**, not a random split: train on `k <= 6`, test on `k = 7`. Report separation
-   there. A permuted-label control is mandatory — it caught nothing last time but that is the point.
-3. Only if that separates: factor a policy, decode top-k with the DP, and put it in front of the
-   solver's split loop.
+1. ~~Train `V(S,k)` as a DeepSets over parts on the certificate chain plus census positives~~ — not
+   what was run. The certificate-chain-plus-census design was already refuted before this note was
+   written (disjoint mass bands, see the trap table); the pooled sum/mean/max/min/std/median
+   features already used by `value_level_transfer.py` are permutation- and part-count-invariant
+   without a DeepSets network, and no torch is installed in `.venv`. `tools/ml/recursive_value.py`
+   reuses that feature set.
+2. Hold out a **level**: train `k<=6`, test `k=7`, matched sampler, oracle-labelled, permuted
+   control. **Done — it separates.** AUC 0.986 (logistic) / 0.996 (boosted) vs a 0.482 permuted
+   control, though the sound per-part deficit alone is now at 0.996 too — the learned edge has
+   narrowed to the 131-of-273 states neither sound filter decides (boosted 0.971 vs mass 0.843
+   there).
+3. Since that separated: score a candidate split by `min(V(child))` one level down, on real forced
+   census endpoints. **Done.** Logistic V, with zero split-label supervision, reaches 120x
+   selectivity against a directly-supervised flat ranker's 130.5x on the identical population.
+   Gradient-boosted V — despite *higher* standalone AUC — collapses to 2.3x recursively; standalone
+   AUC did not predict this, only the composed metric did.
 
-**Judge it on end-to-end CPU seconds on a known-hard instance, not on AUC.** A predictor that is
-more accurate but costs more per node than the sound filters it displaces is a loss, and the sound
-filters are very cheap: the per-part Pareto bound is ~9-12x at full recall for a table lookup, `R_0`
-another 8x. Anything learned has to beat that on cost, not just on quality.
+**What's left of step 3**: the DP top-k decoder over the factored per-part policy, and actually
+putting either in front of `canSolveB`'s split loop — still not done, still gated on judging it by
+end-to-end CPU seconds on a known-hard instance, not on AUC or on the offline selectivity numbers
+above. The sound filters remain very cheap (per-part Pareto bound ~9-12x at full recall for a table
+lookup, `R_0` another 8x); a learned component in the actual loop still has to beat that on cost.
 
-Failure is a result here. If a level-held-out value model does not separate, that is worth as much as
-if it does, and belongs in [journal.md](journal.md) with its measured cost.
+Failure is a result here, and one showed up mid-experiment: the fixed [0.70,1.02]-of-cap mass band
+that worked at k=4/k=5 sampled **zero solvable states out of 300 at k=7** — it does not transfer,
+because the per-part solo Pareto maximum grows almost as fast as the cap does. The band must be
+bisected per level against the oracle before drawing a training sample; see the evidence file and
+the trap table.

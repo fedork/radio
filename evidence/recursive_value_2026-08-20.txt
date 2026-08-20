@@ -1,0 +1,169 @@
+The recursive value/policy predictor: first build and measurement, 2026-08-20
+Status: measured. Scripts: tools/ml/recursive_value.py, tools/ml/value_gen_states.py (extended).
+Continues evidence/value_level_transfer_2026-08-20.txt and docs/ml-guided-search.md's "First
+experiment" spec. Needs numpy + scikit-learn in .venv, and a warm `radio_oracle` for fresh labels
+(none of this reads or writes the sa193 cache/snapshot -- these are unrelated synthetic states).
+
+QUESTIONS ASKED, IN ORDER:
+1. Does the matched-sampler + oracle-label protocol that worked at k=4->k=5 hold further up the
+   ladder, through k=7 -- the level ml-guided-search.md flagged as untested and as where MAYBE
+   verdicts start appearing?
+2. The design note's diagnosis was "the flat ranker predicts the OR-choice from the parent's shape
+   alone and stalls at median rank 76 of 54,014; what determines the winner lives one level down."
+   Does scoring a candidate split by the trained value of its own three children -- with ZERO
+   supervision on which splits win -- recover ranking power close to a ranker trained directly on
+   winning-split labels?
+
+=====================================================================================
+0. TWO THINGS BROKE FIRST, BEFORE EITHER QUESTION COULD BE ANSWERED
+=====================================================================================
+
+(a) THE FIXED MASS BAND DOES NOT TRANSFER ACROSS LEVELS.
+value_level_transfer.py's sampler drew masses uniformly in [0.70,1.02] of cap=3^k, the same band
+at every k. At k=7 this produced **0 solvable of 300** decided states. The per-part solo Pareto
+maximum (MAXN1 in data/pareto_sb.csv) grows almost as fast as the cap itself with k (e.g. at k=7,
+m=2: max n1=127, so a single part alone can already carry 254/2187 = 11.6% of cap; summed over 4
+random parts the naive ceiling averages ~90% of cap). So "mass near cap" increasingly means "mass
+past what any part-respecting split can carry," not a level-independent notion of difficulty -- a
+fixed fraction-of-cap band is a k=4/k=5 artifact, not a sampler property.
+
+Fix: bisect the band per level with the warm oracle itself before drawing the training sample.
+`tools/ml/value_gen_states.py` now takes explicit `lo hi` fraction-of-cap arguments (default
+[0.70,1.02] preserved for k<=5 reproducibility). The bands a 7-step bisection (30-state probes,
+target 50% solved-of-decided) actually chose:
+
+  k=4  [0.897,0.977]   k=5  [0.796,0.876]   k=6  [0.688,0.768]   k=7  [0.480,0.560]
+
+The lower edge falls by roughly 0.1 of cap per level from k=5 on. That the achievable-mass
+fraction shrinks with k is not new -- it is the same reason the Pareto columns thin out -- but
+this is the first time it broke an ML data pipeline, and it will break the next one that assumes
+one band transfers.
+
+(b) A LONG-LIVED WARM ORACLE CAN CRASH OUTRIGHT ON AN ORDINARY QUERY.
+Labeling the k=7 sample at the chosen band, the oracle process's pipe closed mid-run six times in
+300 queries. Its stderr (previously discarded -- `docs/ml-guided-search.md`'s Oracle usage sends
+it to DEVNULL by default) read:
+
+  can't solve Sb(36:4,55:2,36:3,22:3,63:1,13:3,37:1,3:3)[576,285] in 6 ... totalsplits=6312401 ...
+  out of front-record handles
+
+`alloc_front_record` in radiobase.c hard-caps the handle count at `NODE_HANDLE_MASK = 0x3fffffff`
+(~1.07e9) because the handle is packed into a tagged 32-bit descriptor; `front_records_len` only
+grows across the process's lifetime, and a handful of multi-million-split sub-searches (residual
+k=6 states reached inside a single k=7 query) can burn through a meaningful fraction of that space
+before the run ever gets near the theoretical 1e9 cap in aggregate over hundreds of queries. This
+is the same category of trap already on record for `radio_canon_search_generic`'s node pool
+("allocates 1.26 GB per pool chunk and never frees one") but had not been observed or documented
+for the warm-oracle workflow, which is exactly the usage `ml-guided-search.md` recommends for
+"everything that needs many verdicts." No workaround at compile time is documented for this
+driver (unlike `radio_canon_search_generic`'s `MAX_TREE_NODES`/`MAX_MEMO`).
+
+Mitigation used here, not a fix: label with a wrapper (kept at /tmp/rec/label_resilient.py, not
+committed -- it is a two-line retry loop, reproducible from this note) that catches the closed
+pipe, logs the offending state, restarts the oracle, and skips that one query. 6 of 300 states at
+k=7 are lost this way (recorded as "CRASH", loaded as neither class). The oracle's own budget
+command bounds the deterministic accepted-prefix clock, not this: a state can be rejected by
+budget while still allocating unboundedly many front-records on the way to the deadline.
+
+Also observed in the same run: the nominal-second budget (5 here) does not tightly bound wall
+time. Individual queries took 243.9 s, 270.5 s and 215.8 s of real time against a 5-nominal-second
+budget, because the clock counts accepted split prefixes, not all explored work -- consistent with
+the documented budget semantics, just a sharper illustration of the gap than seen before.
+
+=====================================================================================
+1. LEVEL-HELD-OUT VALUE MODEL, EXTENDED TO k=7
+=====================================================================================
+Protocol per docs/ml-guided-search.md's "First experiment": matched sampler (same generator, same
+mass band choice procedure, oracle-labelled) for every level; permuted-label control; held-out
+level, not a random split. 300 states drawn at each level's bisected band; MAYBE and CRASH labels
+dropped (never recorded as either class). Features: the pooled, permutation- and part-count-
+invariant vector from value_level_transfer.py (sum/mean/max/min/std/median of per-part area, and
+of n, m, aspect ratio, each normalized by cap or sqrt(cap); plus the per-part Pareto deficit).
+
+  train k=4: 300 states, 41.7% solvable        train k=5: 300, 64.0%
+  train k=6: 294, 35.0%                        test  k=7: 273, 45.1%
+
+  train->test              mass/cap   deficit(sound)   logistic   boosted   permuted-control
+  k=4 -> k=5                0.5607        0.9284         0.9778    0.9531       0.4086
+  k<=5 -> k=6                0.6154        0.9710         0.9938    0.9655       0.6383
+  k<=6 -> k=7                0.5923        0.9961         0.9861    0.9956       0.4821
+
+Transfer holds all the way to k=7 -- but the sound per-part deficit baseline is now essentially as
+strong as either learned model (0.9961), which it was not at k=4/k=5 (0.9284). **The learned
+model's aggregate-AUC edge over the cheap sound filters shrinks as k grows towards where it
+matters.** The honest subset is what neither sound filter decides:
+
+  k=7 HARD SUBSET: 131 of 273 states (93.9% solvable)     mass/cap 0.8430   boosted 0.9705
+
+A real, if narrower, edge survives on exactly the states worth spending a learned model on.
+
+Caveat on the k<=5->k=6 permuted control: 0.6383, well above the ~0.41-0.48 seen at the other two
+levels. Still far below the real models' 0.99+, so not the corpus-identity failure the trap table
+already warns about (that one showed AUC ~0.95 on a control that also collapsed to ~0.5) -- but a
+reminder that a single-shuffle control on ~600 training rows is itself noisy. Worth a second shuffle
+before leaning on this specific comparison.
+
+=====================================================================================
+2. RECURSIVE CUT SCORING: V(child) ONE LEVEL DOWN, ON REAL CENSUS SPLITS
+=====================================================================================
+The design note's diagnosis, tested directly: for every stage-2 candidate cut of a real, forced
+(single-winning-class) k=7 census endpoint, compute its three actual AND-OR children -- selected,
+mixed, complement, via analyze_single_solution_cuts.children -- and score the cut by
+min(V(selected), V(mixed), V(complement)), using V trained ONLY on the synthetic matched sampler
+above (k<=6; zero exposure to any split/cut label, ever). Same population, same per-endpoint
+negative sampling (per_endpoint=6000), same cost/ratio metric as cut_ranker.py's evaluate(), so
+the numbers below are directly comparable to that script's own output.
+
+For a fair baseline, cut_ranker's flat shape ranker was retrained on k8 (instead of its usual k7)
+and evaluated on the SAME 153 forced k7 endpoints used below -- this flat ranker WAS trained with
+direct supervision on which splits win, unlike the recursive scorer:
+
+  153 forced k7 endpoints, median candidate-set size 6,001 (stage-2: info cap + per-part bound)
+
+  ranker                                          median cost   median ratio   worst
+  flat shape, trained k8 WITH cut supervision          23           130.5x      4.5x
+  recursive logistic-V, ZERO cut supervision           25           120.0x      1.9x
+  recursive gradient-boosted-V, ZERO cut supervision  1331             2.3x      0.6x
+
+**The recursive logistic-V scorer, which never saw a single winning-split label, comes within 8%
+of a flat ranker directly supervised on winning splits, on genuinely held-out real census data.**
+This is the clearest evidence yet for the design note's central claim: recursion captures most of
+what the flat shape ranker needs cut-level supervision to approximate. It is also a real
+distribution-shift test in the sense evidence/value_level_transfer_2026-08-20.txt's section 4
+flagged as untested: V here was trained on synthetic random states and evaluated on genuine
+children of real solver splits, a distribution neither the sampler nor `V` were built to match --
+and it held up anyway.
+
+**Gradient-boosted V collapses under recursion despite winning on standalone AUC.** Table 1 above
+has boosted V ahead of logistic V at the k=7 holdout (0.9956 vs 0.9861); composed recursively and
+applied under distribution shift, it is worse than blind on the hardest endpoint (0.6x) and near-
+useless on the median (2.3x vs logistic's 120.0x). Consistent with this repo's repeated finding
+that logistic regression's smooth decision surface generalizes better than boosting's histogram
+steps (cut_ranker, value_level_transfer) -- this shows the gap matters far more once a model is
+composed (min over three children) and shifted out of its training distribution than it does for
+flat in-distribution classification. **Standalone AUC is not a safe guide to which model to use
+recursively; only the composed, end-to-end metric is.**
+
+=====================================================================================
+3. WHAT THIS DOES AND DOES NOT LICENSE
+=====================================================================================
+* The recursive scorer is ready to prototype in front of the solver's split loop, per
+  ml-guided-search.md step 3 (only reached once the level-holdout separated -- it did). That C
+  integration is NOT done in this session: it is a correctness-sensitive change to the split loop,
+  and per the achievability/unsolvability asymmetry already on record, must only ever REORDER
+  achievability search, never prune an OR-branch.
+* The 120x/130.5x numbers are the same "candidates tried before hitting a winner" selectivity
+  metric cut_ranker.py already uses, not measured solver CPU seconds. Converting selectivity into
+  an end-to-end speedup still requires costing V's own evaluation against the sound filters it
+  would run alongside (mass/cap and the per-part bound are one array lookup each; V is a ~31-
+  feature logistic regression -- cheap, but not free, and the exact cost has not been measured
+  against actual solver internals).
+* This was tested at children-at-k=6 only (scoring real k7 endpoint splits). The k8 -> children-
+  at-k7 case is untested here and is the one that hits both open traps above (k=7 sampling needs
+  the bisected band, and k=7 sub-searches are the ones observed to crash the oracle) at once.
+* Reproduce: build `/tmp/rec/oracle_k7` at `-DMAX_K=7 -DMAX_N=350` (cold, no cache -- these are
+  independent synthetic states, not sa193 facts), bisect+label per level with a resilient wrapper
+  (retry-on-closed-pipe, log and skip the offending state), then
+  `.venv/bin/python tools/ml/recursive_value.py`. The matched-sampler data itself lives under
+  /tmp/rec/labeled3_k{4,5,6,7}.txt and is not committed (small, and exactly reproducible from the
+  fixed RNG seed `1000+k` in value_gen_states.py given the same bands and oracle build/commit).

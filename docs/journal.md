@@ -8568,3 +8568,55 @@ archived inputs, and specific to the `MAX_K=9 MAX_N=300` geometry. Recorded in [
 
 Instance terminated after all artifacts were in S3 and the snapshot verified locally. No AWS compute
 remains; nothing running locally.
+
+## 2026-08-20 (done) — the recursive predictor: built, and it nearly matches directly-supervised ranking with zero split labels
+
+Picked up the fast-solver thread per the previous handoff. `docs/ml-guided-search.md`'s "first
+experiment" asked two things: does the level-held-out value model keep transferring past k=5, and
+does scoring a split by its children's value recover what the flat ranker needed cut supervision
+for. Both answered; full numbers and reproduction commands in
+[../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
+
+**Two things broke before either question could be answered, and both are now in the trap table.**
+The matched sampler's fixed [0.70,1.02]-of-cap mass band, which worked fine at k=4/k=5, sampled
+**zero solvable states out of 300 at k=7** — the per-part solo Pareto maximum grows almost as fast
+as the cap does, so a fixed fraction stops meaning anything level-independent. Fixed by bisecting
+the band per level against the oracle (30-state probes, target ~50% solved). Then labeling the
+bisected k=7 sample crashed the long-lived oracle six times: `out of front-record handles`, a hard
+cap on `radiobase.c`'s tagged 32-bit handle space that a few million-split sub-searches can reach
+well before any documented ceiling would suggest. No compile-time knob bounds it the way
+`radio_canon_search_generic`'s pool is bounded. Worked around with a restart-and-skip wrapper, not
+fixed — a caller keeping a warm oracle alive across many diverse queries needs one.
+
+**The level-held-out value model transfers all the way to k=7** (AUC 0.986/0.996 against a 0.482
+permuted control), but the sound per-part deficit baseline is now just as strong (0.996) — the
+learned edge has narrowed to the states neither cheap sound filter decides, same pattern as the
+k=4/k=5 result, sharper.
+
+**The recursive cut scorer is the real result.** For every stage-2 candidate split of a real
+forced k7 census endpoint, score it by `min(V(selected), V(mixed), V(complement))` — the actual
+AND-OR children, via `analyze_single_solution_cuts.children` — using a value model trained *only*
+on synthetic oracle-labelled states, with no split-label supervision at all. Against an identical
+population, a flat ranker trained *with* direct supervision on which splits win gets 130.5x
+selectivity; the zero-supervision recursive scorer gets 120x. Within 8%, on real held-out data the
+value model was never built to see. This is the design note's "what decides the winner lives one
+level down" diagnosis, confirmed rather than argued.
+
+**A model that wins on standalone AUC lost badly once composed.** Gradient boosting beat logistic
+regression at the k=7 value-model holdout (0.996 vs 0.986) but its recursive score collapsed to
+2.3x, worse than blind on the hardest endpoint (0.6x). Logistic regression's smoother decision
+surface — already the winner in `cut_ranker.py` and `value_level_transfer.py` — matters far more
+once a model is composed through a `min` and shifted onto a distribution it never trained on than
+it does for flat in-sample classification. Standalone AUC did not predict this; only the composed,
+end-to-end metric did.
+
+**What's not done:** the factored per-part policy and its `(S,X)` DP top-k decoder, and actually
+putting either scorer in front of `canSolveB`'s split loop. That's a correctness-sensitive C change
+gated on exactly the measurement this session produced, and the next thing to build — judged on
+end-to-end CPU seconds on a known-hard instance, not on the selectivity numbers here. Also
+untested: scoring k=8 endpoints (children at k=7), which hits both traps above at once.
+
+`tools/ml/recursive_value.py` is new; `tools/ml/value_gen_states.py` now takes an explicit mass
+band instead of a hardcoded one. No AWS compute; the oracle and all label data are local under
+`/tmp/rec/`, not committed (small, deterministic from the fixed RNG seed given the same bands and
+build).

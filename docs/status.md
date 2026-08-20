@@ -56,6 +56,8 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not extrapolate the one-D `ABBBBBCD` accounting—or identify a bounded/profile projection with the exact all-depth problem.** | One D lineage cannot serve a height-6 mixed path. Finite `(D,C+D)` kernels now exclude 16-atom ranks 290--304 and 32-atom ranks 1090--1179, but rank 1180 lies outside the latter kernel. Exact cover now excludes rank 1180 through depth four; this is still bounded, so depth five and all-depth constructibility remain open. The first projected rank-305 tree has no exact lift, while a *different* projected skeleton yields a checked 19-node exact tree. Projection YES is search permission, not a proof; failure of one skeleton, one finite depth, or a capped search is not global failure. See [the atom-lineage note](theorems/atom-lineage.md). |
 | **The excess-`q` Pareto assembly is parked, not a pending global formula.** | Its corrected four-segment reduction and exact `m=5` calibration are durable, but the sufficiently-large-`q` postulate, completeness of the outer-family list, and stabilization of the synchronized D frontier are unproved. `m=5` already needs competing outer triples and a piecewise D solution; the height-6 rank-1180 question concerns only one restricted aligned slice. Do not restart finite normalization/rank searches unless a new theorem or construction addresses one of those global gaps. |
 | **Never train solvable-vs-unsolvable on two different corpora.** | Certificate negatives and census positives occupy *disjoint* mass bands at k=6 (positives 0.742-0.875 of cap, negatives 0.827-0.959; the central-90% overlap is empty), so any classifier scores AUC 0.946 by learning which corpus a state came from. A permuted-label control does **not** catch this — it destroys the source signal too and returns a reassuring 0.516. What caught it was a matched-pair probe: single-part states differing by one coin scored 47%, chance. Draw both classes from one sampler and label with `radio_one`. Measured 2026-08-20; see [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt). |
+| **A fixed mass-fraction-of-cap sampler does not transfer across `k`.** | `value_gen_states.py`'s original band, [0.70,1.02] of cap, sampled **0 of 300 solvable at k=7**: the per-part solo Pareto maximum grows almost as fast as the cap does, so "mass near cap" stops meaning "near the achievability frontier" by k=7. The band must be bisected per level against a warm oracle (30-state probes, target ~50% solved-of-decided) before drawing a training sample. Measured 2026-08-20; see [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). |
+| **A long-lived `radio_oracle` can crash outright on an ordinary query, silently.** | `alloc_front_record` in `radiobase.c` hard-caps total handles at `NODE_HANDLE_MASK` (~1.07e9, packed into a tagged 32-bit descriptor); a handful of multi-million-split sub-searches can burn through enough of that space to exit with `out of front-record handles`, closing the oracle's stdout pipe. Seen 6 times in 300 k=7 queries. No compile-time knob bounds this the way `MAX_TREE_NODES`/`MAX_MEMO` bound `radio_canon_search_generic`'s pool. A caller that keeps a warm oracle alive across many diverse queries must catch the closed pipe, log the offending state, and restart — losing that one query, not the accumulated warm state. Separately, the deterministic nominal-second budget does not tightly bound wall time: queries budgeted at 5 nominal seconds took up to 270 real seconds. Measured 2026-08-20; see [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). |
 | **Cache-load cost is hump-shaped; never extrapolate it.** | Loading the archived corpus, the rate goes 44,484/s at the start, down to 431/s through an expensive band, then up to 1,067,487/s once almost everything is subsumed. Local prefixes sampled the rise and the collapse and missed the recovery, so I predicted 13+ hours for a load that took **1.58 h** (21,866,180 facts, 3,847/s overall, 36% of the time in five of 88 chunks). Two points were wrong and three were wrong; only the run settled it. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Do not extrapolate solver cost from table dimensions.** | `MAX_N=400/MAX_K=6` inits in 205 s while the *larger* `MAX_N=485/MAX_K=9` inits in 146 s. Init and query cost track the work a state actually needs — which cache is loaded, how much refutation is required — not the table sizes. Measure the candidate configuration; a scaling law inferred from two points will be wrong. The oracle's loader skips facts too wide for the build instead of failing, so `MAX_N` is chosen for the queries alone. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Size `MAX_N` to the states you are asking about.** | `init()` runs before `radio_one`'s argument check and its static tables scale with `MAX_N`: the same query costs **205 s** built at `-DMAX_N=400` and **0.2 s** at `-DMAX_N=120`, where the solve itself is 0.0 s. A padded `MAX_N` buys nothing and can make a cheap oracle look unusable. Measured 2026-08-20. |
@@ -1131,15 +1133,22 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Derive a fast solver from the learned predictor — the active thread.** The substrate is built
-   and measured; the recursive predictor is not written. Read
+0. **Derive a fast solver from the learned predictor — the active thread.** The substrate, the
+   level-held-out value model (now through k=7), and a recursive cut scorer are all built and
+   measured; wiring a prototype into the solver's split loop is not done. Read
    [ml-guided-search.md](ml-guided-search.md) first: its "Read this first" section lists what
    exists, what each piece measured, and the one command that starts a fully warm oracle. In short:
    a learned ranker orders candidates 428x better than blind and transfers across levels, but is an
    *ordering* not a filter; top-5-guaranteed is ~15x short on the median and ~300x on the tail;
    data is not the constraint anywhere (flat from 26 training states); and the things to beat are a
-   9-12x table lookup and an 8x `R_0`. Guidance is correctness-free for **achievability** only,
-   since a witness is checked by `check_witness.py` — never prune an OR-branch with a learned value.
+   9-12x table lookup and an 8x `R_0`. **New 2026-08-20:** scoring a split by `min(V(child))` one
+   level down, with a value model that never saw a single split label, reaches 120x selectivity
+   against a flat ranker directly supervised on winning splits (130.5x) — on the same real, held-out
+   k7 census endpoints. Two traps broke the data pipeline getting there (a fixed mass band doesn't
+   transfer past k=6; a long-lived oracle can crash on a hard query) — see the trap table and
+   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). Guidance
+   is correctness-free for **achievability** only, since a witness is checked by
+   `check_witness.py` — never prune an OR-branch with a learned value.
 
 1. **Use the warm oracle for everything that needs many verdicts.** `radio_oracle.c` is new: it
    pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin. Measured at
@@ -1151,27 +1160,31 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    need a primer. **A fully primed snapshot now exists** — all 21,866,180 archived facts, loaded in
    1.58 h, restoring in 32.8 s at 2.41 GB resident, 173x faster than replaying facts.
 
-2. **Take the value model to k=6 and then into the solver.** The level-transfer premise now has
-   evidence: with matched oracle-labelled sampling, a scale-normalized value model trained on k=4
-   predicts k=5 solvability at **AUC 0.9921**, against a 0.9974 same-level ceiling and 0.8773 for
-   the best cheap sound bound; permuted control 0.5234. On the 1,751 of 2,200 states the sound
-   bounds leave undecided the margin narrows to 0.9596 against 0.9372, which is the honest reading.
-   Details in [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt).
-   Next: k=5 -> k=6 with MAYBE handled as a third label, then judge it on end-to-end CPU against a
-   table lookup, not on AUC. **Trap that cost the first attempt:** see the trap table.
+2. **Take the value model to k=7 — done; now cost it against the solver, not AUC.** With matched
+   oracle-labelled sampling (mass band bisected per level, not fixed — see the trap table), a
+   scale-normalized value model trained on `k<=6` predicts k=7 solvability at AUC 0.986 (logistic)
+   / 0.996 (boosted), against a 0.482 permuted control; the sound per-part deficit alone is also at
+   0.996 by k=7, so the learned edge is now concentrated on the 131 of 273 states neither sound
+   filter decides (boosted 0.971 there vs mass 0.843). Details in
+   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt) (k=4/k=5
+   history in [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt)).
+   Next: judge it on end-to-end CPU against a table lookup, not on AUC — still not done.
 
-3. **Make the predictor recursive.** The flat-feature ranker stalled at median rank 76 of 54,014,
-   and the learning curve says that is a feature-set limit, not a data limit — what decides the
-   winner lives one level down. Design note: [ml-guided-search.md](ml-guided-search.md). Three
-   things it turns on: the training corpus already exists (the certificate chain is 2,846,568
-   `(state,k) -> unsolvable` claims spanning **k=2..9**, plus 57,890 census winners and 11.6M cache
-   facts); the action space must be factored per part, because scoring 1e6 candidates with a model
-   is hopeless while scoring ~1e3 per-part options and composing them with the existing `(S,X)` DP
-   is exact and cheap; and **guidance is correctness-free only for achievability** — a witness found
-   under guidance is still checked by `check_witness.py`, whereas pruning an OR-branch by a learned
-   value would manufacture false negatives. Point it at the k=9 achievability frontier. First test
-   is a *level*-held-out value model, judged on end-to-end CPU seconds against the cheap sound
-   filters it would displace, not on AUC.
+3. **Make the predictor recursive — done for the value side; the policy/DP side is next.** The
+   flat-feature ranker stalled at median rank 76 of 54,014, and the learning curve said that was a
+   feature-set limit, not a data limit — what decides the winner lives one level down. Confirmed
+   2026-08-20: scoring a candidate split by `min(V(child))`, `V` trained with **zero split-label
+   supervision**, reaches 120x selectivity on real forced k7 endpoints — within 8% of a flat ranker
+   directly supervised on winning splits (130.5x), on the identical population. A model with
+   *higher* standalone AUC (gradient boosting) collapsed to 2.3x under the same composition —
+   standalone AUC did not predict this; only the end-to-end composed metric did. Design note and
+   full numbers: [ml-guided-search.md](ml-guided-search.md),
+   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). Still
+   open: factor the policy per part, decode top-k with the `(S,X)` DP, and put either scorer in
+   front of `canSolveB`'s actual split loop — judged on end-to-end CPU seconds on a known-hard
+   instance, not on the offline selectivity numbers above. **Guidance remains correctness-free only
+   for achievability** — a witness found under guidance is still checked by `check_witness.py`,
+   whereas pruning an OR-branch by a learned value would manufacture false negatives.
 
 4. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
