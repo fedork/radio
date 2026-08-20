@@ -1,8 +1,59 @@
 # A recursive learned predictor: design note
 
-Written 2026-08-20, after the flat-feature ranker topped out. Status: **design, nothing measured
-yet.** The numbers quoted from earlier work carry their own sources; everything proposed here is
-untested and is labelled as such.
+Written 2026-08-20, after the flat-feature ranker topped out; revised the same day once the value
+model and the oracle were measured. Status: **the substrate is built and measured; the recursive
+predictor itself is not written.** Every number below has a source in `evidence/`; anything proposed
+rather than measured says so.
+
+## Read this first if you are picking the thread up
+
+The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
+verdicts sooner. Four things are already in place, and one thing is not.
+
+**Built and measured.**
+
+| what | where | measured |
+|---|---|---|
+| warm oracle, stdin protocol | `radio_oracle.c`, `tools/oracle_client.py` | 0.11 ms/query; verdicts identical to `radio_one` on 2,200 states |
+| full-corpus snapshot | `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst` | 21.9M facts, restores in **32.8 s** at 2.41 GB |
+| learned cut ranker | `tools/ml/cut_ranker.py` | median rank **76 of 54,014** with `R_0`; 428x better than blind |
+| level-transfer value model | `tools/ml/value_level_transfer.py` | **AUC 0.9921** trained k=4, tested k=5 |
+| corpus analysis | `tools/analyze_single_solution_cuts.py` | the forced-cut structure of both censuses |
+
+**Not built: the recursive predictor.** Everything above predicts at one level from the parent's
+shape. The remaining work is the value/policy pair applied at every level, which is what the rest of
+this note designs.
+
+**Start the oracle before anything else.** It removes the reason the earlier experiments were
+awkward — labels used to cost 200 ms and a process each:
+
+```
+aws s3 cp s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst .
+zstd -d cache.snap.zst
+tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=300 radio_oracle.c -o radio_oracle_k9_n300
+./radio_oracle_k9_n300 --restore-any=cache.snap --journal=oracle-journal.txt
+```
+
+`restore-any` is needed because that snapshot was built by Linux clang; the geometry is checked
+either way. Journal every session so the next one starts warmer.
+
+## What the measurements already rule in and out
+
+* **A learned ranker works, as an ordering.** 428x better than blind at ranking winners, and it
+  transfers across levels. It is **not** a filter: worst case 6.5x, no recall guarantee, so it can
+  order a search but never prune one.
+* **Top-5 guaranteed is out of reach this way.** Exact ranks over the full candidate set: median 76
+  and worst 1,533 with `R_0` applied first, against the 5 a guarantee needs. ~15x short on the
+  median, ~300x on the tail. See [../evidence/learned_cut_ranker_2026-08-20.txt](../evidence/learned_cut_ranker_2026-08-20.txt).
+* **Data is not the constraint anywhere.** Both the ranker and the value model are flat from ~26
+  training states, and plain logistic regression beats gradient boosting in both. The feature set
+  binds.
+* **The cheap sound filters are the thing to beat.** Per-part Pareto bound from `pareto_sb.csv`:
+  ~9-12x at full recall for one array lookup. `R_0` full-star majorization: another 8x. A learned
+  component earns its place only on end-to-end CPU against those.
+* **Most of the learned gain sits where the sound bounds already decide.** On the 1,751 of 2,200
+  states they leave undecided, the value model is 0.9596 against 0.9372 for mass alone. Real, much
+  smaller, and that is the honest number to carry forward.
 
 ## Why the flat ranker stalled, and why recursion is the fix
 

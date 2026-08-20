@@ -1131,7 +1131,17 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Use the warm oracle for everything that needs many verdicts.** `radio_oracle.c` is new: it
+0. **Derive a fast solver from the learned predictor — the active thread.** The substrate is built
+   and measured; the recursive predictor is not written. Read
+   [ml-guided-search.md](ml-guided-search.md) first: its "Read this first" section lists what
+   exists, what each piece measured, and the one command that starts a fully warm oracle. In short:
+   a learned ranker orders candidates 428x better than blind and transfers across levels, but is an
+   *ordering* not a filter; top-5-guaranteed is ~15x short on the median and ~300x on the tail;
+   data is not the constraint anywhere (flat from 26 training states); and the things to beat are a
+   9-12x table lookup and an 8x `R_0`. Guidance is correctness-free for **achievability** only,
+   since a witness is checked by `check_witness.py` — never prune an OR-branch with a learned value.
+
+1. **Use the warm oracle for everything that needs many verdicts.** `radio_oracle.c` is new: it
    pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin. Measured at
    **MAX_K=9, MAX_N=300** (init 37 s, 0.64 GB): 2,200 k=5 states in 243 ms of query time, **0.11 ms
    each**, verdicts identical to per-process `radio_one` on all 2,200. Start with
@@ -1141,7 +1151,7 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    need a primer. **A fully primed snapshot now exists** — all 21,866,180 archived facts, loaded in
    1.58 h, restoring in 32.8 s at 2.41 GB resident, 173x faster than replaying facts.
 
-1. **Take the value model to k=6 and then into the solver.** The level-transfer premise now has
+2. **Take the value model to k=6 and then into the solver.** The level-transfer premise now has
    evidence: with matched oracle-labelled sampling, a scale-normalized value model trained on k=4
    predicts k=5 solvability at **AUC 0.9921**, against a 0.9974 same-level ceiling and 0.8773 for
    the best cheap sound bound; permuted control 0.5234. On the 1,751 of 2,200 states the sound
@@ -1150,7 +1160,7 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    Next: k=5 -> k=6 with MAYBE handled as a third label, then judge it on end-to-end CPU against a
    table lookup, not on AUC. **Trap that cost the first attempt:** see the trap table.
 
-2. **Make the predictor recursive.** The flat-feature ranker stalled at median rank 76 of 54,014,
+3. **Make the predictor recursive.** The flat-feature ranker stalled at median rank 76 of 54,014,
    and the learning curve says that is a feature-set limit, not a data limit — what decides the
    winner lives one level down. Design note: [ml-guided-search.md](ml-guided-search.md). Three
    things it turns on: the training corpus already exists (the certificate chain is 2,846,568
@@ -1163,7 +1173,7 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    is a *level*-held-out value model, judged on end-to-end CPU seconds against the cheap sound
    filters it would displace, not on AUC.
 
-3. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
+4. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
@@ -1171,11 +1181,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    are terminated and their volumes deleted. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
-4. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
+5. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
-5. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
+6. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
    cache as a frozen read view plus worker-local overlay, then separate immutable split geometry
    from learned cut metadata. Extract and regression-test a resumable serial pass-2 prefix cursor
    before scheduling limited-width batches. The ownership contract is in
