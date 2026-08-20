@@ -8494,3 +8494,28 @@ expensive, unrestartable part was always building the primer, and that part is n
 not doing.
 
 Process inventory: no AWS compute was ever launched for this; all local oracle processes stopped.
+
+## 2026-08-20 (night, last) — launched the full-corpus prime rather than extrapolating again
+
+I had talked myself out of this run on the strength of a curve fitted to three points, which is
+exactly the reasoning this repo keeps punishing. The points were real — 78,752 facts/s at 50k,
+61,689/s at 200k, 687/s at 800k, structure reaching 2.88 GB — but "27x further along a worsening
+curve" is a prediction, not a measurement, and it was doing the work of one. So the run is going.
+
+`tools/oracle_prime_ec2_launch.sh` starts an on-demand `r7iz.xlarge` — 4 vCPU and 32 GiB at a high
+clock, since the load is single-threaded and memory is the constraint that matters. On-demand rather
+than Spot because the load has no intra-run checkpoint: an interruption throws away the whole thing.
+The remote script pulls the archived census caches from S3, builds the oracle at MAX_K=9 MAX_N=300,
+sorts both caches with `tools/sort_cache.py` for the measured 2.25x, splits them into 250k-line
+chunks, and loads chunk by chunk so progress is reported per chunk instead of inferred from a rate.
+It dumps `cache.snap` at the end, compresses it and uploads.
+
+Two guards, because 32 GiB was chosen from a superlinear curve and could be wrong: the run aborts at
+28 GiB resident rather than swapping the host, and a systemd unit hard-stops at 24 h. If it hits
+either, that is the answer — it tells us the full prime is infeasible at this size, which is what I
+had merely asserted before.
+
+Launched as `i-0957cf6024c13a1e3`, run `20260820T165448Z`, commit `cdffe46`, artifacts under
+`s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/`. Status is
+`tools/oracle_prime_status.sh 20260820T165448Z`, which reads the STATUS object the host writes every
+60 s; it costs nothing and does not touch the run. Deliberately not polled from here.

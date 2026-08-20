@@ -367,6 +367,20 @@ Do not run `gh auth switch`.
 
 ## Running now
 
+**One job: the oracle-prime full-corpus load.** On-demand `r7iz.xlarge` (4 vCPU, 32 GiB, high clock;
+the load is single-threaded) `i-0957cf6024c13a1e3`, run `20260820T165448Z`, commit `cdffe46`. It
+loads all 21.9M archived cache facts — sorted, in 250k-line chunks so progress is per chunk rather
+than an assumed rate — and dumps a binary snapshot. Check it with
+`tools/oracle_prime_status.sh 20260820T165448Z`; it reads a STATUS object the host writes every 60 s
+and does not touch the run. Artifacts land in
+`s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/`, the snapshot as `cache.snap.zst`.
+
+Guards: the run aborts at 28 GiB resident rather than swapping the host, and a 24 h systemd hard
+stop bounds it regardless. On-demand rather than Spot because the load has no intra-run checkpoint.
+**This run exists because three local extrapolations disagreed** — 78,752 facts/s at 50k, 61,689/s
+at 200k, 687/s at 800k — so the answer is measured rather than predicted. If it aborts on the memory
+cap that is itself the result.
+
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
 reported UNSOLVABLE. **The k=8 Pareto-prefix census is finished, archived and its host is gone.** It
 exited 0 at 2026-08-19 22:34:43 UTC after 5.87 days on shared `r7iz.4xlarge` `i-0005d74f985c52ae1`,
