@@ -55,37 +55,35 @@ The archived caches are text logs replayed through `parse_file`:
   exact.cache       515,080,944 bytes   11,661,763 facts
   dominance.cache   419,264,669 bytes   10,204,438 facts
 
-Measured replay rate on a stratified 1-in-117 sample: **304 facts/s** in file order, 685 sorted.
+PRIMING DOES NOT SCALE, AND THE FULL CORPUS SHOULD NOT BE LOADED AT ALL.  Loading sequential
+prefixes of exact.cache, MAX_K=9 MAX_N=300, each run dumping a snapshot afterwards:
 
-**Treat those as an upper bound on cost, not an estimate.**  A stratified sample deliberately breaks
-the locality of the file: consecutive facts in the real corpus are related and subsume each other,
-while sampled ones each land in an emptier trie and expand more.  Redundancy in the sample was 1.4%;
-in a sequential full load it will be much higher and the rate correspondingly better.  The full-file
-rate has not been measured and the honest position is that it is somewhere between one and nine
-hours.  The composition of the sample was at least right: the corpus is 98.4% negative
-(exact.cache 185,540 positive / 11,476,223 negative; dominance.cache 218,350 / 9,986,088).
+  facts      load time     rate        peak RSS   structure (branches/records/vectors)   snapshot
+   50,000        0.6 s   78,752/s       0.59 GB      124,627 /    562,993 /   263,709    17.2 MB
+  200,000        3.2 s   61,689/s       0.65 GB      356,213 /  1,557,051 /   695,444    54.9 MB
+  800,000    1,164.8 s      687/s       2.75 GB   12,752,501 / 42,025,603 / 7,233,342     2.88 GB
 
-WHERE THE TIME GOES, measured rather than guessed.  Neither insert is a plain trie write: a positive
-fact is propagated down to every state it dominates (`cacheCanSolve` recurses over all lesser parts)
-and a negative fact up to every state that dominates it (`cacheCantSolve` recurses over all greater
-parts, for every permutation of the parts).  Replay therefore redoes the closure work the original
-run already did.
+Both axes are violently superlinear.  4x the facts from 200k to 800k costs **360x the time** and
+**52x the structure**.  A separate contiguous 800k block taken from the negative-heavy middle of the
+file was killed after exceeding the head-of-file time without finishing, so this table is if
+anything the optimistic case.
 
-Two candidate explanations, one right and one wrong:
+Extrapolating is pointless except to rule the thing out: 21.9M facts is 27x the 800k row on a curve
+that is getting worse, in both hours and bytes.  **Do not try to prime the full corpus.**  Earlier
+notes in this file estimated 8.7 hours from a stratified sample and were wrong in both directions --
+the sample understated the rate on cheap positives (the file's head loads at 60-79k facts/s) and
+badly understated how fast cost explodes once the structure is large.  Two points never described
+this curve; three barely do.
 
-* *Duplicate facts* -- WRONG.  Of 99,672 inserts only **1,186 were redundant**, 1.4%.  Pre-pruning
-  subsumed facts offline would buy essentially nothing.
-* *Insertion order* -- RIGHT, partly.  Sorting so that each fact subsumes as much as possible before
-  the rest arrive (largest solvable first, smallest unsolvable first) took the same 99,672 facts
-  from **304 facts/s to 685 facts/s, a 2.25x speedup** for a pure reordering.  `tools/sort_cache.py`
-  does it.
+WHAT TO DO INSTEAD.  Prime from a bounded, targeted subset -- the k band and mass range a given job
+actually queries -- snapshot it once, and reuse the snapshot.  The corpus is 98.4% negative
+(exact.cache 185,540 positive / 11,476,223 negative; dominance.cache 218,350 / 9,986,088) and by
+level almost all k=4..6, so a filter is easy and cuts most of it.  `tools/sort_cache.py` reorders
+whatever subset is chosen for a further 2.25x.
 
-2.25x is real and free, and it still leaves ~8.9 hours for the full corpus.  **The actual fix is a
-structural snapshot**: serialize the trie itself -- the roots, the branch arrays behind
-`branch_handles`, and the front arena -- and reload it linearly, which is O(structure) instead of
-O(facts x closure) and should be seconds.  Not implemented here: it touches the allocator, and a
-silently corrupted cache means false verdicts, which is the failure mode that put 37 false negatives
-in the 2023 corpus.  It wants its own change with its own regression test, not a footnote to this one.
+Better still for most work: start cold and journal.  A cold oracle answered 2,200 k=5 queries in
+243 ms with no primer at all, and `--journal FILE` makes each session prime the next with exactly
+the states that were actually asked about.
 
 By level, the exact cache is almost entirely k=4..6:
 

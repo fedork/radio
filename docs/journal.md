@@ -8454,3 +8454,43 @@ run, and it is also what decides the instance size, so the run should report str
 before anything else.
 
 Process inventory: no AWS compute; all local oracle processes stopped.
+
+## 2026-08-20 (night, later) — measuring the load curve killed the EC2 plan, which is the right outcome
+
+Before renting anything I measured what the full-corpus prime would actually cost, on sequential
+prefixes of `exact.cache` at MAX_K=9 MAX_N=300, each run also dumping a snapshot:
+
+  facts      load       rate        RSS       branches/records/vectors            snapshot
+   50,000     0.6 s   78,752/s    0.59 GB      124,627 /    562,993 /   263,709    17.2 MB
+  200,000     3.2 s   61,689/s    0.65 GB      356,213 /  1,557,051 /   695,444    54.9 MB
+  800,000  1,164.8 s     687/s    2.75 GB   12,752,501 / 42,025,603 / 7,233,342     2.88 GB
+
+Both axes are violently superlinear: **4x the facts costs 360x the time and 52x the structure.** A
+contiguous 800k block from the negative-heavy middle of the file was killed after exceeding the
+head-of-file time without finishing, so the table is the optimistic case. 21.9M facts is 27x further
+along a curve that is still getting worse, in hours and in bytes alike.
+
+So the answer to "which instance should we rent" is **none, for this job**. Priming the full corpus
+is not a thing to do at a different size; it is a thing not to do. That is a better outcome than
+renting 64 GB and finding out there.
+
+**My estimates were wrong in both directions and it took three points to see it.** The stratified
+sample said 304 facts/s and 8.7 hours. The file's head loads 200x faster than that, because
+positives are cheap and the corpus head is all positive — which is what Fedor suspected. But the
+same sample also hid the explosion: once the structure is large the rate falls to 687/s and keeps
+falling. Two points never described this curve and three barely do. The trap now says so.
+
+**What actually works.** Prime from a bounded subset — the k band and mass range a job really queries
+— snapshot it once with the new `snapshot` command, and restore in milliseconds thereafter. The
+corpus is 98.4% negative and almost all k=4..6, so filtering is easy. For most work, skip priming
+entirely: a cold oracle answered 2,200 k=5 queries in 243 ms, and `--journal` makes each session
+prime the next with exactly the states that were asked about.
+
+**On Spot versus On-Demand,** since the question is now moot for this job but will recur: the
+snapshot changes the calculus. An oracle that restores from a snapshot in milliseconds and journals
+what it learns loses almost nothing to an interruption, so Spot becomes reasonable for *serving* —
+which it would not have been for a process holding hours of irreproducible warm state. The
+expensive, unrestartable part was always building the primer, and that part is now the part we are
+not doing.
+
+Process inventory: no AWS compute was ever launched for this; all local oracle processes stopped.
