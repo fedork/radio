@@ -8130,3 +8130,62 @@ having exactly one of something, the control has to use all of them.
 
 Process inventory: no AWS compute remains — both radio-tagged hosts are terminated and their volumes
 deleted. Nothing running locally.
+
+## 2026-08-20 — a learned ranker for cut selection: the corpus was never the problem
+
+Follow-up to the forced-cut analysis, prompted by the fair objection that "mixed is largest" is not
+sharp enough to *choose* a cut. It is not — I measured it exactly (2D DP over `(S, X)`, so the whole
+split space is counted rather than sampled) and it removes about half the cap-feasible candidates,
+1.95x at k=7 and 1.92x at k=8. The best 100%-recall variant of it, a fixed margin threshold, gives
+2.5x. Against the existing `R_0` at 16.1x and `R_0`+pairs at 140.4x that is not a filter worth
+having. I had described it as one; that framing was wrong and is corrected in place.
+
+**The right frame for learning is not 624 examples.** The unit is (state, candidate cut), the census
+enumerates every winner of every endpoint, so unrecorded cap-feasible cuts are clean negatives:
+26,876 positives against roughly 1e7 candidates per state. Scarce axis is states, not examples.
+
+**Result.** Trained on the k=7 corpus only, tested on 120 forced k=8 states with 6,000
+sound-filtered candidates each, a logistic regression on 26 scale-normalized features finds the
+winner after a **median of 7 tries — 428x better than blind**, worst case 6.5x. Full detail in
+[../evidence/learned_cut_ranker_2026-08-20.txt](../evidence/learned_cut_ranker_2026-08-20.txt),
+reproducible in ~40 s with `tools/ml/cut_ranker.py`.
+
+Three guards make that believable, and I would not have believed it without them. Splits are grouped
+by state. The headline is cross-level, so neither the state nor the level was in training — that
+rules out memorisation far more convincingly than a within-level holdout. And a permuted-label
+control through the identical pipeline gives 1.6x. An earlier version of this measurement reported
+1201x, which was an artifact of censoring: with 600 sampled negatives, "zero negatives outrank the
+winner" is a floor, not a value. Quote floors as floors.
+
+**The answer to "is it bound to overfit on such a small corpus" is no, and the reason is worth
+keeping.** Performance is flat from 26 training states to 534 — the learning curve never rises. And
+plain logistic regression beats gradient boosting, 428x to 273x. Both are signatures of a smooth,
+low-dimensional decision surface, not of a data-starved one. The binding constraint is the feature
+set, and the corpus is about two orders of magnitude larger than this model can use.
+
+**The elicited rule is small.** Three features give 57.8x, eight give 250x: cut every part close to
+proportionally, balance the two pure outcomes, leave headroom under the cap in the larger pure child,
+and avoid a single dominant rectangle in the pure children.
+
+**A correction I owe.** Yesterday I wrote that diagonal cuts "carry no signal". That was measured on
+forced endpoints against multi-solution endpoints — winners against *other winners*. Against
+non-winners, diagonality is the strongest single feature in the whole study: `diag_mean` alone gives
+9.7x, with winners at |a/n − b/m| = 0.083 against 0.179 for sound-filtered non-winners. Both
+statements are true and the distinction is the substance: **geometry does not tell you which states
+are forced, but it does tell you a great deal about which cut wins.** Several sessions of negative
+results on "no scalar feature locates the winner" were all measured on the first contrast; the
+second was never tested until now.
+
+**What this is and is not.** It is a ranker with no recall guarantee — worst case 6.5x — so it can
+order a search but never prune one, and the sound filters keep their role. Untested where it matters
+most: transfer to residual k=7, and composition with `R_0`/pairs, whose 140.4x was quoted against a
+stronger denominator (cap + four-rectangle frontier) than the stage-2 set used here, so the numbers
+are not additive. Also worth recording separately: the per-part Pareto bound read straight from
+`data/pareto_sb.csv` is a sound full-recall filter of ~9-12x on its own, and it is applied before
+anything above is measured.
+
+`tools/ml/` is the first thing in this repo with third-party dependencies. They live in the
+gitignored `.venv`; the three checks and everything under `tools/` proper stay dependency-free, and
+`tools/ml/README.md` says so.
+
+Process inventory: no AWS compute; nothing running locally.

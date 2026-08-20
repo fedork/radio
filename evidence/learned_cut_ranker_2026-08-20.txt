@@ -1,0 +1,118 @@
+A learned ranker for state -> winning cut, 2026-08-20
+Status: measured. Reproduce with `CENSUS_CACHE=/tmp/c.pkl .venv/bin/python tools/ml/cut_ranker.py`
+(~40 s; needs numpy + scikit-learn in the gitignored .venv -- see tools/ml/README.md).
+
+THE FRAMING MATTERS MORE THAN THE MODEL.  "624 forced states" is the wrong way to count this.  The
+unit is (state, candidate cut) and the label is "is this cut a winner"; the census enumerates
+*every* winner of every endpoint, so unrecorded cap-feasible cuts are clean negatives.  That gives
+26,876 positives and effectively unlimited negatives -- about 1e7 cap-feasible cuts per state.  The
+scarce axis is states (2,320 four-part across both corpora), and that is what bounds generalization.
+
+WHAT IS BEING PREDICTED, AND AGAINST WHAT DENOMINATOR.  Selectivity is meaningless without a stated
+candidate set.  Candidates here are *stage 2*: the information cap on all three children, plus every
+part of every child inside the proven per-part bound from data/pareto_sb.csv.  That per-part bound
+is itself a sound, cheap filter and it is worth measuring on its own:
+
+  100% of winners pass it, against 8.4% (k=7) and 10.9% (k=8) of cap-feasible candidates
+  => a sound ~9-12x filter at full recall, before any learning.
+
+Everything below is the gain *on top of* that.
+
+=====================================================================================
+1. HEADLINE: trained on k=7 only, tested on forced k=8 states
+=====================================================================================
+Training: all 534 four-part k=7 endpoints, 2,995 positives, 323,395 rows.
+Test: 120 forced (single-solution) four-part k=8 endpoints, 6,000 stage-2 candidates each.
+Neither the state nor the level was seen in training.
+Metric: rank candidates by score, try until a winner is hit.  Blind order costs about (N+1)/(P+1).
+
+  ranker                                  median cost   median gain   worst   censored
+  logistic regression, 26 features             7           428.6x      6.5x     12%
+  gradient boosting, 26 features              11           272.8x      4.1x     10%
+  PERMUTED-LABEL CONTROL                    1908             1.6x      0.5x      1%
+
+A median of SEVEN candidates tried before hitting the winner, out of 6,000 sound-filtered ones.
+The permuted-label control -- identical pipeline, labels shuffled -- collapses to 1.6x, which is
+what rules out leakage; a result this large should not be believed without it.
+
+Note the worst case: 6.5x.  This is a RANKER, not a filter.  It cannot prune (no recall guarantee),
+but reordering the search costs nothing and never loses completeness.  That is the honest use.
+
+Within-level k=8 grouped 5-fold CV agrees: 120x median over all states, 300x over forced states,
+though both are censored by the 600-negative sample there.
+
+=====================================================================================
+2. IS THE CORPUS TOO SMALL?  NO -- IT SATURATES AT ~26 STATES
+=====================================================================================
+Same held-out test, varying how many k=7 training states the model sees:
+
+     26 training states   333.4x
+     53 training states   428.6x
+    133 training states   375.1x
+    267 training states   375.1x
+    534 training states   428.6x
+
+Flat from the very first point.  The corpus is two orders of magnitude larger than this model needs.
+Overfitting is not the binding constraint and never was -- the constraint is the feature set.
+Corroborating: plain logistic regression BEATS gradient boosting (428x vs 273x), which is what you
+see when the decision surface is smooth and low-dimensional rather than data-starved.
+
+=====================================================================================
+3. THE ELICITED RULE — how small can it be?
+=====================================================================================
+  1 feature   diag_mean                                    9.7x   (median cost 310)
+  3 features  diag_mean, pure_gap, max_pure               57.8x   (median cost  52)
+  5 features  + diag_max, pureB_top2                      95.3x   (median cost  32)
+  8 features  + offhalf_mean, margin, mixed_bigrect      250.0x   (median cost  12)
+  26 features                                            428.6x   (median cost   7)
+
+The three-feature model has standardized coefficients diag_mean -2.50, pure_gap -2.31,
+max_pure -2.06, i.e. all three "smaller is better".  In words, and this is the algorithm:
+
+  Prefer a split that
+    (a) cuts every part close to proportionally      -- a_i/n_i near b_i/m_i
+    (b) balances the two pure outcomes               -- selected mass near complement mass
+    (c) leaves headroom under the cap in the larger pure child
+  and, for the last stretch of performance, keeps the cut near half in each part and avoids a
+  single dominant rectangle in the pure children.
+
+Feature means, winners vs stage-2 non-winners, in units of the non-winner standard deviation:
+
+  feature              winners   non-winners   gap
+  pureB_top2             0.666      0.815      2.02
+  diag_max               0.147      0.328      1.70
+  diag_mean              0.083      0.179      1.64
+  max_pure_over_cap      0.840      0.916      1.51
+  pure_gap_over_cap      0.034      0.166      1.30
+  margin_over_cap        0.133      0.038      1.29
+  offhalf_mean           0.209      0.273      1.16
+
+=====================================================================================
+4. A CORRECTION TO THE 2026-08-20 CUT ANALYSIS
+=====================================================================================
+`evidence/single_solution_cuts_2026-08-20.txt` says diagonal cuts "carry no signal".  That is true
+only for the contrast it measured -- forced endpoints against multi-solution endpoints, which is
+winners against *other winners*.  Against NON-winners, diagonality is the strongest single feature
+in this whole study: diag_mean alone ranks the winner 9.7x better than blind, and it is the second
+largest mean-gap of the 26.  Winners cut at |a/n - b/m| = 0.083 on average where sound-filtered
+non-winners sit at 0.179.
+
+So both statements hold and the distinction is the point: geometry does not tell you *which states
+are forced*, but it does substantially tell you *which cut wins*.  My earlier framing conflated the
+two questions, and the earlier "diagonal cuts are rare and carry no signal" line should be read
+strictly as scoped to the forced-vs-unforced contrast.
+
+=====================================================================================
+5. WHAT THIS DOES NOT SHOW
+=====================================================================================
+* No recall guarantee.  Worst observed case is 6.5x, so this can order a search but never prune one.
+  The existing sound filters (per-part Pareto ~9-12x, R_0 16.1x, R_0+pairs 140.4x) keep their role.
+* Not composed with R_0 or the cross-part pair condition.  The stage-2 denominator is weaker than
+  the four-rectangle frontier those were quoted against, so the numbers are not additive with them
+  and no combined claim is made here.
+* Tested across two levels only (residual k=5 -> k=6).  Transfer to residual k=7 is the thing that
+  would actually matter for k=9 and is untested; the scale-normalized features are designed for it,
+  but design is not evidence.
+* Median is not worst case.  A search using this must still be prepared to enumerate.
+* The negatives are uniformly sampled from the stage-2 set.  A solver enumerating in a structured
+  order faces a differently-ordered, not differently-composed, candidate set.

@@ -75,9 +75,15 @@ proportional (a*m = b*n exactly, i.e. the diagonal cut), generic.
   generic                 60.2%        67.0%        47.4%        51.3%
   part-cuts counted        1,884       93,640          612       11,368
 
-DIAGONAL CUTS ARE RARE AND CARRY NO SIGNAL.  Counting every exactly-proportional cut including those
-that are also whole-part or sliver: 6.4% of k=8 forced part-cuts, 10.9% at k=7; median normalized
-defect |a*m - b*n|/(n*m) is 0.083 and 0.119.  Single and multi are indistinguishable on it.
+DIAGONAL CUTS ARE RARE, AND CARRY NO SIGNAL *FOR THIS CONTRAST*.  Counting every exactly-proportional
+cut including those that are also whole-part or sliver: 6.4% of k=8 forced part-cuts, 10.9% at k=7;
+median normalized defect |a*m - b*n|/(n*m) is 0.083 and 0.119.  Single and multi are
+indistinguishable on it.  **Read that strictly**: it compares forced winners against multi-solution
+winners.  Against NON-winners, diagonality is the strongest single feature found anywhere in this
+work -- winners average 0.083 where sound-filtered non-winners average 0.179, and that feature alone
+ranks the winner 9.7x better than blind search.  See
+[learned_cut_ranker_2026-08-20.txt](learned_cut_ranker_2026-08-20.txt).  Geometry does not say which
+states are forced; it does say a good deal about which cut wins.
 
 SLIVERS ARE THE ONE REAL ENRICHMENT, and only at k=8: 33.4% vs 27.9%, z = +5.3.  At k=7 the same
 comparison is 41.7% vs 39.4%, z = +1.1, not significant.  Per class the shift is clearer than the

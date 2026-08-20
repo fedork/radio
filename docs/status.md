@@ -412,8 +412,31 @@ reproduce in ~4 s with `tools/analyze_single_solution_cuts.py`. The findings:
   repeated component are single-class in 2 of 25 cases (8.0%) against 442 of 1,674 (26.4%) for the
   asymmetric ones. The only real enrichment is sliver cuts — parts feeding just two of the three
   outcomes — at 33.4% vs 27.9% (z=+5.3) at k=8, but only z=+1.1 at k=7, so treat it as a lead.
-- **Diagonal cuts are rare and carry no signal**: 6.4% of forced k=8 part-cuts are exactly
-  proportional, 10.9% at k=7, with single and multi indistinguishable.
+- **Diagonal cuts are rare, and carry no signal for the forced-vs-unforced contrast**: 6.4% of
+  forced k=8 part-cuts are exactly proportional, 10.9% at k=7, single and multi indistinguishable.
+  Scoped strictly — against *non-winners* diagonality is the strongest single feature found, see
+  the learned ranker below.
+
+**A learned ranker does work, as an ordering rather than a filter (2026-08-20).** Numbers and
+controls in [../evidence/learned_cut_ranker_2026-08-20.txt](../evidence/learned_cut_ranker_2026-08-20.txt);
+reproduce with `tools/ml/cut_ranker.py` (the only scripts here with third-party dependencies).
+Counting this as a 624-example problem is the wrong frame: the unit is (state, candidate cut), the
+census enumerates every winner so unrecorded cap-feasible cuts are clean negatives, and that gives
+26,876 positives against ~1e7 candidates per state.
+
+- Trained on the k=7 corpus **only** and tested on 120 forced k=8 states with 6,000 sound-filtered
+  candidates each, a logistic regression finds the winner after a **median of 7 tries (428x better
+  than blind)**, worst case 6.5x. A permuted-label control on the identical pipeline gives 1.6x,
+  which is what rules out leakage. It transfers across levels, so it is not memorising states.
+- **The corpus is not the constraint.** Performance is flat from 26 training states to 534, and
+  plain logistic regression beats gradient boosting — both signatures of a smooth low-dimensional
+  surface rather than a data-starved one. The feature set binds, not the sample size.
+- The elicited rule is small: three features give 57.8x — cut every part close to proportionally,
+  balance the two pure outcomes, and leave headroom under the cap in the larger pure child.
+- **It is a ranker, not a filter.** No recall guarantee, so it can order a search but never prune
+  one; the sound filters keep their role. The per-part Pareto bound from `pareto_sb.csv` is itself
+  a sound ~9-12x filter at full recall and is already applied before any of the above is measured.
+- Untested where it would matter most: transfer to residual k=7, and composition with `R_0`/pairs.
 
 The mass-descending independent audit is no longer active. Run `20260818T062429Z` reached
 251,131/2,576,885 k=7 claims (73,045 four-part), with zero gaps, after 2,160 seconds and
