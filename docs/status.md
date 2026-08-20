@@ -1119,7 +1119,20 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 ## Immediate next steps
 
-0. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
+0. **Make the predictor recursive.** The flat-feature ranker stalled at median rank 76 of 54,014,
+   and the learning curve says that is a feature-set limit, not a data limit — what decides the
+   winner lives one level down. Design note: [ml-guided-search.md](ml-guided-search.md). Three
+   things it turns on: the training corpus already exists (the certificate chain is 2,846,568
+   `(state,k) -> unsolvable` claims spanning **k=2..9**, plus 57,890 census winners and 11.6M cache
+   facts); the action space must be factored per part, because scoring 1e6 candidates with a model
+   is hopeless while scoring ~1e3 per-part options and composing them with the existing `(S,X)` DP
+   is exact and cheap; and **guidance is correctness-free only for achievability** — a witness found
+   under guidance is still checked by `check_witness.py`, whereas pruning an OR-branch by a learned
+   value would manufacture false negatives. Point it at the k=9 achievability frontier. First test
+   is a *level*-held-out value model, judged on end-to-end CPU seconds against the cheap sound
+   filters it would displace, not on AUC.
+
+1. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
@@ -1127,27 +1140,11 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    are terminated and their volumes deleted. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
-1. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
+2. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven
    maximum, citing the verified witness and proof-safe cold log. Its remaining TODO sections are
    editorial/theorem integration work, not an H3 compute dependency.
 
-2. **Let the complete uncolored level-local replay finish and archive it.** Run
-   `20260818T194508Z` passed the same-type gate and is now in its dominant k7 phase. Do not stop its
-   dedicated instance. Check each independently uploaded level checkpoint and the final manifest,
-   compare measured CPU with the proof-producing solver, then publish the retained bundle. See
-   [`../evidence/verifier_level_v2_2026-08-18.txt`](../evidence/verifier_level_v2_2026-08-18.txt).
-
-3. **Let the separate citation-colored replay finish.** Run `20260818T205010Z` passed its
-   same-host gate and has durably checkpointed k9 and k8 before entering its dominant k7 phase. Do
-   not stop its dedicated instance. Each selection is valid only after its parent reports zero
-   gaps, and each selected next level must itself verify before the chain can terminate at
-   `used 0`. After completion, verify every per-level checksum and final manifest, then move the
-   durable compact bundle from S3 staging to the private GitHub release store. Never substitute the old Sa(113) colored subset.
-   Collect per-root reachability benefit later for optional hints; do not add a global exact hash
-   without a measured first-touch hit case. Explicit split-space coverage remains the route to an
-   independently cheap verifier.
-
-4. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
+3. **Continue the parallel-solver prerequisite, not the thread pool yet.** Objectify the result
    cache as a frozen read view plus worker-local overlay, then separate immutable split geometry
    from learned cut metadata. Extract and regression-test a resumable serial pass-2 prefix cursor
    before scheduling limited-width batches. The ownership contract is in

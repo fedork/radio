@@ -8233,3 +8233,53 @@ verification over the domain of use, which for k=9 does not exist.
 recording: I first ran the R_0 filter one level too low and it rejected every candidate including
 every winner. A sound filter that removes the winner is always a bug in the caller, never a result —
 the 0/60 survival rate is what caught it.
+
+## 2026-08-20 (later still) — the predictor has to recurse, and the corpus for it already exists
+
+The flat-feature ranker stalled at median rank 76 of 54,014 with a learning curve flat from 26
+states, which says feature-set limit rather than data limit. `solvable(S,k)` is an AND-OR recursion,
+so the object to learn is the recursion — a value `V(S,k)` and a policy over splits, applied at every
+level — not a shape-to-cut map at one level. Design note in [ml-guided-search.md](ml-guided-search.md);
+nothing is measured yet and it is labelled as design.
+
+Three things came out of thinking it through that change what the project costs.
+
+**The training corpus is already sitting in the artifact store.** The adopted Sa(193) certificate is
+2,846,568 `(state, k) -> unsolvable` claims **spanning k=2 through k=9**, per level, normalized, with
+checked split hints, verified with zero gaps. Add 57,890 complete census winners at k=5 and k=6 for
+positives and 11.6M oracle facts in the solver caches. Nothing needs generating. The bias needs
+stating: the chain is all negatives from a single refutation lineage, so positives must come from the
+censuses and the witness trees.
+
+**The action space has to be factored, and that also fixes the cost problem.** There are
+`prod (n_i+1)(m_i+1)` splits, about 1e9 at a k=8 endpoint, so no softmax over actions and — the part
+that actually matters — no per-candidate network evaluation. Factoring the policy per part means one
+pass over `sum_i (n_i+1)(m_i+1)` ~ 1e3 options, and then the same `(S,X)` DP I used to count the
+candidate space exactly gives **exact top-k decoding** with the information cap enforced inside it.
+That is the difference between a feasible design and an unaffordable one, and it fell out of
+machinery already built for the measurement.
+
+**The soundness asymmetry decides where to aim.** Guidance is correctness-free for *achievability*:
+any witness tree a learned policy finds is still checked by `check_witness.py` against the Singleton
+Majorization Theorem, and by this repo's own evidence hierarchy such a tree stands even if the solver
+is wrong — a bad prediction costs time, never correctness. For *unsolvability* the OR-branches have
+to be exhausted, and pruning one by a learned value would manufacture exactly the false negatives the
+2023 corpus already shipped 37 times. So this points at the k=9 achievability frontier, where the
+14-month near-diagonal walk lives, and stays away from refutations.
+
+The named methods that fit are learning-to-branch (strong branching is precisely our exact child
+solve, and its evaluation protocol — end-to-end solve time, never prediction accuracy — is the one to
+copy), Proof Number Search as the host algorithm since it already carries per-node difficulty
+estimates on an AND-OR tree, expert iteration for bootstrapping, and Bellman consistency as a loss
+for pushing past the levels the solver reaches. Curriculum across k is justified by evidence rather
+than hope: the k=7 -> k=8 transfer is already measured.
+
+First experiment is deliberately small: a DeepSets value model over parts with `sqrt(3^k)`
+normalization, held out by *level* (train k<=6, test k=7) rather than at random, with a permuted-label
+control. It only earns a policy stage if that separates. And it gets judged on end-to-end CPU seconds
+against the sound filters it would displace — the per-part Pareto bound is 9-12x at full recall for a
+table lookup and `R_0` another 8x, so anything learned has to beat a table lookup on cost, not only on
+quality. A negative result there is worth recording with its cost.
+
+Also cleaned two stale next-step items: both level replays finished and were archived days ago but
+were still listed as running, and the numbering had collided.
