@@ -29,7 +29,12 @@ exec > >(tee -a supervisor.log) 2>&1
 
 put() { aws s3 cp "$1" "s3://$BUCKET/$PREFIX/$1" --no-progress >/dev/null 2>&1 || true; }
 
+# NOTE: no `set -e` semantics inside here, and no trailing conditional. The first version ended
+# with `[[ -f exit.status ]] && echo ...`, which returns 1 before the file exists; under `set -e`
+# that failed the function, killed the status subshell on its first iteration, and the run went
+# 20 minutes with no STATUS uploaded. A status writer must never be able to fail.
 write_status() {
+    set +e
     {
         date -u +updated_utc=%FT%TZ
         printf 'run_id=%s\nstate=%s\ncommit=%s\n' "$RUN_ID" "$1" "$COMMIT"
@@ -44,9 +49,14 @@ write_status() {
         echo 'last_chunks:'; grep -a '^OK loaded' out.txt 2>/dev/null | tail -3
         echo 'last_stats:';  grep -a '^OK queries=' out.txt 2>/dev/null | tail -1
         grep -a '^OK snapshot' out.txt 2>/dev/null | tail -1
-        [[ -f exit.status ]] && echo "exit_status=$(cat exit.status)"
-    } > STATUS
+        if [[ -f exit.status ]]; then echo "exit_status=$(cat exit.status)"; fi
+        if [[ -f abort.reason ]]; then echo "abort_reason=$(cat abort.reason)"; fi
+        return 0
+    } > STATUS 2>/dev/null
     put STATUS
+    put out.txt
+    set -e
+    return 0
 }
 
 echo "== fetching inputs =="
