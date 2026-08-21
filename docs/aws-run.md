@@ -2,8 +2,11 @@
 
 This page is the operational record for the completed cold runs, the solver-core verifier replays
 and the k=8 census that ran on the original shared instance; the findings go to
-[journal.md](journal.md) as usual. **Nothing is running.** As of 2026-08-20 the compute is fully
-wound down and only S3 and the release store hold state.
+[journal.md](journal.md) as usual. As of 2026-08-20 that compute is fully wound down and only S3
+and the release store hold state for it. **This is no longer true of the account as a whole**:
+2026-08-21 added a persistent `oracle-serve` instance with no planned end date — see
+[Persistent oracle-serve instance](#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date)
+below before assuming nothing is running.
 
 ## What is left
 
@@ -18,6 +21,47 @@ wound down and only S3 and the release store hold state.
 | bucket | `s3://radio-sa193-393287594714/` — unaffected by termination, and the only copy of the run3/run/run2/run4-7 raw logs |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
 | completion | every final upload and manifest was checked before each teardown; keep it that way |
+
+## Persistent oracle-serve instance (2026-08-21, no fixed end date)
+
+**Currently running and billing.** Different in kind from every run below: those loaded a fixed
+corpus and terminated; this one is a standing service meant to survive across sessions, at
+Fedor's explicit request (2026-08-21) — reachable without depending on a laptop that sleeps or
+loses connectivity. No planned end date; flag it at the start of any session that touches this
+thread, and check `tools/oracle_serve_status.sh` before assuming otherwise.
+
+| | |
+|---|---|
+| instance | `i-05196369e708e0740`, `r7i.large` (2 vCPU, 16 GiB), run `20260821T184140Z` |
+| purpose tag | `Purpose=oracle-serve` (distinct from `Purpose=oracle-prime`) |
+| build | `MAX_K=8 MAX_N=400`, commit `9cd7f73` — includes the new `enumerate` oracle command |
+| serving | `tools/oracle_server.py` on `127.0.0.1:7777` under systemd unit `radio-oracle-server`, cold start (no pre-loaded cache; grows its own from real queries), snapshots to local disk every 1800s |
+| reach it | `aws-vault exec --server default -- aws ssm start-session --target i-05196369e708e0740 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["7777"],"localPortNumber":["7777"]}'`, then talk to `127.0.0.1:7777` as a plain line-protocol socket (see `radio_oracle.c`'s header comment for the grammar). Needs `session-manager-plugin` locally (`brew install --cask session-manager-plugin`, requires sudo once) |
+| status | `tools/oracle_serve_status.sh 20260821T184140Z` |
+| stop (billing pauses, EBS persists) | `aws-vault exec --server default -- aws ec2 stop-instances --instance-ids i-05196369e708e0740` |
+| terminate (EBS persists too — `DeleteOnTermination=false`) | `aws-vault exec --server default -- aws ec2 terminate-instances --instance-ids i-05196369e708e0740` |
+
+**Sizing history, worth not repeating.** First launch used `MAX_K=9 MAX_N=500` for "headroom" with
+no evidence it was needed. On this same instance type it was still deep in `init()` past 500
+seconds and 2 GiB RSS with no end in sight — exactly the trap already on record
+("do not extrapolate solver cost from table dimensions... a padded MAX_N buys nothing"), now paid
+for on a live, billing instance instead of caught locally first. Terminated and relaunched at
+`MAX_K=8 MAX_N=400` (covers every state actually queried in this thread: 3-4 parts, side-sum up to
+~350) — init finished in 362 s at ~3.0 GiB RSS. Re-provision (rebuild larger, which means a fresh
+instance since `MAX_K`/`MAX_N` are compile-time) only once an actual query needs more, not for
+speculative headroom.
+
+Two bugs caught before/during this launch, both already fixed and committed: `restart_loop.sh`
+originally ran `python3 "$@"` where `"$@"` already started with `python3`, so it looped
+"python3: can't open file 'python3'" every 5 seconds without ever starting
+(`93fbd02`); and locally, `session-manager-plugin` wasn't installed and its Homebrew cask install
+needs an interactive sudo password this session couldn't supply, so the binary was extracted from
+the fetched `.pkg` by hand into `~/.local/bin` (already on `$PATH`) instead.
+
+Validated end-to-end after the fix: a plain query and an `enumerate` call over the actual SSM
+tunnel reproduced the exact local results (2 winners of 1,212,971,760 for the documented
+"knife edge" state), at 68.8 s for the enumerate call (vs 40 s on this Mac -- slower per-core, but
+usable).
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.

@@ -8854,3 +8854,31 @@ No fixed end date for this one, by request — it stays up across sessions rathe
 down at the end of this one. Flagging that plainly: **an oracle-serve instance may be running and
 billing right now** — check `tools/oracle_serve_status.sh` before assuming otherwise, and note it
 at the start of any session that picks this thread back up.
+
+**Launching it caught two real bugs, and one avoidable cost, before it actually worked.** First:
+`restart_loop.sh` ran `python3 "$@"`, but `"$@"` already started with `python3` (passed explicitly
+in the `systemd-run` command line) -- it looped "python3: can't open file 'python3'" every 5
+seconds, forever, never starting. Caught via `aws ssm send-command` diagnosis, not by watching a
+STATUS that never updated (it wrote once, correctly, then nothing -- the bug was downstream of
+where STATUS gets written). Fixed to plain `"$@"` (`93fbd02`).
+
+Second, more expensive: I sized the build `MAX_K=9 MAX_N=500` for "headroom" with no evidence it
+was needed. On the actual `r7i.large` it was still deep in `init()` past 500 seconds and 2 GiB RSS
+with no end in sight -- exactly the "do not extrapolate solver cost from table dimensions... a
+padded MAX_N buys nothing" trap already on record, except this time paid for on a live, billing
+instance rather than caught locally first. Terminated that instance and relaunched at
+`MAX_K=8 MAX_N=400` (`9cd7f73`) -- sized to what this thread has actually queried (3-4 parts,
+side-sum up to ~350), not to a round number. Init finished in 362 s at ~3.0 GiB RSS.
+
+Locally, `session-manager-plugin` (needed for the SSM port-forward) wasn't installed, and its
+Homebrew cask install wants an interactive sudo password this session couldn't supply. Fetched the
+cask without installing (`brew fetch --cask`), expanded the `.pkg` by hand (`pkgutil --expand`,
+then decompress the cpio `Payload`), and copied the binary to `~/.local/bin` (already on `$PATH`)
+instead of the system location the installer would have used.
+
+**Validated end-to-end after both fixes**, over the actual SSM tunnel, not just locally: a plain
+query and an `enumerate` call reproduced the exact local results -- 2 winners of 1,212,971,760 for
+the documented knife-edge state -- at 68.8 s (vs 40 s on this Mac; slower per-core on this cloud
+instance's CPU, but perfectly usable). The persistent oracle is real, reachable, and running.
+Full record, including the exact instance ID and reach/stop/terminate commands:
+[aws-run.md](aws-run.md#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date).
