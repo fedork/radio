@@ -8818,7 +8818,15 @@ check to any future long local run rather than trusting elapsed time blindly.
 
 Evidence: [../evidence/real_benchmark_4part_2or4_2026-08-21.txt](../evidence/real_benchmark_4part_2or4_2026-08-21.txt).
 
-## 2026-08-21 (done) — moving enumeration into the oracle, and off the laptop
+## 2026-08-21 (done, deployment details below superseded) — moving enumeration into the oracle, and off the laptop
+
+**The deployment this entry describes (cold start, `MAX_K=8 MAX_N=400`, instance
+`i-05196369e708e0740`) was superseded the same day** once Fedor asked for a real warm start
+instead — see the later entry below and
+[aws-run.md](aws-run.md#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date) for the
+final instance, ID, and validated result. The `enumerate` capability and the C-side design
+described here are unaffected and still accurate; only the specific instance/build/cold-start
+choice changed.
 
 The 60-minute run above was the last straw for doing this in Python. `radiobase.c` already has
 everything needed: `all_solutions` enumerates every raw split (no pre-filter, which is why it's
@@ -8882,3 +8890,62 @@ the documented knife-edge state -- at 68.8 s (vs 40 s on this Mac; slower per-co
 instance's CPU, but perfectly usable). The persistent oracle is real, reachable, and running.
 Full record, including the exact instance ID and reach/stop/terminate commands:
 [aws-run.md](aws-run.md#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date).
+
+## 2026-08-21 (done) — the real warm start: base snapshot + certificate, and three bugs caught live
+
+Fedor's actual ask, arriving right as the entry above shipped: don't cold-start this, load all
+available certified facts (a couple of hours is fine, faster than re-solving), and make sure it
+can load its own snapshot too. Slow init is fine -- give it time.
+
+**Loading the certificate needed a real converter, not a text substitution.** The sa193
+certificate stores claims in a compact `part`/`claim`/`fact` format
+(`radio-negative-level-certificate-v2`), not the "can't solve Sb(...) in k" lines a raw solver log
+emits -- `radio_oracle.c`'s `load` command expects the further-distilled `parse_out.sh` cache-line
+grammar (`- b n1 m1 ... t pairs n k`). Wrote `tools/cert_to_cache.py`, reusing
+`check_level_chain.py`'s already-verified `Level` parser rather than re-implementing it. The one
+real risk -- a wrong part order silently corrupting the dominance trie rather than crashing --
+turned out not to apply: reading `cacheCantSolve` in `radiobase.c` shows it explicitly rotates
+every remaining part into the pivot position at each recursion level ("other part permutations in
+this call may still add information"), unlike `cacheCanSolve`, which does assume `sort1`'s
+descending order. Every certificate claim is negative, so only the permutation-robust path is ever
+exercised.
+
+**Trusted that reading, then checked it lived, at three scales.** Generated a perturbed-neighbor
+control population at each scale -- take a certified claim, nudge one coin on one part, solve the
+result FRESH on an oracle with nothing loaded, independent of the certificate or the converter --
+then loaded the certificate and re-checked both the claims (must be UNSOLVABLE) and the neighbors
+(must match their independent ground truth exactly). k=3 (127 claims, 69 neighbors): 0 mismatches.
+k=5 (80,634 claims, 1,112 neighbors): 0 mismatches, 3.3 s load. Full chain, all 8 levels
+(2,846,568 claims): 0 mismatches on a 1,145-claim cross-level sample and 46 k<=7 neighbor
+controls, 414.5 s load. k=8/k=9 neighbors couldn't get real ground truth this way -- every cold
+solve hit MAYBE at a 10-15 s budget, which is exactly why the certificate exists (these are the
+near-saturated Sa(193)-boundary states run9 spent days refuting) -- but their post-load behavior
+was the most informative result of the day: for five k=8 and five k=9 perturbed pairs, one side of
+each now resolves to UNSOLVABLE instantly (certificate-covered) while the other still needs real
+search and hits MAYBE again -- a sharp, structurally sensible split, not corruption bleeding
+either direction. Also validated the exact production sequence, not just each half separately:
+dumped a snapshot from an oracle already holding one certificate level, started a fresh process,
+restore-any'd from it, then loaded a different level's file on top -- both an old fact (from the
+restore) and a new one (from the load) resolved correctly in the same process.
+
+**Rewired the deploy script, and it caught two more bugs on the actual instance, live.** Rebuilt at
+`MAX_K=9 MAX_N=300` to match the existing base snapshot's geometry (needed for `restore-any`).
+First relaunch attempt (`i-0a64e15e18061c334`) crash-looped every 5 seconds, harmlessly: a real
+argparse ambiguity -- `oracle_server.py`'s `caches` positional (`nargs='*'`) has to come
+immediately after the binary positional, before any `--flag`, or argparse reports the cache path
+as unrecognized. The process never got past argument parsing, so nothing was corrupted, just
+nothing served. Fixed and reproduced with a 4-line minimal repro before touching AWS again
+(`d9e3f03`). The corrected relaunch (`i-002cabc654b2078ed`) came up clean: 35 s to restore the
+21.9M-fact base snapshot (matches the earlier measurement), then **560.6 s** to load the
+certificate on top -- slower than the 414.5 s empty-cache local measurement, because inserting
+2.85M more facts into an already-large warm trie costs more per fact than inserting into an empty
+one. Worth remembering next time rather than re-deriving: don't extrapolate one cache-load
+scenario's cost onto a differently-loaded one, same trap as the hump-shaped full-prime load, one
+more shape of it.
+
+Validated on the real, final, serving instance over the actual tunnel: a known certificate claim
+resolved `UNSOLVABLE` in 0.0 ms (instant cache hit), and `enumerate` on the knife-edge state
+returned the identical correct answer as every earlier test. Full instance record, superseded
+history, and reach/stop/terminate commands:
+[aws-run.md](aws-run.md#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date). ~10 GiB
+resident of 16 GiB after warm-start -- real but not huge headroom; watch it.

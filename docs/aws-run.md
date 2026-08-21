@@ -27,41 +27,53 @@ below before assuming nothing is running.
 **Currently running and billing.** Different in kind from every run below: those loaded a fixed
 corpus and terminated; this one is a standing service meant to survive across sessions, at
 Fedor's explicit request (2026-08-21) — reachable without depending on a laptop that sleeps or
-loses connectivity. No planned end date; flag it at the start of any session that touches this
-thread, and check `tools/oracle_serve_status.sh` before assuming otherwise.
+loses connectivity, and explicitly warm-started (never cold) from the archived corpus plus the
+sa193 certificate of record. No planned end date; flag it at the start of any session that touches
+this thread, and check `tools/oracle_serve_status.sh` before assuming otherwise.
 
 | | |
 |---|---|
-| instance | `i-05196369e708e0740`, `r7i.large` (2 vCPU, 16 GiB), run `20260821T184140Z` |
+| instance | `i-002cabc654b2078ed`, `r7i.large` (2 vCPU, 16 GiB), run `20260821T202105Z` |
 | purpose tag | `Purpose=oracle-serve` (distinct from `Purpose=oracle-prime`) |
-| build | `MAX_K=8 MAX_N=400`, commit `9cd7f73` — includes the new `enumerate` oracle command |
-| serving | `tools/oracle_server.py` on `127.0.0.1:7777` under systemd unit `radio-oracle-server`, cold start (no pre-loaded cache; grows its own from real queries), snapshots to local disk every 1800s |
-| reach it | `aws-vault exec --server default -- aws ssm start-session --target i-05196369e708e0740 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["7777"],"localPortNumber":["7777"]}'`, then talk to `127.0.0.1:7777` as a plain line-protocol socket (see `radio_oracle.c`'s header comment for the grammar). Needs `session-manager-plugin` locally (`brew install --cask session-manager-plugin`, requires sudo once) |
-| status | `tools/oracle_serve_status.sh 20260821T184140Z` |
-| stop (billing pauses, EBS persists) | `aws-vault exec --server default -- aws ec2 stop-instances --instance-ids i-05196369e708e0740` |
-| terminate (EBS persists too — `DeleteOnTermination=false`) | `aws-vault exec --server default -- aws ec2 terminate-instances --instance-ids i-05196369e708e0740` |
+| build | `MAX_K=9 MAX_N=300`, commit `d9e3f03` — includes the `enumerate` command; geometry matches the base snapshot for `restore-any` |
+| warm start | restored the validated 21.9M-fact base snapshot (35 s), then loaded the sa193 certificate of record on top (2,846,568 more facts, **560.6 s** — slower than the 414.5 s empty-cache local measurement, because inserting into an already-large warm trie costs more per fact; do not extrapolate one from the other). Total warm-start ~10 minutes, not a cold start and not the multi-hour raw-replay alternative |
+| memory after warm-start | ~10 GiB resident of 16 GiB total (5.3 GiB free) — real but not huge headroom for cache growth from here; watch `STATUS`'s `host_mem_available_gib` and re-provision if it tightens |
+| serving | `tools/oracle_server.py` on `127.0.0.1:7777` under systemd unit `radio-oracle-server`, snapshots to local disk every 1800s; a within-boot crash restarts from that local snapshot and skips re-fetching the external warm-start entirely |
+| reach it | `aws-vault exec --server default -- aws ssm start-session --target i-002cabc654b2078ed --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["7777"],"localPortNumber":["7777"]}'`, then talk to `127.0.0.1:7777` as a plain line-protocol socket (see `radio_oracle.c`'s header comment for the grammar, including `enumerate`). Needs `session-manager-plugin` locally (`brew install --cask session-manager-plugin`, requires sudo once) |
+| status | `tools/oracle_serve_status.sh 20260821T202105Z` |
+| stop (billing pauses, EBS persists) | `aws-vault exec --server default -- aws ec2 stop-instances --instance-ids i-002cabc654b2078ed` |
+| terminate (EBS persists too — `DeleteOnTermination=false`) | `aws-vault exec --server default -- aws ec2 terminate-instances --instance-ids i-002cabc654b2078ed` |
 
-**Sizing history, worth not repeating.** First launch used `MAX_K=9 MAX_N=500` for "headroom" with
-no evidence it was needed. On this same instance type it was still deep in `init()` past 500
-seconds and 2 GiB RSS with no end in sight — exactly the trap already on record
-("do not extrapolate solver cost from table dimensions... a padded MAX_N buys nothing"), now paid
-for on a live, billing instance instead of caught locally first. Terminated and relaunched at
-`MAX_K=8 MAX_N=400` (covers every state actually queried in this thread: 3-4 parts, side-sum up to
-~350) — init finished in 362 s at ~3.0 GiB RSS. Re-provision (rebuild larger, which means a fresh
-instance since `MAX_K`/`MAX_N` are compile-time) only once an actual query needs more, not for
-speculative headroom.
+**This superseded two earlier same-day launches, both terminated, each catching a real bug before
+it could corrupt anything:**
 
-Two bugs caught before/during this launch, both already fixed and committed: `restart_loop.sh`
-originally ran `python3 "$@"` where `"$@"` already started with `python3`, so it looped
-"python3: can't open file 'python3'" every 5 seconds without ever starting
-(`93fbd02`); and locally, `session-manager-plugin` wasn't installed and its Homebrew cask install
-needs an interactive sudo password this session couldn't supply, so the binary was extracted from
-the fetched `.pkg` by hand into `~/.local/bin` (already on `$PATH`) instead.
+1. `i-05196369e708e0740` (`MAX_K=8 MAX_N=400`, cold start, no cert): sized `MAX_N=500` on the very
+   first attempt before this one for unearned "headroom" — still deep in `init()` past 500 s and
+   2 GiB RSS with no end in sight, exactly the trap already on record ("do not extrapolate solver
+   cost from table dimensions... a padded MAX_N buys nothing"), paid for on a live, billing
+   instance instead of caught locally first. Also had a `restart_loop.sh` bug (ran `python3 "$@"`
+   where `"$@"` already started with `python3`, crash-looping "can't open file 'python3'" every
+   5 s). Terminated once the cert-loading design was settled and `MAX_N=300` was chosen instead
+   (to match the base snapshot's geometry) — this instance was never actually broken by that
+   specific bug at the time, it was superseded before serving real traffic.
+2. `i-0a64e15e18061c334` (`MAX_K=9 MAX_N=300`, first attempt at the base-snapshot + certificate
+   warm start): a real argparse bug — `oracle_server.py`'s `caches` positional (`nargs='*'`) must
+   come immediately after the binary positional, before any `--flag`; placing it after
+   `--restore X` made argparse report the cache path as an unrecognized argument. The restart loop
+   crash-looped on this every 5 s, harmlessly (the process never got past argument parsing, so no
+   facts, queries, or cache mutation ever happened). Fixed in `d9e3f03`; the current instance is
+   the corrected relaunch.
 
-Validated end-to-end after the fix: a plain query and an `enumerate` call over the actual SSM
-tunnel reproduced the exact local results (2 winners of 1,212,971,760 for the documented
-"knife edge" state), at 68.8 s for the enumerate call (vs 40 s on this Mac -- slower per-core, but
-usable).
+Local `session-manager-plugin` also wasn't installed and its Homebrew cask install needs an
+interactive sudo password this session couldn't supply, so the binary was extracted from the
+fetched `.pkg` by hand into `~/.local/bin` (already on `$PATH`) instead.
+
+**Validated end-to-end on the actual serving instance**, not just locally: a known sa193
+certificate claim resolved `UNSOLVABLE` in 0.0 ms (an instant cache hit, as expected for a
+certificate-covered state), and `enumerate` on the documented "knife edge" state
+(`Sb(16:12,17:10,29:5,21:6)@6`) returned the exact same correct answer as every prior test — 2
+winners, 1,212,971,760 checked — in 66.3 s over the real SSM tunnel (vs 40-69 s measured
+elsewhere; consistent, not a regression).
 
 Each Sa run was internally serialized: one process and cache handled all sixteen top-level states in
 sequence. Every run was isolated by directory, binary, cache, raw log, watchdog and S3 prefix.
