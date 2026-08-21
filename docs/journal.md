@@ -8772,11 +8772,16 @@ about 4-5 parts.
 **Scope, stated plainly.** n=1 per part count — three real states, not a systematic sweep. The
 8-part comparison is against a historical default-order figure from a different build/cache era,
 not confirmed fresh on the current build the way the 4-part control's 37,899 was (independently
-identical across two engine builds). And 8-part states specifically are a different regime at k=6
-than the one tested here: the documented record shows 8-part, near-saturated-mass k=6 states are
-*never* solvable (0 of 165 sampled) and are 99.57% of all k=6 solver cost — a pure refutation
-problem, out of scope for guidance that must stay achievability-only. The state tested here is at
-k=5 and is a genuine, independently-verified positive.
+identical across two engine builds).
+
+**Correction, same day: the "8-part k=6 is never solvable" aside above was wrong to assert.**
+Fedor caught it: the 0-of-165 figure (2026-08-08 journal entry) came from one specific solver
+run's log, not a neutral sample of 8-part k=6 states, and I never checked whether that run's own
+selection was biased toward negatives before treating the count as a structural fact. It may well
+be — this is exactly the "check how the sample was obtained" discipline the disjoint-corpora trap
+already exists for, applied to a corpus I hadn't scrutinized. No conclusion about 8-part k=6
+solvability, either direction, survives from this entry. The state actually tested above is at
+k=5 and is a genuine, independently-verified positive, unaffected by this retraction.
 
 Both new witnesses independently re-verified in a fresh process (mass arithmetic exact, all three
 children genuinely `SOLVABLE`), same discipline as the 4-part result. Scripts:

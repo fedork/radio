@@ -76,11 +76,16 @@ WHAT THIS DOES AND DOES NOT SHOW
   from a different build/cache era, not a fresh same-build measurement -- unlike the 4-part
   control, where the 37,899 figure was independently confirmed identical across two different
   engine builds. Treat 52-vs-18.86M as indicative of scale, not as a precise ratio.
-* 8-part states at k=6 specifically are a *different regime entirely* and out of scope here: the
-  documented record (docs/journal.md) shows 8-part, near-saturated-mass k=6 states are **never
-  solvable** (0 of 165 sampled) and account for 99.57% of all k=6 solver cost. That is a pure
-  refutation problem, which this thread's guidance is explicitly not safe to touch (achievability
-  only). The 8-part state tested here is at k=5 and is a genuine positive.
+* **Retracted, 2026-08-21 (same day):** an earlier version of this note read the "0 of 165 8-part
+  k=6 states solvable" figure (docs/journal.md, 2026-08-08) as a structural fact and scoped 8-part
+  k=6 out of this thread as "a pure refutation regime." That is not established. Those 165 states
+  came from one specific solver run's log, not a neutral sample of all 8-part k=6 states, and
+  whether that run's selection was itself biased toward negatives (e.g. because it walked a
+  refutation-heavy search) has not been checked. Solvable 8-part k=6 states may well exist and be
+  under-represented in that particular log for reasons having nothing to do with k=6/8-part being
+  intrinsically unsolvable — exactly the kind of corpus-provenance question this repo's own trap
+  table already warns about for a different pair of corpora. No claim about 8-part k=6
+  solvability, either direction, is made here. The 8-part state actually tested above is at k=5.
 * 1- and 2-part states were not tested because there is nothing to test: both are already solved
   exactly, with no split search, by existing non-learned methods in this codebase.
 * Not yet wired into radiobase.c, still real-oracle-as-black-box validation.
