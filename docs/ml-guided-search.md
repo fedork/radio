@@ -14,7 +14,7 @@ into `radiobase.c`'s own split loop is the remaining step.** Every number below 
 ## Read this first if you are picking the thread up
 
 The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
-verdicts sooner. Eight things are already in place; wiring one of them into the solver is not.
+verdicts sooner. Nine things are already in place; wiring one of them into the solver is not.
 
 **Built and measured.**
 
@@ -28,6 +28,7 @@ verdicts sooner. Eight things are already in place; wiring one of them into the 
 | **worst case (sound) + order (learned)**, composed | `tools/ml/recursive_value.py` (Experiment 3) | `R_0` gives a real, theorem-backed cutoff — median 6,892 / worst 16,547 survivors, vs stage-2's up to 130,262 — that shrinks **more** on the hardest endpoints (10.6x vs 4.7x), and once applied first, the recursive ranker's hard-case degradation (median rank doubling, worst near-blind) disappears entirely (correlation with hardness drops from 0.129 to 0.001) |
 | **end-to-end, real solver calls, no proxy** | `/tmp/rec/real_benchmark.py` (not committed; self-contained, reproducible) | on this repo's own "residual positive control" `Sb(29:6,19:9,13:12,36:3)@6` (documented: 37,899 top-level splits, 26.6-33 CPU s under the current default order), the composed pipeline finds an independently-verified working split after **67** real, oracle-checked top-level candidates — a **566x** reduction — while the same `R_0` survivors in natural order had not found one after 1,340 tries |
 | **same, across 3/4/8-part states** | `/tmp/rec/real_benchmark_generic.py`, `/tmp/rec/real_benchmark_beam.py` | candidates-to-success is **43 / 67 / 52** — remarkably stable across a 3-8 part range and 9 orders of magnitude of raw search space, using the SAME value model, untouched. What actually needed to change by part count was candidate *generation*: exact DP enumeration broke (OOM) at 8 parts and needed a width-bounded beam variant, tried 5 times before succeeding — the scorer needed zero changes |
+| **native `enumerate` oracle command — every winning split, exactly, in seconds** | `radio_oracle.c` (additive; `docs/tools.md` protocol) | replaces the Python-driven enumeration entirely: exact match to two documented ground truths (2 winners of 1,212,971,760; the residual control's complete list, 6 winners + 2 inconclusive) in 40s-7min, where the Python-plus-oracle pipeline took 40-60+ minutes for a single found witness. Sound `R_0` pre-filter before ever calling `canSolveB`; scoped to raw-space cost so not yet usable past ~4-5 parts. See [../evidence/oracle_enumerate_2026-08-21.txt](../evidence/oracle_enumerate_2026-08-21.txt) |
 | corpus analysis | `tools/analyze_single_solution_cuts.py` | the forced-cut structure of both censuses |
 
 **Not done: wiring a prototype into `radiobase.c`'s own split loop.** Every result above except

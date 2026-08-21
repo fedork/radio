@@ -1,0 +1,60 @@
+A new oracle capability: enumerate every winning split of a state, not just its solvability
+Status: measured, validated against two exact documented ground truths. Code: radio_oracle.c
+(additive only -- radiobase.c untouched), new `enumerate <k> <n1> <m1> ...` command.
+
+WHY: every real-oracle test in this thread so far (real_benchmark_residual_control_2026-08-21.txt
+and its successors) drove the enumeration and R_0 filtering from Python, at Python speed, against
+one warm C oracle used only as a per-candidate verdict lookup. That's why a single state's test
+took 40-60 minutes. The actual enumeration and the sound R_0 pre-filter are simple, fast
+operations already implemented in C for other purposes (`all_solutions` in radiobase.c enumerates
+every raw split with no pre-filter; `star_expansion_majorization_can_solve` is R_0 itself). Moving
+both into the oracle process removes nearly all of that overhead.
+
+WHAT WAS ADDED, and how it stays safe:
+* `r0_admissible(sb, size, k)`: cap check + `star_expansion_majorization_can_solve` (R_0, proved
+  in docs/theorems/singleton-majorization.md). A sound necessary condition -- can only reject a
+  candidate that theorem-provably cannot work, never a true winner.
+* `enumerate_winning_splits(k, sb, size)`: the same unfiltered mixed-radix walk `all_solutions`
+  already uses (visits every raw (m1,m2) per part), but checks `r0_admissible` on all three
+  children BEFORE ever calling `canSolveB`, and calls `canSolveB` (the real, unmodified solver)
+  only for the sound-admissible remainder. `MAYBE` verdicts are counted separately
+  (`inconclusive`) and never folded into "not a winner" -- the same discipline every other query
+  in this codebase already follows.
+* Neither function modifies canSolveB, its cache, or any existing command. This is the same
+  narrow-safe-exception shape as `radio_refute.c`: new orchestration code calling only
+  already-proven building blocks.
+
+VALIDATION -- exact match against known ground truth, not just plausible output:
+  Sb(16:12,17:10,29:5,21:6)@6, documented "knife edge": exactly 2 winners of 1,212,971,760.
+    enumerate returned: winners=2, checked=1,212,971,760 (exact match on BOTH numbers), in 40 s.
+    One of the two, [8:7,4:2,12:2,19:6], is EXACTLY the split this thread's much slower
+    Python-plus-oracle pipeline found independently the same day at real-oracle candidate #1,373
+    (real_benchmark_4part_2or4_2026-08-21.txt) -- an unplanned cross-check that both were correct.
+
+  Sb(29:6,19:9,13:12,36:3)@6, the residual positive control: previously only 2 literal winners
+  were known (one documented, one found by this thread). Full enumeration finds the complete
+  answer: exactly 6, in 7 minutes:
+    [21:5,11:5,2:1,17:1]  [20:5,11:6,2:1,15:1]  [15:3,15:8,2:2,17:1]
+    [14:3,4:1,11:10,19:2] [9:1,8:3,11:11,21:2]  [8:1,8:4,11:11,19:2]
+  plus 2 admissible candidates left `inconclusive` (a 30s per-child budget could not decide them --
+  correctly not counted as non-winners; the true total could be as high as 8).
+  **This state does not actually belong to the "2 or 4 winners" tier** -- worth knowing before
+  using it as a representative example of that population going forward.
+
+COST: ~40 s (6,870,052 admissible of 1,212,971,760 checked) for the knife-edge state, ~7 min
+(5,767,254 admissible of 1,131,312,000 checked, 2 inconclusive) for the residual control --
+against the Python-plus-oracle pipeline's 40-60+ minutes for far less complete answers (a single
+found witness, not the exhaustive list). Two to three orders of magnitude faster, and now exact
+rather than approximate/sampled.
+
+SCOPE, same as noted in the function's own C comment: this is the raw, unpruned mixed-radix walk,
+so its cost is the RAW combinatorial size, not the admissible size. Fine through 3-4 parts with
+moderate n,m. NOT fine at 8 parts (raw space up to ~1.4e13, see
+evidence/real_benchmark_by_part_count_2026-08-21.txt) -- would not finish in reasonable time. A
+version that prunes during the walk using partial cap sums, not just completed leaves, would be
+needed there; not built.
+
+Protocol addition (radio_oracle.c header comment has the exact grammar):
+  enumerate <k> <n1> <m1> ...  ->  zero or more `WINNER <m1>:<m2> ...` lines, then one
+                                    `ENUM_END k=<k> winners=<n> checked=<n> admissible=<n>
+                                    inconclusive=<n>` line.

@@ -8817,3 +8817,40 @@ files, should now be read as an upper bound, not a measurement. Worth adding a h
 check to any future long local run rather than trusting elapsed time blindly.
 
 Evidence: [../evidence/real_benchmark_4part_2or4_2026-08-21.txt](../evidence/real_benchmark_4part_2or4_2026-08-21.txt).
+
+## 2026-08-21 (done) — moving enumeration into the oracle, and off the laptop
+
+The 60-minute run above was the last straw for doing this in Python. `radiobase.c` already has
+everything needed: `all_solutions` enumerates every raw split (no pre-filter, which is why it's
+slow), and `star_expansion_majorization_can_solve` is `R_0` itself, already proven and already
+used inline by `canSolveB`. Added one new, purely additive `radio_oracle.c` command,
+`enumerate <k> <n1> <m1> ...`: the same raw mixed-radix walk `all_solutions` uses, but check `R_0`
+on all three children before ever paying for a real `canSolveB` call, and return the exact winner
+list instead of a visualization grid. `radiobase.c` itself is untouched.
+
+Validated against two exact ground truths, not just "looks plausible": the knife-edge state
+matched 2 winners of 1,212,971,760 exactly, in 40 seconds (the Python pipeline took an hour for
+one witness). The residual control's complete winner list is now known for the first time: 6
+winners (not 2 or 4 — it was never actually in the tier we're focusing on) plus 2 correctly-
+flagged-inconclusive candidates, in 7 minutes. One of the knife-edge winners, `[8:7,4:2,12:2,
+19:6]`, is exactly what the slow Python-plus-oracle run found the same day at candidate #1,373 —
+an accidental but welcome cross-check that both were right.
+
+Then the actual ask: get this off a laptop that sleeps and loses connectivity. Wrote
+`tools/oracle_server.py`, a small TCP front-end so the one long-lived oracle subprocess can be
+reached from any future session (via an SSM port-forward, never a public port) instead of needing
+a live terminal attached to it; it periodically dumps a local snapshot so a crash loses at most
+one interval. `tools/oracle_serve_ec2_launch.sh` / `oracle_serve_ec2_remote.sh` /
+`oracle_serve_status.sh` adapt the existing `oracle_prime_ec2_launch.sh` pattern (same subnet,
+security group, IAM profile, S3-bundle bootstrap) but for a persistent service rather than a
+one-shot load-and-terminate job: no hard-stop, cold start (grows its own cache from real queries,
+by design — this isn't the sa193 lineage), r7i.large (2 vCPU: one for the solver, one for the
+request loop; 16 GiB — Fedor's sizing, room for a cache that grows once long states are being
+solved regularly), on-demand rather than Spot because the whole point is not depending on
+interruption. EBS `DeleteOnTermination=false`, unlike the disposable oracle-prime volumes, since
+the accumulated cache is the thing worth keeping.
+
+No fixed end date for this one, by request — it stays up across sessions rather than being torn
+down at the end of this one. Flagging that plainly: **an oracle-serve instance may be running and
+billing right now** — check `tools/oracle_serve_status.sh` before assuming otherwise, and note it
+at the start of any session that picks this thread back up.

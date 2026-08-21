@@ -14,6 +14,12 @@
 // lines and lines starting with '#' are ignored.
 //
 //   <k> <n1> <m1> [<n2> <m2> ...]   ->  VERDICT <SOLVABLE|UNSOLVABLE|MAYBE> k=<k> ms=<n> <state>
+//   enumerate <k> <n1> <m1> ...     ->  zero or more WINNER <m1>:<m2>,... lines, then
+//                                       ENUM_END k=<k> winners=<n> checked=<n> admissible=<n>
+//                                       inconclusive=<n>   (every top-level split whose three
+//                                       children are ALL solvable; `inconclusive` counts splits a
+//                                       finite budget could not decide -- never read as "not a
+//                                       winner"; raw-space cost, see the function's own comment)
 //   budget <seconds>                ->  OK budget=<seconds>   (0 means no deadline)
 //   load <path>                     ->  OK loaded <path>
 //   stats                           ->  OK queries=<n> solvable=<n> unsolvable=<n> maybe=<n> ...
@@ -147,6 +153,113 @@ static void respond_verdict(int r, int k, double ms, int *sb, int size) {
     fflush(resp);
 }
 
+/* ---- enumerate: every winning top-level split of a state, not just its own solvability -------
+   New capability, additive only -- radiobase.c is untouched. Reuses the same building blocks
+   canSolveB itself trusts: `star_expansion_majorization_can_solve` (R_0, proved in
+   docs/theorems/singleton-majorization.md) as a sound pre-filter before ever paying for a real
+   solve, and canSolveB for the exact verdict. R_0 can only ever reject a true winner if the
+   theorem is wrong, which is the same trust every other positive result in this codebase already
+   rests on.
+
+   Enumeration itself is the unfiltered mixed-radix walk `all_solutions` already uses (every raw
+   (m1,m2) per part) -- correct and simple, but with no pruning of whole sub-trees, so its cost is
+   the RAW combinatorial size, not the R_0-admissible size. That is fine through 3-4 parts with
+   moderate n,m (seconds), and was not made to scale further: an 8-part state's raw space can reach
+   1e13+ (see evidence/real_benchmark_by_part_count_2026-08-21.txt) and this function would not
+   finish it in any reasonable time. A future version needing that would prune during the walk
+   using partial cap sums, not just filter completed leaves. */
+static int r0_admissible(const int *sb, int size, int k) {
+    int nonunit[size];
+    int nonunit_size = 0;
+    int pairs_full = 0;
+    int i;
+    for (i = 0; i < size; i++) {
+        pairs_full += sb_pairs[sb[i]];
+        if (sb[i] > 1) nonunit[nonunit_size++] = sb[i];
+    }
+    if (pairs_full > power3[k]) return FALSE;
+    if (nonunit_size == 0) return TRUE;
+    return star_expansion_majorization_can_solve(nonunit, nonunit_size, k);
+}
+
+static void enumerate_winning_splits(int k, int *sb_in, int size_in) {
+    int tmp[size_in];
+    int newsize = 0, i;
+    for (i = 0; i < size_in; i++)
+        if (sb_in[i] > 1) tmp[newsize++] = sb_in[i];
+    int size = newsize;
+    if (size == 0) {
+        respond("ENUM_END k=%d winners=0 checked=0 admissible=0 inconclusive=0 trivial=yes", k);
+        return;
+    }
+    sort1(tmp, size);
+
+    int n[size * 2], m[size * 2];
+    int sb0[size], sb2[size], sb1[size * 2];
+    for (i = 0; i < size; i++) {
+        n[i * 2] = sbb_to_n1[tmp[i]];
+        n[i * 2 + 1] = sbb_to_n2[tmp[i]];
+        m[i * 2] = 0;
+        m[i * 2 + 1] = 0;
+    }
+
+    long long checked = 0, admissible = 0, winners = 0, inconclusive = 0;
+    m[0] = 1 + n[0];
+    int j = 0;
+    while (1) {
+        while (m[j] == 0) {
+            if (j == 0) goto done;
+            j--;
+        }
+        m[j]--;
+        for (i = 0; i < size; i++) {
+            sb0[i] = getSbb(m[i * 2], m[i * 2 + 1]);
+            sb2[i] = getSbb(n[i * 2] - m[i * 2], n[i * 2 + 1] - m[i * 2 + 1]);
+            sb1[i * 2] = getSbb(m[i * 2], n[i * 2 + 1] - m[i * 2 + 1]);
+            sb1[i * 2 + 1] = getSbb(n[i * 2] - m[i * 2], m[i * 2 + 1]);
+        }
+        if (j == size * 2 - 1) {
+            checked++;
+            if (r0_admissible(sb0, size, k - 1) &&
+                r0_admissible(sb2, size, k - 1) &&
+                r0_admissible(sb1, size * 2, k - 1)) {
+                admissible++;
+                uint64_t d = query_budget_seconds
+                                 ? radio_budget_after_seconds(query_budget_seconds)
+                                 : NO_DEADLINE;
+                int r0v = canSolveB(sb0, size, k - 1, d);
+                int r2v = FALSE, r1v = FALSE;
+                if (r0v != FALSE) {
+                    d = query_budget_seconds ? radio_budget_after_seconds(query_budget_seconds)
+                                              : NO_DEADLINE;
+                    r2v = canSolveB(sb2, size, k - 1, d);
+                    if (r2v != FALSE) {
+                        d = query_budget_seconds
+                                ? radio_budget_after_seconds(query_budget_seconds)
+                                : NO_DEADLINE;
+                        r1v = canSolveB(sb1, size * 2, k - 1, d);
+                    }
+                }
+                if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
+                    winners++;
+                    fprintf(resp, "WINNER");
+                    for (i = 0; i < size; i++)
+                        fprintf(resp, " %d:%d", m[i * 2], m[i * 2 + 1]);
+                    fprintf(resp, "\n");
+                } else if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) {
+                    inconclusive++;   /* MAYBE is not a refutation -- never counted as "not a winner" */
+                }
+            }
+        } else {
+            j++;
+            m[j] = n[j] + 1;
+        }
+    }
+done:
+    fflush(resp);
+    respond("ENUM_END k=%d winners=%lld checked=%lld admissible=%lld inconclusive=%lld",
+            k, winners, checked, admissible, inconclusive);
+}
 
 /* ---- binary snapshot -------------------------------------------------------------------------
    Replaying facts re-derives the dominance closure the original run already computed, which is why
@@ -408,9 +521,12 @@ int main(int argc, char **argv) {
             continue;
         }
 
+        int is_enumerate = !strncmp(line, "enumerate ", 10);
+        char *body = is_enumerate ? line + 10 : line;
+
         // <k> <n1> <m1> [<n2> <m2> ...]
         int vals[512], nv = 0;
-        char *tok = strtok(line, " \t");
+        char *tok = strtok(body, " \t");
         int bad = 0;
         while (tok && nv < 512) {
             char *end;
@@ -430,6 +546,11 @@ int main(int argc, char **argv) {
         int sb[512];
         for (int i = 0; i < size; i++)
             sb[i] = getSbb(vals[1 + 2 * i], vals[2 + 2 * i]);
+
+        if (is_enumerate) {
+            enumerate_winning_splits(k, sb, size);
+            continue;
+        }
 
         double t0 = now_ms();
         uint64_t deadline = query_budget_seconds
