@@ -14,7 +14,7 @@ into `radiobase.c`'s own split loop is the remaining step.** Every number below 
 ## Read this first if you are picking the thread up
 
 The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
-verdicts sooner. Seven things are already in place; wiring one of them into the solver is not.
+verdicts sooner. Eight things are already in place; wiring one of them into the solver is not.
 
 **Built and measured.**
 
@@ -27,6 +27,7 @@ verdicts sooner. Seven things are already in place; wiring one of them into the 
 | recursive cut scorer | `tools/ml/recursive_value.py` | scoring a split by `min(V(child))`, with **zero split-label supervision**, reaches **120x** selectivity vs a directly-supervised flat ranker's 130.5x, on the identical 153 real forced k7 endpoints |
 | **worst case (sound) + order (learned)**, composed | `tools/ml/recursive_value.py` (Experiment 3) | `R_0` gives a real, theorem-backed cutoff — median 6,892 / worst 16,547 survivors, vs stage-2's up to 130,262 — that shrinks **more** on the hardest endpoints (10.6x vs 4.7x), and once applied first, the recursive ranker's hard-case degradation (median rank doubling, worst near-blind) disappears entirely (correlation with hardness drops from 0.129 to 0.001) |
 | **end-to-end, real solver calls, no proxy** | `/tmp/rec/real_benchmark.py` (not committed; self-contained, reproducible) | on this repo's own "residual positive control" `Sb(29:6,19:9,13:12,36:3)@6` (documented: 37,899 top-level splits, 26.6-33 CPU s under the current default order), the composed pipeline finds an independently-verified working split after **67** real, oracle-checked top-level candidates — a **566x** reduction — while the same `R_0` survivors in natural order had not found one after 1,340 tries |
+| **same, across 3/4/8-part states** | `/tmp/rec/real_benchmark_generic.py`, `/tmp/rec/real_benchmark_beam.py` | candidates-to-success is **43 / 67 / 52** — remarkably stable across a 3-8 part range and 9 orders of magnitude of raw search space, using the SAME value model, untouched. What actually needed to change by part count was candidate *generation*: exact DP enumeration broke (OOM) at 8 parts and needed a width-bounded beam variant, tried 5 times before succeeding — the scorer needed zero changes |
 | corpus analysis | `tools/analyze_single_solution_cuts.py` | the forced-cut structure of both censuses |
 
 **Not done: wiring a prototype into `radiobase.c`'s own split loop.** Every result above except
@@ -101,6 +102,15 @@ either way. Journal every session so the next one starts warmer.
   `radiobase.c`, but this is the first result in the thread that isn't measured against a sampled
   or exactly-enumerated proxy. Measured 2026-08-21; see
   [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
+* **State length changes what's needed, but not where you'd guess.** Tested at 3, 4, and 8 parts
+  (real documented states, real oracle calls): candidates-to-success is 43 / 67 / 52 —
+  strikingly stable, using the SAME value model, unretrained, across a 3-8 part range and 9 orders
+  of magnitude of raw search space. What actually breaks by part count is *generating* the
+  candidates, not scoring them: exact DP enumeration (clean at 3-4 parts) OOM'd outright at 8, and
+  needed a width-bounded beam variant — a cheap version of the DP top-k decoder the design already
+  called for — tried at two widths before one found anything. 1- and 2-part states weren't tested:
+  this repo already solves those exactly, no search needed. Measured 2026-08-21; see
+  [../evidence/real_benchmark_by_part_count_2026-08-21.txt](../evidence/real_benchmark_by_part_count_2026-08-21.txt).
 
 ## Why the flat ranker stalled, and why recursion is the fix
 

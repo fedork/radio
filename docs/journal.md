@@ -8729,3 +8729,59 @@ real one and confuse the results; confirmed after the fact it hadn't. No AWS com
 at `/tmp/rec/real_benchmark.py`, not committed — self-contained and reproducible from this note.
 Evidence:
 [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
+
+## 2026-08-21 (done) — does the algorithm need to differ by state length? Yes, but not where I expected
+
+Fedor's follow-up, two parts: is 67-vs-37,899 actually benchmarked against the real solver (yes —
+that was already true, clarified for the record), and a genuinely new hypothesis not yet discussed
+in this thread: 1-, 2-, 4-, 8-part states probably need different algorithms, and things may level
+out past 8.
+
+Picked real states from the documented record rather than inventing convenient ones: a 3-part
+exact positive with only 2 winners of 37.7M splits (`Sb(110:3,115:2,121:1)@7`), and the "hard
+eight-part positive" `Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)@5` — 12,585 CPU seconds / 18.86M
+evaluations historically, still timing out at 300s against a warmed cache in one attempt. 1- and
+2-part states turn out not to need testing at all: this repo already solves both exactly (singleton
+majorization; an exhaustive two-part pair table), no search involved.
+
+**The scorer doesn't care about part count. The generator falls over at 8 without help.**
+Candidates-to-success: 43 (3 parts), 67 (4 parts), 52 (8 parts) — the same trained value model,
+never retrained per part count, landed a witness in roughly the same 40-70 range across a 3-8 part
+span and nine orders of magnitude of raw search space. That's not what "different algorithms by
+length" predicts for the ordering step, and it's a real, useful negative — the value model and
+`min(child)` composition generalize by part count for free.
+
+What did NOT generalize for free was generating the candidates to score. The exact DP enumeration
+that handled 3 and 4 parts cleanly (millions of candidates, seconds) got OOM-killed outright at 8
+parts — silently, no error, just gone, RSS climbing past several GB first. Two sampling fallbacks
+(uniform random over the raw per-part range; random over each part's own Pareto-prefiltered
+options) both starved: 2M draws produced 3, then 4, `R_0` survivors — nowhere near enough to test
+anything. What worked was a width-bounded incremental DP: build the (S,X) combination one part at
+a time like the exact method, but randomly subsample down to a fixed beam width whenever an
+intermediate step would otherwise exceed it. At beam=3M: 513 survivors, no winner among them. At
+beam=15M: 2,577 survivors, a winner at #52. Intermediate step sizes before capping reached 59M,
+194M, 131M, 174M — the filtered space at 8 parts is not "somewhat bigger," it's big enough that
+naive strategies fail in qualitatively different ways depending on which one you try, and even the
+one that worked needed 5 attempts across two scripts to tune.
+
+This is a cheap, forced-by-necessity version of exactly the "DP top-k decoder" the design note
+already named as the deployable architecture (`docs/ml-guided-search.md`) — needed here just to
+*measure* anything at 8 parts, which is itself evidence it'll be needed to *deploy* anything past
+about 4-5 parts.
+
+**Scope, stated plainly.** n=1 per part count — three real states, not a systematic sweep. The
+8-part comparison is against a historical default-order figure from a different build/cache era,
+not confirmed fresh on the current build the way the 4-part control's 37,899 was (independently
+identical across two engine builds). And 8-part states specifically are a different regime at k=6
+than the one tested here: the documented record shows 8-part, near-saturated-mass k=6 states are
+*never* solvable (0 of 165 sampled) and are 99.57% of all k=6 solver cost — a pure refutation
+problem, out of scope for guidance that must stay achievability-only. The state tested here is at
+k=5 and is a genuine, independently-verified positive.
+
+Both new witnesses independently re-verified in a fresh process (mass arithmetic exact, all three
+children genuinely `SOLVABLE`), same discipline as the 4-part result. Scripts:
+`/tmp/rec/real_benchmark_generic.py` (exact DP), `/tmp/rec/real_benchmark_beam.py` (width-bounded
+beam, needed beyond ~4-5 parts) — not committed, self-contained. Housekeeping: an early attempt
+used a `radio_one` binary as if it were a `radio_oracle` (wrong stdin protocol, would have hung);
+caught before it wasted a run. No AWS compute. Evidence:
+[../evidence/real_benchmark_by_part_count_2026-08-21.txt](../evidence/real_benchmark_by_part_count_2026-08-21.txt).

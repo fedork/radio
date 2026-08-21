@@ -1165,6 +1165,14 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    not found one after 1,340 tries, so the ordering itself, not just the sound filter, is doing the
    work. Not yet wired into `radiobase.c`, and n=1. See
    [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
+   **Same day, does the algorithm differ by part count?** Tested at 3, 4 and 8 parts (real
+   documented states, real oracle calls): candidates-to-success is **43 / 67 / 52** — strikingly
+   stable across a 3-8 part range and 9 orders of magnitude of raw search space, same value
+   model, unretrained. What actually breaks by part count is *generating* the candidates, not
+   scoring them: exact enumeration (clean at 3-4 parts) OOM'd outright at 8 parts and needed a
+   width-bounded beam DP, which itself needed two widths tried before one found anything. 1- and
+   2-part states weren't tested — already solved exactly with no search in this codebase. See
+   [../evidence/real_benchmark_by_part_count_2026-08-21.txt](../evidence/real_benchmark_by_part_count_2026-08-21.txt).
    Guidance is correctness-free for **achievability** only, since a witness is checked by
    `check_witness.py` — never prune an OR-branch with a learned value; only a proven filter like
    `R_0` may ever certify a negative.

@@ -1,0 +1,91 @@
+Does the algorithm need to differ by state length? Tested across 3, 4, and 8 parts, 2026-08-21
+Status: measured. Continues real_benchmark_residual_control_2026-08-21.txt with the same protocol
+(real oracle calls, no offline proxy) applied to real documented states of different part counts,
+prompted directly by a user hypothesis: "algorithms is likely to be different depending on state
+length... 1-2-4-segment states all have different optimal algorithms... 8 is probably different
+from 4."
+
+States chosen from the documented record (not cherry-picked for this test): the 4-part residual
+positive control already used; a 3-part exact positive with only 2 winning splits of 37.7M total
+(`Sb(110:3,115:2,121:1)@7`, docs/results.md); and the 4-part-generic "hard eight-part positive"
+`Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)@5` (docs/journal.md), historically 12,585 CPU seconds /
+18,857,614 evaluations under default order, still timing out at a 300s cap against a warmed cache
+in one attempt. 1- and 2-part states are omitted: this repo already solves those exactly (singleton
+majorization; the exhaustive two-part pair table) with no search at all, so there is no ordering
+question to test there.
+
+=====================================================================================
+RESULTS
+=====================================================================================
+  parts  state                                            raw space      R_0 survivors   learned-order candidates to success
+  3      Sb(110:3,115:2,121:1)@7                           37,700,928 *   204 (exact)      43
+  4      Sb(29:6,19:9,13:12,36:3)@6                          ~4.4e6 (stage-2 exact)   809,706 (exact)   67  (documented default: 37,899)
+  8      Sb(15:3,14:3,17:2,8:4,11:2,10:2,19:1,15:1)@5        1.4e13 *      2,577 (of a 15M-candidate beam sample)   52
+
+  * raw space = full (n_i+1)(m_i+1) product, before any filtering.
+
+All three witnesses independently re-verified in a fresh process, separate from the run that found
+them: mass arithmetic exact (children's masses sum to the parent's, in every case), all three
+children genuinely `SOLVABLE` per a second oracle call.
+
+**The candidates-to-success number (43, 67, 52) is remarkably stable across a 3-to-8 part range and
+nine orders of magnitude of raw search space.** That is the opposite of what "different part counts
+need different algorithms" would predict for the SCORING/ORDERING step specifically: the same value
+model (trained once, on 4-part synthetic states, never retrained per part count) and the same
+min(V(child)) composition rule ordered a workable witness into the top ~50-70 at 3, 4, AND 8 parts.
+
+=====================================================================================
+WHAT ACTUALLY HAD TO CHANGE BY PART COUNT: GENERATING THE CANDIDATES, NOT SCORING THEM
+=====================================================================================
+The hypothesis is confirmed, but not where expected. The exact-DP candidate enumeration
+(`exact_topk.py`'s method, used cleanly for the 3- and 4-part states above) broke outright at 8
+parts:
+
+  attempt 1, exact DP, no bound:                    OOM-killed (RSS climbing past several GB,
+                                                       process silently vanished)
+  attempt 2, pure random sampling (2M draws,
+    raw per-part range):                             only 3 R_0 survivors -- too sparse to test
+  attempt 3, random sampling from each part's own
+    per-part-Pareto-prefiltered options (2M draws):  only 4 R_0 survivors -- still too sparse
+  attempt 4, width-bounded incremental DP,
+    beam=3,000,000:                                  513 R_0 survivors, but NONE was a winner
+  attempt 5, same, beam=15,000,000:                  2,577 R_0 survivors, learned order finds one
+                                                       at candidate #52
+
+Four rewrites of the *generator* were needed to get a usable candidate pool at 8 parts; zero
+changes were needed to the *scorer*. The width-bounded incremental DP (build the (S,X) combination
+one part at a time like the exact method, but randomly subsample down to a fixed beam width
+whenever an intermediate step would exceed it, rather than letting it grow unboundedly) is a cheap
+approximation of exactly the "DP top-k decoder" the design note already called for as the
+deployable architecture -- this session needed it just to MEASURE, which is itself evidence it will
+be needed to DEPLOY at high part counts.
+
+Intermediate step sizes for the 8-part state make the scale concrete: even after cap-filtering,
+raw survivor counts at intermediate steps reached 59M, 194M, 131M, and 174M before each was capped
+back down to the beam width. The filtered candidate space is not "large," it is large enough that
+naive generation strategies fail in qualitatively different ways depending on which one you try.
+
+=====================================================================================
+WHAT THIS DOES AND DOES NOT SHOW
+=====================================================================================
+* n=1 per part count. Three real states, chosen from the documented record, not a systematic
+  sweep. A single 8-part success does not establish that this generalizes to the near-saturated,
+  often-UNSOLVABLE 8-part states that dominate k=6 cost (see below) -- this one is a genuine
+  positive, chosen because it already has a documented difficulty figure to compare against.
+* The 8-part comparison is against a historical default-order figure (18,857,614 evaluations)
+  from a different build/cache era, not a fresh same-build measurement -- unlike the 4-part
+  control, where the 37,899 figure was independently confirmed identical across two different
+  engine builds. Treat 52-vs-18.86M as indicative of scale, not as a precise ratio.
+* 8-part states at k=6 specifically are a *different regime entirely* and out of scope here: the
+  documented record (docs/journal.md) shows 8-part, near-saturated-mass k=6 states are **never
+  solvable** (0 of 165 sampled) and account for 99.57% of all k=6 solver cost. That is a pure
+  refutation problem, which this thread's guidance is explicitly not safe to touch (achievability
+  only). The 8-part state tested here is at k=5 and is a genuine positive.
+* 1- and 2-part states were not tested because there is nothing to test: both are already solved
+  exactly, with no split search, by existing non-learned methods in this codebase.
+* Not yet wired into radiobase.c, still real-oracle-as-black-box validation.
+
+Reproduce: `/tmp/rec/real_benchmark_generic.py` (exact DP, works at <=4-5 parts) and
+`/tmp/rec/real_benchmark_beam.py` (width-bounded beam DP, needed beyond that) -- both self-
+contained, not committed, reproducible from this note plus `tools/ml/recursive_value.py` and
+`tools/bundled_majorization.py`.
