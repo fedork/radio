@@ -8790,3 +8790,30 @@ beam, needed beyond ~4-5 parts) — not committed, self-contained. Housekeeping:
 used a `radio_one` binary as if it were a `radio_oracle` (wrong stdin protocol, would have hung);
 caught before it wasted a run. No AWS compute. Evidence:
 [../evidence/real_benchmark_by_part_count_2026-08-21.txt](../evidence/real_benchmark_by_part_count_2026-08-21.txt).
+
+## 2026-08-21 (done) — narrowing to 4-part, 2-or-4-winner states, and a wall-clock warning
+
+Fedor's direction after the part-count test and the 8-part-k=6 retraction: stop varying part
+count, focus on 4-part states specifically, and within those the ones with exactly 2 or 4 winning
+splits — which the census stratification already showed isn't a narrow slice, it's close to the
+whole forced-endpoint population (131 of 153 k7 endpoints have exactly 2 literal winners, 22 have
+4).
+
+Second real-oracle test, harder than the residual control: `Sb(16:12,17:10,29:5,21:6)@6`, a
+documented "knife edge" with exactly 2 winners of 1,212,971,760 raw combinations. Result: a
+genuine, independently-verified witness (mass arithmetic exact, all three children confirmed
+`SOLVABLE` in a fresh process) at candidate **#1,373** of 885,342 `R_0` survivors — worse than the
+residual control's 67, and that's the useful part: the number tracks how rare the actual winner
+is, not a fixed constant. Still ~322x better than blind over the `R_0`-survivor population alone.
+
+**A cost problem worth flagging rather than quietly absorbing:** the `R_0`-filtering pass on this
+run took 3,611 seconds for 3,686,536 candidates — about 15x this thread's usual rate. The
+per-checkpoint log shows why: normal ~110s/500k-row pacing for three million rows, then one single
+2,964-second gap for the last half-million. Almost certainly this Mac sleeping or getting
+throttled mid-run, not the algorithm — but I didn't catch it happening, only after the fact from
+the log. The candidate-count results are unaffected (they don't depend on wall-clock), but every
+local wall-clock figure from this session, including in the two prior real-benchmark evidence
+files, should now be read as an upper bound, not a measurement. Worth adding a heartbeat/liveness
+check to any future long local run rather than trusting elapsed time blindly.
+
+Evidence: [../evidence/real_benchmark_4part_2or4_2026-08-21.txt](../evidence/real_benchmark_4part_2or4_2026-08-21.txt).

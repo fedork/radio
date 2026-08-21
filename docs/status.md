@@ -1174,6 +1174,16 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    width-bounded beam DP, which itself needed two widths tried before one found anything. 1- and
    2-part states weren't tested — already solved exactly with no search in this codebase. See
    [../evidence/real_benchmark_by_part_count_2026-08-21.txt](../evidence/real_benchmark_by_part_count_2026-08-21.txt).
+   **Narrowed back to 4 parts, 2-or-4-winner tier (the direction after this):** a second, harder
+   4-part instance, `Sb(16:12,17:10,29:5,21:6)@6` (documented: exactly 2 winners of 1.2 billion),
+   needed **1,373** real oracle-checked candidates against the residual control's 67 — still
+   overwhelmingly better than blind (~322x over the `R_0`-survivor population alone), but not a
+   constant number: it tracks how rare the winner actually is. Also surfaced a measurement
+   problem: the `R_0`-filtering pass on this run took an anomalous 60 minutes (15x this thread's
+   usual rate), almost certainly this machine sleeping/throttling mid-run rather than the
+   algorithm — candidate counts are unaffected, but local wall-clock numbers from this session
+   should be read as upper bounds only. See
+   [../evidence/real_benchmark_4part_2or4_2026-08-21.txt](../evidence/real_benchmark_4part_2or4_2026-08-21.txt).
    Guidance is correctness-free for **achievability** only, since a witness is checked by
    `check_witness.py` — never prune an OR-branch with a learned value; only a proven filter like
    `R_0` may ever certify a negative.

@@ -1,0 +1,68 @@
+Focusing on 4-part states with exactly 2 or 4 winning splits, 2026-08-21
+Status: measured, one state. Continues real_benchmark_residual_control_2026-08-21.txt and
+real_benchmark_by_part_count_2026-08-21.txt, narrowed per direction: stop varying part count for
+now, and within 4-part states specifically test the "few winners" (2 or 4) tier -- which the
+census stratification already showed is not a narrow slice but close to the WHOLE forced-endpoint
+population (131 of 153 k7 endpoints have exactly 2 literal winners, 22 have exactly 4; see
+recursive_value_worst_case_2026-08-21.txt).
+
+STATE: `Sb(16:12,17:10,29:5,21:6)@6`, documented (docs/results.md) as a "knife edge": exactly 2
+winning splits out of 1,212,971,760 raw combinations -- more extreme than the residual control
+(`Sb(29:6,19:9,13:12,36:3)@6`, winner count there not documented, but at least 2 distinct literal
+winners are now known: the historical `[8:1,8:4,11:11,19:2]` and this thread's own
+`[(14,3),(4,1),(11,10),(19,2)]`).
+
+METHOD: identical to the residual-control benchmark -- exact stage-2 (cap + per-part Pareto bound)
+enumeration, `R_0` filter (sound), recursive-V order (trained on matched-sampler k=4,5,6,7 pooled),
+then real oracle calls (genuine `canSolveB`, no shortcuts) in that order until all three children
+of a candidate are `SOLVABLE`.
+
+RESULT:
+  stage-2 candidates: 3,686,536      R_0 survivors: 885,342
+  learned order: SUCCESS at candidate #1,373: split = (8:7),(4:2),(12:2),(19:6)
+
+Independently re-verified in a fresh process: mass arithmetic exact (202 + 236 + 195 = 633 =
+parent mass), all three children genuinely `SOLVABLE`.
+
+**1,373 is worse than the residual control's 67, and that is the informative part, not a
+disappointment.** This state's winner count is documented at exactly 2 (or 2 up to
+complementation) against the residual control's unknown-but-presumably-larger count -- an even
+sharper needle. Against blind search at each stage: ~322x better than R_0-survivor-blind
+(885,342/2), ~1,343x better than stage-2-blind, and (extrapolating to the raw space) on the order
+of 4-5 hundred thousand-x better than raw-blind. Still overwhelming in absolute terms, but the
+number that matters here -- rank among genuinely comparable hard cases -- is clearly not constant;
+it varies with exactly how rare the winner is, which is the whole point of choosing this
+population.
+
+=====================================================================================
+A REAL COST PROBLEM THAT NEEDS FIXING BEFORE THIS SCALES FURTHER
+=====================================================================================
+The R_0-filtering pass on this state took an anomalous **3,611 seconds** (60 min) for 3,686,536
+candidates -- roughly 15x slower per-candidate than every prior run in this thread (the residual
+control did a comparable-sized pass in under 10 minutes). The per-checkpoint timings show why:
+regular ~110s/500k-row intervals for the first 3,000,000 rows, then a single **2,964-second** gap
+for the last ~500,000. That is almost certainly this Mac going to sleep or being heavily
+throttled/swapped mid-run, not the algorithm degrading -- but it was not checked in real time, and
+it means the wall-clock figures in this file (and likely in the two prior real-benchmark evidence
+files, run on the same machine over the same long session) are not a reliable measure of the
+pipeline's true cost. The candidate-count results (43 / 67 / 52 / 1,373) are unaffected -- they
+are correct regardless of how long the machine took -- but "how long did this take" claims from
+this session's local runs should be treated as upper bounds only, not measurements.
+
+=====================================================================================
+WHAT THIS DOES AND DOES NOT SHOW
+=====================================================================================
+* n=1 in this specific tier so far. One 4-part, documented-2-winner state. The residual control
+  (unknown winner count, presumably more than 2) and this state bracket a range; a systematic
+  sweep across the census's 131 two-winner and 22 four-winner endpoints, rather than one more
+  hand-picked example, is the natural way to actually characterize this tier rather than collect
+  isolated points.
+* Confirms, on a second and harder 4-part instance, that the composed pipeline finds a real,
+  oracle-verified witness well inside a tier that is by construction close to a worst case for any
+  ordering method (documented winner count of exactly 2 in ~1.2 billion).
+* Does not yet address the "4 winners" half of the requested tier, or attempt the width-bounded
+  beam/greedy-incremental generator discussed earlier in this thread.
+* Not yet wired into radiobase.c.
+
+Reproduce: `/tmp/rec/real_benchmark_generic.py "16:12,17:10,29:5,21:6" 6 /tmp/rec/oracle_k6`
+(oracle built `-DMAX_K=6 -DMAX_N=200`), not committed, self-contained.
