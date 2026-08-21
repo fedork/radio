@@ -126,12 +126,17 @@ while true; do
 done
 EOF
 chmod +x restart_loop.sh
+# The "caches" positional (nargs='*') MUST come immediately after the binary positional, before
+# any --flag. argparse's handling of a nargs='*' positional interspersed with value-taking
+# optionals is a known ambiguity: `binary --restore X CACHEFILE` reports CACHEFILE as an
+# unrecognized argument, while `binary CACHEFILE --restore X` parses correctly. Caught live on
+# the first real deploy attempt (2026-08-21) -- the restart loop crash-looped harmlessly (no
+# facts, no queries, no cache mutation) rather than corrupting anything, but fix the order.
 systemd-run --unit=radio-oracle-server --collect \
     /bin/bash "$WORK/restart_loop.sh" "$WORK" \
-    python3 "$SRC/tools/oracle_server.py" ./oracle --port "$PORT" \
-    --snapshot-every "$SNAPSHOT_EVERY" --snapshot-dir "$WORK" \
-    --restore "$RESTORE_TARGET" \
-    "${WARMSTART_CACHE[@]}"
+    python3 "$SRC/tools/oracle_server.py" ./oracle "${WARMSTART_CACHE[@]}" \
+    --port "$PORT" --snapshot-every "$SNAPSHOT_EVERY" --snapshot-dir "$WORK" \
+    --restore "$RESTORE_TARGET"
 sleep 3
 pgrep -f './oracle' > oracle.pid || true
 
