@@ -1,0 +1,59 @@
+Loading the sa193 certificate as cache facts: converter + empirical validation, 2026-08-21
+Status: validated at two scales (127 and 80,634 claims), zero mismatches. Tool:
+tools/cert_to_cache.py. Not yet run on the full 8-level, 2,846,568-claim chain.
+
+WHY THIS NEEDED VALIDATION, NOT JUST A CORRECT-LOOKING FORMAT
+The sa193 certificate stores unsolvability claims in a compact per-level `part`/`claim`/`fact`
+format (radio-negative-level-certificate-v2, consumed by radio_refute.c / check_level_chain.py),
+not the plain-text "can't solve Sb(...) in k ..." lines a raw solver log emits. radio_oracle.c's
+`load` command expects the DISTILLED cache-line format parse_out.sh produces from raw logs:
+`- b n1 m1 n2 m2 ... t <pairs> <n> <k>`, fed straight into radiobase.c's cache()/cacheCantSolve().
+
+Two real risks, not hypothetical: (1) a wrong format crashes the loader -- safe, loud, easy to
+catch; (2) a wrong PART ORDER within a state could silently insert facts at the wrong place in the
+dominance trie, since cacheCantSolve descends the trie edge-by-edge keyed on each part in sequence.
+Reading radiobase.c settled the theoretical question -- cacheCantSolve explicitly rotates every
+remaining part into the pivot position at each recursion level ("other part permutations in this
+call may still add information"), unlike cacheCanSolve, which does assume sort1's descending
+order. Since every certificate claim is a NEGATIVE fact, only cacheCantSolve's ordering behavior
+applies, and it is permutation-robust by construction. But per this repo's own standard, reading
+the source is not the same as trusting it live -- hence the two-scale empirical check below.
+
+METHOD
+For each cert level, generate a control population the certificate itself doesn't cover: take a
+sample of certified-unsolvable states, perturb one coin on one random part (+-1, and at k=5 also
++-2), and solve each perturbed state FRESH on an oracle with NOTHING loaded -- this is
+ground truth, independent of the certificate and the converter entirely. Then load the certificate
+into a clean oracle process and re-query both (a) every certified claim -- must come back
+UNSOLVABLE -- and (b) every perturbed neighbor -- must match its independently-computed ground
+truth exactly. A neighbor mismatch in either direction (a truly solvable neighbor now reporting
+unsolvable, or vice versa) would be the signature of trie corruption bleeding into states the
+certificate never made a claim about.
+
+RESULTS
+  level  claims   neighbors  claim mismatches  neighbor mismatches  load time
+  k=3    127      69 (40 unsolvable/29 solvable ground truth)   0   0    instant
+  k=5    80,634   1,112 (798 unsolvable/313 solvable ground truth)  0   0    3.3s
+
+Both runs: 0 malformed lines, 0 skipped, load rate in the hundreds-of-thousands/s to instant range
+(80,634 facts in 3.3s). Only 1 redundant insertion at k=5 (a certified claim whose insertion the
+trie had already subsumed via an earlier one) -- consistent with expectations, not a sign of
+anything wrong.
+
+WHAT THIS DOES AND DOES NOT ESTABLISH
+* Validates the converter and the load *mechanism* at two real scales, with a real (not
+  rubber-stamp) control population spanning both solvable and unsolvable ground truth. This is
+  meaningfully stronger evidence than "the format looks right" or "the loader didn't crash."
+* Does NOT by itself validate the full 8-level, 2,846,568-claim chain -- k=6 through k=9 are
+  untested by this note. The mechanism (cacheCantSolve's permutation robustness) doesn't change
+  with level, and k=5 is a meaningful majority-share level (80,634 of 2,846,568 claims, and the
+  level immediately below the largest, k=7's 2,508,278), so this is reasonable but not complete
+  evidence for the whole chain.
+* The certificate's own correctness (that these states really are unsolvable) is not what this
+  validates -- that rests on the proof-safe cold run9 execution and the certificate's own
+  structural/semantic checks (check_level_chain.py, run9_refute). This note only validates that
+  the CONVERSION into the oracle's cache format, and the CACHE INSERTION itself, preserve that
+  correctness without corrupting anything nearby.
+* Reproduce: tools/cert_to_cache.py <cert.zst> > facts.txt, then load into any radio_oracle sized
+  for the level's states, with an independent (uncached) oracle process supplying ground truth for
+  a perturbed-neighbor control set before trusting the load.
