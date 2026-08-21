@@ -76,7 +76,7 @@ cat > restart_loop.sh <<'EOF'
 #!/bin/bash
 cd "$1"; shift
 while true; do
-    python3 "$@" >> server.out 2>&1
+    "$@" >> server.out 2>&1
     echo "$(date -u +%FT%TZ) oracle_server exited, restarting in 5s" >> server.out
     sleep 5
 done
