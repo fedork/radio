@@ -1,6 +1,36 @@
 Loading the sa193 certificate as cache facts: converter + empirical validation, 2026-08-21
-Status: validated at two scales (127 and 80,634 claims), zero mismatches. Tool:
-tools/cert_to_cache.py. Not yet run on the full 8-level, 2,846,568-claim chain.
+Status: validated at three scales, culminating in the full 8-level, 2,846,568-claim chain, zero
+mismatches at every scale. Tool: tools/cert_to_cache.py.
+
+UPDATE, same day: the full chain. Converted and concatenated all 8 levels (k=2..9) into one file,
+2,846,568 lines (114 MB text, 17.2 MB compressed), max side-sum 193 across the whole chain (fits
+comfortably inside MAX_N=300). Loaded into a fresh MAX_K=9/MAX_N=300 oracle: **414.5 s** (under
+7 minutes), 1 redundant insertion, 0 malformed/skipped. Re-verified a 1,145-claim cross-level
+sample (0 mismatches, all UNSOLVABLE) and 46 perturbed-neighbor controls at k<=7 against
+independently-computed ground truth (0 mismatches). k=8/k=9 neighbors could not get real ground
+truth this way -- every single one hit MAYBE at a 10-15s budget from a cold solve, which is
+exactly why the certificate exists (these are the near-saturated Sa(193)-boundary states run9
+spent days refuting). Their POST-LOAD behavior is the most informative result of the whole test:
+for five k=8 and five k=9 perturbed pairs, one side of each pair now resolves to UNSOLVABLE
+INSTANTLY (0.00s -- the loaded certificate covers it directly) while the other side still needs
+real search and again hits MAYBE (~9-15s) -- a sharp, structurally sensible split, not corruption
+bleeding either direction. This is what "layering proof-safe facts onto a warm cache" should look
+like, and matches expectation better than a null result would have.
+
+Also validated the exact production sequence, not just each half separately: dumped a snapshot
+from an oracle already holding the k=5 certificate, started a FRESH process, restore-any'd from
+that snapshot, then loaded the k=3 certificate on top -- both a fact from the restored snapshot
+(k=5) and a fact from the freshly-loaded file (k=3) resolved correctly (UNSOLVABLE, as claimed) in
+the same process. This is exactly the deploy-time sequence (restore the base corpus snapshot, then
+load the certificate on top) and confirms radiobase.c's "snapshot before any facts or queries"
+requirement composes cleanly with a load immediately afterward.
+
+Uploaded for deployment: s3://radio-sa193-393287594714/cert-cache/sa193-certificate-2026-08-19.cache.zst
+(sha256 6516500d848725d428aea8ddcec74d44023cf4dda139cbef0efb08d373435afe).
+
+Combined with the existing base-snapshot restore (32.8s, 21.9M facts, docs/aws-run.md), full
+warm-start is under 8 minutes total -- not the "couple of hours" a raw replay of everything would
+have cost, and not a cold start either.
 
 WHY THIS NEEDED VALIDATION, NOT JUST A CORRECT-LOOKING FORMAT
 The sa193 certificate stores unsolvability claims in a compact per-level `part`/`claim`/`fact`
