@@ -50,8 +50,14 @@ write_status() {
     return 0
 }
 
-echo "== building oracle (MAX_K=9 MAX_N=500, includes the new enumerate command) =="
-python3 "$SRC/tools/build_radio.py" -O3 -DMAX_K=9 -DMAX_N=500 \
+echo "== building oracle (MAX_K=8 MAX_N=400, includes the new enumerate command) =="
+# Sized to what has actually been queried in this thread (3-4 part states up to side-sum ~350),
+# not padded for headroom: "Do not extrapolate solver cost from table dimensions" already burned
+# this once locally (MAX_N=400/MAX_K=6 inits in 205s while MAX_N=485/MAX_K=9 inits in 146s) and
+# burned it harder here on first boot -- MAX_N=500/MAX_K=9 was still climbing past 500s and 2 GiB
+# RSS with no end in sight, an unforced, unevidenced choice. Re-provision (rebuild larger) only
+# once a real query needs it, per the same trap.
+python3 "$SRC/tools/build_radio.py" -O3 -DMAX_K=8 -DMAX_N=400 \
     "$SRC/radio_oracle.c" -o oracle
 cp "$SRC/radio_oracle.c" "$SRC/radiobase.c" . 2>/dev/null || true
 put oracle.provenance
@@ -59,7 +65,7 @@ put oracle.provenance
 {
     printf 'started_utc=%s\n' "$(date -u +%FT%TZ)"
     printf 'run_id=%s\nsource_commit=%s\nsource_sha256=%s\n' "$RUN_ID" "$COMMIT" "$SRC_SHA"
-    printf 'max_k=9\nmax_n=500\nport=%s\nsnapshot_every_s=%s\n' "$PORT" "$SNAPSHOT_EVERY"
+    printf 'max_k=8\nmax_n=400\nport=%s\nsnapshot_every_s=%s\n' "$PORT" "$SNAPSHOT_EVERY"
     printf 'instance_type=%s\n' \
            "$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $(curl -s -m 2 -X PUT \
               -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
