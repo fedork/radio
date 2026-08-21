@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-20** (the published exact `m=5` result is now reconstructed
+don't know it. Last refreshed **2026-08-21** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
 for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
@@ -58,6 +58,8 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never train solvable-vs-unsolvable on two different corpora.** | Certificate negatives and census positives occupy *disjoint* mass bands at k=6 (positives 0.742-0.875 of cap, negatives 0.827-0.959; the central-90% overlap is empty), so any classifier scores AUC 0.946 by learning which corpus a state came from. A permuted-label control does **not** catch this — it destroys the source signal too and returns a reassuring 0.516. What caught it was a matched-pair probe: single-part states differing by one coin scored 47%, chance. Draw both classes from one sampler and label with `radio_one`. Measured 2026-08-20; see [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt). |
 | **A fixed mass-fraction-of-cap sampler does not transfer across `k`.** | `value_gen_states.py`'s original band, [0.70,1.02] of cap, sampled **0 of 300 solvable at k=7**: the per-part solo Pareto maximum grows almost as fast as the cap does, so "mass near cap" stops meaning "near the achievability frontier" by k=7. The band must be bisected per level against a warm oracle (30-state probes, target ~50% solved-of-decided) before drawing a training sample. Measured 2026-08-20; see [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). |
 | **A long-lived `radio_oracle` can crash outright on an ordinary query, silently.** | `alloc_front_record` in `radiobase.c` hard-caps total handles at `NODE_HANDLE_MASK` (~1.07e9, packed into a tagged 32-bit descriptor); a handful of multi-million-split sub-searches can burn through enough of that space to exit with `out of front-record handles`, closing the oracle's stdout pipe. Seen 6 times in 300 k=7 queries. No compile-time knob bounds this the way `MAX_TREE_NODES`/`MAX_MEMO` bound `radio_canon_search_generic`'s pool. A caller that keeps a warm oracle alive across many diverse queries must catch the closed pipe, log the offending state, and restart — losing that one query, not the accumulated warm state. Separately, the deterministic nominal-second budget does not tightly bound wall time: queries budgeted at 5 nominal seconds took up to 270 real seconds. Measured 2026-08-20; see [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). |
+| **A headline median/selectivity number can hide hard-case collapse — stratify by exact candidate-set size before trusting it.** | The recursive cut scorer's "120x median" looked uniform until stratified by exact stage-2 candidate-set size: the hardest third has median rank 331 (vs 146 for the middle third) and a worst case of 16,886 of up to 130,262 — barely better than blind. Literal winning-cut count is *not* a usable hardness proxy here — it is almost always exactly 2 or 4 (the trivial complementation pair), with no real spread. The fix was not more data: composing with the sound `R_0` filter first made the degradation disappear entirely (hardness/rank correlation 0.129 -> 0.001), because `R_0` shrinks the hardest tier *more*, not less (10.6x vs 4.7x). Measured 2026-08-21; see [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt). |
+| **A learned ranking can never certify "no solution exists" — only a sound filter can, and none has been composed into a small cutoff yet.** | `R_0` (`tools/bundled_majorization.r0`, proved in `theorems/singleton-majorization.md`) is the only sound worst-case bound measured against this thread's stage-2 candidate set so far: median 6,892 / worst 16,547 survivors, down from up to 130,262 — real, but still thousands, not the "exhaust a handful and stop" cutoff the ideal algorithm would have. Do not read the recursive scorer's rank-within-survivors (median 14) as any kind of stopping bound; it is ordering only. The cross-part pair condition and deeper `R_d` are the next sound filters to compose and have not been tested on this stratification. Measured 2026-08-21; see [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt). |
 | **Cache-load cost is hump-shaped; never extrapolate it.** | Loading the archived corpus, the rate goes 44,484/s at the start, down to 431/s through an expensive band, then up to 1,067,487/s once almost everything is subsumed. Local prefixes sampled the rise and the collapse and missed the recovery, so I predicted 13+ hours for a load that took **1.58 h** (21,866,180 facts, 3,847/s overall, 36% of the time in five of 88 chunks). Two points were wrong and three were wrong; only the run settled it. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Do not extrapolate solver cost from table dimensions.** | `MAX_N=400/MAX_K=6` inits in 205 s while the *larger* `MAX_N=485/MAX_K=9` inits in 146 s. Init and query cost track the work a state actually needs — which cache is loaded, how much refutation is required — not the table sizes. Measure the candidate configuration; a scaling law inferred from two points will be wrong. The oracle's loader skips facts too wide for the build instead of failing, so `MAX_N` is chosen for the queries alone. Measured 2026-08-20; see [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt). |
 | **Size `MAX_N` to the states you are asking about.** | `init()` runs before `radio_one`'s argument check and its static tables scale with `MAX_N`: the same query costs **205 s** built at `-DMAX_N=400` and **0.2 s** at `-DMAX_N=120`, where the solve itself is 0.0 s. A padded `MAX_N` buys nothing and can make a cheap oracle look unusable. Measured 2026-08-20. |
@@ -1146,9 +1148,16 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    against a flat ranker directly supervised on winning splits (130.5x) — on the same real, held-out
    k7 census endpoints. Two traps broke the data pipeline getting there (a fixed mass band doesn't
    transfer past k=6; a long-lived oracle can crash on a hard query) — see the trap table and
-   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). Guidance
-   is correctness-free for **achievability** only, since a witness is checked by
-   `check_witness.py` — never prune an OR-branch with a learned value.
+   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
+   **New 2026-08-21:** that 120x figure hid real degradation on the hardest endpoints (median rank
+   doubling, worst case near-blind) — composing the recursive scorer with the sound `R_0` filter
+   first fixes it completely (degradation-vs-hardness correlation 0.129 -> 0.001), and `R_0` itself
+   gives the first real worst-case cutoff bound in this thread (median 6,892 / worst 16,547
+   survivors). See
+   [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+   Guidance is correctness-free for **achievability** only, since a witness is checked by
+   `check_witness.py` — never prune an OR-branch with a learned value; only a proven filter like
+   `R_0` may ever certify a negative.
 
 1. **Use the warm oracle for everything that needs many verdicts.** `radio_oracle.c` is new: it
    pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin. Measured at
@@ -1179,12 +1188,23 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    *higher* standalone AUC (gradient boosting) collapsed to 2.3x under the same composition —
    standalone AUC did not predict this; only the end-to-end composed metric did. Design note and
    full numbers: [ml-guided-search.md](ml-guided-search.md),
-   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). Still
-   open: factor the policy per part, decode top-k with the `(S,X)` DP, and put either scorer in
-   front of `canSolveB`'s actual split loop — judged on end-to-end CPU seconds on a known-hard
-   instance, not on the offline selectivity numbers above. **Guidance remains correctness-free only
-   for achievability** — a witness found under guidance is still checked by `check_witness.py`,
-   whereas pruning an OR-branch by a learned value would manufacture false negatives.
+   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
+   **2026-08-21, worst case first, then order:** stratified by exact candidate-set size, the
+   recursive ranker alone degrades sharply on the hardest third (median rank 146->331, worst
+   near-blind at 16,886 of up to 130,262) — a real gap, not a data-generation artifact. Composing
+   with `R_0` (the proven sound filter, `tools/bundled_majorization.r0`) FIRST fixes it: `R_0`
+   gives a real worst-case cutoff (median 6,892 / worst 16,547 survivors, vs stage-2's up to
+   130,262), shrinks the hardest tier *more* than the easiest (10.6x vs 4.7x), and once applied,
+   the recursive ranker's hardness-correlated degradation vanishes (correlation 0.129 -> 0.001).
+   The two guarantees stay separate: `R_0`'s survivor count is a sound proof-of-unsolvability
+   bound if exhausted; the rank within it is ordering only, never a stopping rule. See
+   [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+   Still open: compose the cross-part pair condition and deeper `R_d` on the same stratification,
+   factor the policy per part, decode top-k with the `(S,X)` DP, and put either scorer in front of
+   `canSolveB`'s actual split loop — judged on end-to-end CPU seconds on a known-hard instance, not
+   on the offline selectivity numbers above. **Guidance remains correctness-free only for
+   achievability** — a witness found under guidance is still checked by `check_witness.py`, whereas
+   pruning an OR-branch by a learned value would manufacture false negatives.
 
 4. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is

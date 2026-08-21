@@ -2,15 +2,17 @@
 
 Written 2026-08-20, after the flat-feature ranker topped out; revised the same day once the value
 model and the oracle were measured, and again the same day once the recursive predictor itself was
-built and measured. Status: **the substrate, the level-held-out value model, and the recursive
-cut-scorer are all built and measured; wiring a prototype into the solver's split loop is the
-remaining step.** Every number below has a source in `evidence/`; anything proposed rather than
-measured says so.
+built and measured; revised again 2026-08-21 once a user challenge showed the recursive scorer
+degrades on the hardest endpoints, and composing it with a sound filter fixed that. Status: **the
+substrate, the level-held-out value model, the recursive cut-scorer, and its composition with a
+sound worst-case bound are all built and measured; wiring a prototype into the solver's split loop
+is the remaining step.** Every number below has a source in `evidence/`; anything proposed rather
+than measured says so.
 
 ## Read this first if you are picking the thread up
 
 The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
-verdicts sooner. Five things are already in place; wiring one of them into the solver is not.
+verdicts sooner. Six things are already in place; wiring one of them into the solver is not.
 
 **Built and measured.**
 
@@ -21,14 +23,17 @@ verdicts sooner. Five things are already in place; wiring one of them into the s
 | learned cut ranker | `tools/ml/cut_ranker.py` | median rank **76 of 54,014** with `R_0`; 428x better than blind |
 | level-transfer value model | `tools/ml/value_level_transfer.py`, extended by `tools/ml/recursive_value.py` | **AUC 0.99+** transfers train-k<=6/test-k=7, not just the original k=4->k=5 pair |
 | recursive cut scorer | `tools/ml/recursive_value.py` | scoring a split by `min(V(child))`, with **zero split-label supervision**, reaches **120x** selectivity vs a directly-supervised flat ranker's 130.5x, on the identical 153 real forced k7 endpoints |
+| **worst case (sound) + order (learned)**, composed | `tools/ml/recursive_value.py` (Experiment 3) | `R_0` gives a real, theorem-backed cutoff — median 6,892 / worst 16,547 survivors, vs stage-2's up to 130,262 — that shrinks **more** on the hardest endpoints (10.6x vs 4.7x), and once applied first, the recursive ranker's hard-case degradation (median rank doubling, worst near-blind) disappears entirely (correlation with hardness drops from 0.129 to 0.001) |
 | corpus analysis | `tools/analyze_single_solution_cuts.py` | the forced-cut structure of both censuses |
 
-**Not done: wiring a prototype into the solver's split loop.** The recursive scorer above is
-measured offline (selectivity against the same sampled stage-2 candidates `cut_ranker.py` uses),
-not yet in front of `canSolveB`'s actual split loop, and only at children-at-k=6 (scoring real k7
-endpoint splits) — not yet children-at-k=7. Full results, including two traps that broke the data
-pipeline before either question could be answered, in
-[../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
+**Not done: wiring a prototype into the solver's split loop.** Every scorer above is measured
+offline (selectivity against sampled or exactly-enumerated stage-2 candidates), not yet in front of
+`canSolveB`'s actual split loop, and only at children-at-k=6 (scoring real k7 endpoint splits) —
+not yet children-at-k=7 or the real k=9 H2 frontier. Full results, including two traps that broke
+the data pipeline before either question could be answered, in
+[../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt); the
+worst-case-first composition and the hard-case stratification that motivated it are in
+[../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
 
 **Start the oracle before anything else.** It removes the reason the earlier experiments were
 awkward — labels used to cost 200 ms and a process each:
@@ -67,6 +72,16 @@ either way. Journal every session so the next one starts warmer.
   k=7 holdout) collapses to 2.3x once composed and shifted onto real data; only the end-to-end,
   composed metric caught this. Measured 2026-08-20; see
   [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt).
+* **The recursive ranker alone degrades on the hardest endpoints — composing it with `R_0` fixes
+  that, it doesn't just paper over it.** Stratified by exact candidate-set size, the recursive
+  ranker's median rank roughly doubles on the hardest third (146 -> 331) and its worst case is
+  barely better than blind (16,886 of up to 130,262). Apply `R_0` first — the real, sound,
+  theorem-backed filter, not a heuristic — and the degradation vanishes: rank medians go flat
+  across hardness tiers (18/12/13) and the hardness-vs-rank correlation drops from 0.129 to 0.001.
+  `R_0` itself shrinks the hardest tier *more*, not less (10.6x vs 4.7x). Two lessons: a ranking can
+  never certify a negative, only a sound filter can — and the "hard cases resist learning" framing
+  was measuring the wrong stage's output. Measured 2026-08-21; see
+  [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
 
 ## Why the flat ranker stalled, and why recursion is the fix
 
@@ -183,6 +198,16 @@ in [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026
    selectivity against a directly-supervised flat ranker's 130.5x on the identical population.
    Gradient-boosted V — despite *higher* standalone AUC — collapses to 2.3x recursively; standalone
    AUC did not predict this, only the composed metric did.
+4. Stratifying step 3 by exact candidate-set size (2026-08-21, prompted by a user challenge that a
+   scorer good on "easy" cases is not the interesting claim) showed real degradation on the hardest
+   third — median rank roughly doubles, worst case near-blind. **Fixed by composing with `R_0`
+   first**, not by more data or a bigger model: `R_0` is a sound filter (never drops a true winner,
+   proved), gives a real worst-case cutoff (median 6,892 / worst 16,547 survivors, down from up to
+   130,262), shrinks the hardest tier *more* than the easiest (10.6x vs 4.7x), and once applied the
+   recursive ranker's hardness-correlated degradation disappears (0.129 -> 0.001). This is the
+   Proof-Number-Search analogy above made concrete: `R_0`'s survivor count is the proof/disproof-
+   number-like completeness bound; `V` is the learned estimate ordering what's left. See
+   [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
 
 **What's left of step 3**: the DP top-k decoder over the factored per-part policy, and actually
 putting either in front of `canSolveB`'s split loop — still not done, still gated on judging it by

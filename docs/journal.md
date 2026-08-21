@@ -8620,3 +8620,69 @@ untested: scoring k=8 endpoints (children at k=7), which hits both traps above a
 band instead of a hardcoded one. No AWS compute; the oracle and all label data are local under
 `/tmp/rec/`, not committed (small, deterministic from the fixed RNG seed given the same bands and
 build).
+
+## 2026-08-21 (done) — a challenge that found a real gap, and a fix that wasn't more data
+
+Two pointed questions from Fedor about the previous session's recursive scorer, in sequence, both
+worth recording because they each redirected the work correctly.
+
+**"Easy cases are not the interesting claim — training on a random sample underrepresents the hard
+ones."** Checked directly rather than argued with: re-ran the recursive scorer against the exact
+stage-2 candidate enumeration (no 6,000-candidate sampling cap) and stratified by exact
+candidate-set size, since the literal winning-cut count turned out to be a useless hardness proxy
+(almost always exactly 2 or 4 — the trivial complementation pair, no real spread). The concern was
+right: median rank roughly doubles on the hardest third of endpoints (146 -> 331) and the worst
+case is 16,886 of up to 130,262 — barely better than blind. Full stratified numbers in
+[../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt)
+section 0.
+
+**"Optimize the worst case first — find a sound early cutoff — then worry about ordering."** This
+reframes correctly: no ranking, however good on the typical case, can ever certify "no solution
+exists" — only a proven necessary condition can, by shrinking the set that must be exhaustively
+tried. This repo already has one sitting unused in this exact context: `R_0` (full-star
+majorization, proved in `theorems/singleton-majorization.md`, implemented as
+`tools/bundled_majorization.r0`). It had been measured before, but never composed on top of this
+thread's stage-2 candidate set, never stratified by hardness, and never combined with the recursive
+scorer into one pipeline.
+
+Composing them fixes both problems, and not by coincidence: `R_0`'s survivor count is a **real,
+sound worst-case bound** (median 6,892, worst 16,547 of up to 130,262 — a median 6.1x shrink beyond
+stage-2), zero winners dropped across every sampled candidate at every endpoint, as the theorem
+requires. Stratified by the same hardness tiers, `R_0` shrinks the *hardest* third **more**, not
+less (10.6x vs 4.7x on the easiest) — the opposite of "hard cases resist filtering." And once `R_0`
+has removed whatever it removes, the recursive ranker's hardness-correlated degradation vanishes
+entirely: rank medians go flat at 18/12/13 across the three tiers, and the hardness-vs-rank
+correlation drops from 0.129 to 0.001. The earlier degradation was never evidence that the value
+model gets confused by hard cases specifically — it was evidence that the hard tier's larger raw
+candidate space contains more candidates only a *sound* condition can rule out, and once that's
+done first, what's left is no harder to rank than the easy tier's leftovers.
+
+**The two guarantees stay separate, on purpose.** `R_0`'s survivor count is the number that, if
+exhausted with no success, soundly proves unsolvability — no learned model touches that claim. The
+recursive ranker's position within the survivors is ordering only: it speeds up finding a witness
+when one exists and must never be read as a stopping rule. Conflating them is exactly the shortcut
+that produced the 2023 corpus's 37 false negatives.
+
+**What this is not**: a small cutoff. Thousands of `R_0` survivors is a real improvement over
+stage-2's up to 130,262, not the "exhaust a handful and stop" bound the ideal algorithm would want.
+The cross-part pair condition (`tools/split_choice_rules.py`, previously measured combined with
+`R_0` at 140.4x on a different, smaller denominator, not stratified by hardness) and deeper `R_d`
+are the next sound filters to compose and re-test the same way — not done here. Nor is k=8/k=9
+tested; k=7-rooted sub-searches are exactly what crashed the warm oracle building this thread's
+training data yesterday.
+
+Also declined, with reasons on record rather than just tried and dropped: training a neural net to
+regress directly from state to winning-split coordinates. The target function has no tolerance for
+approximation (`Sb(8:1,2:1)` solvable in 3, `Sb(9:1)` not, at strictly lower mass — one coin flips
+the answer), the closely related easier version (rank candidates by their own shape) was already
+refuted at the 5th percentile, the hard-case corpus is small by construction (153 forced endpoints
+total at k=7, against an action space up to ~1e9) and expensive to grow (a hard case's solution is
+exactly the expensive search being avoided), and the chess/Go precedent is that policy nets are
+never trusted standalone on sharp positions — they're paired with real search, same as the
+achievability/unsolvability asymmetry already written into this repo.
+
+Code: `tools/ml/recursive_value.py` gained `worst_case_then_order` (Experiment 3) and
+`_r0_children`, reusing `tools/bundled_majorization.py` (unmodified, already committed, no new
+dependency). Evidence:
+[../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+No AWS compute; all label/candidate data stays local under `/tmp/rec/`, not committed.

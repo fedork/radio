@@ -1,0 +1,118 @@
+Worst case first, then order: composing a sound filter with the recursive scorer, 2026-08-21
+Status: measured. Script: tools/ml/recursive_value.py (Experiment 3, `worst_case_then_order`).
+Continues evidence/recursive_value_2026-08-20.txt. Prompted by two user challenges in sequence:
+(1) a random-sampler-trained value model mostly proves itself on "easy" cases; the hard cases --
+few winning splits -- are what actually matters and were undertested; (2) instead of chasing the
+exact winning split, optimize the WORST case first (a sound early-stop point) and only then worry
+about ordering for the typical case.
+
+=====================================================================================
+0. THE CHALLENGE, CONFIRMED FIRST
+=====================================================================================
+Re-ran experiment 2 (evidence/recursive_value_2026-08-20.txt section 2) against the EXACT stage-2
+candidate enumeration (`exact_topk.py`'s method, no 6,000-candidate sampling cap) and stratified
+by exact candidate-set size -- the real hardness axis here, since the literal winning-cut count
+turned out to be nearly constant (2 or 4, almost always just the trivial complementation pair) and
+carries no stratifying information on its own.
+
+  recursive logistic-V, scaled to the full exact space: median rank 198, worst 16,886 (of up to
+  130,262) -- essentially tied with a flat ranker trained WITH direct split supervision on this
+  same population (193, worst 8,834), so the "recursion matches supervision" finding holds up on
+  the harder exact protocol.
+
+  stratified by exact stage-2 candidate-set size (thirds, easiest -> hardest):
+    7,684-40,610 candidates:    median rank 177   worst  4,082   top-100 33.3%
+    41,278-60,636 candidates:   median rank 146   worst 15,315   top-100 35.3%
+    60,760-130,262 candidates:  median rank 331   worst 16,886   top-100 19.6%
+
+The hardest third really is worse: median rank roughly doubles, top-100 hit rate drops by nearly
+half. The user's concern was correct, on this population, before anything else was tried.
+
+=====================================================================================
+1. THE REFRAME: A RANKING CANNOT CERTIFY A NEGATIVE. A SOUND FILTER CAN.
+=====================================================================================
+No ordering, however good on the typical case, changes how many candidates must be exhausted to
+PROVE none of them work -- that number can only be shrunk by a proven necessary condition. This
+repo already has one, unused in this context: `R_0` (full-star majorization, proved in
+docs/theorems/singleton-majorization.md, implemented as `tools/bundled_majorization.r0` and, for
+the production solver, `radiobase.c`'s `star_expansion_majorization_can_solve`). It had been
+measured before (docs/journal.md, `evidence/learned_cut_ranker_2026-08-20.txt`) but never: (a)
+composed specifically on top of the stage-2 (cap + per-part-Pareto) candidate set used throughout
+this ML thread, (b) stratified by hardness to check whether it holds up on the hard tier, or (c)
+combined with the recursive scorer and measured as one pipeline.
+
+**Two guarantees, kept deliberately separate, exactly per the achievability/unsolvability
+asymmetry already on record:**
+- `R_0`-survivor count: the real, sound, theorem-backed worst-case bound. Exhausting every
+  survivor with no success is a valid proof of unsolvability. No learned model is involved.
+- Rank of the winner WITHIN the survivors, by the recursive V scorer: unsound, ordering only.
+  Speeds up finding a witness when one exists; must never be used to stop early or declare
+  unsolvable -- the 2023 corpus's 37 false negatives are what that shortcut costs.
+
+=====================================================================================
+2. MEASURED: COMPOSING THEM FIXES BOTH PROBLEMS AT ONCE
+=====================================================================================
+Same 153 forced k7 endpoints, same exact stage-2 enumeration, same <=20,000-candidate uniform
+subsample (winners always kept) used for tractability. `R_0` applied to each candidate's three
+children (its own semantic-state convention, NOT `analyze_single_solution_cuts.children`'s --
+that one drops n*m<=1 "unit" parts that `bm.r0` was not built to have pre-pruned; see
+`_r0_children` in the script). Soundness spot-check: **0 winners dropped by R_0** across every
+sampled candidate at every endpoint, as the theorem requires.
+
+  stage-2 candidates: median 54,014, max 130,262
+  R_0 survivors (SOUND worst-case bound), scaled to the full space:
+    median 6,892, max 16,547 -- a median 6.1x shrink beyond stage-2 alone
+  rank of the winner WITHIN the R_0 survivors (recursive V order):
+    median 14, worst 954
+
+That worst-case rank (954, and a median of 14) is already far better than the pre-filter numbers
+(331 median / 16,886 worst on the hardest tier) -- but the more important result is what happens
+under the SAME hardness stratification as section 0:
+
+  stage-2 size tier          R_0 survivors (median/max)   shrink    rank median/worst
+  7,684-40,610 (easiest)     5,924 / 11,277                4.7x       18 / 528
+  41,278-60,636              8,162 / 13,369                6.1x       12 / 954
+  60,760-130,262 (hardest)   7,940 / 16,547               10.6x       13 / 943
+
+  correlation(stage-2 size, R_0-survivor count) =  0.257
+  correlation(stage-2 size, rank-within-R_0)    =  0.001
+
+**`R_0` shrinks the hardest tier MORE, not less** (10.6x vs 4.7x on the easiest) -- the opposite
+of what you'd fear from "the hard cases are hard because nothing distinguishes them." And once
+`R_0` has removed whatever it removes, **the recursive ranker's degradation on hard cases
+disappears entirely**: rank medians are 18/12/13 across the three tiers (flat, not "roughly
+double" as before `R_0`), and the correlation between hardness and rank drops from 0.129
+(pre-filter, evidence/recursive_value_2026-08-20.txt section 2's own follow-up check) to 0.001.
+
+**Reading:** the earlier degradation on the hard tier was not evidence that the recursive value
+model gets confused by hard cases specifically. It was evidence that the hard tier's larger raw
+candidate space contains more candidates that only a *sound* condition can rule out -- once `R_0`
+removes those first, the residual population the learned ranker actually has to sort is no harder,
+on average, than the easy tier's. Sound filtering and learned ordering are doing genuinely
+different jobs here, and composing them is far better than either alone.
+
+=====================================================================================
+3. WHAT THIS DOES AND DOES NOT LICENSE
+=====================================================================================
+* "Optimize the worst case first, then order" is a sound, validated objective, and this composed
+  pipeline is the first concrete instance of it in the ML thread. The `R_0`-survivor count (median
+  6,892, worst 16,547) is the number to quote as the current cutoff-with-proof bound -- still in
+  the thousands, not small, but a real, theorem-backed improvement over stage-2's up-to-130,262,
+  and one that specifically holds up (in fact improves) on the hardest cases.
+* This is NOT the full worst-case story. `R_0`'s own ladder continues (`R_1`, deeper `R_d`,
+  converging to exact solving per the Synchronized Hierarchy Theorem) and the "cross-part pair"
+  condition (`tools/split_choice_rules.py`, previously measured at 140.4x combined with `R_0` on a
+  different, smaller denominator and NOT stratified by hardness) is the natural next sound filter
+  to compose and re-test on this same hardness stratification. Neither is done here.
+* The 6.1x/10.6x shrink numbers are against THIS thread's stage-2 denominator (cap + per-part
+  Pareto). The previously-quoted 16.1x (`R_0` alone) and 140.4x (`R_0`+pairs) figures in
+  docs/journal.md are against a different, smaller "cap + four-rectangle frontier" denominator on
+  a 25-endpoint subsample -- the numbers are not directly comparable across denominators, and
+  neither superseded the other; they answer different questions on different populations.
+* Still untested: k=8 (children at k=7) and the real k=9 H2 frontier. k=7-rooted sub-searches are
+  exactly what crashed the warm oracle building this thread's own training data (front-record
+  handle exhaustion, see evidence/recursive_value_2026-08-20.txt section 0b) -- expect that to
+  recur if this is extended to k=8 without a fix or a much smaller budget per query.
+* Reproduce: `.venv/bin/python tools/ml/recursive_value.py` (Experiment 3 section). Needs
+  `tools/bundled_majorization.py` (already committed, no third-party deps) alongside the usual
+  `.venv` numpy/scikit-learn and the pulled k7/k8 census artifacts.
