@@ -1,0 +1,103 @@
+Re-running the real-oracle ordering benchmark against the persistent AWS oracle, 2026-08-22
+Status: measured, one endpoint, with a real bug caught and fixed along the way.
+Tools: tools/oracle_tcp_client.py, tools/ml/real_benchmark_via_aws.py.
+
+WHY: every prior real-oracle test in this thread (real_benchmark_residual_control_2026-08-21.txt
+and successors) used a cold local `radio_oracle` built fresh per test, each paying its own
+init() cost and starting with an empty cache. The persistent oracle-serve instance
+(docs/aws-run.md) removes that per-test setup cost and is warm with 24.7M facts (base snapshot +
+sa193 certificate). This note is the first real use of it for this thread's actual purpose:
+ordering a solver's split search.
+
+=====================================================================================
+0. `enumerate` IS NOT THE RIGHT TOOL FOR THIS, AND WHY
+=====================================================================================
+First attempt used the oracle's `enumerate` command directly on a k7 4-part forced census
+endpoint, expecting a fast, complete answer as at k=6 (40-66s in prior tests). It ran for over 10
+minutes with no result (connection stayed alive, so it was making real progress, not hung) before
+being killed. Reading `enumerate_winning_splits` in radio_oracle.c explains why: the admissibility
+check (`R_0` + cap) is applied only at the DEEPEST leaf of the mixed-radix walk, not incrementally
+on partial sub-trees -- `checked` increments once per raw split regardless of whether any prefix
+of it could already be pruned. At k=6 this cost ~1.2 billion raw splits, 40-66s; at k=7, with
+wider parts, the raw space is large enough that a single call did not finish in 10+ minutes. This
+is not a new discovery -- the function's own comment already flagged "an 8-part state's raw space
+can reach 1e13+... not made to scale further" -- but it is the first time it was hit on an
+ordinary 4-part state, not just the documented 8-part case. `enumerate` remains the right tool for
+smaller states (validated at k<=6); for k=7 census endpoints, the existing stage-2
+(cap + per-part-Pareto bound) candidate construction plus plain per-candidate queries is the
+practical path, and that is what the rest of this note uses.
+
+=====================================================================================
+1. A REAL BUG CAUGHT: CENSUS "kN" CORPORA ARE NOT ROOTED AT LITERAL k=N
+=====================================================================================
+`CORPORA["k7"]`'s endpoints are RESIDUAL states reached after some root-level splits of a census
+rooted at k=7 -- their actual parent level is `C["rk"]`, which is **5**, not 7. A first test run
+queried a k7 endpoint's children at k=6 (wrong -- should have been k=4), producing verdicts that
+answered a different, easier question than the endpoint's real claim. All 3 children still came
+back SOLVABLE and the found split's mass balanced exactly, which is exactly the trap: a
+plausible-looking, internally-consistent WRONG answer. Caught by checking `C["rk"]` directly
+rather than trusting the corpus's label. Re-ran everything below at the correct k=5.
+
+=====================================================================================
+2. THE REAL COMPARISON, ON A GENUINELY HARD ENDPOINT
+=====================================================================================
+State: `Sb(14:5,9:6,13:4,9:5)@5` -- a real k7-census forced endpoint (parent level 5, per the fix
+above), mass 221 of cap 243 (90.9%), exactly 2 known literal winners. Chosen as the highest-mass
+(hardest) endpoint in the corpus, specifically to avoid the trivial-state trap below.
+
+  exact stage-2 candidates: 56,798 (matches this thread's previously-measured median for this
+    population almost exactly -- a good sanity check that the correct k fixed the earlier
+    18,952,500-candidate anomaly, which was an artifact of the wrong, larger k)
+  R_0 survivors: 2,626 of a 20,000-candidate uniform subsample (13.1%)
+
+  LEARNED ORDER (R_0 -> recursive V, trained on the matched-sampler k<=6 corpus, zero split-label
+  supervision): SUCCESS at candidate #1 of 2,626 -- [5s total, including V-model training]
+
+  NATURAL ORDER (identical 20,000-candidate subsample, NOT R_0-filtered -- the more directly
+  comparable "what would blind search actually try" baseline): SUCCESS at candidate #2,970 --
+  [238s]
+
+  Both found the EXACT SAME split: `((4,1),(5,2),(7,2),(9,5))` -- which is also EXACTLY one of the
+  census's two recorded literal winners. Independently re-verified in a fresh connection: mass
+  arithmetic exact (selected 73 + mixed 80 + complement 68 = 221, the parent mass exactly), all
+  three children genuinely SOLVABLE.
+
+**~2,970x, on a state chosen for difficulty, not convenience, in under five minutes of wall clock,
+using only the already-existing, already-validated pipeline (R_0 filter + recursive-V order) --
+the only thing that changed is the oracle backend.**
+
+=====================================================================================
+3. A TRIVIAL-STATE TRAP, FOUND AND DISCARDED BEFORE TRUSTING THE RESULT ABOVE
+=====================================================================================
+An earlier draft of this test used a LOW-mass endpoint (192 of 2187 -- but that mass fraction
+itself was computed against the WRONG cap, see section 1) almost by accident (`forced[10]`,
+arbitrary index). Both learned AND natural order succeeded at candidate #1 on that state, with the
+SAME random subsample -- meaning the very first sampled candidate happened to be a genuine winner
+regardless of any ordering. That is not evidence the learned order does anything; it is evidence
+the state was too easy to test anything with. This is why section 2 deliberately picked the
+HIGHEST-mass (hardest) endpoint instead of an arbitrary one, and why a natural-order control is not
+optional even after the wrong-k bug was fixed -- a good number under the learned order does not by
+itself distinguish "the order works" from "the state was already easy."
+
+=====================================================================================
+4. WHAT THIS DOES AND DOES NOT ESTABLISH
+=====================================================================================
+* n=1 real state, on top of the two prior real-oracle states from 2026-08-21
+  (Sb(29:6,19:9,13:12,36:3)@6 and Sb(16:12,17:10,29:5,21:6)@6). Together: 67, 1373, and now
+  effectively "1 vs 2970" (a selectivity, not a raw candidate count, since the two orders here
+  were measured against slightly different denominators -- R_0-filtered vs not).
+* The per-candidate query loop still opens a fresh TCP connection per request (matches
+  oracle_server.py's own one-request-per-connection design). This adds real per-query overhead
+  over an SSM tunnel (roughly 70-80ms/candidate observed here, 500 candidates in 34-42s) -- fine
+  for hundreds of candidates, would need a persistent/pipelined protocol extension to scale
+  comfortably to the tens of thousands some earlier local tests needed.
+* `enumerate` itself is unaffected by anything here and remains validated and useful for what it
+  was built for (k<=6, complete exact winner sets) -- this note only establishes it is NOT the
+  right tool for ordering a k=7 search, which needs the existing stage-2/R_0/recursive-V pipeline
+  instead, same as before the persistent oracle existed.
+* Not yet: a systematic sample across the 131-two-winner/22-four-winner tiers. This note
+  establishes the corrected, working method (right k, hardest-endpoint selection, natural-order
+  control) needed before running that sample at scale.
+
+Reproduce: `tools/ml/real_benchmark_via_aws.py "14:5,9:6,13:4,9:5" 5` with an SSM tunnel open to
+the oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).

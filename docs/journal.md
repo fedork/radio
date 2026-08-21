@@ -8949,3 +8949,60 @@ returned the identical correct answer as every earlier test. Full instance recor
 history, and reach/stop/terminate commands:
 [aws-run.md](aws-run.md#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date). ~10 GiB
 resident of 16 GiB after warm-start -- real but not huge headroom; watch it.
+
+## 2026-08-22 (done) — the ordering pipeline, re-validated against the persistent oracle, and two real bugs on the way
+
+Back to the actual regression: does the R_0-then-recursive-V ordering still work, now that there's
+a warm, persistent oracle instead of a cold local one to test it against. Wrote
+`tools/oracle_tcp_client.py` (minimal client for `oracle_server.py`'s TCP protocol) and
+`tools/ml/real_benchmark_via_aws.py`, then hit two real problems before getting a trustworthy
+answer.
+
+**First: `enumerate` is not the tool for this, and the reason generalizes past the 8-part case.**
+Tried it directly on a k7 4-part census endpoint expecting the same 40-66s turnaround as the k=6
+knife-edge test. It ran 10+ minutes with no result -- still connected, not hung, but not close to
+done either. Reading `enumerate_winning_splits` again explains it: the admissibility check runs
+only at the deepest leaf of the raw mixed-radix walk, never on a partial sub-tree, so cost is the
+RAW combinatorial size no matter how selective `R_0` is. The function's own comment already said
+this about 8-part states; it turns out an ordinary wide 4-part state at k=7 is enough to hit it
+too. Killed it and switched to the already-proven method: exact stage-2 (cap + per-part-Pareto)
+candidates, `R_0` filter, recursive-V order, walk with plain queries -- now against the fast
+persistent oracle instead of a cold local one.
+
+**Second, and more consequential: I queried the wrong level, and it looked completely fine.** The
+"k7" census corpus's endpoints are residual states reached after root-level splits of a census
+rooted at k=7 -- their real parent level is `C["rk"]`, which is **5**, not 7. Queried an endpoint's
+children at k=6 (should have been k=4). Every verdict came back clean: `SOLVABLE`, mass arithmetic
+exact, a plausible-looking winning split. All of it was answering a different, easier question
+than the endpoint's actual claim -- and nothing about the output would have revealed that on its
+own. What caught it: the stage-2 candidate count (18,952,500) didn't match this exact population's
+already-known median (~54,000) from earlier work in this thread. That mismatch was a lucky
+plausibility check, not a structural guard -- there's no code path that verifies a query's k
+against a census corpus's actual residual level. Re-ran at the correct k=5 and the candidate count
+landed at 56,798, right where it should.
+
+**Also caught, cheaply, before trusting a good number: a trivial-state trap.** An early draft
+picked an arbitrary endpoint (low mass, 192 of what I'd miscomputed as a 2187 cap using the wrong
+k) where BOTH the learned order and a natural/unscored order succeeded at candidate #1 on the same
+random subsample. That's not evidence the ordering does anything -- it's evidence the first
+sampled candidate happened to be a winner regardless of order, because the state was too easy to
+discriminate anything with. Re-did the test on the corpus's highest-mass (hardest) endpoint
+instead, specifically to avoid this.
+
+**The real result, once both bugs were fixed:** `Sb(14:5,9:6,13:4,9:5)@5`, mass 221 of 243 (90.9%
+of cap), 2 known literal winners. Stage-2: 56,798 candidates, 2,626 pass `R_0`. Learned order
+(`R_0` then recursive-V): success at candidate **#1**. Natural order, same 20,000-candidate random
+subsample, not R_0-filtered: success at candidate **#2,970**. Both found the exact same split,
+which is exactly one of the census's two recorded winners -- independently re-verified in a fresh
+connection, mass arithmetic exact (73+80+68=221). Whole experiment, training included, under five
+minutes wall-clock -- against 40-60+ minutes per state with the old method. The speed difference
+here isn't from the oracle being faster per query (each query is still one fresh TCP connection);
+it's from not needing to build and warm a fresh local oracle for every single test.
+
+Not done: a systematic sample across the corpus's 131-two-winner/22-four-winner tiers -- this
+session establishes the corrected, trustworthy method (right k, hardest-endpoint selection,
+mandatory natural-order control) that sampling needs, but doesn't run it yet.
+
+New trap-table entries for both bugs -- the census-corpus-level one especially, since it produces
+answers that look completely correct while being wrong. Evidence:
+[../evidence/real_benchmark_via_aws_oracle_2026-08-22.txt](../evidence/real_benchmark_via_aws_oracle_2026-08-22.txt).
