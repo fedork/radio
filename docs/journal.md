@@ -8686,3 +8686,46 @@ Code: `tools/ml/recursive_value.py` gained `worst_case_then_order` (Experiment 3
 dependency). Evidence:
 [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
 No AWS compute; all label/candidate data stays local under `/tmp/rec/`, not committed.
+
+## 2026-08-21 (done) — 67 vs 37,899: the composed pipeline beats a real benchmark, with real solver calls
+
+Same day, same thread, one more push: "do we have an algorithm yet, or are we still measuring."
+Answer before this: measuring. Answer after: measured against the real thing, on one state, not
+wired in yet.
+
+`Sb(29:6,19:9,13:12,36:3)@6` is this repo's own standing test for exactly this question —
+documented in status.md as the "residual positive control" specifically because a prior
+split-ordering proposal already failed it. Current solver, default order: 37,899 top-level splits,
+26.6-33 CPU seconds. The test: enumerate the same cap+per-part-Pareto candidate space this whole
+thread has used (**4,449,172** candidates for this one state — far more than any k=7 census
+endpoint, because its parts are wider), filter by `R_0` (809,706 survivors), train `V` on all four
+matched-sampler levels pooled, order the survivors by `min(V(child))`, and — the part that makes
+this real rather than another offline number — for each candidate in that order, ask a genuine
+warm oracle (full `canSolveB` recursion, no shortcuts, no ML anywhere in the loop) whether its
+three children are solvable. Stop at the first yes.
+
+**67.** Against 37,899. A different, independently-verified winning split than the documented one
+(mass arithmetic exact, both children-solvable answers reproduced in a separate process). The same
+`R_0` survivors in their natural, unscored order had not found a working split after 1,340 tries —
+so the ordering itself, not just the sound filter, is carrying this.
+
+Cost accounting, because it matters for what to build next: the 46-minute wall-clock was almost
+entirely unoptimized Python scoring 4.4M raw candidates one at a time. `r0()` and `feat()` are each
+a handful of arithmetic operations — a C port should do this scoring pass in a small fraction of a
+second. The number worth remembering is 67 vs 37,899 top-level candidates, not this harness's own
+runtime.
+
+**What this is and isn't.** It is the first result in the thread measured against the real solver
+instead of a sampled or exactly-enumerated proxy, on the project's own previously-unbeaten
+acceptance test for this question. It is not yet inside `radiobase.c` — this used the solver only
+as a black-box oracle, changing nothing in production. It is one state. The witness rests on
+`canSolveB`'s own verdict (the same trust every other achievability claim in this thread already
+rests on) rather than a full singleton-leaf tree checked by `check_witness.py`, which remains the
+strictly stronger proof and wasn't built here.
+
+Housekeeping: killed one stray duplicate process from a botched quoting attempt (an `exec()`-split
+smoke test that should have been thrown away and wasn't) before it could run in parallel with the
+real one and confuse the results; confirmed after the fact it hadn't. No AWS compute. Script kept
+at `/tmp/rec/real_benchmark.py`, not committed — self-contained and reproducible from this note.
+Evidence:
+[../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).

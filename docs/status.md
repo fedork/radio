@@ -1137,7 +1137,8 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
 
 0. **Derive a fast solver from the learned predictor — the active thread.** The substrate, the
    level-held-out value model (now through k=7), and a recursive cut scorer are all built and
-   measured; wiring a prototype into the solver's split loop is not done. Read
+   measured, and are now validated end-to-end via real solver calls on a real benchmark; wiring
+   a prototype into `radiobase.c` itself is not done. Read
    [ml-guided-search.md](ml-guided-search.md) first: its "Read this first" section lists what
    exists, what each piece measured, and the one command that starts a fully warm oracle. In short:
    a learned ranker orders candidates 428x better than blind and transfers across levels, but is an
@@ -1155,6 +1156,15 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    gives the first real worst-case cutoff bound in this thread (median 6,892 / worst 16,547
    survivors). See
    [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+   **New 2026-08-21, real solver calls, no offline proxy:** on this repo's own standing hard
+   benchmark, `Sb(29:6,19:9,13:12,36:3)@6` (documented at 37,899 top-level splits, 26.6-33 CPU
+   seconds under the current default order — see item 4 below), ordering `R_0` survivors by the
+   recursive scorer and asking a real warm oracle (genuine `canSolveB`, no shortcuts) whether each
+   candidate's three children are solvable finds a working split after **67** top-level tries — a
+   **566x reduction**, independently re-verified. The `R_0`-survivor set in its natural order had
+   not found one after 1,340 tries, so the ordering itself, not just the sound filter, is doing the
+   work. Not yet wired into `radiobase.c`, and n=1. See
+   [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
    Guidance is correctness-free for **achievability** only, since a witness is checked by
    `check_witness.py` — never prune an OR-branch with a learned value; only a proven filter like
    `R_0` may ever certify a negative.
@@ -1199,10 +1209,15 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    The two guarantees stay separate: `R_0`'s survivor count is a sound proof-of-unsolvability
    bound if exhausted; the rank within it is ordering only, never a stopping rule. See
    [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+   **2026-08-21, end-to-end on a real benchmark:** the offline selectivity claim above is now
+   confirmed with real solver calls, not a proxy — 67 vs 37,899 top-level splits on this repo's own
+   `Sb(29:6,19:9,13:12,36:3)@6` control (item 4 below); see
+   [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
    Still open: compose the cross-part pair condition and deeper `R_d` on the same stratification,
-   factor the policy per part, decode top-k with the `(S,X)` DP, and put either scorer in front of
-   `canSolveB`'s actual split loop — judged on end-to-end CPU seconds on a known-hard instance, not
-   on the offline selectivity numbers above. **Guidance remains correctness-free only for
+   factor the policy per part, decode top-k with the `(S,X)` DP, confirm the win survives once
+   scoring is not paid for in unoptimized Python, broaden past n=1, and put either scorer in front
+   of `canSolveB`'s actual split loop — judged on end-to-end CPU seconds, now with a real number to
+   beat rather than only offline selectivity. **Guidance remains correctness-free only for
    achievability** — a witness found under guidance is still checked by `check_witness.py`, whereas
    pruning an OR-branch by a learned value would manufacture false negatives.
 
@@ -1233,7 +1248,13 @@ star expansion is different: it is an arbitrary-part-count global theorem and is
    bundled proposal must order the real winning split earlier under the same warm k<=5 cache; merely
    finding an `R_1` or `R_2` witness is already known not to do that. Current `main` takes 26.6
    solve seconds and 37,899 top-level splits after the exact-L1 change. Keep any deeper check
-   bounded and fallback-safe.  For the separate recursive Pareto-lift track, move upward in k before
+   bounded and fallback-safe. **2026-08-21: the recursive-V-ordered `R_0` survivors pass this test**
+   — not yet inside `radiobase.c`, but real `canSolveB` calls via the oracle confirm a working split
+   (different from the documented one, independently re-verified, exact mass arithmetic) after 67
+   top-level candidates, against the documented 37,899 — while the SAME `R_0`-survivor set in its
+   natural, unscored order had not found one after 1,340 tries. See
+   [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
+   Still not C-integrated, and n=1. For the separate recursive Pareto-lift track, move upward in k before
    adding solver code: retain several parent-conditioned Pareto upgrades and inequivalent splits,
    preserve lineage labels through equal components, and measure whether one branch survives at the
    next recursive node.  One greedy low-k path is already known to fail.

@@ -1,0 +1,88 @@
+First end-to-end validation on a real documented benchmark, via genuine solver calls, 2026-08-21
+Status: measured. Not yet wired into radiobase.c -- this validates the design using the existing
+solver as a black-box oracle, so the result is real (every "solvable" verdict below is a genuine
+canSolveB answer, not an ML prediction) without touching production C code.
+
+=====================================================================================
+0. THE BENCHMARK, AND WHY IT'S THE RIGHT ONE
+=====================================================================================
+`Sb(29:6,19:9,13:12,36:3)@6` is this repo's own standing "residual positive control" for exactly
+this question (docs/status.md item 4, docs/journal.md 2026-08-09/10/17): a real, solvable,
+genuinely hard four-part state kept specifically to test split-ordering proposals, because a
+proposal has already failed it once -- "merely finding an R_1 or R_2 witness is already known not
+to do that" (docs/journal.md, 2026-08-09). Documented baseline, current solver, default internal
+order: the winning split `[8:1,8:4,11:11,19:2]` is found after **37,899 top-level splits**, in
+26.6-33 CPU seconds depending on build.
+
+=====================================================================================
+1. METHOD -- NO CHANGE TO radiobase.c
+=====================================================================================
+For this exact state: enumerate the same cap + per-part-Pareto-bound ("stage-2") candidate space
+used throughout this ML thread (**4,449,172** raw candidates -- far more than any k=7 census
+endpoint, because this state's parts are wider), filter by `R_0` (sound, `tools/bundled_majorization.r0`,
+**809,706 survivors**), train `V` on ALL four matched-sampler levels pooled (k=4,5,6,7 -- 1,167
+states, no holdout needed since this is a real deployment test rather than a generalization
+claim), score every `R_0` survivor by `min(V(selected), V(mixed), V(complement))`, sort.
+
+Then -- the part that makes this a real test rather than another offline proxy -- walk that order
+and for each candidate ask a genuine warm `radio_oracle` (built `-DMAX_K=6 -DMAX_N=200`, cold, no
+cache) whether all three children are `SOLVABLE` at k-1=5. `radio_oracle` calls the same
+`canSolveB` as production, doing full exhaustive recursion with no shortcuts. Stop at the first
+candidate where all three answer `SOLVABLE`. The resulting count is directly comparable to
+"top-level splits" in the documented baseline: both count attempts at the identical decision.
+
+=====================================================================================
+2. RESULT
+=====================================================================================
+  documented baseline (current solver, default internal order):      37,899 top-level splits
+  R_0 survivors, NATURAL enumeration order (no V), same population:  gave up after 1,340
+  R_0 survivors, ordered by recursive V (min over 3 children):       SUCCESS at candidate #67
+
+**67 real, oracle-verified top-level splits, against a documented 37,899 -- a 566x reduction**,
+achieved without pruning a single OR-branch unsoundly: the stopping rule is "found a working
+split," identical in kind to what the production solver already does, just reached far sooner
+because the order is informed instead of default.
+
+The found split differs from the documented one: `[(14,3),(4,1),(11,10),(19,2)]`, not
+`[8:1,8:4,11:11,19:2]` -- there is more than one winner, and this order reaches a different one
+first. Independently re-verified in a fresh process, separately from the run that found it:
+
+  selected   (14,3),(4,1),(11,10),(19,2)     mass 194   -> SOLVABLE
+  mixed      (14,3),(4,8),(11,2),(19,1),(15,3),(15,1),(2,10),(17,2)   mass 229   -> SOLVABLE
+  complement (15,3),(15,8),(2,2),(17,1)      mass 186   -> SOLVABLE
+  194 + 229 + 186 = 609 = parent mass, exactly.
+
+The documented winner itself is present in the candidate set and passes `R_0` (confirmed), and
+ranks 279th under the learned order -- still 136x better than 37,899, just not the specific split
+this run's stopping rule reached first.
+
+**The ordering, not just `R_0`, is doing the work.** `R_0` alone shrinks 4,449,172 -> 809,706
+(5.5x) but the natural order within that reduced set still had not found a winner after 1,340
+tries (>20x worse than the learned order, at minimum -- the true gap could be larger since that
+run was stopped, not exhausted). The recursive value model is what turns "a smaller haystack" into
+"the needle is near the front."
+
+=====================================================================================
+3. WHAT THIS DOES AND DOES NOT ESTABLISH
+=====================================================================================
+* This is n=1: one state, chosen because it's the project's own standing acceptance test for this
+  exact question, not because it was cherry-picked favorably. A single instance beating a
+  benchmark that has already rejected a prior proposal is meaningful, but it is one data point.
+* Not yet wired into `radiobase.c`. This measures what the algorithm WOULD do if it replaced the
+  solver's default top-level order, using the real solver as ground truth for every claim. The
+  actual C integration -- and confirming the win survives once you're not paying Python-per-
+  candidate overhead -- is still ahead.
+* The witness is solver-verified (two independent oracle calls, in two separate processes, agree,
+  and the mass arithmetic is exact) but not yet reduced to a full singleton-leaf tree and checked
+  by `tools/check_witness.py`. That remains the strictly stronger, solver-independent proof; this
+  result rests on trusting `canSolveB`'s own verdict, which is the same trust every other positive
+  result in this thread already rests on (the "achievability is safe" asymmetry this repo already
+  relies on: a positive claim from a real solver call is not an ML claim).
+* Wall-clock here (46 minutes) is dominated by unoptimized Python doing `R_0` + feature
+  construction over 4,449,172 raw candidates, not by the algorithm's real cost. `r0()` and `feat()`
+  are each a handful of arithmetic operations; a C port would do this scoring pass in a small
+  fraction of a second, not 37 minutes. The number to carry forward is **67 vs 37,899 candidates**,
+  not the wall-clock of this Python harness.
+* Reproduce: `/tmp/rec/real_benchmark.py` (not committed -- self-contained, ~150 lines, reproducible
+  from this note plus `tools/ml/recursive_value.py`'s `load`/`feat`, `tools/bundled_majorization.py`,
+  and a `radio_oracle` built `-DMAX_K=6 -DMAX_N=200`).

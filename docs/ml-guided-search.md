@@ -3,16 +3,18 @@
 Written 2026-08-20, after the flat-feature ranker topped out; revised the same day once the value
 model and the oracle were measured, and again the same day once the recursive predictor itself was
 built and measured; revised again 2026-08-21 once a user challenge showed the recursive scorer
-degrades on the hardest endpoints, and composing it with a sound filter fixed that. Status: **the
-substrate, the level-held-out value model, the recursive cut-scorer, and its composition with a
-sound worst-case bound are all built and measured; wiring a prototype into the solver's split loop
-is the remaining step.** Every number below has a source in `evidence/`; anything proposed rather
-than measured says so.
+degrades on the hardest endpoints, and composing it with a sound filter fixed that; revised once
+more the same day after that composition was validated end-to-end with real solver calls, on a
+real documented hard benchmark, not an offline proxy. Status: **the substrate, the level-held-out
+value model, the recursive cut-scorer, and its composition with a sound worst-case bound are all
+built, measured, and now validated end-to-end via genuine `canSolveB` calls; wiring a prototype
+into `radiobase.c`'s own split loop is the remaining step.** Every number below has a source in
+`evidence/`; anything proposed rather than measured says so.
 
 ## Read this first if you are picking the thread up
 
 The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
-verdicts sooner. Six things are already in place; wiring one of them into the solver is not.
+verdicts sooner. Seven things are already in place; wiring one of them into the solver is not.
 
 **Built and measured.**
 
@@ -24,16 +26,24 @@ verdicts sooner. Six things are already in place; wiring one of them into the so
 | level-transfer value model | `tools/ml/value_level_transfer.py`, extended by `tools/ml/recursive_value.py` | **AUC 0.99+** transfers train-k<=6/test-k=7, not just the original k=4->k=5 pair |
 | recursive cut scorer | `tools/ml/recursive_value.py` | scoring a split by `min(V(child))`, with **zero split-label supervision**, reaches **120x** selectivity vs a directly-supervised flat ranker's 130.5x, on the identical 153 real forced k7 endpoints |
 | **worst case (sound) + order (learned)**, composed | `tools/ml/recursive_value.py` (Experiment 3) | `R_0` gives a real, theorem-backed cutoff — median 6,892 / worst 16,547 survivors, vs stage-2's up to 130,262 — that shrinks **more** on the hardest endpoints (10.6x vs 4.7x), and once applied first, the recursive ranker's hard-case degradation (median rank doubling, worst near-blind) disappears entirely (correlation with hardness drops from 0.129 to 0.001) |
+| **end-to-end, real solver calls, no proxy** | `/tmp/rec/real_benchmark.py` (not committed; self-contained, reproducible) | on this repo's own "residual positive control" `Sb(29:6,19:9,13:12,36:3)@6` (documented: 37,899 top-level splits, 26.6-33 CPU s under the current default order), the composed pipeline finds an independently-verified working split after **67** real, oracle-checked top-level candidates — a **566x** reduction — while the same `R_0` survivors in natural order had not found one after 1,340 tries |
 | corpus analysis | `tools/analyze_single_solution_cuts.py` | the forced-cut structure of both censuses |
 
-**Not done: wiring a prototype into the solver's split loop.** Every scorer above is measured
-offline (selectivity against sampled or exactly-enumerated stage-2 candidates), not yet in front of
-`canSolveB`'s actual split loop, and only at children-at-k=6 (scoring real k7 endpoint splits) —
-not yet children-at-k=7 or the real k=9 H2 frontier. Full results, including two traps that broke
-the data pipeline before either question could be answered, in
-[../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt); the
-worst-case-first composition and the hard-case stratification that motivated it are in
-[../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+**Not done: wiring a prototype into `radiobase.c`'s own split loop.** Every result above except
+the last used sampled or exactly-enumerated stage-2 candidates scored offline; the last one (real
+benchmark, real oracle calls) closes that gap for one state by using the real solver as ground
+truth for every claim, without touching production code — but it is still not `canSolveB`'s
+actual loop, it is one state (n=1), the win has only been shown at children-at-k=5 (this
+benchmark) and children-at-k=6 (the census experiments) — not yet children-at-k=7 or the real k=9
+H2 frontier — and the 46-minute wall-clock of that Python harness is not the number that matters
+(`r0`/`feat` are cheap enough that a C port should score millions of candidates in well under a
+second; 67-vs-37,899 candidates is the number to carry forward, not the harness's own runtime).
+Full results, including two traps that broke the data pipeline before either question could be
+answered, in [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt);
+the worst-case-first composition and the hard-case stratification that motivated it are in
+[../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt);
+the real-benchmark validation is in
+[../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
 
 **Start the oracle before anything else.** It removes the reason the earlier experiments were
 awkward — labels used to cost 200 ms and a process each:
@@ -82,6 +92,15 @@ either way. Journal every session so the next one starts warmer.
   never certify a negative, only a sound filter can — and the "hard cases resist learning" framing
   was measuring the wrong stage's output. Measured 2026-08-21; see
   [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+* **This isn't just an offline artifact — it beats a real, previously-unbeaten benchmark using the
+  real solver.** This repo already keeps `Sb(29:6,19:9,13:12,36:3)@6` on record specifically
+  because a prior split-ordering proposal failed it. The composed pipeline (`R_0` then recursive
+  V), tested by asking a genuine warm oracle — full `canSolveB` recursion, no shortcuts — whether
+  each ordered candidate's three children are solvable, finds an independently-verified working
+  split after 67 top-level candidates against the documented 37,899. n=1, and not yet inside
+  `radiobase.c`, but this is the first result in the thread that isn't measured against a sampled
+  or exactly-enumerated proxy. Measured 2026-08-21; see
+  [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
 
 ## Why the flat ranker stalled, and why recursion is the fix
 
@@ -208,12 +227,24 @@ in [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026
    Proof-Number-Search analogy above made concrete: `R_0`'s survivor count is the proof/disproof-
    number-like completeness bound; `V` is the learned estimate ordering what's left. See
    [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt).
+5. Judging it end-to-end, on a known-hard instance, with real solver calls instead of an offline
+   proxy (2026-08-21, same day): this repo's own "residual positive control"
+   `Sb(29:6,19:9,13:12,36:3)@6` — kept on record because it already rejected one split-ordering
+   proposal — documented at 37,899 top-level splits under the current default order. Asking a real
+   warm oracle (`canSolveB`, no shortcuts) whether each `R_0`-survivor's three children are
+   solvable, in recursive-V order, finds an independently-verified working split after **67**.
+   566x, on the actual acceptance test this thread was always going to be judged against, not on
+   AUC and not on a sampled candidate set. See
+   [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
 
-**What's left of step 3**: the DP top-k decoder over the factored per-part policy, and actually
-putting either in front of `canSolveB`'s split loop — still not done, still gated on judging it by
-end-to-end CPU seconds on a known-hard instance, not on AUC or on the offline selectivity numbers
-above. The sound filters remain very cheap (per-part Pareto bound ~9-12x at full recall for a table
-lookup, `R_0` another 8x); a learned component in the actual loop still has to beat that on cost.
+**What's left**: confirm this survives a C port (the 46-minute wall-clock above is unoptimized
+Python scoring 4.4M candidates; `r0`/`feat` are cheap enough that this should not be the bottleneck
+once ported), broaden past n=1, extend to children-at-k=7/k=8 and the real k=9 H2 frontier, the DP
+top-k decoder over a factored per-part policy so candidates need not be enumerated at all, and
+actually putting it in front of `canSolveB`'s split loop as a genuine (sound-preserving,
+reordering-only) patch. The sound filters remain very cheap on their own (per-part Pareto bound
+~9-12x at full recall for a table lookup, `R_0` another 8x); a learned component in the actual loop
+still has to beat the composed pipeline on cost, not just beat blind.
 
 Failure is a result here, and one showed up mid-experiment: the fixed [0.70,1.02]-of-cap mass band
 that worked at k=4/k=5 sampled **zero solvable states out of 300 at k=7** — it does not transfer,
