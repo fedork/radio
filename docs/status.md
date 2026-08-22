@@ -1244,14 +1244,28 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    *endpoints*' real parent level is `C["rk"]` (5, not 7, for the "k7" corpus) — querying the wrong
    k gives internally-consistent, wrong answers with no code-level guard against it. See
    [../evidence/real_benchmark_via_aws_oracle_2026-08-22.txt](../evidence/real_benchmark_via_aws_oracle_2026-08-22.txt).
-   Still open: a systematic sample across the 131-two-winner/22-four-winner tiers using this
-   corrected method; compose the cross-part pair condition and deeper `R_d` on the same stratification,
+   **2026-08-22, the systematic 16-endpoint sample (8 per tier), done:** `rank_learned` is small
+   and fully measured for every endpoint (2-winner tier: median 7, max 104, of 31k-75k true
+   candidates; 4-winner tier: median 83, max 687). `rank_natural`'s 8,000-try cap resolved only
+   4/16 endpoints (selectivity 68.9x-6,041x where measured); the other 12 give only a lower bound
+   (as low as >=11.6x, as high as >=1,600x) — read this as two separate complete facts (learned
+   rank always small; natural rank, wherever measurable, in the thousands) rather than one blended
+   median, since averaging just the resolved cases would silently drop the harder-to-measure
+   majority. One real bug caught first: subsampling the stage-2 pool to 20,000 before checking
+   winner-membership can silently exclude every known winner for a rare-winner endpoint (not a
+   corner case for this population — fixed by ranking over the full true pool, ~50-85k, instead).
+   One sampling-bias caveat: the 4-winner tier has only 22 endpoints total, so its "hardest-octile"
+   sampling is actually an unbiased draw over the whole tier, unlike the 131-endpoint 2-winner
+   tier where it is a real bias — the two tiers' numbers are not directly comparable as
+   hardest-vs-hardest. See
+   [../evidence/tier_sample_via_aws_2026-08-22.txt](../evidence/tier_sample_via_aws_2026-08-22.txt).
+   Still open: compose the cross-part pair condition and deeper `R_d` on the same stratification,
    factor the policy per part, decode top-k with the `(S,X)` DP, confirm the win survives once
-   scoring is not paid for in unoptimized Python, broaden past n=1, and put either scorer in front
-   of `canSolveB`'s actual split loop — judged on end-to-end CPU seconds, now with a real number to
-   beat rather than only offline selectivity. **Guidance remains correctness-free only for
-   achievability** — a witness found under guidance is still checked by `check_witness.py`, whereas
-   pruning an OR-branch by a learned value would manufacture false negatives.
+   scoring is not paid for in unoptimized Python, and put either scorer in front of `canSolveB`'s
+   actual split loop — judged on end-to-end CPU seconds, now with real numbers to beat rather than
+   only offline selectivity. **Guidance remains correctness-free only for achievability** — a
+   witness found under guidance is still checked by `check_witness.py`, whereas pruning an
+   OR-branch by a learned value would manufacture false negatives.
 
 4. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is

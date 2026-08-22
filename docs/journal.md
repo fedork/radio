@@ -9053,3 +9053,52 @@ restart; its result is not in this entry -- see the next entry or docs/status.md
 if this one wasn't updated in place.
 
 Evidence: [../evidence/tier_sample_via_aws_2026-08-22.txt](../evidence/tier_sample_via_aws_2026-08-22.txt).
+
+## 2026-08-22 (done) — the full 16-endpoint tier sample, and why "median selectivity" needs care here
+
+Continuation of the entry above: after the subsampling-coverage fix and the tunnel restart, the
+full `n_per_tier=8` sample (16 endpoints, 8 per tier) completed -- 9,985s (2h 46m), ~624s/endpoint.
+
+**`rank_learned` is real and complete for all 16 endpoints** (bounded only by the `R_0`-survivor
+count, never near the 150,000 cap): 2-winner tier median 7 (range 1-104); 4-winner tier median 83
+(range 15-687). Small in every single case, out of pools of 31k-85k true candidates.
+
+**`rank_natural` is the weak link in this run, not the ordering.** The 8,000-try cap (sized off
+the earlier 2-endpoint pilot's timing, not re-examined before the full run) resolved only 3/8
+2-winner and 1/8 4-winner endpoints; the rest exhausted 8,000 tries without success, giving only a
+lower bound (`>= 8000/rank_learned`) rather than an exact rank. Resolved selectivity: 559.6x,
+4,691x, 6,041x (2-winner); 68.9x (4-winner). Unresolved lower bounds range from >=11.6x up to
+>=1,600x. **The right read is two separate complete facts, not one blended median**: (a) the
+learned order's rank is uniformly small and fully measured; (b) wherever the natural order's rank
+*could* be measured, it was in the thousands, and the majority of endpoints are only bounded, not
+resolved. Averaging just the resolved selectivity numbers would silently drop the harder-to-
+measure endpoints and there is no evidence that direction of exclusion favors either measured
+value being an over- or under-estimate (the weakest lower bound, 11.6x, sits below several fully
+resolved values).
+
+**One endpoint is a real outlier worth flagging, not smoothing over:** 4-winner `U000068` has
+mass 165/243 (68% fill, well below every other sampled endpoint's 87-92%) and the sample's worst
+`rank_learned` (687) and weakest lower bound (>=11.6x). Root cause, also caught and worth keeping:
+the "hardest-endpoint" sampling only works when the tier has more than `3*n_per_tier` candidates
+to draw the top slice from. The 2-winner tier has 131 endpoints, so top-24-of-131 really is a
+hardest-mass bias (all 8 sampled land at 89.7-90.9% fill). The 4-winner tier has only 22 -- "top
+24" is the whole tier, so its 8-endpoint sample is an *unbiased* draw across the full 4-winner
+population, not a hardest-biased one. The two tiers' numbers describe different things (hardest
+octile vs. whole tier) and should not be read as directly comparable.
+
+**Split agreement**: of the 4 endpoints where both orders resolved, only 2 landed on the identical
+split; the other 2 found different (but equally oracle-certified) solving splits -- expected,
+since the census only records 2-4 winners per endpoint and these hard states generally have more
+valid splits than that.
+
+Net result for the original ask ("focus on 4-part states, 2 or 4 solutions"): the learned order
+(`R_0` then recursive-V) resolves every sampled hard endpoint within double or low-triple digits
+of tries, against pools of tens of thousands, while blind/natural order needs thousands of tries
+wherever it could be measured at all and more often could not be measured within a
+budget-constrained 8,000-try cap. That asymmetry, not any single "Nx" headline, is the load-
+bearing finding of this sample.
+
+Fixed the SSM tunnel dying mid-run (see prior entry) with a plain reconnect; the oracle-serve
+instance and its cache were unaffected throughout.
+
+Evidence, with full per-endpoint numbers: [../evidence/tier_sample_via_aws_2026-08-22.txt](../evidence/tier_sample_via_aws_2026-08-22.txt).

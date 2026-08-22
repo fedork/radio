@@ -99,3 +99,70 @@ everyone" or "learned order always lands at #1."
 Reproduce: `tools/ml/tier_sample_via_aws.py k7 1 150000 8000` (single endpoint per tier) or
 `tools/ml/tier_sample_via_aws.py k7 8 150000 8000` (full sample), with an SSM tunnel open to the
 oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).
+
+=====================================================================================
+4. THE FULL 16-ENDPOINT SAMPLE (8 per tier), RUN AFTER THE FIX
+=====================================================================================
+9,985s (2h 46m) total, ~624s/endpoint average, all against the persistent oracle over the SSM
+tunnel (which needed one mid-run reconnect -- see the trap note above; the process itself did
+not crash, a separate diagnostic connection did, before the batch was relaunched).
+
+RANK_LEARNED is real and complete for all 16 endpoints -- it is bounded only by the R_0-survivor
+count (typically several thousand, far under the 150,000 cap), so it never hit a try-cap:
+
+  2-winner (n=8): rank_learned = 1, 1, 5, 5, 9, 13, 75, 104        median 7,    max 104
+  4-winner (n=8): rank_learned = 15, 43, 79, 81, 85, 123, 191, 687  median 83,  max 687
+
+RANK_NATURAL is the weak link in this particular run: the 8,000-try cap (chosen for the earlier
+2-endpoint pilot's timing, not re-examined before the full run) resolved only 3/8 2-winner and
+1/8 4-winner endpoints. Read the natural_cap number itself as an artifact of this run's time
+budget, not a property of the states.
+
+  RESOLVED (natural rank measured exactly, both orders succeeded within cap):
+    2-winner: 3/8 -- selectivity 559.6x, 4,691x, 6,041x  (median 4,691x)
+    4-winner: 1/8 -- selectivity 68.9x
+
+  UNRESOLVED (natural order exhausted 8,000 tries without success -- true rank is >8,000, so
+  these are LOWER bounds on selectivity, computed as 8000/rank_learned):
+    2-winner (5/8): >=615x, >=77x, >=1,600x, >=107x, >=1,600x
+    4-winner (7/8): >=42x, >=186x, >=12x, >=99x, >=101x, >=65x, >=533x
+
+Do not average or median the *known* selectivity numbers alone and call it "the" tier median --
+that silently drops the harder-to-resolve half to two-thirds of each tier, and there is no reason
+to believe the excluded endpoints are systematically easier OR harder than the resolved ones (the
+weakest lower bound in the whole sample, 4-winner U000068's >=11.6x, sits BELOW several of the
+fully-resolved values, so exclusion bias does not obviously run in one direction here). The
+honest summary is two separate, complete facts: (a) the learned order's own rank is small and
+fully measured for every endpoint (max 104 of up to ~75,000 candidates in the 2-winner tier, max
+687 in the 4-winner tier), and (b) the natural order's rank, wherever it could be measured at all,
+was in the thousands -- with the remaining majority of endpoints only bounded below, not
+resolved.
+
+One endpoint stands out: 4-winner U000068 (mass 165/243, 68% fill -- notably lower than every
+other sampled endpoint's ~87-91%) has the sample's worst rank_learned (687) and weakest lower
+bound (>=11.6x). This is not evidence the method fails on lower-mass states in general (n=1); it
+is a flag that the "hardest-endpoint" sampling bias did NOT actually apply to the 4-winner tier --
+see below.
+
+TIER-4 SAMPLING CAVEAT: `hardest()` takes the top `3*n_per_tier` candidates by mass, then samples
+n_per_tier from that pool. The 2-winner tier has 131 endpoints, so top-24-of-131 is a genuine
+hardest-mass bias (all 8 sampled 2-winner endpoints landed at 218-221 of 243, i.e. 89.7-90.9%
+fill). The 4-winner tier has only 22 endpoints total, so "top 24" is the entire tier -- the
+4-winner sample is an unbiased draw across ALL 22 endpoints, not a hardest-biased one, which is
+exactly why its masses range from 68% to 92% instead of clustering near the cap like the 2-winner
+tier's. Not a bug -- both tiers were sampled by the same code -- but the two tiers' results are
+not directly comparable as "hardest vs hardest"; the 4-winner numbers describe this tier's full
+population, the 2-winner numbers describe specifically its hardest octile.
+
+SPLIT AGREEMENT: of the 4 endpoints where both orders resolved, only 2 (U000368, U000607) found
+the exact identical split; the other 2 (U000534, U000547) found different splits. Both are
+equally valid: `run_order` only accepts a candidate when the real oracle certifies all three
+children SOLVABLE, independent of whether that specific split matches a census-recorded literal
+winner -- states in this population have more valid solving splits than the 2-4 the census
+happened to enumerate, and both orders are free to land on any of them.
+
+WHAT WOULD FIX THE CENSORING FOR A FUTURE RUN: raise natural_cap well past 8,000 (say 15-20k,
+matching the observed 4,691-6,041 range with headroom) at the cost of proportionally more wall
+time on the endpoints that still don't resolve, or accept the lower-bound-only outcome as the
+honest result for a hard-tail population where "even a raw walk of tens of thousands rarely
+finds a winner" is itself part of the finding.
