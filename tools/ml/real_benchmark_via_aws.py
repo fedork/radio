@@ -73,7 +73,13 @@ def main():
     # respectively, NOT literally 7/8. Pass the correct residual k as K here, or every solver
     # call answers a different, easier question than the endpoint's real claim (caught live
     # 2026-08-22: a first attempt used K=7 for a "k7" endpoint whose real k was 5).
-    cand_cap = int(sys.argv[3]) if len(sys.argv) > 3 else 20000
+    # cand_cap default raised 2026-08-22 (see evidence/tier_sample_via_aws_2026-08-22.txt sec 1):
+    # subsampling the true stage-2 pool down to a fixed cap BEFORE checking whether any known
+    # winner survives the sample can silently drop every winner by chance for a rare-winner (hard)
+    # endpoint -- exactly the population this pipeline targets. 150000 is comfortably above this
+    # corpus's typical true stage-2 size (~50-60k for a k7 4-part endpoint), so ordinary endpoints
+    # are ranked over their FULL true pool, never a lossy subsample.
+    cand_cap = int(sys.argv[3]) if len(sys.argv) > 3 else 150000
     PARTS = [tuple(int(x) for x in p.split(":")) for p in state_str.split(",")]
     KC = K - 1
     CAPC = 3 ** KC

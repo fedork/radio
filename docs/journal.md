@@ -9006,3 +9006,50 @@ mandatory natural-order control) that sampling needs, but doesn't run it yet.
 New trap-table entries for both bugs -- the census-corpus-level one especially, since it produces
 answers that look completely correct while being wrong. Evidence:
 [../evidence/real_benchmark_via_aws_oracle_2026-08-22.txt](../evidence/real_benchmark_via_aws_oracle_2026-08-22.txt).
+
+## 2026-08-22 (partial) — the systematic tier sample, a subsampling coverage bug, and a tunnel that silently died
+
+Picked up "let's go back to regression using the new oracle" by building the systematic sample
+across the k7 census's 2-winner/4-winner tiers that the prior entry left pending
+(`tools/ml/tier_sample_via_aws.py`): per sampled endpoint, exact stage-2 candidates, `R_0`-filter,
+recursive-V order, walk learned vs. a mandatory natural-order control against the real oracle,
+biased toward the hardest (highest-mass) endpoint per tier.
+
+**A real bug, caught before trusting a tier-level number.** First version reused the 20,000
+candidate-cap-with-random-subsample pattern from `real_benchmark_via_aws.py`. A 2-endpoint pilot
+(1 per tier) gave one endpoint a clean `rank_learned=1` and the other `rank_learned=None,
+rank_natural=None` on BOTH orders -- looked like a null result about the ordering. It wasn't:
+offline census lookup (no oracle calls) showed the true, unsampled stage-2 pool for that endpoint
+was 60,534 candidates and contained all 4 known literal winners -- the random 20,000-subsample
+(33% retention) had simply excluded every one of them by chance. With only 2-4 known winners and
+~65-67% per-winner exclusion odds at that retention rate, this isn't a rare corner case for this
+population -- it's close to the modal case, since rare-winner endpoints are exactly what this
+track targets. Fixed by raising the default candidate cap to 150,000 (above this corpus's typical
+true stage-2 size, ~50-60k, so ordinary endpoints are never subsampled) and printing "known
+winners in pool: X/Y" per endpoint so a future gap like this can't hide inside a rank number
+again. `real_benchmark_via_aws.py` had the identical pattern; fixed the same way, though not
+re-tested since its one prior use happened not to be hit by this.
+
+**Re-run with the fix, both endpoints resolve for real:** `Sb(14:5,9:6,13:4,9:5)@5` (2-winner,
+mass 221/243): stage-2 56,798, R_0 survivors 7,666, rank_learned=1, rank_natural=6,041, same
+split -> 6,041x. `Sb(14:6,15:3,9:5,9:5)@5` (4-winner, mass 219/243): stage-2 60,534, R_0 survivors
+7,152, rank_learned=**13** (not 1 -- more known winners didn't mean easier for the learned order
+either), rank_natural=4,272, same split -> 328.6x. Both are complete, uncapped ranks, ~350s/
+endpoint average against the real oracle.
+
+**Also caught: the SSM port-forwarding tunnel died silently after ~4h52m**, with no error --
+the local process (`session-manager-plugin`) stayed listed in `ps` but stopped actually listening
+on 127.0.0.1:7777, so the next oracle query got `ConnectionRefusedError`. Not a bug in the oracle
+or the pipeline; the persistent oracle-serve instance itself was untouched and healthy
+(`oracle_serve_status.sh` showed `state=running`, cache intact, query counter kept climbing after
+reconnect). Fix was just to kill the dead tunnel processes and re-run the documented
+`ssm start-session --document-name AWS-StartPortForwardingSession` command. Practical
+consequence for any future long batch through this tunnel: expect it to need re-establishing
+after several hours, and don't assume a listed `session-manager-plugin` process means the tunnel
+is actually forwarding -- check with a real connection (`stats`), not `ps`.
+
+The full n_per_tier=8 systematic sample (16 endpoints) was launched after the fix and the tunnel
+restart; its result is not in this entry -- see the next entry or docs/status.md's current state
+if this one wasn't updated in place.
+
+Evidence: [../evidence/tier_sample_via_aws_2026-08-22.txt](../evidence/tier_sample_via_aws_2026-08-22.txt).

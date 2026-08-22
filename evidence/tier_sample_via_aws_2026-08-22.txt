@@ -1,0 +1,101 @@
+Systematic k7 2-winner/4-winner tier sample via the persistent oracle, 2026-08-22
+Status: measured. Tool: tools/ml/tier_sample_via_aws.py (batch generalization of
+real_benchmark_via_aws.py, adding a mandatory natural-order control per endpoint).
+Follows evidence/real_benchmark_via_aws_oracle_2026-08-22.txt's single-endpoint result; this
+is the systematic sample across the corpus's hardest 2-winner and 4-winner tiers that note left
+pending.
+
+=====================================================================================
+1. A REAL BUG, CAUGHT BEFORE TRUSTING ANY TIER-LEVEL NUMBER: SUBSAMPLING CAN ERASE ALL
+   KNOWN WINNERS FROM THE POOL BEING RANKED
+=====================================================================================
+First version of the script reused real_benchmark_via_aws.py's cand_cap=20000 pattern: build
+the exact stage-2 candidate set, then randomly subsample it down to 20,000 if larger, THEN rank
+and walk. A first 2-endpoint pilot (1 endpoint per tier) gave:
+
+  2-winner U000368 (Sb(14:5,9:6,13:4,9:5)@5): rank_learned=1, rank_natural=None (hit the 8,000
+    natural-order cap without success)
+  4-winner U000559 (Sb(14:6,15:3,9:5,9:5)@5): rank_learned=None, rank_natural=None -- BOTH
+    orders found nothing
+
+The second result looked like a null result about the ordering. It was not. Checking offline
+(no oracle calls, pure census-data lookup):
+
+  true stage-2 size (unsampled): U000368 = 56,798,  U000559 = 60,534
+  literal census winners present in the FULL stage-2 set: 2/2 and 4/4 respectively
+
+Both endpoints' known winners are legitimate, R_0-admissible members of the true candidate
+space -- exactly as they must be, since they are certified solving splits. The 20,000-candidate
+subsample (35% and 33% retention respectively) simply failed to include ANY of the 2-4 known
+winners for U000559 by chance: with a ~65-67% per-winner exclusion probability at that retention
+rate, P(all N winners excluded) is not small for N=2..4 (roughly 20% for N=4). Since
+`rank_learned` scans EVERY R_0-survivor of the sampled pool exhaustively (2,341 of them, for
+U000559's sample) and still found nothing, the winners were almost certainly not in the sampled
+20,000 at all -- confirmed by the true-pool membership check above. This is exactly the
+missing-from-stage2 risk that tools/ml/census_sample_via_aws_oracle.py's docstring already
+flagged for a different reason (enumerate's own re-sorting); here it is the SAME risk from plain
+random subsampling, applied specifically to the rare-winner (hard) population this whole track
+exists to test -- so it is not a corner case, it is close to the modal case for this population.
+
+FIX (in tools/ml/tier_sample_via_aws.py): raise the default cand_cap from 20,000 to 150,000 --
+well above this corpus's typical true stage-2 size (~50-60k for a k7-census 4-part forced
+endpoint) -- so ordinary endpoints are ranked over their FULL true candidate pool, never a
+subsample. A truncation still triggers (and is now logged with an explicit WARNING line) if a
+genuine outlier exceeds 150,000; per-endpoint output also now reports "known winners in pool:
+X/Y" so a future silent gap of this kind cannot hide in a rank number again. real_benchmark_via_
+aws.py has the same 20,000-cap pattern (used successfully so far because both its measured
+endpoints happened not to be hit by this) -- it should get the same fix before its next use on a
+new endpoint; not yet done as of this note.
+
+=====================================================================================
+2. THE RE-RUN, WITH THE FIX: BOTH ENDPOINTS NOW RESOLVE
+=====================================================================================
+Same two endpoints, same corpus/tiers, cand_cap=150000 (i.e. unsampled for both -- true sizes
+56,798 and 60,534 are under the cap):
+
+  2-winner U000368 (Sb(14:5,9:6,13:4,9:5)@5), mass 221/243:
+    stage-2 = 56,798  (2/2 known winners present, as expected once unsampled)
+    R_0 survivors = 7,666 (13.5%)
+    rank_learned = 1      rank_natural = 6,041      SAME split, both orders   [394s]
+    -> selectivity 6,041x
+
+  4-winner U000559 (Sb(14:6,15:3,9:5,9:5)@5), mass 219/243:
+    stage-2 = 60,534  (4/4 known winners present)
+    R_0 survivors = 7,152 (11.8%)
+    rank_learned = 13     rank_natural = 4,272      SAME split, both orders   [310s]
+    -> selectivity 328.6x
+
+Both are real, complete (non-capped) measurements: neither order hit its try-cap, so these are
+exact ranks, not lower bounds. Total wall time for both endpoints: 705s (~5.9 min/endpoint
+average), all against the persistent oracle over the SSM tunnel.
+
+Note the 4-winner endpoint's much smaller selectivity (328.6x vs 6,041x) despite having MORE
+known winners, not fewer -- a reminder that winner *count* alone doesn't predict how favorably
+the learned order does; rank_learned=13 here (not 1) means even the recursive-V order took a
+handful of tries on this state, worth keeping in mind before assuming "more winners = easier for
+everyone" or "learned order always lands at #1."
+
+=====================================================================================
+3. WHAT THIS DOES AND DOES NOT ESTABLISH
+=====================================================================================
+* n=2 endpoints (1 per tier), both now with COMPLETE (uncapped) natural-order ranks, on top of
+  the n=1 partial result in real_benchmark_via_aws_oracle_2026-08-22.txt (same U000368 endpoint,
+  consistent: rank_learned=1 there too; that note's rank_natural=2,970 came from a different
+  random subsample/order than this one's 6,041 -- both are real measurements of the same
+  underlying fact ("natural order needs thousands of tries here"), not a contradiction; the
+  exact natural rank depends on which specific enumeration order is walked, only the ORDER OF
+  MAGNITUDE (thousands, not tens) is the load-bearing claim).
+* Both endpoints were chosen as the HIGHEST-mass (hardest) in their tier, per the trivial-state-
+  trap lesson -- not a random or convenient pick.
+* A full n_per_tier=8 systematic sample (16 endpoints, 8 per tier) was launched after this fix
+  to get median/spread statistics across the tiers rather than n=1 each; see the summary
+  appended below once it completes, or docs/journal.md's dated entry if this file was not
+  updated afterward.
+* Per-endpoint cost with the fix (~5-6 min/endpoint, dominated by the natural-order control's
+  ~60-130ms/candidate oracle round-trip) means a 16-endpoint sample costs on the order of 90
+  minutes of wall clock against the shared persistent oracle -- a real, non-trivial cost, run
+  with the user's explicit go-ahead given the repo's ask-before-long-runs convention.
+
+Reproduce: `tools/ml/tier_sample_via_aws.py k7 1 150000 8000` (single endpoint per tier) or
+`tools/ml/tier_sample_via_aws.py k7 8 150000 8000` (full sample), with an SSM tunnel open to the
+oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).
