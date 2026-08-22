@@ -167,3 +167,69 @@ already is -- an engineering change, not a new algorithm -- not yet done or test
 
 Reproduce: `tools/ml/proto_deficit_bestfirst.py [endpoint_name ...]` (defaults to all 4), with an
 SSM tunnel open to the oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).
+
+=====================================================================================
+6. FOLLOW-UP: BLOCK COORDINATE DESCENT (a real packing-problem framing), tested for real
+=====================================================================================
+Prompted by naming the problem precisely: the mass/cap constraint is a multiple-choice knapsack,
+already solved exactly by `exact_candidates`'s (S,X) DP -- the open problem is that the actual
+quality signal (does a combination lead to three solvable children) is a genuinely joint,
+non-separable function of the parts, which no per-part-decomposable proxy (deficit, sum-of-slack)
+can capture. Coordinate descent sidesteps this by using the EXPENSIVE, ACCURATE pooled
+recursive-V score directly, evaluated only on a small free block of parts at a time, holding the
+rest fixed. Tool: tools/ml/proto_coord_descent.py.
+
+1-PART-AT-A-TIME DESCENT FAILS OUTRIGHT: tested with real oracle verification on U000368 (the
+easiest of the 4 endpoints for every other method) -- 30 restarts, 10 rounds each, 1,765 total
+pooled-score evaluations, ZERO real successes. Offline (no oracle, comparing against the known
+winner's own score) confirms why: even 300 restarts (19,392 evaluations) plateau at score 0.039,
+never reaching the known winner's own score of 0.059 under the same model instance -- the
+AND-of-three-children landscape is rugged enough that single-part moves cannot climb out of the
+local optima a random start lands in.
+
+2-PARTS-AT-A-TIME (BLOCK) DESCENT WORKS ON THE EASIER HALF, FAILS DECISIVELY ON THE HARDER HALF:
+jointly re-optimizing one PAIR of parts at a time (holding the other two fixed, searching that
+pair's own admissible-option cross product, still small -- up to ~60x60) gives real success:
+
+  endpoint   R_0 survivors  pooled rank_learned  2-block descent result
+  U000368    7,666          1                    SUCCESS, 18,447 evals (2.4x R_0 count)
+  U000535    6,992          13                   SUCCESS, 7,046 evals (1.0x R_0 count)
+  U000607    10,940         85                   FAILED after 150 restarts, 257,591 evals (23.5x)
+  U000068    3,436          687                  FAILED after 150 restarts, 774,712 evals (225x)
+
+Both successes are real, oracle-verified splits -- U000368's matches a known census literal winner
+exactly; U000535's ((5,2),(5,3),(9,5),(4,0)) does not match either known census winner, confirming
+(again) that these hard states have valid solving splits beyond the 2-4 the census happened to
+record. But both failures are decisive, not just "needs a bit more budget": 150 restarts (up to
+774,712 evaluations, ~225x the endpoint's own R_0-survivor count) never found a working
+combination on the two endpoints where the pooled model itself needed the MOST tries (rank 85 and
+687 respectively) to find a winner by directly scoring the full survivor list.
+
+The pattern lines up with what pooled rank_learned already told us: 2-block descent succeeds
+exactly on the endpoints that were already "easy" for the pooled model (rank 1, 13) and fails on
+the ones that were already "hard" for it (rank 85, 687) -- consistent with a genuinely narrower,
+harder-to-find optimum on those states that local search, even with a larger neighborhood and 150
+restarts, does not reliably locate, while directly scoring the (still modestly sized, 3.4k-11k)
+full survivor list does.
+
+COST COMPARISON, HONESTLY: at the k7 scale tested, 2-block descent is NOT cheaper than simply
+scoring the full R_0-survivor list directly with the pooled model, even on the two endpoints where
+it succeeds (2.4x and 1.0x the direct-scan cost, not a fraction of it) -- let alone the two where
+it fails at 23-225x the cost with nothing to show for it. Its value, if any, is specifically for
+scales where the direct scan itself becomes the bottleneck (the k8 3-9M-candidate endpoints
+measured in section 4) -- untested here, and given the failure pattern above, there is no
+particular reason to expect coordinate descent to do better on hard cases at that scale either;
+if anything the harder-endpoint failures here suggest the opposite.
+
+WHAT THIS ESTABLISHES: block coordinate descent is a real, working algorithm -- unlike deficit
+best-first, it does find genuine winners, some of which are not census-recorded, using the
+already-validated pooled score rather than a separable proxy. But it is not a general solution:
+it works on the population's easier half and fails, expensively and decisively, on the harder
+half -- precisely the population (few known winners, deep in the search space) this whole track
+exists to help with. Not recommended for adoption over direct full-list scoring at the scale
+tested; worth reconsidering only if a genuinely different escape mechanism (simulated annealing,
+3+-block moves, or a smarter non-uniform restart distribution) is tried and shown to close the gap
+on the hard half specifically -- none of which has been attempted.
+
+Reproduce: `tools/ml/proto_coord_descent.py [endpoint_name ...]` (defaults to all 4), with an SSM
+tunnel open to the oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).

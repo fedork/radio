@@ -9168,3 +9168,54 @@ saturating score and is low-expected-value before a genuinely different, non-sat
 decomposable signal exists.
 
 Evidence: [../evidence/deficit_order_and_bestfirst_2026-08-22.txt](../evidence/deficit_order_and_bestfirst_2026-08-22.txt).
+
+## 2026-08-22 (done) — coordinate descent: names the problem correctly, works on the easy half, fails decisively on the hard half
+
+Direct follow-up to the deficit-order/best-first entry above, prompted by naming the actual
+problem shape: the mass/cap constraint is a multiple-choice knapsack (already solved exactly by
+`exact_candidates`'s DP) -- the open problem is that "does this combination actually work" is a
+genuinely joint, non-separable function of the parts, which is exactly why no per-part-decomposable
+proxy (deficit, sum-of-slack) could rank well. Coordinate/block descent sidesteps that by using the
+real, expensive, ACCURATE pooled recursive-V score, evaluated on only a small free block of parts
+at a time while the rest stay fixed -- reusing the score that already gave rank 1/13/85/687, not a
+cheap proxy.
+
+**1-part-at-a-time fails outright**: 30 restarts, real oracle verification, U000368 (the easiest
+endpoint for every other method) -- 0/30 successes, 1,765 evaluations. Offline (300 restarts,
+19,392 evaluations) plateaus at score 0.039, never reaching the known winner's own 0.059 under the
+same model -- single-part moves can't escape the local optima a random start lands in.
+
+**2-parts-at-a-time (block descent) genuinely works, but only on half the population**, tested
+with real oracle verification on all 4 tier-sample endpoints:
+
+  U000368 (pooled rank 1):   SUCCESS, 18,447 evals (2.4x the R_0-survivor count)
+  U000535 (pooled rank 13):  SUCCESS, 7,046 evals (~1.0x the R_0-survivor count)
+  U000607 (pooled rank 85):  FAILED after 150 restarts, 257,591 evals (23.5x)
+  U000068 (pooled rank 687): FAILED after 150 restarts, 774,712 evals (225x)
+
+Both successes are real: U000368's matches a known census literal winner exactly; U000535's found
+split does NOT match either known census winner -- confirming again these states have more valid
+solving splits than the census happened to record. But the two failures are decisive, not
+budget-starved: 150 restarts (up to 774,712 evaluations) never found a working combination on
+either endpoint where the pooled model itself needed the most tries to find one by directly
+scoring the full survivor list. The pattern tracks the endpoint's own pooled-model difficulty
+exactly -- descent succeeds where the pooled model already had it easy (rank 1, 13) and fails
+where the pooled model itself struggled (rank 85, 687), consistent with those states having a
+narrower, harder-to-find optimum that restarts and a bigger neighborhood still don't reliably
+locate.
+
+**Honest cost accounting**: at the k7 scale tested, block descent is not cheaper than directly
+scoring the full R_0-survivor list even where it succeeds (2.4x and ~1.0x the direct-scan cost,
+not a fraction of it) -- let alone where it fails (23-225x the cost, nothing to show for it). Its
+only plausible value is at scales where direct scoring itself is the bottleneck (the k8
+3-9M-candidate endpoints from the prior entry), and the harder-endpoint failures here give no
+reason to expect it would do better there specifically on hard cases -- if anything the opposite.
+
+**Net assessment**: a real, working algorithm -- unlike deficit best-first, it does find genuine,
+sometimes non-census-recorded winners, using the validated score rather than a separable proxy --
+but not a general solution. It works on the easier half of exactly the population this track cares
+about and fails, expensively, on the harder half. Not recommended for adoption over direct
+full-list scoring at the tested scale. Untried, and worth a future look: simulated annealing or
+3+-block moves to see if either closes the gap on the hard half specifically.
+
+Evidence appended to [../evidence/deficit_order_and_bestfirst_2026-08-22.txt](../evidence/deficit_order_and_bestfirst_2026-08-22.txt) (section 6).
