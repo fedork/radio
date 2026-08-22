@@ -1,0 +1,169 @@
+Prototyping the two 2026-08-22 proposals ("improve BY_MAGIC3" / "direct generation without large
+enumeration"), tested against the real persistent oracle, 2026-08-22
+Status: measured. Tool: tools/ml/proto_deficit_bestfirst.py.
+
+BACKGROUND. Both proposals were motivated by one existing offline measurement
+(tools/ml/recursive_value.py's own baseline check): the per-part "Pareto deficit" -- how far the
+worst rectangle in a child sits below the proven Sb-Pareto frontier at k-1, `deficit(parts,k) =
+max over parts of (n - MAXN1[k][m])` -- gets AUC 0.9961 ALONE as a per-state solvability
+classifier, nearly matching the full pooled recursive-V model (logistic 0.9861, gradient boosting
+0.9956) and decisively beating plain mass/cap (0.5923). Two ideas followed: (1) swap this signal
+in for BY_MAGIC3's current "distance from the geometric midpoint" heuristic, since it is already
+computed at the exact point `split_admissible`/`split_child_admissible` run in radiobase.c, at
+zero extra enumeration cost; (2) since deficit is a MAX over independent per-part terms, generate
+candidates best-first via a priority queue over per-part choices, without ever building the full
+R_0-survivor list.
+
+=====================================================================================
+0. A REAL BUG CAUGHT WHILE VALIDATING THE DECOMPOSITION -- BEFORE TRUSTING EITHER PROTOTYPE
+=====================================================================================
+The claim "deficit is a max over independent per-part terms" needed checking, not assuming.
+First cross-check (whole-child deficit computed the normal way, via recursive_value.deficit() on
+each of selected/mixed/complement, vs. a per-part decomposition summing the four shapes each part
+feeds) gave 1833/2000 MISMATCHES on random splits of a real state. Root cause: `bm.normalize`
+drops any rectangle with a zero side (x<=0 or y<=0 -- not a real constraint) before deficit() ever
+sees it, but the naive combination rule `max(deficit(sel), deficit(mix), deficit(comp))` was
+feeding `deficit()`'s own "-1.0 = trivially fine, empty child" SENTINEL into that same max() as if
+it were a real, comparable value -- and -1.0 frequently beats a real child's genuine (much more
+negative, i.e. better-margin) deficit, incorrectly making an EMPTY, unconstrained child look like
+the state's worst-case bottleneck. Fixed by excluding empty children from the combination (an
+empty child imposes no constraint and can never be the bottleneck) rather than passing its
+sentinel through arithmetic meant for real values. Re-checked over 20,000 random splits: 0
+mismatches. The per-part decomposition is genuinely correct once this is fixed; recorded here
+because it is exactly the kind of quiet, plausible-looking error the repo's "verify before
+relying" discipline exists to catch, and because it briefly made prototype 2 look far more broken
+than it already was on its own.
+
+=====================================================================================
+1. PROTOTYPE 1 -- DEFICIT ORDER, TESTED ON ALL 4 CHARACTERIZED ENDPOINTS FROM THE TIER SAMPLE
+=====================================================================================
+Same 4 real k7-census endpoints as evidence/tier_sample_via_aws_2026-08-22.txt (parts looked up
+live from CORPORA["k7"], never hand-typed -- see section 4). R_0-survivor counts reproduce that
+run's numbers exactly (a live cross-check that these are genuinely the same states). Candidates
+ordered by ascending `deficit` (lower deficit = more margin = tried first) instead of the pooled
+recursive-V score, walked against the real oracle:
+
+  endpoint   R_0 survivors   rank_learned (pooled)   rank_DEFICIT   rank_natural (blind)
+  U000368    7,666           1                        2,698          6,041
+  U000535    6,992           13                       2,283          >8,000 (capped)
+  U000607    10,940          85                       1,260          5,860
+  U000068    3,436           687                      2,916          >8,000 (capped)
+
+Deficit order is a real, complete, working order in every case -- it always resolves (never hit
+a try-cap), and it beats blind/natural order by a wide margin (2.2x-4.7x where natural itself
+resolved; a real, finite rank where natural didn't resolve at all within its budget). But it is
+consistently, substantially worse than the pooled recursive-V model -- 1,000x-2,700x worse on the
+easy end (U000368: 1 vs 2,698), though notably the GAP narrows on the hardest case (U000068: 687
+vs 2,916, only ~4.2x) -- a pattern worth more data before reading anything into it (n=4).
+
+=====================================================================================
+2. WHY DEFICIT UNDERPERFORMS: IT SATURATES WITHIN THE R_0-SURVIVOR POPULATION
+=====================================================================================
+Checked the actual deficit distribution across ALL stage-2 (mass-feasible) candidates, not just
+R_0-survivors, for all 4 endpoints:
+
+  endpoint    stage-2 size   deficit range   candidates AT the worst value (0)
+  U000368     56,798         [-2, 0]         47,128 (83.0%)
+  U000535     41,912         [-2, 0]         34,444 (82.2%)
+  U000607     42,338         [-2, 0]         39,508 (93.3%)
+  U000068     85,286         [-2, 0]         62,374 (73.1%)
+
+73-93% of EVERY tested endpoint's mass-feasible candidates already sit at deficit=0 -- the single
+WORST value a candidate can have and still be admissible at all. This is a real property of these
+states, not noise: they are near-cap-mass (87-93% of the parent's information cap), so hitting the
+EXACT total mass required routinely forces at least one part to sit right at its own individual
+boundary, regardless of how comfortably the other parts fit. The offline AUC (0.9961) was measured
+ACROSS a population of states spanning easy to hard; deficit correctly separates that population
+(most states are nowhere near their cap and get comfortably negative deficits). But CONDITIONED on
+already being in the R_0-survivor set of one specific hard, near-cap-mass endpoint -- which is
+exactly the population an ordering signal has to discriminate within -- deficit has almost no
+dynamic range left. This is the same shape as Berkson's-paradox-style range restriction: a strong
+population-level predictor can carry near-zero information once you condition on the population
+already having passed through the filter it correlates with.
+
+A same-cost variant tried before writing this up: SUM the per-part slack across every rectangle
+in every child, instead of taking the MAX. This has much better dynamic range (94 distinct values
+among U000368's 7,666 survivors, vs 3 for max-deficit) and modestly improves the rank of both
+known literal winners (2,196 and 2,218, vs max-deficit's 2,698) -- but is still nowhere near the
+pooled model's rank 1. More granularity alone doesn't close the gap; whatever the pooled model
+captures beyond per-part slack (likely some cross-part balance/interaction signal, given it pools
+mean/std/aspect statistics across all parts together) isn't recovered by summing instead of
+maxing the same underlying per-part number.
+
+=====================================================================================
+3. PROTOTYPE 2 -- NAIVE BEST-FIRST GENERATION: FAILS, DIAGNOSED PRECISELY
+=====================================================================================
+Implemented a heap-based best-first generator: each part's own admissible options pre-sorted by
+that part's own worst-shape deficit; states are index-tuples across the 4 parts; pop the
+lowest-max-deficit tuple, check joint mass/cap feasibility, push single-index-increment neighbors.
+Tested exhaustively on U000368 (the easiest of the 4 for every other method): 200,000 pops,
+**zero** mass-feasible candidates found (let alone a solvable one).
+
+Root cause, confirmed directly: both of U000368's known literal winners require, in at least one
+part, an option ranked 36th-of-46 or 59th-of-60 within that PART's own deficit-sorted list --
+i.e. deep in the "worse" end of that single part's range, not near its own best choice. The
+threshold needed to admit either winner is deficit=0 in EVERY part simultaneously (confirmed via
+direct computation) -- which, per section 2, is also the single worst value across the board. A
+frontier search over 4 independent dimensions needs to explore roughly the PRODUCT of each
+dimension's per-threshold option count before reaching a given threshold, not the sum: at
+threshold 0, that product is the full per-part cross product, 46*62*54*60 = 9,240,480. This is a
+genuine, diagnosed algorithmic limitation of independent-dimension best-first search once the
+target sits near the boundary in every dimension at once -- not a coding bug, and not specific to
+this one endpoint (the section-2 distribution shows every tested endpoint has the same
+73-93%-at-the-boundary shape, so the same failure mode is expected to generalize, and was not
+re-run to exhaustion on the other 3 endpoints for that reason -- an explicit, deliberate scope
+limit, not an oversight: repeating a diagnosed, expected-negative 200,000-pop run three more times
+would spend real oracle-adjacent time for no new information).
+
+=====================================================================================
+4. SCOPE CHECK: DOES "AVOID FULL ENUMERATION" EVEN MATTER AT THE SCALE TESTED?
+=====================================================================================
+Before concluding, checked whether full materialization is actually expensive at the scale this
+thread has validated on (k7, 4 parts, stage-2 tens of thousands): it is not. `exact_candidates`'s
+vectorized numpy DP builds the full (mass-feasible) stage-2 set in well under a second; R_0
+filtering plus pooled feature computation over the full stage-2 set completes in single-digit
+seconds (measured throughout this session's other work). "Avoid enumeration" is not a live
+constraint at this scale.
+
+It IS a live constraint one level up: CORPORA["k8"]'s hardest 4-part endpoints (mass ~88% of a
+larger cap, since rk=6 there) have stage-2 sizes of 3.3-3.9 MILLION candidates (measured on the
+top 3 highest-mass k8 endpoints: 3,866,716 / 3,429,504 / 3,282,604). At that scale, the CURRENT
+(unvectorized, per-candidate Python loop) R_0-plus-feature-computation pipeline extrapolates to
+about 3.2 minutes for one endpoint (measured on a 3,000-candidate sample of U000054: 0.050
+ms/candidate including R_0, ~25% R_0 survival rate, ~967,000 estimated survivors). Real, but not
+extreme -- and notably, the naive best-first generator would very likely hit the exact same
+saturation failure at this scale too, since section 2's finding (near-cap-mass forces some part to
+its own boundary) is a property of high mass-fill states in general, not of k7's particular sizes.
+So scaling up would not rescue prototype 2 as designed; the SCORE, not the search algorithm, is
+the limiting factor. The more promising fix for the k8-scale cost, if it is ever needed, is
+vectorizing the existing per-candidate R_0/feature loop the same way stage-2 candidate generation
+already is -- an engineering change, not a new algorithm -- not yet done or tested.
+
+=====================================================================================
+5. WHAT THIS ESTABLISHES, AND WHAT IT DOES NOT
+=====================================================================================
+* BY_MAGIC3 CAN be improved cheaply and safely: deficit order is a real, complete, working
+  improvement over blind/natural order (2.2x-4.7x where comparable, and resolves several cases
+  natural order couldn't resolve at all within budget) at zero additional enumeration cost, since
+  the underlying signal is already computed at split-table-build time in radiobase.c. It is NOT a
+  substitute for the full pooled model where that is affordable -- it is a candidate for the
+  cheap, always-on static-heuristic tier only.
+* Direct generation via a deficit-driven best-first search, AS SPECIFIED, does not work, for a
+  clearly diagnosed structural reason (near-cap-mass states force per-part deficit to saturate at
+  its worst admissible value for the large majority of feasible candidates, including known
+  winners) -- not a scale problem, not a bug, a genuine mismatch between what this particular
+  signal measures and what the search needs to prioritize. This is recorded as a negative result
+  specifically so the same mechanism is not re-attempted from scratch later.
+* A more sophisticated DP/beam-integrated best-first search (combining the existing (S,X)
+  mass-feasibility DP with a running best-path priority, Dijkstra/bottleneck-shortest-path style)
+  was designed but NOT built or tested -- deliberately, because it would very likely inherit the
+  same saturation problem from the same underlying score, making it low-expected-value to build
+  before a better decomposable score exists. Flagged as the natural next step only if paired with
+  a genuinely different, non-saturating decomposable signal.
+* n=4 endpoints, all from the same k7 corpus and the same near-cap-mass, few-known-winner
+  population this whole thread has focused on. Generalization beyond that population (e.g. lower
+  mass-fill states, where deficit would plausibly have much better dynamic range within R_0
+  survivors too) is untested.
+
+Reproduce: `tools/ml/proto_deficit_bestfirst.py [endpoint_name ...]` (defaults to all 4), with an
+SSM tunnel open to the oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).

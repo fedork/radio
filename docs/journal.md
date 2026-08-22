@@ -9102,3 +9102,69 @@ Fixed the SSM tunnel dying mid-run (see prior entry) with a plain reconnect; the
 instance and its cache were unaffected throughout.
 
 Evidence, with full per-endpoint numbers: [../evidence/tier_sample_via_aws_2026-08-22.txt](../evidence/tier_sample_via_aws_2026-08-22.txt).
+
+## 2026-08-22 (done) — prototyping BY_MAGIC3's replacement and direct candidate generation: one real win, one clean negative result
+
+Follow-up to the tier-sample entries above, prompted by a direct question: can the existing
+per-part Pareto-margin ("deficit") signal -- already measured offline at AUC 0.9961 alone, nearly
+matching the full pooled model -- either (a) replace `BY_MAGIC3`'s current data-free "distance
+from the midpoint" heuristic, or (b) drive a best-first candidate generator that never needs to
+materialize the R_0-survivor list at all?
+
+**A real bug caught first, in my own test harness, not the codebase:** validating that `deficit`
+decomposes as a max over independent per-part terms (needed for idea (b)) gave 1833/2000
+mismatches on first try. Cause: `bm.normalize` drops zero-sided rectangles before `deficit()` ever
+sees them, but `deficit()`'s own "-1.0 = trivially fine, empty child" sentinel was being fed into a
+combining `max()` as if comparable to a real value -- and an empty, unconstrained child's sentinel
+routinely "won" that max over a real child's much-better genuine deficit, making a non-constraint
+look like the bottleneck. Fixed (exclude empty children from the combination); re-checked over
+20,000 random splits, 0 mismatches. The decomposition is genuinely sound once this is fixed.
+
+**(a) Deficit order, tested on all 4 real endpoints from the last tier sample, via the real
+oracle:** a real, complete, working improvement over blind order in every case (2.2x-4.7x where
+natural order itself resolved; a real finite rank in two cases natural didn't resolve at all
+within its 8,000-try budget) -- U000368 rank 2,698/7,666; U000535 rank 2,283/6,992; U000607 rank
+1,260/10,940; U000068 rank 2,916/3,436. But consistently 1,000x-2,700x worse than the pooled
+recursive-V model's ranks (1, 13, 85, 687 respectively) -- notably the gap narrows sharply on the
+hardest case (687 vs 2,916, only ~4x), worth more data before reading into it. Root cause of the
+underperformance, confirmed directly: 73-93% of EVERY tested endpoint's mass-feasible candidates
+already sit at the single worst admissible deficit value -- these are near-cap-mass (87-93% fill)
+states, so hitting the exact required total mass routinely forces some part to its own boundary
+regardless of how comfortable the others are. The population-level AUC (measured across easy and
+hard states together) doesn't survive conditioning on already being inside one hard state's own
+R_0-survivor set -- a real, worth-remembering instance of range restriction hiding a predictor's
+power. A same-cost SUM-of-slack variant has far better dynamic range (94 distinct values vs 3) and
+nudges the rank a bit (2,196-2,218 vs 2,698) but doesn't close the gap to the pooled model --
+more granularity alone isn't the missing ingredient.
+
+**(b) Best-first generation via a heap over per-part deficit-sorted indices:** built, and it fails
+cleanly -- 200,000 pops on the easiest of the 4 endpoints, ZERO mass-feasible candidates
+generated. Diagnosed precisely, not just observed: both of U000368's known winners need, in some
+part, an option near the *bottom* of that part's own deficit-sorted list, and the threshold
+needed to admit either is exactly the worst deficit value in ALL FOUR parts simultaneously -- at
+that threshold the number of index-tuples to explore is the full 4-way cross product (9.24M), not
+a fraction of it, because independent-dimension best-first search needs the PRODUCT of
+per-dimension counts below a threshold, not the sum. Not re-run to exhaustion on the other 3
+endpoints given this diagnosis and the section-2-style distribution check already showing the same
+73-93%-at-the-boundary shape on all 4 -- a deliberate scope limit, not an oversight.
+
+**Scope check, not just an afterthought:** is "avoid full enumeration" even a live problem at the
+scale this thread has been testing? No -- k7 4-part stage-2 sets (tens of thousands) build and
+score in low single-digit seconds. It IS live one level up: `CORPORA["k8"]`'s hardest 4-part
+endpoints have stage-2 sizes of 3.3-3.9 million, where the current unvectorized per-candidate
+Python scoring extrapolates to ~3 minutes/endpoint. But the same saturation diagnosis says a
+deficit-driven best-first generator would very likely fail the same way at that scale too -- this
+isn't a scale problem, the SCORE is the limiting factor, not the search algorithm. The more
+promising fix there, if ever needed, is vectorizing the existing scoring loop the way stage-2
+candidate generation already is -- an engineering change, not a new algorithm, and not yet done.
+
+**Net recommendation:** deficit order is worth adopting as a cheap, real, zero-extra-cost
+replacement for `BY_MAGIC3`'s current unvalidated heuristic (better than nothing, much better than
+blind order, complete, safe) -- but not as a substitute for the pooled model where that is
+affordable. Direct generation via this specific mechanism does not work, and is recorded as a
+negative result specifically so it is not re-attempted the same way later; a smarter DP-integrated
+best-first search was designed but deliberately not built, since it would inherit the same
+saturating score and is low-expected-value before a genuinely different, non-saturating
+decomposable signal exists.
+
+Evidence: [../evidence/deficit_order_and_bestfirst_2026-08-22.txt](../evidence/deficit_order_and_bestfirst_2026-08-22.txt).
