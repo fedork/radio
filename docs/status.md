@@ -1364,6 +1364,27 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    the earlier per-part deficit order (0.9961 population-level AUC) for the outer segments. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    sections 11-12.
+   **The deadline-propagation currency inside `canSolveB_ctx` itself is now radius, not work-units**
+   — a new `radius_mode` field on `radio_search_context` (default off, zero change for every
+   existing caller) makes the trusted solver's own recursion bound each level by "top-N candidates
+   per segment" (N per part, so N^size total — uniform across depth and part count) instead of the
+   deterministic work clock, capping each level's own `splitindex[]` range directly rather than
+   comparing an aggregate counter. Two real correctness/liveness issues surfaced and were fixed
+   while building this: an infinite retry loop (canSolveB_ctx's iterative-deepening assumes each
+   retry grows the child's budget; radius mode's unchanged propagation broke that — fixed by
+   stopping after one exhaustive pass) and a genuine false-negative hazard from capping a level's
+   candidate range below its true size (fixed with a `radius_truncated` flag threaded into every
+   path that could otherwise conclude FALSE, verified directly: `radius_mode=1, N=1` on a real
+   solvable state returns MAYBE, `N=2^40` returns TRUE). Also found, by tracing the exact index
+   arithmetic: `canSolveB_ctx`'s own BY_MAGIC3 walk is most-balanced-first, the *opposite* of
+   concentric_search's own top-level least-balanced-first sweep — reconciled by reversing BY_MAGIC3
+   in radius mode so every level walks the same direction. Reran all 43 previously-tested endpoints
+   under this design: every one is byte-for-byte identical (round, checked, frac, and the literal
+   winner) to the work-unit-currency results above, which transitively carries the same 55/55
+   census-match correctness weight to this design. No regression to the default path (plain VERDICT
+   queries, `enumerate`) throughout. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 13.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

@@ -9513,3 +9513,50 @@ case rather than a change to today's numbers.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 12.
+
+## 2026-08-23 (same day, third follow-up) — radius propagation replaces work-unit currency inside canSolveB_ctx itself
+
+Direct implementation of "the deadline propagation was there already... now we just want to
+replace that with radius propagation instead." Section 12's resolve pass still bounded children
+via radiobase.c's existing deterministic work-unit clock; this replaces that currency inside
+canSolveB_ctx itself with radius, gated behind a new `radius_mode` field on `radio_search_context`
+(default off, zero behavior change for every existing caller).
+
+Three iterations, each corrected by something found only by testing or by tracing the code, not by
+reasoning alone:
+1. First attempt (radius = totalsplits vs a cap) was rejected before writing code -- a single
+   aggregate-combinations cap scales unevenly across different part counts.
+2. Second attempt (radius = totalsplits, absolute propagation) compiled and immediately hung: pass
+   counts in the tens of millions. canSolveB_ctx's existing iterative-deepening retry assumes each
+   retry gives children MORE budget; radius mode's unchanged child propagation broke that
+   assumption. Fixed by making radius mode stop after exactly one exhaustive pass -- confirmed
+   safe since the function already returns MAYBE unconditionally whenever `skipped_some` is true
+   at loop exit, regardless of why the loop stopped.
+3. Third attempt, the one that stuck: radius = "top-N candidates per segment, at every level" (1
+   segment -> N, 2 segments -> N^2, 4 segments -> N^4), implemented by capping each level's own
+   `splitindex[]` range directly rather than comparing an aggregate counter. This needed real
+   correctness engineering: a new `radius_truncated` flag, set whenever any level's range is
+   actually capped below its true size, threaded into every path that could otherwise conclude a
+   definitive FALSE -- a truncated search can only end in MAYBE or a genuine TRUE, never a
+   manufactured FALSE. Verified directly: a tiny standalone harness confirms `canSolveB_ctx` with
+   `radius_mode=1, N=1` on a real solvable state returns MAYBE, and `N=2^40` returns TRUE.
+
+Also found, by tracing the exact index arithmetic rather than assuming: `canSolveB_ctx`'s own
+internal BY_MAGIC3 walk goes the OPPOSITE direction from concentric_search's own top-level sweep
+(confirmed by the code's own comment, "walks the descending-sorted index from the far end, i.e.
+in ascending key order") -- not a bug, but an inconsistency for "radius means the same thing at
+every level." Fixed per explicit direction: radius mode reverses BY_MAGIC3 inside `HOIST_ORDER` so
+every level walks least-balanced-first, matching the top level, and forces BY_MAGIC3 everywhere in
+radius mode (overriding the existing per-level heuristic choice) so radius refers to one consistent
+order throughout the recursion.
+
+**Validation**: reran all 43 previously-tested endpoints (10 k7, 8 k8-hardest, 20 k8 diverse, 5
+previously-hardest) under this design. Every one succeeds, and every substantive field -- round,
+checked, raw_space, frac, and the literal winner reported -- is byte-for-byte identical to the
+work-unit-currency results from the earlier entries today. Since those were already confirmed
+55/55 exact census matches, this carries the same correctness weight transitively to the new
+radius-currency design. No regression to the default (radius_mode=0) path: plain VERDICT queries
+and `enumerate` (both using `radio_default_search_context`) are unaffected throughout.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 13.

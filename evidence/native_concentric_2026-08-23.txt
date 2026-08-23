@@ -395,3 +395,95 @@ round/checked/frac numbers to the pre-hook build. No behavior change for the rea
 budget (60 nominal seconds = 1.2 billion work units per child check), where MAYBE essentially never
 arises in this population -- the correction matters for correctness guarantees and for any future
 run at a tighter budget, not for today's default numbers.
+
+=====================================================================================
+13. RADIUS PROPAGATION REPLACES WORK-UNIT CURRENCY IN canSolveB_ctx ITSELF
+=====================================================================================
+Direct follow-up to "the deadline propagation was there already... now we just want to replace
+that with radius propagation instead." Section 12 escalated ambiguous candidates to NO_DEADLINE
+(unbounded work-unit budget) via the UNMODIFIED canSolveB -- correct, but the currency children
+were bounded by during the exploratory sweep was still radiobase.c's existing deterministic
+work-unit clock, not radius. This section replaces that currency inside canSolveB_ctx itself.
+
+DESIGN, arrived at over three iterations, each corrected by a real problem the previous one hit:
+
+Iteration 1 (rejected before writing code): treat radius as "totalsplits <= N" -- a raw count of
+full joint-combination candidates tried at a level, reusing canSolveB_ctx's own totalsplits
+counter directly as the currency in place of the work clock. Rejected on reflection: N compared
+against a TOTAL-combinations count scales unevenly across states with different part counts (a
+budget of 1000 total combinations gives a 4-part state ~5.6 options per part but a 2-part state
+~31.6), which is not what "the same radius at every level" should mean.
+
+Iteration 2 (built, found broken by testing): "radius = totalsplits, absolute propagation" as
+above. Compiled and ran; the very first k7 batch hung with pass counts in the tens of millions.
+Root cause: canSolveB_ctx's existing iterative-deepening retry (an unresolved exhaustive pass
+doubles probe_seconds and starts over) assumes each retry gives children MORE budget via
+probe_child_deadline's growing quantum -- radius mode's absolute (unchanged) child propagation
+means retrying with the identical child radius can never make progress, so the loop retried
+forever. Fixed: radius mode now stops after exactly one exhaustive pass instead of retrying --
+confirmed safe by tracing the code, since canSolveB_ctx already returns MAYBE unconditionally
+whenever skipped_some is true at loop exit (line ~2621), regardless of why cont2 became 0.
+
+Iteration 3, the one that stuck: radius = "top-N candidates tried, per segment, at every level" --
+so a 1-segment state explores N total, a 2-segment state N^2, a 4-segment state N^4, uniform
+across depth and part count. Implemented by capping each level's OWN splitindex[] range at
+min(its true size, N) directly, rather than comparing an aggregate counter to a threshold. This
+needed real correctness engineering, not just a currency swap:
+
+  - CORRECTNESS HAZARD, caught before it was ever run: capping a level's own candidate range below
+    its true size means a pass that finds only clean FALSEs within the cap proves NOTHING about
+    the candidates outside the cap. Added a new radius_truncated flag, set the moment any level's
+    splitindex is actually capped below its real size, and threaded it into every path that could
+    otherwise conclude a definitive FALSE (both the "!skipped_some -> cont2=0" branch and the
+    post-loop "else if (skipped_some) return MAYBE" check, plus the frozen_refute early return) --
+    a truncated search can only ever end in MAYBE or a genuine TRUE (a witness found inside the cap
+    is unconditionally valid regardless of what was never looked at), never a manufactured FALSE.
+    Verified directly with a tiny standalone harness: canSolveB_ctx with radius_mode=1 and N=1 on a
+    real solvable 4-part k5 state returns MAYBE (not FALSE); the same call with N=2^40 returns TRUE.
+
+  - A GENUINELY NEW FACT, found by tracing the exact index arithmetic, not assumed: canSolveB_ctx's
+    own internal walk of BY_MAGIC3 goes the OPPOSITE direction from concentric_search's own
+    top-level sweep. ORDER_REVERSED[BY_MAGIC3]=0, so HOIST_ORDER sets ordp/ords to walk forward
+    from index 0 -- but the actual loop pre-decrements splitindex[i] (initialized to the level's
+    full size) before every use, so the FIRST candidate tried is index size-1, counting DOWN to
+    index 0 last. Combined with ind[BY_MAGIC3] being sorted DESCENDING (index 0 = largest magic3 =
+    least balanced), this means canSolveB_ctx's own recursion tries MOST-balanced-first, while
+    concentric_search's top level (reading ind[BY_MAGIC3][idx] for idx=0,1,2,...) tries
+    LEAST-balanced-first -- confirmed by the code's own comment ("walks the descending-sorted
+    index from the far end, i.e. in ascending key order"). Not a bug (MAYBE is always safe either
+    direction) but a real inconsistency for "radius means the same thing at every level." Fixed,
+    per explicit direction, by making radius mode reverse BY_MAGIC3 specifically inside
+    HOIST_ORDER, so every level -- top and recursive alike -- walks least-balanced-first.
+
+  - Forced splitincr[i] = BY_MAGIC3 unconditionally at every level in radius mode (overriding the
+    existing size/pass-tuned BY_SP0/1/2 heuristic selection), so "radius" refers to one consistent
+    order everywhere, not a different metric depending on which heuristic canSolveB_ctx would
+    otherwise have picked for that specific level.
+
+  - radio_effort_now_ctx (the totalsplits-vs-deadline comparison used everywhere in iteration 2)
+    is now inert in radius mode (returns 0 unconditionally) -- correctness-and-progress bounding
+    is entirely structural (the splitindex cap) now, not an auxiliary counter comparison, which
+    would otherwise fire almost immediately for any part count > 1 since N is a per-segment count.
+
+IMPLEMENTATION SCOPE. All in canSolveB_ctx and its budget helpers (search_deadline,
+probe_child_deadline, HOIST_ORDER, radio_effort_now_ctx) in radiobase.c, gated entirely behind a
+new radius_mode field on radio_search_context, default 0 (off) for every existing context and
+caller. radio_oracle.c creates one dedicated radius_ctx (radius_mode=1) for concentric_search's
+own child verification, separate from radio_default_search_context used by canSolveB/enumerate/
+cache loading -- both still share the same global dominance trie, so a fact either proves is
+immediately available to the other. Never passes NO_DEADLINE through radius_ctx (radius mode would
+misread the sentinel value 2 as a radius cap of 2); RADIUS_UNBOUNDED (2^40) plays that role instead
+for the resolve-ambiguous-candidates pass from section 12.
+
+VALIDATION. Reran every endpoint tested so far under this design: all 43 (10 k7, 8 k8-hardest, 20
+k8 mass/wins-diverse, 5 previously-hardest) succeed, and every substantive field -- round, checked,
+raw_space, frac, and the literal WINNER split reported -- is BYTE-FOR-BYTE IDENTICAL to the
+extensively-validated work-unit-currency results from sections 10-12 (only the provenance banner's
+build_id/commit/timestamp differ). Given section 10 already confirmed 55/55 of that design's
+winners exactly match independently-certified census facts, this transitively carries the same
+correctness weight to the radius-currency design: it isn't just internally consistent, it
+reproduces the identical, externally-verified answers.
+
+Confirmed no regression to the default (radius_mode=0) path throughout: plain VERDICT queries and
+the `enumerate` command (both still using radio_default_search_context) produce byte-identical
+output to the pre-this-section binary at every stage of this rewrite.

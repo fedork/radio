@@ -55,6 +55,18 @@
 static FILE *resp;
 static FILE *journal;
 static uint64_t query_budget_seconds = 60;
+
+/* Dedicated context for the `concentric` command's child verification: radius_mode=1 makes
+   canSolveB_ctx bound its own effort by totalsplits (candidates tried at that level) instead of
+   the shared work clock, with a child's cap propagating from its parent unchanged (absolute, not
+   divided) -- see radiobase.c's radio_effort_now_ctx/search_deadline/probe_child_deadline. Separate
+   from radio_default_search_context (used by plain canSolveB/enumerate/cache loading) so this never
+   perturbs their own work-clock-based behavior; both still share the same global dominance trie, so
+   a fact this context proves is immediately available to every other caller too. Never pass
+   NO_DEADLINE through this context -- radius mode would misread the sentinel (2) as a radius cap of
+   2; RADIUS_UNBOUNDED below is the "run until genuinely resolved" value instead. */
+static radio_search_context radius_ctx;
+#define RADIUS_UNBOUNDED ((uint64_t)1 << 40)
 static long n_query, n_true, n_false, n_maybe;
 static double total_ms;
 static long long n_loaded, n_skipped_wide, n_skipped_k, n_malformed;
@@ -410,6 +422,10 @@ static void concentric_search(int k, int *sb_in, int size_in) {
 
     for (round = 1; ; round++) {
         int fully_saturated = 1;
+        /* This round's nominal radius, before any per-part capping to its own list size -- handed
+           to children below as their OWN radius cap (absolute propagation: the same number, not
+           divided, since a child's own per-part lists are naturally no larger than its parent's). */
+        uint64_t round_radius = (uint64_t)ceil(R0 * pow(g, round - 1));
         for (i = 0; i < no; i++) {
             Rprev[i] = R[i];
             int want = (int)ceil(R0 * pow(g, round - 1));
@@ -449,19 +465,17 @@ static void concentric_search(int k, int *sb_in, int size_in) {
                         sb1[i * 2] = pick[i][1];
                         sb1[i * 2 + 1] = pick[i][2];
                     }
-                    uint64_t d = query_budget_seconds
-                                     ? radio_budget_after_seconds(query_budget_seconds)
-                                     : NO_DEADLINE;
-                    int r0v = canSolveB(sb0, P, k - 1, d);
+                    /* Radius propagation, not a work-clock deadline: each child gets this round's
+                       own nominal radius, unchanged (radiobase.c's search_deadline/
+                       probe_child_deadline are identity functions in radius_mode) -- so a child
+                       returning MAYBE genuinely means "not solved within the radius my parent gave
+                       me, and I haven't exhausted my own space yet," never a wall-clock artifact. */
+                    int r0v = canSolveB_ctx(&radius_ctx, sb0, P, k - 1, round_radius);
                     int r2v = FALSE, r1v = FALSE;
                     if (r0v != FALSE) {
-                        d = query_budget_seconds
-                                ? radio_budget_after_seconds(query_budget_seconds) : NO_DEADLINE;
-                        r2v = canSolveB(sb2, P, k - 1, d);
+                        r2v = canSolveB_ctx(&radius_ctx, sb2, P, k - 1, round_radius);
                         if (r2v != FALSE) {
-                            d = query_budget_seconds
-                                    ? radio_budget_after_seconds(query_budget_seconds) : NO_DEADLINE;
-                            r1v = canSolveB(sb1, P * 2, k - 1, d);
+                            r1v = canSolveB_ctx(&radius_ctx, sb1, P * 2, k - 1, round_radius);
                         }
                     }
                     if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
@@ -517,11 +531,15 @@ static void concentric_search(int k, int *sb_in, int size_in) {
         int still_maybe = ambig_overflow;  /* an overflowed candidate can't be resolved -- it was never stored */
         int j;
         for (j = 0; j < ambig_count; j++) {
-            int r0v = canSolveB(ambig_sb0[j], P, k - 1, NO_DEADLINE);
+            /* RADIUS_UNBOUNDED, not NO_DEADLINE -- radius_ctx must never see that sentinel (it
+               would be misread as a radius cap of 2). 2^40 candidates is far beyond anything any
+               real per-part list in this population reaches, so this is "run until genuinely
+               resolved" in radius currency, the same role NO_DEADLINE plays in work-unit currency. */
+            int r0v = canSolveB_ctx(&radius_ctx, ambig_sb0[j], P, k - 1, RADIUS_UNBOUNDED);
             int r2v = FALSE, r1v = FALSE;
             if (r0v != FALSE) {
-                r2v = canSolveB(ambig_sb2[j], P, k - 1, NO_DEADLINE);
-                if (r2v != FALSE) r1v = canSolveB(ambig_sb1[j], P * 2, k - 1, NO_DEADLINE);
+                r2v = canSolveB_ctx(&radius_ctx, ambig_sb2[j], P, k - 1, RADIUS_UNBOUNDED);
+                if (r2v != FALSE) r1v = canSolveB_ctx(&radius_ctx, ambig_sb1[j], P * 2, k - 1, RADIUS_UNBOUNDED);
             }
             if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
                 fprintf(resp, "WINNER");
@@ -533,10 +551,9 @@ static void concentric_search(int k, int *sb_in, int size_in) {
                         raw_space > 0 ? checked / raw_space : 0.0);
                 return;
             }
-            /* NO_DEADLINE still only hands each recursive child 1000 nominal seconds' worth of
-               work (search_deadline's own NO_DEADLINE case, radiobase.c) -- generous, but not
-               literally infinite, so a residual MAYBE here, though rare, is possible and must
-               still be reported honestly rather than folded into a clean refutation. */
+            /* RADIUS_UNBOUNDED (2^40) is generous but still finite, so a residual MAYBE here,
+               though it should essentially never happen in practice, is possible and must still be
+               reported honestly rather than folded into a clean refutation. */
             if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) still_maybe = 1;
         }
         respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f "
@@ -754,6 +771,8 @@ static void snapshot_load(const char *path, int allow_foreign) {
 
 int main(int argc, char **argv) {
     init();
+    radio_search_context_init(&radius_ctx);
+    radius_ctx.radius_mode = 1;
 
     // Keep the real stdout for responses; send every later solver print to stderr.
     fflush(stdout);
