@@ -9560,3 +9560,50 @@ and `enumerate` (both using `radio_default_search_context`) are unaffected throu
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 13.
+
+## 2026-08-23 (same day, fourth follow-up) — drop ambiguous-candidate storage, re-sweep with cache instead
+
+Simplification per direct feedback: section 13's has_maybe resolution stored up to 4096 ambiguous
+candidates in fixed arrays to re-verify individually, with a real overflow risk if more were ever
+left ambiguous. Replaced with something simpler and equally correct: when has_maybe is set at full
+saturation, re-sweep the entire candidate space once more (every combination, not just "new" ones)
+with an unbounded radius. No storage needed -- the shared dominance trie already holds every fact
+this run has proven, so an already-resolved candidate is an instant cache hit on the re-sweep, and
+only genuinely-still-ambiguous ones cost real work twice.
+
+Validated with a temporary (reverted) test hook forcing a constant round_radius instead of the real
+growth schedule: round_radius=2 matched the unforced run exactly on all 10 k7 endpoints (radius 2
+per segment already sufficed for every child check this population needed -- many recursive calls
+bottom out via theorem-based base cases that don't consult radius at all, so real truncation is
+rarer than the raw N suggests); round_radius=0 (guarantees truncation everywhere) correctly
+exhausted to full saturation, triggered exactly one re-sweep, and found the same previously-
+validated winner via the unbounded radius, with no meaningful slowdown -- confirming the cache-hit
+argument empirically. Reran the full 43-endpoint battery afterward: still byte-for-byte identical
+to every prior result today.
+
+Also clarified two points of possible confusion from the same feedback, worth recording:
+
+1. **Ordering should be conditional on segment count and index, and canSolveB_ctx already has a
+   version of this** (its own chosen/BY_SP0/1/2/DESC heuristic, size<=3 special-cased, branching on
+   the relative magnitudes of p0/p1/p2 as recursion proceeds through segments). Radius mode
+   currently overrides all of this with a blanket BY_MAGIC3-everywhere rule -- done specifically for
+   direction consistency (so "radius" means the same order at every level, per the earlier
+   direction-mismatch fix), not because BY_MAGIC3 is being claimed optimal. This existing heuristic
+   is real prior art worth studying before the "fix ordering" experiment, not something to have
+   quietly discarded.
+
+2. **Two different "growing" mechanisms exist and were conflated in the last write-up.**
+   concentric_search's own outer round loop (radio_oracle.c) is designed to widen and correctly
+   still does -- unrelated to any of this session's radiobase.c work. canSolveB_ctx's own INTERNAL
+   pass-retry loop (radiobase.c) is a separate, lower-level mechanism: a single invocation, on an
+   unresolved exhaustive pass, normally retries with a bigger child quantum (probe_seconds
+   doubling) rather than giving up. Radius mode's probe_child_deadline hands the child its full
+   cap immediately (no incremental slicing), so there is nothing left to widen on a retry --
+   retrying would repeat an identical attempt forever, which is the infinite loop section 13 found.
+   Stopping that inner retry (rather than teaching it to also widen) is fine specifically because
+   this section's re-sweep design now provides the widening role at the OUTER layer instead: the
+   round loop widens the exploratory radius, and the final re-sweep widens it to unbounded when
+   needed. The inner mechanism isn't broken, it's just made redundant by where widening now lives.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 14.

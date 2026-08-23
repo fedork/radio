@@ -1384,7 +1384,26 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    census-match correctness weight to this design. No regression to the default path (plain VERDICT
    queries, `enumerate`) throughout. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 13.
+   section 13. **Simplified per feedback**: dropped the bounded ambiguous-candidate storage (and its
+   overflow risk) in favor of just re-sweeping the whole candidate space once more with an unbounded
+   radius when `has_maybe` — no bookkeeping needed, since the shared trie makes every already-
+   resolved candidate an instant cache hit on the re-sweep. Validated with a forced-constant-radius
+   test hook (reverted before commit): radius=2 matched the real schedule exactly (many recursive
+   calls bottom out via theorem-based base cases that never consult radius at all); radius=0
+   (guarantees truncation everywhere) correctly exhausted to full saturation, triggered exactly one
+   re-sweep, and found the same previously-validated winner via the unbounded radius, with no
+   meaningful slowdown. Two clarifications on record from the same round of feedback: (a)
+   `canSolveB_ctx`'s own existing per-level heuristic already conditions ordering on segment count
+   and index (its BY_SP0/1/2/DESC choice, size<=3 special-cased) — radius mode currently overrides
+   this with a blanket BY_MAGIC3 rule for direction-consistency only, not as a claim it's optimal;
+   this existing heuristic is prior art the eventual ordering experiment should study, not discard.
+   (b) two distinct "growing" mechanisms exist — concentric_search's own outer rounds (unaffected,
+   still correct) and `canSolveB_ctx`'s separate internal pass-retry (disabled in radius mode
+   because its widening assumption no longer held once child propagation went absolute) — the
+   re-sweep above now provides that widening role at the outer layer instead, so the inner
+   mechanism is redundant here, not broken. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 14.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

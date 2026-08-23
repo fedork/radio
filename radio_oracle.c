@@ -396,16 +396,6 @@ static void concentric_search(int k, int *sb_in, int size_in) {
     int round;
     int has_maybe = 0;  /* did any evaluated, non-winning candidate leave a child unresolved? */
 
-    /* Candidates whose children hit MAYBE during the sweep, kept so the top level can force them
-       to a real answer before ever declaring refutation -- see the resolve pass after the round
-       loop. Bounded: a state with more genuinely ambiguous candidates than this is already an
-       unusual case worth its own honest tag (ambig_overflow) rather than unbounded stack growth. */
-    #define CONCENTRIC_MAX_AMBIGUOUS 4096
-    int ambig_sb0[CONCENTRIC_MAX_AMBIGUOUS][P > 0 ? P : 1];
-    int ambig_sb2[CONCENTRIC_MAX_AMBIGUOUS][P > 0 ? P : 1];
-    int ambig_sb1[CONCENTRIC_MAX_AMBIGUOUS][P > 0 ? P * 2 : 1];
-    int ambig_count = 0, ambig_overflow = 0;
-
     /* 2026-08-23 design correction: no overall deadline and no round cap. The round schedule IS
        the graceful effort-growth mechanism; a wall-clock or round-count cutoff layered on top of
        it just reintroduces, silently, the thing rounds were built to replace -- a search that
@@ -415,10 +405,11 @@ static void concentric_search(int k, int *sb_in, int size_in) {
        loop stops for exactly one of two reasons: a confirmed winner, or genuine full saturation.
        Termination is guaranteed without a cap: R[i] grows by at least 1 every round and is capped
        at sz[outer[i]], so the round count is bounded by max(sz[outer[i]]) regardless of G.
-       The per-child canSolveB calls below keep their own query_budget_seconds deadline unchanged
-       -- that MAYBE is fine, it's an intermediate-level check on one candidate split, not the
-       top-level answer, and a MAYBE child simply isn't counted as a confirmed winner (see
-       has_maybe below for how this is kept honest at the end rather than silently dropped). */
+       The per-child calls below use radius_ctx (radiobase.c's radius_mode), bounded by this
+       round's own radius, not a work-clock deadline -- that MAYBE is fine, it's an
+       intermediate-level check on one candidate split, not the top-level answer, and a MAYBE child
+       simply isn't counted as a confirmed winner (see has_maybe below for how the top level forces
+       a real answer for it before ever declaring refutation, rather than silently dropping it). */
 
     for (round = 1; ; round++) {
         int fully_saturated = 1;
@@ -489,21 +480,12 @@ static void concentric_search(int k, int *sb_in, int size_in) {
                     }
                     /* Not a confirmed winner. If that's because a child hit its own deadline
                        (MAYBE) rather than a clean FALSE, this candidate's real status is still
-                       open -- remember it so the top level can force a real answer before ever
-                       declaring refutation, instead of letting an unresolved child pose as one. */
-                    if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) {
-                        has_maybe = 1;
-                        if (ambig_count < CONCENTRIC_MAX_AMBIGUOUS) {
-                            for (i = 0; i < P; i++) {
-                                ambig_sb0[ambig_count][i] = sb0[i];
-                                ambig_sb2[ambig_count][i] = sb2[i];
-                            }
-                            for (i = 0; i < P * 2; i++) ambig_sb1[ambig_count][i] = sb1[i];
-                            ambig_count++;
-                        } else {
-                            ambig_overflow = 1;
-                        }
-                    }
+                       open -- the top level cannot declare refutation once the sweep ends until
+                       every such candidate is re-checked (see the full re-sweep after the round
+                       loop). No need to remember which ones: a re-sweep with the shared dominance
+                       trie warm makes every already-resolved (TRUE/FALSE) candidate an instant
+                       cache hit, so only the genuinely still-ambiguous ones cost anything twice. */
+                    if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) has_maybe = 1;
                 }
             }
 
@@ -522,43 +504,79 @@ static void concentric_search(int k, int *sb_in, int size_in) {
     /* Every R_0-admissible top-level split has now been checked -- the same candidate set
        canSolveB_ctx itself would enumerate. If nothing was left ambiguous, this "no" already
        carries canSolveB's own exhaustive weight. If has_maybe is set, the top level does not get
-       to stop here: it must force every remembered ambiguous candidate to a real answer -- a
-       genuine refutation, not a search that merely ran out of things to try. Reuses canSolveB's
-       existing, cached, trusted recursion unchanged; only the budget handed to it changes. */
+       to stop here: it must force a real answer for every candidate before declaring refutation.
+       Simplest correct way to do that: re-sweep the FULL space once more (every outer x last
+       combination, not just "new" ones -- Rprev is irrelevant here) with an unbounded child
+       radius. No bookkeeping of which candidates were ambiguous is needed: the shared dominance
+       trie already holds every fact this run has proven, so an already-resolved (TRUE/FALSE)
+       candidate is an instant cache hit on the re-sweep and only the genuinely still-ambiguous
+       ones cost real work a second time. */
     if (has_maybe) {
-        fprintf(stderr, "concentric: saturated with no winner, resolving %d ambiguous candidate(s)"
-                         "%s\n", ambig_count, ambig_overflow ? " (list overflowed, some untracked)" : "");
-        int still_maybe = ambig_overflow;  /* an overflowed candidate can't be resolved -- it was never stored */
-        int j;
-        for (j = 0; j < ambig_count; j++) {
-            /* RADIUS_UNBOUNDED, not NO_DEADLINE -- radius_ctx must never see that sentinel (it
-               would be misread as a radius cap of 2). 2^40 candidates is far beyond anything any
-               real per-part list in this population reaches, so this is "run until genuinely
-               resolved" in radius currency, the same role NO_DEADLINE plays in work-unit currency. */
-            int r0v = canSolveB_ctx(&radius_ctx, ambig_sb0[j], P, k - 1, RADIUS_UNBOUNDED);
-            int r2v = FALSE, r1v = FALSE;
-            if (r0v != FALSE) {
-                r2v = canSolveB_ctx(&radius_ctx, ambig_sb2[j], P, k - 1, RADIUS_UNBOUNDED);
-                if (r2v != FALSE) r1v = canSolveB_ctx(&radius_ctx, ambig_sb1[j], P * 2, k - 1, RADIUS_UNBOUNDED);
+        fprintf(stderr, "concentric: saturated with no winner, re-sweeping in full with unbounded "
+                         "child radius\n");
+        int idx2[no > 0 ? no : 1];
+        for (i = 0; i < no; i++) idx2[i] = 0;
+        int still_maybe = 0;
+        while (1) {
+            long S_outer = 0, X_outer = 0;
+            int *pick[P];
+            for (i = 0; i < no; i++) {
+                pick[outer[i]] = sp[outer[i]]->splitsl[sp[outer[i]]->ind[BY_MAGIC3][idx2[i]]];
+                S_outer += sb_pairs[pick[outer[i]][0]];
+                X_outer += sb_pairs[pick[outer[i]][1]] + sb_pairs[pick[outer[i]][2]];
             }
-            if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
-                fprintf(resp, "WINNER");
-                for (i = 0; i < P; i++) fprintf(resp, " %d:%d", ambig_sb0[j][i], ambig_sb2[j][i]);
-                fprintf(resp, "\n");
-                fflush(resp);
-                respond("CONCENTRIC_END k=%d success=yes round=%d checked=%lld raw_space=%.0f "
-                        "frac=%.4f resolved_ambiguous=yes", k, round, checked, raw_space,
-                        raw_space > 0 ? checked / raw_space : 0.0);
-                return;
+            int lj;
+            for (lj = 0; lj < sz[last]; lj++) {
+                pick[last] = sp[last]->splitsl[sp[last]->ind[BY_MAGIC3][lj]];
+                long S = S_outer + sb_pairs[pick[last][0]];
+                long X = X_outer + sb_pairs[pick[last][1]] + sb_pairs[pick[last][2]];
+                long Cm = mass - S - X;
+                if (!(S <= capc && X <= capc && Cm >= 0 && Cm <= capc)) continue;
+
+                int sb0[P], sb2[P], sb1[P * 2];
+                for (i = 0; i < P; i++) {
+                    sb0[i] = pick[i][0];
+                    sb2[i] = pick[i][3];
+                    sb1[i * 2] = pick[i][1];
+                    sb1[i * 2 + 1] = pick[i][2];
+                }
+                /* RADIUS_UNBOUNDED, not NO_DEADLINE -- radius_ctx must never see that sentinel (it
+                   would be misread as a radius cap of 2). 2^40 candidates per segment is far
+                   beyond anything any real per-part list in this population reaches, so this is
+                   "run until genuinely resolved" in radius currency. */
+                int r0v = canSolveB_ctx(&radius_ctx, sb0, P, k - 1, RADIUS_UNBOUNDED);
+                int r2v = FALSE, r1v = FALSE;
+                if (r0v != FALSE) {
+                    r2v = canSolveB_ctx(&radius_ctx, sb2, P, k - 1, RADIUS_UNBOUNDED);
+                    if (r2v != FALSE) r1v = canSolveB_ctx(&radius_ctx, sb1, P * 2, k - 1, RADIUS_UNBOUNDED);
+                }
+                if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
+                    fprintf(resp, "WINNER");
+                    for (i = 0; i < P; i++) fprintf(resp, " %d:%d", pick[i][6], pick[i][7]);
+                    fprintf(resp, "\n");
+                    fflush(resp);
+                    respond("CONCENTRIC_END k=%d success=yes round=%d checked=%lld raw_space=%.0f "
+                            "frac=%.4f resweep=yes", k, round, checked, raw_space,
+                            raw_space > 0 ? checked / raw_space : 0.0);
+                    return;
+                }
+                /* RADIUS_UNBOUNDED (2^40) is generous but still finite, so a residual MAYBE here,
+                   though it should essentially never happen in practice, is possible and must
+                   still be reported honestly rather than folded into a clean refutation. */
+                if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) still_maybe = 1;
             }
-            /* RADIUS_UNBOUNDED (2^40) is generous but still finite, so a residual MAYBE here,
-               though it should essentially never happen in practice, is possible and must still be
-               reported honestly rather than folded into a clean refutation. */
-            if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) still_maybe = 1;
+            if (no == 0) break;
+            i = no - 1;
+            while (i >= 0) {
+                idx2[i]++;
+                if (idx2[i] < sz[outer[i]]) break;
+                idx2[i] = 0; i--;
+            }
+            if (i < 0) break;
         }
         respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f "
-                "resolved_ambiguous=%d%s",
-                k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0, ambig_count,
+                "resweep=yes%s",
+                k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0,
                 still_maybe ? " reason=unresolved_children" : "");
         return;
     }

@@ -487,3 +487,33 @@ reproduces the identical, externally-verified answers.
 Confirmed no regression to the default (radius_mode=0) path throughout: plain VERDICT queries and
 the `enumerate` command (both still using radio_default_search_context) produce byte-identical
 output to the pre-this-section binary at every stage of this rewrite.
+
+=====================================================================================
+14. SIMPLIFIED: DROP AMBIGUOUS-CANDIDATE STORAGE, RE-SWEEP INSTEAD
+=====================================================================================
+Follow-up correction, per direct feedback: section 13's has_maybe resolution stored up to 4096
+ambiguous candidates in fixed arrays (ambig_sb0/sb2/sb1) to re-verify individually with
+RADIUS_UNBOUNDED. Unnecessary complexity, and it carried a real overflow risk (ambig_overflow) if
+more than 4096 candidates were ever left ambiguous in one sweep. Simpler and equally correct: drop
+the storage entirely, and when has_maybe is set at full saturation, re-sweep the ENTIRE candidate
+space once more (every outer x last combination, not just "new" ones) with RADIUS_UNBOUNDED for
+every child check. No candidate-remembering needed: the shared dominance trie already holds every
+fact this run has proven, so an already-resolved (TRUE/FALSE) candidate is an instant cache hit on
+the re-sweep, and only the genuinely still-ambiguous ones cost real recursive work a second time.
+
+Validated directly with a temporary (reverted before commit) test hook forcing round_radius to a
+constant instead of the real R0*g^(round-1) schedule:
+  - round_radius=2: identical results to the unforced run on all 10 k7 endpoints -- N=2 per segment
+    already sufficed for every child check this population needed, no re-sweep ever triggered. This
+    itself is informative: many recursive sub-calls bottom out via the theorem-based base cases
+    (singleton/star-expansion majorization, the pairs-vs-power3[k] counting bound) that don't
+    consult radius at all, so real truncation is rarer in practice than the raw N might suggest.
+  - round_radius=0 (guarantees radius_truncated on every nontrivial call, forcing has_maybe): the
+    sweep correctly exhausted to frac=1.0000, triggered exactly one re-sweep (confirmed via the
+    stderr log), and the re-sweep correctly found the SAME previously-validated winner via
+    RADIUS_UNBOUNDED -- with no meaningful slowdown (comparable total wall time to the unforced
+    run), confirming the cache-hit argument empirically, not just in theory.
+
+Reran the full 43-endpoint battery (10 k7, 8 k8-hardest, 20 k8 diverse, 5 previously-hardest) after
+this simplification: every result remains byte-for-byte identical to sections 10-13's numbers, and
+the default (radius_mode=0) path -- plain VERDICT queries and enumerate -- is unaffected.
