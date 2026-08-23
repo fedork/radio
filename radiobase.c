@@ -289,7 +289,9 @@ static uint64_t search_deadline(const radio_search_context *ctx, uint64_t parent
     /* Radius mode propagates a child's cap unchanged: absolute, not relative. The design relies on
        a child's own per-part candidate lists naturally being no larger than its parent's, so the
        same numeric radius self-scales instead of needing to be divided the way a shared work-time
-       budget does. The caller is responsible for never passing NO_DEADLINE here in this mode. */
+       budget does. NO_DEADLINE is a deliberate, meaningful value here (unlike work-budget mode's
+       search_deadline below): it means "progressively widen your own radius until resolved, and
+       tell your children to do the same" -- see radius_N/radius_grows in the caller. */
     if (ctx->radius_mode) return parent_deadline;
     if (parent_deadline == NO_DEADLINE)
         return radio_budget_add(start, radio_budget_seconds(1000));
@@ -330,9 +332,10 @@ static inline uint64_t radio_effort_now_ctx(const radio_search_context *ctx, lon
    cache cannot repeat the same bounded work forever and no split history is needed. */
 static uint64_t probe_child_deadline(const radio_search_context *ctx, uint64_t child_cap,
                                      uint64_t now, unsigned int probe_seconds, int size) {
-    /* Radius mode: no quantum-slicing. The child gets the current level's own cap directly,
-       matching search_deadline's absolute propagation above. */
-    if (ctx->radius_mode) return child_cap;
+    /* Only ever called in work-budget mode -- canSolveB_ctx computes cd directly for radius_mode
+       (see the cd computation there), since radius mode's child cap depends on radius_grows, which
+       this function has no way to see. `ctx` is still accepted, unused, to keep call sites uniform. */
+    (void)ctx;
     if (size <= 2) return child_cap;
     uint64_t quantum = radio_budget_seconds(probe_seconds);
     uint64_t local = radio_budget_add(now, quantum);
@@ -391,18 +394,17 @@ static const signed char ORDER_MONO_P[INDEX_COUNT] = {
 
 /* The ordering is chosen once per level, so resolve base/direction there rather than on
    every one of the ~108M split-loop iterations. `ordp` points at the first element in
-   iteration order and `ords` is the step, so the lookup is a single indexed load. */
-/* Used only inside canSolveB_ctx, so `ctx` is always a valid identifier at the expansion site.
-   Radius mode reverses BY_MAGIC3 specifically: the table's own _rev=0 for BY_MAGIC3 makes this
-   solver's ordinary recursion walk most-balanced-first (confirmed by tracing the countdown-index
-   pattern below), the OPPOSITE of concentric_search's own top-level sweep, which reads
-   ind[BY_MAGIC3] forward from index 0 (least-balanced first). Forcing _rev=1 here makes every
-   radius-mode level walk least-balanced-first too, so "radius" means the same preference order at
-   every depth -- see docs/journal.md 2026-08-23. */
+   iteration order and `ords` is the step, so the lookup is a single indexed load.
+
+   NOTE (2026-08-23): this solver's own BY_MAGIC3 walk (via the countdown-index pattern in
+   canSolveB_ctx's split loop) goes most-balanced-first, the OPPOSITE of concentric_search's own
+   top-level sweep (which reads ind[BY_MAGIC3] forward from index 0, least-balanced-first). Not
+   reconciled here -- radius mode no longer forces BY_MAGIC3 everywhere (kept as prior art, see
+   docs/journal.md 2026-08-23), so this discrepancy only matters if/when a future change makes the
+   two share an order again. */
 #define HOIST_ORDER(lvl) do {                                                        \
     int _o = splitincr[lvl];                                                         \
     int _rev = ORDER_REVERSED[_o];                                                   \
-    if (ctx->radius_mode && _o == BY_MAGIC3) _rev = 1;                               \
     ordp[lvl] = splitsarr[lvl]->ind[ORDER_BASE[_o]] +                                \
                 (_rev && splitsarr[lvl]->size > 0 ? splitsarr[lvl]->size - 1 : 0);    \
     ords[lvl] = _rev ? -1 : 1;                                                       \
@@ -2094,6 +2096,17 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
        genuine TRUE (a witness found within the cap is unconditionally valid regardless of what was
        skipped elsewhere). */
     int radius_truncated;
+    /* radius_grows: this call was asked (via NO_DEADLINE) to progressively widen its own radius
+       until it gets a definitive answer, and to tell its children to do the same -- radius mode's
+       analogue of the work-budget clock's own NO_DEADLINE/probe_seconds-doubling iterative
+       deepening. radius_N is the actual per-segment cap used below (see splitindex[] capping):
+       starts small and doubles on every unresolved exhaustive pass when radius_grows, or is just
+       the caller's fixed cap otherwise (bounded probe, one pass, MAYBE is an acceptable answer --
+       the intermediate-level case). Kept separate from `deadline` itself, which stays NO_DEADLINE
+       (2) for the whole call so no_deadline/search_deadline/probe_child_deadline's own sentinel
+       checks keep working unmodified. */
+    int radius_grows = ctx->radius_mode && parent_deadline == NO_DEADLINE;
+    uint64_t radius_N = radius_grows ? 4 : deadline;
     /* Start the frozen audit at pass 2: there is no point running the solver's deliberately
        incomplete FAST witness pass before an exhaustive refutation-only traversal. */
     int pass = frozen_refute ? 1 : 0;
@@ -2158,11 +2171,11 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         totalsplits=0;
         skiptop = 0;
         cont=1;
-        /* Radius mode forces BY_MAGIC3 everywhere (overriding the size/pass-tuned heuristic
-           choice below) so "radius" means the same per-part order at every level, matching
-           concentric_search's own top-level sweep -- see also HOIST_ORDER's radius-mode reversal,
-           which makes that shared order walk least-balanced-first at every level too. */
-        splitincr[0] = ctx->radius_mode ? BY_MAGIC3 : (size<=3 ? BY_SP1 : BY_MAGIC3);
+        /* Radius mode keeps this heuristic exactly as-is (no longer overridden to force BY_MAGIC3
+           everywhere): it is already a decent, segment-count/index-conditioned baseline, and the
+           2026-08-23 direction-consistency argument for forcing a single order was premature --
+           iterate on ordering separately, against this as the baseline, rather than discarding it. */
+        splitincr[0] = size<=3 ? BY_SP1 : BY_MAGIC3;
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP1 : BY_MAGIC3);
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP2_DESC : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
@@ -2176,7 +2189,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         memset(splitindex, 0, size * sizeof(int));
         if (ctx->radius_mode) {
             int full0 = splitsarr[0]->size;
-            int capped0 = deadline < (uint64_t)full0 ? (int)deadline : full0;
+            int capped0 = radius_N < (uint64_t)full0 ? (int)radius_N : full0;
             splitindex[0] = capped0;
             if (capped0 < full0) radius_truncated = 1;
         } else {
@@ -2232,22 +2245,38 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 //                        cache(tmp, size, MAYBE_SLOW, k, pairs);
 //                        return MAYBE;
                     } else {
-                        if (parent_deadline == NO_DEADLINE) {
+                        /* Radius mode's own NO_DEADLINE growth (radius_N doubling, below) is
+                           separate from this work-budget doubling and must never touch `deadline`
+                           itself: deadline stays the NO_DEADLINE sentinel (2) for the whole call in
+                           that mode, so budget_start (a work-clock value, unrelated to radius
+                           currency) would underflow the subtraction and, after radio_budget_add's
+                           overflow clamp, corrupt deadline to UINT64_MAX -- silently breaking the
+                           child's own no_deadline recognition (UINT64_MAX != NO_DEADLINE) at the cd
+                           computation below. */
+                        if (!ctx->radius_mode && parent_deadline == NO_DEADLINE) {
                             // double this root's absolute allowance
                             deadline = radio_budget_add(deadline, deadline - budget_start);
                         }
                         if (pass >= 2) {
-                            /* Radius mode never retries an exhaustive pass: probe_child_deadline is
-                               an identity function here (children always get this level's own
-                               unchanged radius, never a growing quantum), so a retry with the same
-                               children's cap cannot resolve what the first exhaustive pass could
-                               not -- looping would just count passes forever without progress.
-                               Stopping here still returns MAYBE, never a wrong FALSE: skipped_some
-                               is true whenever this branch runs, and the check right after this
-                               loop (`else if (skipped_some) return MAYBE;`) fires unconditionally on
-                               that, regardless of why cont2 became 0. */
-                            if (ctx->radius_mode || (!no_deadline
-                                && deadline_expired(deadline, radio_effort_now_ctx(ctx, totalsplits)))) {
+                            if (ctx->radius_mode) {
+                                /* Bounded (non-growing) radius calls never retry: they were asked
+                                   for exactly one pass at a fixed cap, and MAYBE is an acceptable
+                                   answer at that intermediate level. Growing calls retry with a
+                                   doubled radius_N -- real widening, not a repeat of the same
+                                   attempt -- until either resolved or radius_N exceeds every
+                                   level's own true size (radius_truncated then reads false and the
+                                   !skipped_some branch above takes over, since skipped_some is also
+                                   false once no child can return MAYBE any more -- see radius_grows
+                                   propagation at the cd computation below). Guard the multiply the
+                                   same way probe_seconds guards its own doubling. */
+                                if (radius_grows) {
+                                    if (radius_N <= UINT64_MAX / 2) radius_N *= 2;
+                                    else radius_N = UINT64_MAX;
+                                } else {
+                                    cont2 = 0;
+                                }
+                            } else if (!no_deadline
+                                && deadline_expired(deadline, radio_effort_now_ctx(ctx, totalsplits))) {
                                 cont2=0;
                             } else if (probe_seconds <= UINT_MAX / 2) {
                                 /* Monotone work allowance replaces the old cache-progress gate:
@@ -2486,9 +2515,16 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                     progress = cpu_now + PROGRESS_INTERVAL;
                                 }
                             }
-                            uint64_t cd = probe_child_deadline(
-                                ctx, deadline, radio_effort_now_ctx(ctx, totalsplits),
-                                probe_seconds, size);
+                            /* radius_grows propagates recursively: a child of a progressively-
+                               widening call gets NO_DEADLINE itself (not radius_N or deadline,
+                               either of which could be a plain finite number by now) so it does
+                               its own widen-until-resolved, all the way down. A bounded radius
+                               call (radius_grows false) still propagates its fixed cap unchanged,
+                               absolute, exactly as before. */
+                            uint64_t cd = ctx->radius_mode
+                                ? (radius_grows ? NO_DEADLINE : deadline)
+                                : probe_child_deadline(ctx, deadline,
+                                      radio_effort_now_ctx(ctx, totalsplits), probe_seconds, size);
                             /* MAYBE in one branch must not hide an easy refutation in another.
                                Probe all still-possible children, stopping only after a FALSE. */
                             if (cs0 == MAYBE)
@@ -2529,7 +2565,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                             }
                             if (ctx->radius_mode) {
                                 int fulli = splitsarr[i]->size;
-                                int cappedi = deadline < (uint64_t)fulli ? (int)deadline : fulli;
+                                int cappedi = radius_N < (uint64_t)fulli ? (int)radius_N : fulli;
                                 splitindex[i] = cappedi;
                                 if (cappedi < fulli) radius_truncated = 1;
                             } else {
@@ -2545,11 +2581,10 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                    smallest. The _DESC variants are never chosen here: they have
                                    ORDER_MONO_P = -1, so they get no early termination at all.
                                    Measured 2026-08-08 on the cheapest monster: 3.5x fewer candidate
-                                   evaluations than the gap heuristic below.
-                                   Radius mode forces BY_MAGIC3 instead, unconditionally -- see the
-                                   level-0 comment above. */
+                                   evaluations than the gap heuristic below. Radius mode keeps this
+                                   heuristic unchanged -- see the level-0 comment above. */
                                 int chosen = -1;
-                                if (!ctx->radius_mode && pass >= 2 && size > 3) {
+                                if (pass >= 2 && size > 3) {
                                     splits *sp_ = splitsarr[i];
                                     int M = sp_->clen, best = 1 << 30, j;
                                     int bnd[3];
@@ -2563,9 +2598,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                         if (cc < best) { best = cc; chosen = ORD_FOR_KEY[j]; }
                                     }
                                 }
-                                if (ctx->radius_mode) {
-                                    splitincr[i] = BY_MAGIC3;
-                                } else if (chosen >= 0) {
+                                if (chosen >= 0) {
                                     splitincr[i] = chosen;
                                 } else
                                 // confusingly enough p0 corresponds to BY_SP2 and p2 to BY_SP0

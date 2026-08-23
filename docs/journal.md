@@ -9607,3 +9607,48 @@ Also clarified two points of possible confusion from the same feedback, worth re
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 14.
+
+## 2026-08-23 (same day, fifth follow-up) — NO_DEADLINE now widens recursively; a real fork on concentric_search's fate
+
+Two corrections per direct feedback, then a direct test of the resulting architectural question.
+
+**Kept the pre-existing per-level ordering heuristic** (BY_SP0/1/2/DESC, size<=3 special-cased,
+the counting-bound-driven selection) instead of forcing BY_MAGIC3 everywhere in radius mode --
+that override was a reasonable first cut for the direction-mismatch finding, but discarded real
+prior art (a heuristic with its own measured "3.5x fewer candidate evaluations" result). Reverted,
+along with the now-moot HOIST_ORDER BY_MAGIC3 reversal. No regression: byte-identical on all 43
+endpoints.
+
+**Implemented real progressive widening for NO_DEADLINE**, replacing the earlier "stop after one
+pass" fix: a growing call's radius_N starts small and doubles on every unresolved exhaustive pass
+(mirroring the work-budget clock's own probe_seconds doubling), and its children get NO_DEADLINE
+themselves -- not a finite slice -- so widening propagates recursively. Found and fixed a real
+corruption bug while wiring this up: the pre-existing work-budget doubling logic and
+probe_child_deadline both read `deadline` directly, which stays the NO_DEADLINE sentinel in radius
+mode by design -- an unsigned underflow (deadline - a work-clock budget_start) that the overflow
+clamp turned into UINT64_MAX, silently breaking a child's ability to recognize "I should also
+widen" (UINT64_MAX != NO_DEADLINE). Fixed by gating the work-budget doubling to non-radius-mode
+only and computing the child's cd explicitly in radius mode.
+
+**The direct test this makes possible**: does a plain canSolveB_ctx(&radius_ctx, sb, size, k,
+NO_DEADLINE) call -- no concentric_search wrapper, no asymmetric last-segment structure -- correctly
+and efficiently answer the same queries? Ran all 43 previously-tested endpoints this way. All 43
+correctly return TRUE. The 10 k7 and 8 k8-hardest endpoints resolve in 0.00-0.27s each -- two to
+three orders of magnitude faster than concentric_search's own times for the identical states. Most
+of the 20 k8-diverse endpoints resolve in under a second. But 2 of the 5 previously-hardest
+endpoints -- the ones with the most extreme lopsided parts (41:4/51:1 and 46:2/50:1, the same shape
+that triggered both deadline bugs earlier today) -- took 494s and 300s respectively, slower than
+concentric_search's own handling of those same 5 endpoints (8 CPU-minutes combined for all 5).
+Correct, not a false answer or a timeout -- just slow.
+
+**Left open, not resolved unilaterally**: this is a real fork, not a clean win. Baking progressive
+widening into canSolveB_ctx eliminates the need for concentric_search's bespoke sweep for the
+overwhelming majority of states, dramatically faster -- but concentric_search's own asymmetric
+"last segment always full" structure appears to be solving a real problem for the lopsided-part
+shape that the existing per-level heuristic does not. Whether to retire concentric_search, keep it
+as a fallback for that shape, or dig into why the heuristic struggles there specifically, is a
+decision for the next session or explicit direction, not something to resolve by picking one
+silently.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 15.

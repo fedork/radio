@@ -517,3 +517,74 @@ constant instead of the real R0*g^(round-1) schedule:
 Reran the full 43-endpoint battery (10 k7, 8 k8-hardest, 20 k8 diverse, 5 previously-hardest) after
 this simplification: every result remains byte-for-byte identical to sections 10-13's numbers, and
 the default (radius_mode=0) path -- plain VERDICT queries and enumerate -- is unaffected.
+
+=====================================================================================
+15. NO_DEADLINE NOW MEANS "PROGRESSIVELY WIDEN, RECURSIVELY" -- AND A DIRECT TEST OF
+    WHETHER concentric_search IS STILL NEEDED
+=====================================================================================
+Two follow-up corrections, per direct feedback, plus the resulting direct test of a genuinely
+different architectural question: does concentric_search's bespoke top-level sweep still earn its
+keep once canSolveB_ctx itself can progressively widen?
+
+CORRECTION A -- kept the pre-existing per-level heuristic (BY_SP0/1/2/DESC, size<=3 special-cased,
+the counting-bound-driven `chosen` selection) instead of forcing BY_MAGIC3 everywhere in radius
+mode. That override (section 13) was a reasonable first cut to fix the direction-mismatch finding,
+but it discarded prior art: this heuristic is already segment-count/index-conditioned and has its
+own measured wins ("3.5x fewer candidate evaluations," 2026-08-08). Reverted; HOIST_ORDER's
+radius-mode BY_MAGIC3 reversal is removed too (moot once BY_MAGIC3 isn't forced). Regression: byte-
+identical to sections 13-14 on all 43 endpoints -- this population's canSolveB_ctx calls apparently
+don't need the ordering forced to matter, at least not yet; ordering remains open for iteration.
+
+CORRECTION B -- real progressive widening for radius currency, replacing the earlier "stop after
+one exhaustive pass" fix (section 13) for the specific case that was asked for: a call made with
+NO_DEADLINE. Added `radius_grows` (true iff radius_mode and parent_deadline==NO_DEADLINE) and
+`radius_N`, a per-call cap that starts small (4) and DOUBLES on every unresolved exhaustive pass
+when radius_grows -- real widening, mirroring the work-budget clock's own probe_seconds-doubling,
+rather than a repeated identical attempt. Bounded (non-growing) radius calls still take exactly one
+pass, as before -- MAYBE remains an acceptable answer at that intermediate level. Children of a
+growing call get NO_DEADLINE themselves (not a finite slice), so widening propagates recursively,
+all the way down, exactly as asked.
+
+A real corruption bug surfaced and was fixed while wiring this up: the pre-existing work-budget
+"double this root's absolute allowance" logic and probe_child_deadline both read `deadline`
+directly, which stays the literal NO_DEADLINE sentinel (2) for the whole call in radius mode (by
+design, so `no_deadline`/`parent_deadline==NO_DEADLINE` checks keep working). The work-budget
+doubling line computed `deadline - budget_start` where budget_start is a work-clock value unrelated
+to radius currency -- an unsigned underflow that radio_budget_add's own overflow clamp turned into
+UINT64_MAX, which would then have been handed to a child as `cd`, indistinguishable from a plain
+huge finite cap rather than the sentinel meaning "you also widen." Fixed by gating that doubling
+logic to work-budget mode only, and computing the child's cd explicitly in radius mode
+(NO_DEADLINE if radius_grows, the unchanged fixed cap otherwise) rather than routing through
+probe_child_deadline, which has no way to see radius_grows.
+
+THE DIRECT TEST. With both corrections in place, does a PLAIN canSolveB_ctx(&radius_ctx, sb, size,
+k, NO_DEADLINE) call -- with NO concentric_search wrapper, no asymmetric last-segment structure,
+just canSolveB_ctx's own existing per-level heuristic and the new recursive progressive-widening --
+correctly and efficiently answer the same top-level 4-part queries concentric_search was built to
+answer? Ran all 10 k7 + 8 k8-hardest + 5 previously-hardest + 20 k8-diverse endpoints (43 total)
+this way, bypassing concentric_search entirely:
+
+  - 43/43 correctly return TRUE (matching every known-solvable census fact tested throughout this
+    thread) -- full correctness held.
+  - The 10 k7 and 8 k8-hardest endpoints resolve in 0.00-0.27s EACH -- roughly two to three orders
+    of magnitude faster than concentric_search's own reported times for the identical endpoints
+    (concentric_search: ~3.7s/endpoint average for k7, ~7s/endpoint average for k8-hardest). The
+    20 k8-diverse endpoints mostly resolve in well under a second, a few taking several seconds.
+  - BUT: the 2 most lopsided-part endpoints from the "5 previously-hardest" set (the ones with
+    41:4/51:1 and 46:2/50:1 parts, the SAME shape that triggered both deadline bugs earlier today)
+    took 494s and 300s respectively -- SLOWER than concentric_search's own handling of those same 5
+    endpoints (8 CPU-minutes combined, ~96s average). No timeout, no MAYBE, no false answer -- they
+    correctly resolved to TRUE, just slowly.
+
+CONCLUSION, stated honestly rather than as a clean verdict either way: baking progressive radius
+widening into canSolveB_ctx itself, using its existing heuristic, is a dramatic win for the
+overwhelming majority of states tested -- and eliminates the need for concentric_search's bespoke
+sweep code for those. But it is not a strict improvement: the specific lopsided-part failure mode
+this thread already identified twice today is WORSE under this design than under
+concentric_search's own asymmetric "last segment always full" structure, not just comparably slow.
+Whatever concentric_search's design was doing specifically for that shape (forcing full coverage of
+one narrow segment immediately, rather than growing all segments' radius together) appears to be
+solving a real problem the existing per-level heuristic does not. This is now a genuine, evidence-
+backed design fork rather than an obvious simplification, and is left open rather than resolved
+unilaterally: whether to retire concentric_search, keep it as a fallback for lopsided-part shapes,
+or investigate why canSolveB_ctx's own heuristic struggles specifically with those.

@@ -1404,6 +1404,33 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    mechanism is redundant here, not broken. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 14.
+   **NO_DEADLINE now means "progressively widen your own radius, recursively," per direct
+   feedback** — reverted the BY_MAGIC3-forcing from above (kept `canSolveB_ctx`'s own pre-existing,
+   segment-count/index-conditioned heuristic as the baseline instead, no regression on any of the
+   43 endpoints) and implemented real widening for a NO_DEADLINE call: `radius_N` starts small and
+   doubles on every unresolved exhaustive pass, and children of a growing call get NO_DEADLINE
+   themselves rather than a finite slice, so the widening recurses all the way down. Found and
+   fixed a real corruption bug along the way: the pre-existing work-budget doubling logic and
+   `probe_child_deadline` both read `deadline` directly, which stays the NO_DEADLINE sentinel in
+   radius mode by design — an unsigned underflow silently corrupted it to UINT64_MAX, which would
+   have broken a child's ability to recognize it should also widen.
+   **This made a direct architectural test possible: is concentric_search's bespoke sweep even
+   still needed?** Called `canSolveB_ctx(&radius_ctx, sb, size, k, NO_DEADLINE)` directly — no
+   wrapper, no asymmetric last-segment structure — on all 43 previously-tested endpoints. All 43
+   correctly resolve TRUE. The 10 k7 and 8 k8-hardest endpoints resolve in 0.00-0.27s each, two to
+   three orders of magnitude faster than concentric_search's own times for the identical states;
+   most of the 20 k8-diverse set resolves in under a second. **But** 2 of the 5 previously-hardest
+   endpoints — the ones with the most extreme lopsided parts (41:4/51:1, 46:2/50:1 — the same shape
+   that triggered both deadline bugs earlier today) — took 494s and 300s, slower than
+   concentric_search's own 8-CPU-minutes-combined handling of those same 5 endpoints. Correct, not
+   a false answer, just slow. **Left open, not resolved unilaterally**: a real, evidence-backed
+   fork — baking widening into `canSolveB_ctx` is a dramatic win for most states and could retire
+   concentric_search's bespoke code, but its asymmetric "last segment always full" structure
+   appears to solve a real problem for the lopsided-part shape that the existing heuristic doesn't.
+   Whether to retire concentric_search, keep it as a fallback for that shape, or investigate the
+   heuristic's lopsided-part weakness directly is a decision for next steps. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 15.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.
