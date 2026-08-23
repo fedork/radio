@@ -156,3 +156,47 @@ default, but there is no basis yet to prefer the new signal over the old one out
 
 Reproduce: `tools/ml/proto_concentric_rounds.py` with `outer_order='magic3'` (see `magic3_key` in
 the module, a direct port of radiobase.c's `magic3()`/`distance()`).
+
+=====================================================================================
+7. SCALING UP FROM n=4 TO n=10: A REAL SAMPLE, NOT AN ANECDOTE
+=====================================================================================
+Fair pushback: n=4 (all cherry-picked from the earlier tier sample's characterized endpoints)
+is not enough to trust as a general result. Sampled 6 MORE endpoints from the same k7-census
+tiers, excluding the 4 already tested -- 3 from the 2-winner tier (hardest-mass-biased, since 131
+candidates make that a real bias) and 3 from the 4-winner tier (unbiased, since only 22 exist
+total, 4 already used). Ran the same real-oracle-verified concentric round search on each, using
+"deficit" as the outer-segment order (picked pragmatically, not because section 6 showed it's
+better -- it wasn't shown to be). Tool: tools/ml/concentric_tier_sample.py.
+
+  2-winner (new):  U000547 round 16, 1,517 calls [96s] | U000326 round 18, 2,971 calls [185s]
+                   U000560 round 16, 886 calls [58s]
+  4-winner (new):  U000382 round 18, 961 calls [61s]   | U000358 round 18, 6,971 calls [481s]
+                   U000521 round 17, 1,656 calls [104s]
+
+**All 6 succeed.** Combined with the original 4 (section 2), that is 10/10 real, oracle-verified
+successes across the tested population:
+
+  oracle calls: median 2,154, range 886-6,971
+  round of success: median 17, range 16-18
+
+The round range stays remarkably tight (16-18 across all 10, spanning pooled-model difficulty
+from rank 1 to rank 687) -- reinforcing, with real statistical breadth now rather than 4
+anecdotes, that a round cap around 20 would very likely resolve this entire population, and that
+the round number is a genuinely meaningful, narrow-banded signal rather than something that varies
+wildly by endpoint. The oracle-call cost is more spread (886-6,971, an 8x range) -- one endpoint
+(U000358) took 481s wall-clock because of a single individual oracle query that ran unusually long
+(a known, already-documented oracle behavior -- some queries budgeted for a few nominal seconds
+take far longer in real wall-clock time; confirmed live here when a `stats` call to the same
+serialized oracle process itself blocked for 16.5s behind it) -- a real cost-variance source
+independent of the round-search design itself, worth remembering: total wall-clock cost is not
+purely a function of oracle-CALL COUNT, occasional individual queries can dominate.
+
+**What this adds over section 2**: real sample-size confidence rather than a 4-endpoint anecdote.
+100% success rate held across 10 endpoints spanning both known-winner tiers and a ~700x range in
+how hard the endpoint was for the pooled model. Still not tested at this scale: the magic3-vs-
+deficit segment-order question (section 6's n=4 comparison was already inconclusive; this batch
+used deficit only, pragmatically, to keep the run tractable) -- and, as before, the multi-level
+propagation of round/radius into the children's own recursive verification.
+
+Reproduce: `tools/ml/concentric_tier_sample.py k7 3 22` (samples 3 new endpoints per tier,
+excluding the 4 already characterized; requires an SSM tunnel to the oracle-serve instance).

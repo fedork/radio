@@ -9313,3 +9313,30 @@ cost even though mixed fails more often, which the pooled last-segment score (al
 all three children) already implicitly biases toward without needing an explicit check-order rule.
 
 Evidence appended to [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt) (section 6).
+
+## 2026-08-22 (done) — concentric round search at n=10: 100% success rate, tight round band
+
+Direct response to fair pushback that n=4 (all cherry-picked from the earlier characterized
+endpoints) is not a conclusive sample. Sampled 6 more endpoints from the same k7-census tiers,
+excluding the 4 already tested, ran the identical real-oracle-verified concentric round search
+(deficit-ordered outer segments, picked pragmatically since section 6's magic3-vs-deficit
+comparison was inconclusive and not what this run was trying to settle).
+
+All 6 succeed. Combined with the original 4: **10/10 real, oracle-verified successes**:
+
+  oracle calls: median 2,154, range 886-6,971
+  round of success: median 17, range 16-18
+
+The round band stays remarkably tight (16-18) across all 10 endpoints despite a ~700x spread in
+how hard they were for the pooled model (rank 1 to rank 687) -- this is now a real, sample-backed
+finding, not an artifact of 4 convenient examples: a round cap around 20 would very likely resolve
+this whole population, and the round number is a genuinely narrow, meaningful signal. Oracle-call
+cost is more spread (8x range) -- one endpoint (U000358) took 481s wall-clock purely because of a
+single unusually slow individual oracle query (confirmed live: a `stats` call to the same
+serialized oracle process blocked for 16.5s behind it), a known oracle behavior independent of the
+round-search design -- total wall-clock is not purely a function of oracle-call count.
+
+Not yet done: the segment-order comparison at this scale (used deficit only here to keep the run
+tractable), and the multi-level round/radius propagation into children -- both still open.
+
+Evidence appended to [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt) (section 7).

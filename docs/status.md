@@ -1291,10 +1291,16 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    succeed on all 4 endpoints regardless of which order is used — the round structure's own
    exhaustiveness carries the robustness result, segment order is a real but modest (~20-80%)
    efficiency lever on top of it, not a correctness question. See section 6 of the same evidence
-   file. Still open: the multi-level propagation test, composing the cross-part pair condition and
-   deeper `R_d` on the same stratification, confirming the win survives once scoring is not paid
-   for in unoptimized Python, and — now with a genuinely promising single-level design in hand —
-   sketching what a native `radiobase.c` prototype of concentric round expansion would look like.
+   file. **Scaled from n=4 to n=10** (`tools/ml/concentric_tier_sample.py`, 6 freshly-sampled
+   endpoints excluding the original 4): all 6 also succeed, for **10/10 overall**, real oracle
+   calls median 2,154 (range 886-6,971), round of success median 17 (range 16-18) — a strikingly
+   tight round band now backed by a real sample rather than 4 anecdotes, across a ~700x spread in
+   pooled-model difficulty. See section 7 of the same evidence file. Still open: the segment-order
+   comparison at this scale, the multi-level propagation test, composing the cross-part pair
+   condition and deeper `R_d` on the same stratification, confirming the win survives once scoring
+   is not paid for in unoptimized Python, and — now with a genuinely promising, sample-backed
+   single-level design in hand — sketching what a native `radiobase.c` prototype of concentric
+   round expansion would look like.
    **Guidance remains correctness-free only for achievability** — a witness found under guidance
    is still checked by `check_witness.py`, whereas pruning an OR-branch by a learned value would
    manufacture false negatives.
