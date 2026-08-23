@@ -9444,3 +9444,43 @@ historically) -- a real, expensive, high-stakes production benchmark this repo's
 say needs a check-in before launching, not something to run unsupervised overnight.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt).
+
+## 2026-08-23 (same day, follow-up) — three review corrections: rounds replace the deadline, MAYBE stays honest, and ordering (not starting point) is the real gap
+
+Direct response to review of the overnight batch. Three concrete corrections, each applied and
+retested, not left as discussion:
+
+1. **Rounds are the effort-growth mechanism, full stop -- they must not be paired with a wall-clock
+   deadline or round cap.** Both silently reintroduce what rounds exist to replace: a capped "no"
+   is indistinguishable from a genuinely exhaustive one. Removed both from `concentric_search`; it
+   now only stops on a confirmed winner or true `fully_saturated`, guaranteed to terminate since
+   the radius grows by >=1/round and is capped at each segment's real size.
+2. **MAYBE is fine at the intermediate (per-candidate) level, never as the top-level answer.**
+   Added `has_maybe` tracking so a saturated "no" that rests on an unresolved child check is tagged
+   `reason=unresolved_children` rather than silently reading like a proof -- the exact failure
+   pattern this repo's own history (the `k(k-5)/2` transcription error, the 2023 corpus's 37 false
+   negatives) warns about.
+3. **Widened the round-1 starting radius (R0=8, was ~2)** to test directly whether easy states
+   converge in round 1 as expected, and if not, whether the fix is a wider start or a better order.
+
+Retested with all three changes in place. The 5 endpoints that had timed out in the earlier batch
+(U000035, U001260, U001766, U001702, U001598) now all succeed with no deadline at all -- round
+15-16, 8 CPU-minutes combined for all 5. They were never stuck; they were victims of a deadline too
+tight for how much of the raw space this design generically needs, on states whose outer-segment
+sizes (147-240) happened to make each round costlier. The original 10 k7 and 8 hardest-k8 endpoints
+still succeed 10/10 and 8/8, with round-of-success dropping (k7: 16-20 -> 8-12; k8: 23-24 -> 15-16)
+purely from the wider start.
+
+**The real finding, from a genuinely difficulty-diverse test** (20 k8 endpoints spanning mass
+497-638 and win-count 1-32, not just the highest-mass tier): all 20 succeed, but round-of-success
+sits FLAT at 14-16 regardless of difficulty -- even the 32-winner endpoint, the easiest in the
+sample by any reasonable measure, needs round 15. Widening the start narrowed the round band overall
+but created no separation between hard and easy states. That rules out "start too narrow" and
+points at "the ordering doesn't rank by winner-likelihood" -- BY_MAGIC3's descending-least-balanced
+walk, direction confirmed correct in section 2 of the evidence file, evidently does not concentrate
+this population's real winners toward the front of any outer segment's list. Recommended next
+experiment, not yet run: swap in the earlier per-part "deficit" order (0.9961 population-level AUC,
+see the 2026-08-22 evidence file) for the outer segments and re-measure.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 11.

@@ -1333,8 +1333,25 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    an unusually lopsided part (large n, small m), the same pattern that triggered both deadline
    bugs — a real, characterized limitation, not unexplained variance. Not yet done: integrating
    this as an actual split-ordering strategy inside `canSolveB_ctx` — deliberately left for a
-   future, reviewed step rather than folded into an unattended overnight session. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt).
+   future, reviewed step rather than folded into an unattended overnight session.
+   **Same-day review produced three corrections**, all applied and retested: (1) the overall
+   deadline and the `max_rounds` cap were both removed — they silently reintroduce the early-return
+   the round schedule exists to replace, since a capped "no" and a genuinely exhaustive one are
+   indistinguishable to the caller; the search now only stops on a confirmed winner or true
+   `fully_saturated`. Retested directly: the 5 previously-timed-out endpoints now all succeed with
+   no deadline at all (round 15-16, 8 CPU-minutes combined) — they were never stuck, just under a
+   deadline too tight for how much raw space this design generically needs. (2) MAYBE is fine at
+   the per-candidate level (an unresolved child just isn't a confirmed winner) but a saturated "no"
+   built on one is now tagged `reason=unresolved_children` rather than reading like a proof. (3)
+   widened the round-1 starting radius (R0=8, was ~2) and retested on a genuinely difficulty-diverse
+   20-endpoint k8 sample (mass 497-638, wins 1-32, not just the hardest tier): all 20 succeed, but
+   **round-of-success sits flat at 14-16 regardless of difficulty** — even the 32-winner endpoint
+   needs round 15. This rules out "starting point too narrow" and points at "the ordering doesn't
+   rank by winner-likelihood" — BY_MAGIC3 evidently doesn't concentrate this population's real
+   winners early for either hard or easy states. Recommended next experiment, not yet run: swap in
+   the earlier per-part deficit order (0.9961 population-level AUC) for the outer segments. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 11.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

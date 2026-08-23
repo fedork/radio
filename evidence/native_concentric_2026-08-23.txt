@@ -258,3 +258,87 @@ combined completing well under 20 minutes total), and has an honestly-characteri
 worthwhile, considered as a genuine candidate split-ordering strategy for `canSolveB_ctx` itself --
 that integration step was not attempted here, deliberately, since it would mean modifying trusted
 solving logic rather than adding a new, isolated, additive command.
+
+=====================================================================================
+11. THREE DESIGN CORRECTIONS FROM REVIEW, APPLIED AND TESTED SAME DAY
+=====================================================================================
+Review of section 10's results produced three concrete corrections, applied to radio_oracle.c and
+retested before writing this section (not from reasoning alone).
+
+CORRECTION 1 -- rounds replace the deadline, not sit alongside it. The overall wall-clock deadline
+added in sections 7/9 was the wrong fix for the real problem: it let a search stop before
+fully_saturated, and a capped "no" is indistinguishable, from the caller's side, from a genuinely
+exhaustive one. Removed entirely (both the outer counter-based check and the post-canSolveB check),
+along with the `max_rounds` cap that had the same silent-early-return property (round could exceed
+40 for a large enough segment before saturating -- section 10's own results never actually hit this,
+but it was a live risk, not a theoretical one). The loop now stops for exactly one of two reasons: a
+confirmed winner, or true fully_saturated. Termination is still guaranteed: R[i] grows by >=1/round
+and is capped at sz[outer[i]].
+
+CORRECTION 2 -- MAYBE is fine at the intermediate level (one candidate's child check), never at the
+top. A candidate whose child canSolveB call returns MAYBE (its own bounded deadline) is correctly
+not counted as a confirmed winner -- but if the search reaches full saturation with no winner AND at
+least one candidate along the way left a child unresolved (MAYBE, not a clean FALSE), the "no" is
+NOT the same claim as canSolveB's own exhaustive negative would be. Added `has_maybe` tracking; a
+saturated "no" now reports `reason=unresolved_children` when this happened, so nothing downstream
+reads an inconclusive result as a proof. (Not exercised in this round of testing -- every endpoint
+below found a confirmed winner -- but now structurally in place.)
+
+CORRECTION 3 -- widened the round-1 starting radius (R0 = 8 per outer segment, was implicitly ~2)
+to test the hypothesis that an easy state should converge by round 1, and if it doesn't, that's a
+signal to fix ordering or widen the start.
+
+RESULT OF CORRECTION 1, retested directly: the 5 endpoints that timed out in section 10
+(U000035, U001260, U001766, U001702, U001598 -- all lopsided-part, all wins=1) now ALL succeed with
+no deadline at all: round 15-16, frac 0.68-0.996, 8 CPU-minutes combined for all 5. They were never
+stuck or pathologically hard -- they were victims of a deadline that was too tight relative to how
+much of the raw space this design generically needs, and their outer-segment sizes (147-240) simply
+made each round's cost proportionally larger. Removing the deadline was the correct fix, not a
+bigger deadline.
+
+RESULT OF CORRECTION 3, and the answer to the round-1 question: retested the original 10 k7 and 8
+hardest-k8 endpoints -- still 10/10 and 8/8, and round-of-success DROPPED (k7: 16-20 -> 8-12; k8
+hardest: 23-24 -> 15-16) purely from the wider start, no other change. Then built a genuinely
+difficulty-diverse test: 20 real k8 4-part endpoints sampled across the full range this corpus
+offers -- mass 497 to 638 (out of 729) and win-count 1 to 32, not just the highest-mass tier.
+
+  name       mass  wins  round  frac
+  U001138     497     1     15  0.983
+  U001067     590     1     16  0.996
+  U000971     609     1     16  0.990
+  U000989     613     2     14  0.609
+  U000866     619     1     16  0.987
+  U000937     620     2     16  0.945
+  U001636     624     8     15  0.756
+  U001349     626     1     16  0.995
+  U001850     629    14     16  0.953
+  U001568     632     2     16  0.972
+  U000063     632     1     16  0.917
+  U000178     633    32     15  0.684
+  U001518     634     9     16  0.937
+  U000522     634    23     16  0.859
+  U000036     636     6     15  0.707
+  U000571     636     3     16  0.986
+  U000340     637    12     15  0.684
+  U000161     638     3     15  0.725
+  U000153     638     2     16  0.920
+  U000443     638     1     15  0.939
+
+All 20/20 succeed. **Round-of-success is essentially flat at 14-16, independent of mass and of
+win-count** -- even U000178 (32 known winners, the single easiest endpoint by any reasonable proxy
+in this sample) needs round 15, not round 1. Fraction of raw space needed is *weakly* related to
+win-count (32-winner and 23-winner cases sit at 0.68 and 0.86, most 1-2-winner cases sit at
+0.92-0.996) but the effect is modest, not the dramatic early-stop a working ordering heuristic
+should produce.
+
+CONCLUSION on point 3, stated as the user's own diagnostic frames it: widening the starting point
+(the lever tried here) narrowed the round band but produced ZERO separation between the hardest and
+easiest states tested. That rules out "the start was too narrow" as the explanation and points at
+"the ordering does not rank by winner-likelihood" instead -- BY_MAGIC3's descending-least-balanced-
+first walk (correct, verified against HOIST_ORDER/indexSpl in section 2) evidently does not
+concentrate this population's real winning splits toward the front of any outer segment's list, for
+either hard or easy states alike. This is a genuine, sobering, data-backed finding, not a bug: it
+means the earlier per-part "deficit" signal's population-level 0.9961 AUC (see
+evidence/deficit_order_and_bestfirst_2026-08-22.txt) is a more promising candidate to try in
+BY_MAGIC3's place for the OUTER segments specifically than anything tested so far -- untested here,
+recommended as the next concrete experiment rather than assumed.

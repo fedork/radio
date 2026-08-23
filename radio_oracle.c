@@ -310,8 +310,18 @@ done:
    already fully inside the previous round's box, rather than maintaining a set of visited tuples
    -- since round-over-round the old box is a roughly 1/G fraction of the new one, this revisits
    (without re-solving) a constant fraction of already-covered ground each round, a deliberate,
-   well-understood tradeoff for a plain nested-loop odometer over a hash set. */
-static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
+   well-understood tradeoff for a plain nested-loop odometer over a hash set.
+
+   2026-08-23 DESIGN CORRECTION (post-60-endpoint validation): the round schedule is the effort-
+   growth mechanism, full stop -- it must not be paired with an independent deadline or round cap,
+   which would just reintroduce, silently, the early-return the rounds exist to replace (a capped
+   "no" and a genuinely exhaustive "no" look identical to the caller). Removed both; this loop now
+   only stops on a confirmed winner or true fully_saturated -- guaranteed to terminate since R[i]
+   grows by >=1/round and is capped at sz[outer[i]]. See has_maybe below for how an unresolved
+   intermediate-level MAYBE is kept from silently posing as a proven "no." Also widened the
+   round-1 starting radius (R0, was implicitly ~2) to test whether easy states converge in round 1
+   once given a fair-sized first look -- see evidence/native_concentric_2026-08-23.txt section 11. */
+static void concentric_search(int k, int *sb_in, int size_in) {
     int sb[size_in], P = 0, i;
     for (i = 0; i < size_in; i++) if (sb_in[i] > 1) sb[P++] = sb_in[i];
     if (P == 0) {
@@ -360,30 +370,39 @@ static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
     int capc = power3[k - 1];
     double G = 2.0;
     double g = no > 0 ? pow(G, 1.0 / no) : 1.0;
+    /* Round-1 starting radius per outer segment. Was implicitly ceil(g^1) ~= 2 for typical no --
+       too narrow to tell "ordering already surfaces a winner immediately" apart from "ordering
+       needs several rounds to reach one": round-of-success came back 16-24 on every endpoint
+       tested so far, hard and easy alike, which is the wrong signature for a decent per-part
+       order (an easy state should hit round 1). R0=8 is a first widened starting point to test
+       that distinction with; see evidence/native_concentric_2026-08-23.txt section 11. */
+    int R0 = 8;
 
     int R[no > 0 ? no : 1], Rprev[no > 0 ? no : 1], idx[no > 0 ? no : 1];
     for (i = 0; i < no; i++) R[i] = 0;
     long long checked = 0;
     int round;
+    int has_maybe = 0;  /* did any evaluated, non-winning candidate leave a child unresolved? */
 
-    /* An earlier version had NO overall bound on this loop at all -- found live 2026-08-23 when
-       one sampled k8 endpoint with an unusually lopsided part (n:m = 43:2) ran past 4 CPU-minutes
-       with no way to stop it short of killing the process. concentric_search can check billions
-       of raw combinations; a single pathological state must not be able to block a batch
-       indefinitely. Reuses the same query_budget_seconds knob (`budget <seconds>`) that already
-       bounds each individual canSolveB call, applied here as an overall wall-clock bound on the
-       whole search -- checked every 1M combinations, not every one, so it costs nothing on the
-       common fast path. */
-    uint64_t overall_deadline = query_budget_seconds
-                                     ? radio_budget_after_seconds(query_budget_seconds * 5)
-                                     : NO_DEADLINE;
-    int timed_out = 0;
+    /* 2026-08-23 design correction: no overall deadline and no round cap. The round schedule IS
+       the graceful effort-growth mechanism; a wall-clock or round-count cutoff layered on top of
+       it just reintroduces, silently, the thing rounds were built to replace -- a search that
+       stops before fully_saturated is indistinguishable, from the caller's side, from one that
+       genuinely exhausted every R_0-admissible split. This command answers a TOP-level query, and
+       per this repo's rule a missing "can't solve" line must never be read as unsolvable, so this
+       loop stops for exactly one of two reasons: a confirmed winner, or genuine full saturation.
+       Termination is guaranteed without a cap: R[i] grows by at least 1 every round and is capped
+       at sz[outer[i]], so the round count is bounded by max(sz[outer[i]]) regardless of G.
+       The per-child canSolveB calls below keep their own query_budget_seconds deadline unchanged
+       -- that MAYBE is fine, it's an intermediate-level check on one candidate split, not the
+       top-level answer, and a MAYBE child simply isn't counted as a confirmed winner (see
+       has_maybe below for how this is kept honest at the end rather than silently dropped). */
 
-    for (round = 1; round <= max_rounds && !timed_out; round++) {
+    for (round = 1; ; round++) {
         int fully_saturated = 1;
         for (i = 0; i < no; i++) {
             Rprev[i] = R[i];
-            int want = (int)ceil(pow(g, round));
+            int want = (int)ceil(R0 * pow(g, round - 1));
             int next = R[i] + 1;
             if (want > next) next = want;
             if (next > sz[outer[i]]) next = sz[outer[i]];
@@ -407,11 +426,6 @@ static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
                 int lj;
                 for (lj = 0; lj < sz[last]; lj++) {
                     checked++;
-                    if (overall_deadline != NO_DEADLINE && (checked & 0xFFFFF) == 0
-                        && deadline_expired(overall_deadline, radio_budget_now())) {
-                        timed_out = 1;
-                        break;
-                    }
                     pick[last] = sp[last]->splitsl[sp[last]->ind[BY_MAGIC3][lj]];
                     long S = S_outer + sb_pairs[pick[last][0]];
                     long X = X_outer + sb_pairs[pick[last][1]] + sb_pairs[pick[last][2]];
@@ -449,24 +463,13 @@ static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
                                 k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0);
                         return;
                     }
-                    /* Checked here too, not just on the `checked & 0xFFFFF` counter above: THIS
-                       codebase's own documented behavior is that an individual canSolveB call can
-                       legitimately run up to its full per-call budget (up to query_budget_seconds,
-                       sometimes far longer in real wall-clock terms per an existing trap already on
-                       record) -- a handful of such calls in a row, each on a mass-feasible but hard
-                       candidate, can burn through the whole overall deadline before the raw-check
-                       counter ever reaches its next multiple of 2^20 (found live 2026-08-23: a k8
-                       endpoint's search ran well past its intended bound this way). Checking after
-                       every real canSolveB attempt is cheap -- these are already the rare, expensive
-                       branch -- and closes the gap. */
-                    if (overall_deadline != NO_DEADLINE
-                        && deadline_expired(overall_deadline, radio_budget_now())) {
-                        timed_out = 1;
-                        break;
-                    }
+                    /* Not a confirmed winner. If that's because a child hit its own deadline
+                       (MAYBE) rather than a clean FALSE, this candidate's real status is still
+                       open -- record it so a "no" at full saturation can say so honestly instead
+                       of silently reading like a proof of unsolvability. */
+                    if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) has_maybe = 1;
                 }
             }
-            if (timed_out) break;
 
             if (no == 0) break;
             i = no - 1;
@@ -477,12 +480,17 @@ static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
             }
             if (i < 0) break;
         }
-        if (timed_out || fully_saturated) break;
+        if (fully_saturated) break;
         if (no == 0) break;  /* single-part state: the "full" segment IS the whole state */
     }
+    /* Reaching here means every R_0-admissible top-level split was checked -- the same candidate
+       set canSolveB_ctx itself would enumerate, so this "no" carries the same weight canSolveB's
+       own exhaustive negative would, UNLESS has_maybe is set: then at least one candidate's status
+       was never actually resolved (a child hit its own deadline), and "no" here means "no CONFIRMED
+       winner found," not "proven unsolvable." Tag it so nothing downstream conflates the two. */
     respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f%s",
-            k, round > max_rounds ? max_rounds : round, checked, raw_space,
-            raw_space > 0 ? checked / raw_space : 0.0, timed_out ? " reason=timeout" : "");
+            k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0,
+            has_maybe ? " reason=unresolved_children" : "");
 }
 
 /* ---- binary snapshot -------------------------------------------------------------------------
@@ -777,7 +785,7 @@ int main(int argc, char **argv) {
             continue;
         }
         if (is_concentric) {
-            concentric_search(k, sb, size, 40);
+            concentric_search(k, sb, size);
             continue;
         }
 
