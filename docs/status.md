@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-22** (the published exact `m=5` result is now reconstructed
+don't know it. Last refreshed **2026-08-23** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
 for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
@@ -1298,9 +1298,30 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    pooled-model difficulty. See section 7 of the same evidence file. Still open: the segment-order
    comparison at this scale, the multi-level propagation test, composing the cross-part pair
    condition and deeper `R_d` on the same stratification, confirming the win survives once scoring
-   is not paid for in unoptimized Python, and — now with a genuinely promising, sample-backed
-   single-level design in hand — sketching what a native `radiobase.c` prototype of concentric
-   round expansion would look like.
+   is not paid for in unoptimized Python.
+   **2026-08-23, ported natively into `radio_oracle.c`** (additive `concentric` command,
+   radiobase.c untouched, every leaf check calls the existing trusted `canSolveB`) — removes the
+   Python/TCP oracle's round-trip ceiling entirely. All 10 k7 endpoints still succeed, cold, 36.7s
+   TOTAL (vs. 58-481s EACH over TCP) — genuinely 2-3 orders of magnitude faster. **A real reframing
+   forced by measuring against the true raw space for the first time**: round-of-success is narrow
+   (16-20), but the FRACTION of the true combinatorial space needed before success is 64-96%, not
+   small — the earlier "narrow round band" framing had been read as "finds winners early," which
+   this shows is wrong; the actual value is a predictable stopping point plus native speed making
+   near-full coverage practically fast, not avoiding most of the space. Whether a genuinely sound
+   early-stopping design exists is still open. **The larger test**: 8 highest-mass real k8
+   4-part endpoints (confirmed genuine solvable states, 2 known winners each) all succeed, round
+   23-24, 55.4s total — 6 of 8 land EXACTLY on the census's own recorded literal winner, a strong
+   independent correctness check. Two more real bugs caught in the process: the earlier Python
+   `BY_MAGIC3` benchmark (section 6 above) walked the heuristic's index array in the OPPOSITE
+   direction from what `HOIST_ORDER` actually uses (`indexSpl` sorts descending, `HOIST_ORDER`
+   walks forward from position 0) — downgraded to inconclusive, not retracted; and the native
+   search loop had no overall deadline at all (unlike every other search path here), found when a
+   lopsided-part (43:2) k8 endpoint ran past 4 CPU-minutes — fixed by reusing the existing `budget
+   <seconds>` knob as an overall bound. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt).
+   Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
+   historically) — a real, expensive, high-stakes production benchmark that needs a check-in
+   before launching, not an unsupervised overnight decision.
    **Guidance remains correctness-free only for achievability** — a witness found under guidance
    is still checked by `check_witness.py`, whereas pruning an OR-branch by a learned value would
    manufacture false negatives.

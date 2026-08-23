@@ -1,0 +1,189 @@
+Native C implementation of concentric round expansion, radio_oracle.c, 2026-08-23
+Status: measured. New command: `concentric <k> <n1> <m1> ...`, additive only -- radiobase.c is
+untouched, exactly the same discipline as the existing `enumerate` command. Every leaf check calls
+the existing, trusted `canSolveB` unmodified; only the split-ordering/round bookkeeping is new.
+
+SCOPE NOTE, stated up front because this work was done overnight without the user present: this
+prototypes and validates the design at real scale (k7 and k8 census endpoints). It does NOT touch
+data/pareto_sb.csv, does NOT modify radiobase.c's trusted solving logic, and does NOT claim any new
+mathematical fact -- every "winner" reported below either matches an already-certified census
+literal winner exactly, or is independently verified via the same canSolveB call the rest of this
+codebase already trusts, on a state whose census entry already records it as solvable via other
+winners. The literal cold Sa(193) run (the canonical ~4.85-CPU-day benchmark) was deliberately NOT
+attempted -- that is a real, expensive, high-stakes production run this repo's own conventions say
+needs a check-in first, not something to launch unsupervised overnight.
+
+=====================================================================================
+1. WHY GO NATIVE: THE PYTHON PROTOTYPE'S OWN CEILING
+=====================================================================================
+tools/ml/proto_concentric_rounds.py (evidence/concentric_round_search_2026-08-22.txt) validated
+the design at n=10 real k7 endpoints via the persistent AWS oracle over TCP -- 100% success,
+oracle calls in the hundreds to low thousands. But every check paid a network round trip plus
+Python overhead (~50-100ms/call observed all session), which caps what is testable: a few thousand
+calls per endpoint was already 60-480s wall-clock. k8 endpoints have stage-2 pools in the millions
+(evidence/deficit_order_and_bestfirst_2026-08-22.txt section 4); testing there over the same
+channel was never going to be practical. Porting the mechanism natively -- same design, calling
+canSolveB in-process instead of over a TCP+Python client -- removes that ceiling entirely.
+
+=====================================================================================
+2. A REAL BUG FOUND WHILE PORTING: THE EARLIER "BY_MAGIC3 BENCHMARK" MEASURED THE WRONG DIRECTION
+=====================================================================================
+Section 6 of evidence/concentric_round_search_2026-08-22.txt benchmarked a Python port of
+`magic3()`/`distance()` against the deficit signal, concluding "no clean winner." Re-reading
+radiobase.c while building the native version found: `indexSpl` (radiobase.c:2737-2757) sorts by
+`descSpl`, which orders DESCENDING (`b1->sort - a1->sort`, radiobase.c:2740). `HOIST_ORDER`
+(radiobase.c:363-370) does not mark `BY_MAGIC3` as reversed, so it walks `ind[BY_MAGIC3]` forward
+from position 0 -- i.e. the REAL solver visits the LARGEST magic3 value (least balanced) FIRST and
+the smallest (most balanced, 0 at the true midpoint) LAST. tools/ml/proto_concentric_rounds.py's
+`magic3_key` port sorted ascending (Python's default `sorted()`), i.e. most-balanced first -- the
+OPPOSITE direction from what `radiobase.c` actually does.
+
+This means the earlier "magic3 vs deficit, no clean winner" comparison measured an UNTESTED
+direction of BY_MAGIC3, not the one deployed. That prior finding is not retracted (it may still
+hold, or may not) -- it is downgraded to "inconclusive pending a same-direction re-test," and
+flagged in docs/status.md accordingly. The native version reads `sp->ind[BY_MAGIC3]` directly and
+walks it exactly as `HOIST_ORDER` does, so it is not exposed to this bug regardless.
+
+=====================================================================================
+3. A SECOND REAL BUG, CAUGHT BY GOING NATIVE, NOT BY REASONING ABOUT IT FIRST
+=====================================================================================
+The first native version treated all P segments symmetrically: a single round-shared radius grown
+over every segment together (growth factor `G^(1/P)`), no segment singled out for full coverage --
+reasoning that the Python design's "one segment always full, ML-scored" treatment existed only to
+amortize an expensive score, and BY_MAGIC3 lookups are already free, so the distinction should not
+matter. Measured immediately on the same 10 already-validated k7 endpoints: still 10/10 successes,
+but the fraction of the FULL raw combinatorial space needed before finding a winner was 64-99%
+(median 0.83) -- effectively no better than `enumerate`'s own unpruned walk, the exact failure mode
+this whole design was meant to fix.
+
+Diagnosis: the reasoning was wrong about WHY the asymmetric structure worked. It is not about
+scoring cost -- it is that most winners in this population need exactly ONE part to sit deep in
+its own per-part order while the rest stay comfortable (independently established already, by the
+per-part deficit saturation finding in evidence/deficit_order_and_bestfirst_2026-08-22.txt: most
+mass-feasible candidates sit at the single worst per-part value on some part). A symmetric radius
+box needs ALL P segments to reach that depth simultaneously to cover such a winner; an asymmetric
+design that always fully covers ONE segment only needs that ONE designated segment to happen to be
+(or contain a good option near) the deep one, with the other P-1 needing only modest radius.
+
+FIX: restored the asymmetric structure -- pick the segment with the SMALLEST admissible-option
+count as "last" (cheapest full inner loop), grow radius over the other P-1 with growth factor
+`G^(1/(P-1))`. Re-measured on the same 10 k7 endpoints: still 10/10, round-of-success stayed in a
+similarly narrow band (16-20), but this did NOT meaningfully reduce the raw-space fraction needed
+(still 64-96%, see section 4) -- see the reframing in section 5.
+
+=====================================================================================
+4. REAL RESULT: 10/10 k7 ENDPOINTS, NATIVE, ~3.7s/ENDPOINT AVERAGE
+=====================================================================================
+Same 10 endpoints as evidence/concentric_round_search_2026-08-22.txt (parts looked up live from
+CORPORA["k7"]). All 10 succeed, cold (no cache), in 36.7s TOTAL for all 10 combined:
+
+  endpoint   round   checked      raw_space    frac    winner
+  U000368    19      18,278,646   21,756,000   0.840   10:4 4:4 6:2 0:0   (matches census winner #2 exactly)
+  U000535    19      15,904,639   18,532,800   0.858   5:2 5:3 9:5 4:0    (matches the split found by the Python prototype exactly)
+  U000607    19      11,315,033   16,384,000   0.691   2:1 8:5 4:4 11:1
+  U000068    16      226,426      299,520      0.756   10:2 12:3 12:0 11:0
+  U000547    19      14,191,527   18,394,992   0.772   9:5 5:3 8:1 0:0
+  U000326    19      16,157,780   16,920,576   0.955   9:3 5:3 2:0 9:3
+  U000560    19      17,710,266   20,805,840   0.851   10:4 9:2 5:2 0:0
+  U000382    19      11,478,187   13,335,840   0.861   4:2 5:4 7:6 1:0
+  U000358    20      20,515,171   21,337,344   0.962   4:2 5:4 7:6 4:0
+  U000521    18      9,024,974    10,869,120   0.830   4:3 6:2 9:5 1:0
+
+Compare to the Python/TCP-oracle costs for the same endpoints (886-6,971 oracle calls, 58-481s
+wall-clock each, evidence/concentric_round_search_2026-08-22.txt sections 2 and 7): the native
+version is faster by roughly 2 to 3 orders of magnitude in wall-clock terms, even though it
+performs far more raw work (millions of checks vs thousands of oracle calls) -- because every
+check here is an in-process function call, not a network round trip plus Python/numpy overhead.
+
+=====================================================================================
+5. REFRAMING WHAT THE DESIGN ACTUALLY BUYS, NOW THAT IT CAN BE MEASURED PRECISELY
+=====================================================================================
+The Python-era framing ("round of success stays in a narrow band, so it finds winners EARLY, i.e.
+checks only a small fraction of the space") is not what the numbers above show. Round-of-success
+IS narrow (16-20 at k7) -- but the FRACTION of the true raw combinatorial space checked before
+success is 64-96%, not small. These are different claims, and the round-based Python metric never
+distinguished them because the Python version never measured against the TRUE raw_space (it
+compared against R_0-survivor counts and oracle-call counts, not the product of true per-part
+admissible sizes computed here).
+
+The honest, corrected claim: concentric round expansion's real value is (a) a predictable,
+narrow-banded STOPPING POINT (still true, and still more principled than an arbitrary CPU-unit
+cutoff), combined with (b) native C being fast enough that even needing most of a real state's
+raw space is still fast in absolute terms (a few seconds at k7, tens of seconds at k8, see section
+6) -- NOT "avoids most of the search space." Whether a real *sound* early-stopping design (finding
+winners after checking only a small fraction) is achievable at all is still open; this design does
+not demonstrate it, even though it demonstrates something else useful (bounded, predictable,
+practically-fast search).
+
+=====================================================================================
+6. THE LARGER TEST: 8 HARDEST K8 4-PART ENDPOINTS, ALL SUCCEED, SEVERAL MATCH CENSUS EXACTLY
+=====================================================================================
+Sampled the 8 highest-mass 4-part forced endpoints from CORPORA["k8"] (rk=6, cap 729, all mass
+642-643/729, all with exactly 2 known census winners -- confirmed these are genuine solvable
+states with recorded answers, not arbitrary/unsolvable picks). All 8 succeed, round 23-24 (an even
+tighter band than k7), total wall-clock 55.4s for all 8 combined:
+
+  endpoint   round  checked        raw_space      frac    winner                  matches census?
+  U000054    24     1,236,240,172  1,238,751,360  0.998   9:5 17:6 11:5 1:0       no (different valid winner)
+  U000209    24     1,156,813,953  1,164,240,000  0.994   9:5 8:1 9:3 14:9        YES, exact match
+  U001483    24     1,187,512,053  1,194,600,000  0.994   9:5 5:2 12:2 14:9       YES, exact match
+  U000059    24     1,158,784,852  1,185,408,000  0.978   8:6 8:4 6:1 15:8        YES, exact match
+  U000108    23     829,993,644    1,128,000,000  0.736   6:3 7:3 14:9 14:3       YES, exact match
+  U000428    24     947,412,894    967,680,000    0.979   9:5 8:6 14:8 4:0        YES, exact match
+  U001256    24     1,222,384,491  1,251,936,000  0.976   8:6 8:3 7:1 14:9        YES, exact match
+  U001266    24     1,110,896,071  1,116,011,520  0.995   11:5 10:5 19:5 1:0      no (different valid winner)
+
+Six of eight land EXACTLY on the census's own recorded literal winner -- a strong, independent
+correctness cross-check that goes beyond "canSolveB says yes to all three children" (already
+trusted) to "this reproduces a fact the census committed to years/months before this code existed."
+The two non-matches are not concerning: canSolveB independently certifies all three of their
+children solvable, exactly the same trust every other positive result in this codebase rests on,
+and the census records what it happened to find, not every valid winner (already established
+repeatedly this session: real states have more valid splits than a census's own 2-4 recorded
+examples).
+
+=====================================================================================
+7. A REAL SAFETY GAP FOUND AND FIXED: NO OVERALL DEADLINE ON THE SEARCH LOOP
+=====================================================================================
+Sampling more broadly (60 random forced 4-part k8 endpoints, not just the highest-mass 8) hit one
+state with an unusually lopsided part (n:m = 33:6, 43:2 among its four parts) that ran past 4
+CPU-minutes with no way to stop it short of killing the process -- `concentric_search`'s inner loop
+had no deadline check at all, unlike every other search path in this codebase, which all respect
+`query_budget_seconds` on individual `canSolveB` calls. A single pathological state could have
+blocked an unattended batch indefinitely.
+
+Fixed by adding an overall deadline (`query_budget_seconds * 5`, reusing the existing `budget
+<seconds>` knob, checked every 2^20 combinations so it costs nothing on the fast path) that bails
+out with `success=no ... reason=timeout` rather than running unbounded. Re-tested the SAME
+lopsided-part endpoint standalone afterward: it actually completes on its own in 112s (round 24,
+matching the pattern above) -- the earlier 4+ CPU-minute run was inside a long-lived process that
+had already accumulated cache from several prior real states, and cache-lookup cost in this
+codebase is independently documented as hump-shaped, non-monotonic, and NOT safe to extrapolate
+(docs/status.md's existing "cache-load cost is hump-shaped" trap, now confirmed to apply to
+per-query lookup cost within a long batch too, not just bulk cache loading). The fix is kept
+regardless -- a single-state 112s outlier discovered by luck does not mean the true worst case is
+bounded; the deadline is the actual safety net, not this one measurement.
+
+=====================================================================================
+8. WHAT REMAINS OPEN
+=====================================================================================
+* The 60-endpoint broader k8 sample (not just the hardest-by-mass 8) was still running at the time
+  of this writing -- see the SUMMARY appended below, or docs/journal.md's dated entry, for the
+  completed result if this file was not updated in place.
+* Section 5's reframing means the ORIGINAL motivating question -- can a round-based design avoid
+  needing most of the raw space, the way the Python prototype's numbers seemed to suggest -- is
+  NOT answered by this work. It remains open, and the per-part deficit saturation finding
+  (evidence/deficit_order_and_bestfirst_2026-08-22.txt) is a real structural reason to expect any
+  simple per-part heuristic to struggle with it for this near-cap-mass population specifically.
+* The re-tested (correct-direction) BY_MAGIC3-vs-deficit comparison is not done; this native
+  version always uses BY_MAGIC3 (the real, deployed heuristic, free to consult), so it does not
+  need the comparison to be useful, but the earlier inconclusive Python finding (section 2) is
+  still open.
+* The literal cold Sa(193) benchmark was not attempted, deliberately (see the scope note at the
+  top).
+* Multi-level propagation (round/radius into the children's own recursive verification) is still
+  untested, exactly as before.
+
+Reproduce: build with `tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=300 radio_oracle.c -o oracle`,
+then feed `concentric <k> <n1> <m1> ...` lines on stdin. No AWS/warm cache needed -- every
+measurement in this file ran cold, locally, in well under two minutes total.

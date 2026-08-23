@@ -20,6 +20,12 @@
 //                                       children are ALL solvable; `inconclusive` counts splits a
 //                                       finite budget could not decide -- never read as "not a
 //                                       winner"; raw-space cost, see the function's own comment)
+//   concentric <k> <n1> <m1> ...    ->  zero or one WINNER <m1>:<m2>,... line, then
+//                                       CONCENTRIC_END k=<k> success=<yes|no> round=<n> checked=<n>
+//                                       (round-based radius expansion over BY_MAGIC3-ordered,
+//                                       already-R_0-admissible per-part splits -- stops at the
+//                                       FIRST winner found, unlike `enumerate`; see the function's
+//                                       own comment and evidence/concentric_round_search_2026-08-22.txt)
 //   budget <seconds>                ->  OK budget=<seconds>   (0 means no deadline)
 //   load <path>                     ->  OK loaded <path>
 //   stats                           ->  OK queries=<n> solvable=<n> unsolvable=<n> maybe=<n> ...
@@ -40,6 +46,7 @@
 // MEMORY. The result cache grows without bound and is never freed -- that is the point of a warm
 // oracle, but a long-lived process will grow. Run it under tools/capped_run.sh when unattended.
 
+#include <math.h>
 #include <stdarg.h>
 #include <unistd.h>
 
@@ -259,6 +266,208 @@ done:
     fflush(resp);
     respond("ENUM_END k=%d winners=%lld checked=%lld admissible=%lld inconclusive=%lld",
             k, winners, checked, admissible, inconclusive);
+}
+
+/* ---- concentric: round-based radius expansion, native, tested 2026-08-22/23 ------------------
+   Prototyped first as an offline Python simulation against a real oracle over TCP
+   (tools/ml/proto_concentric_rounds.py, evidence/concentric_round_search_2026-08-22.txt):
+   10/10 real successes on real k7-census endpoints, round of success in a tight 16-18 band despite
+   a ~700x spread in how hard the endpoint was for the existing pooled-model order. This is the
+   same design, ported natively so it can be tested at real scale (the Python version paid a
+   network round-trip per child check, which capped it at a few thousand real oracle calls per
+   endpoint before it became impractically slow).
+
+   DESIGN, simplified from the Python version for the native context. The Python prototype scored
+   a "last" segment specially (with an expensive ML model) precisely BECAUSE that scoring was
+   costly and needed amortizing over only one free block at a time (the coordinate-descent trick).
+   Natively there is no expensive score to amortize -- BY_MAGIC3's per-part order is already
+   computed and cached by ensure_splits/indexSpl, essentially free to consult -- so the
+   distinction disappears and every segment is treated symmetrically: grow a round-shared radius
+   over ALL P non-trivial parts together, per-segment growth factor g = G^(1/P) for a target
+   total-work growth G (deriving g from the ACTUAL current P, not a value inherited from a caller,
+   matters when a child has a different part count than its parent -- see the mixed-vs-pure
+   segment-count discussion in the same evidence file).
+
+   A REAL BUG CAUGHT HERE, in the earlier Python benchmark, not in this file: HOIST_ORDER walks
+   BY_MAGIC3 (radiobase.c:2109, 363) starting at ind[BY_MAGIC3][0] with no reversal, and indexSpl
+   sorts by descSpl -- DESCENDING (radiobase.c:2737-2741, "b1->sort - a1->sort"). So the real
+   solver visits the LARGEST magic3 value (least balanced) FIRST and the smallest (most balanced,
+   0 at the true midpoint) LAST. tools/ml/proto_concentric_rounds.py's magic3_key port sorted
+   ASCENDING (Python's default), i.e. most-balanced first -- the OPPOSITE direction. Section 6's
+   "magic3 vs deficit, no clean winner" comparison therefore measured the wrong walk direction for
+   magic3; this native version reads sp->ind[BY_MAGIC3] directly and walks it exactly as
+   HOIST_ORDER does, so it is not exposed to that bug -- but the earlier comparison's numbers
+   should be read as "an untested direction of BY_MAGIC3 vs deficit," not settled either way.
+
+   Per-part admissibility is NOT reimplemented here: ensure_splits(sb[i], k) already builds and
+   caches the exact R_0-admissible (m1,m2) table canSolveB itself trusts, complete with
+   precomputed child sbb ids (fields 0-3) and four ready-made sort orders including BY_MAGIC3
+   (field ind[BY_MAGIC3]). The only new logic is the joint mass/cap feasibility check across parts
+   (no single part's own table can know what the OTHER parts contribute) and the round/radius
+   bookkeeping itself.
+
+   "New each round" is computed by iterating the round's full index box and skipping any tuple
+   already fully inside the previous round's box, rather than maintaining a set of visited tuples
+   -- since round-over-round the old box is a roughly 1/G fraction of the new one, this revisits
+   (without re-solving) a constant fraction of already-covered ground each round, a deliberate,
+   well-understood tradeoff for a plain nested-loop odometer over a hash set. */
+static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
+    int sb[size_in], P = 0, i;
+    for (i = 0; i < size_in; i++) if (sb_in[i] > 1) sb[P++] = sb_in[i];
+    if (P == 0) {
+        respond("CONCENTRIC_END k=%d success=yes round=0 checked=0 trivial=yes", k);
+        return;
+    }
+    if (k <= 1 || k > MAX_K) { respond("ERR k out of range for concentric"); return; }
+
+    splits *sp[P];
+    int sz[P];
+    long mass = 0;
+    double raw_space = 1.0;  /* product of per-part R_0-admissible counts, i.e. full exhaustion size */
+    for (i = 0; i < P; i++) {
+        sp[i] = ensure_splits(sb[i], k);
+        sz[i] = sp[i]->size;
+        mass += sb_pairs[sb[i]];
+        raw_space *= sz[i];
+        if (sz[i] == 0) {
+            respond("CONCENTRIC_END k=%d success=no round=0 checked=0 "
+                    "reason=part_%d_has_no_admissible_split", k, i);
+            return;
+        }
+    }
+
+    /* Pick ONE part to walk in full every round (the "last" segment in the validated Python
+       design) -- the smallest admissible list, so the always-full inner loop is as cheap as
+       possible. This asymmetry is NOT an optional simplification: an earlier native version
+       treated all P segments symmetrically (uniform round-shared radius, no full segment) and it
+       degenerated toward needing 64-99% of the FULL raw space even on the already-validated k7
+       endpoints (see evidence/concentric_round_search_2026-08-22.txt's native section) --
+       essentially no better than `enumerate`'s unpruned walk. The Python prototype's real
+       strength was never "cheap scoring," it was guaranteeing at least one segment always gets
+       full coverage regardless of round, which is exactly what most winners in this population
+       need (one part deep in its own order, the rest comfortable) -- confirmed independently by
+       the per-part-deficit saturation finding in the same evidence file (most feasible candidates
+       sit at the single worst per-part value on at least one part). Restoring the asymmetry here. */
+    int last = 0;
+    for (i = 1; i < P; i++) if (sz[i] < sz[last]) last = i;
+    int outer[P > 1 ? P - 1 : 1], no = 0;
+    for (i = 0; i < P; i++) if (i != last) outer[no++] = i;
+
+    fprintf(stderr, "concentric: P=%d sz=[", P);
+    for (i = 0; i < P; i++) fprintf(stderr, "%s%d%s", i ? "," : "", sz[i], i == last ? "*" : "");
+    fprintf(stderr, "]  (* = always-full segment)\n");
+
+    int capc = power3[k - 1];
+    double G = 2.0;
+    double g = no > 0 ? pow(G, 1.0 / no) : 1.0;
+
+    int R[no > 0 ? no : 1], Rprev[no > 0 ? no : 1], idx[no > 0 ? no : 1];
+    for (i = 0; i < no; i++) R[i] = 0;
+    long long checked = 0;
+    int round;
+
+    /* An earlier version had NO overall bound on this loop at all -- found live 2026-08-23 when
+       one sampled k8 endpoint with an unusually lopsided part (n:m = 43:2) ran past 4 CPU-minutes
+       with no way to stop it short of killing the process. concentric_search can check billions
+       of raw combinations; a single pathological state must not be able to block a batch
+       indefinitely. Reuses the same query_budget_seconds knob (`budget <seconds>`) that already
+       bounds each individual canSolveB call, applied here as an overall wall-clock bound on the
+       whole search -- checked every 1M combinations, not every one, so it costs nothing on the
+       common fast path. */
+    uint64_t overall_deadline = query_budget_seconds
+                                     ? radio_budget_after_seconds(query_budget_seconds * 5)
+                                     : NO_DEADLINE;
+    int timed_out = 0;
+
+    for (round = 1; round <= max_rounds && !timed_out; round++) {
+        int fully_saturated = 1;
+        for (i = 0; i < no; i++) {
+            Rprev[i] = R[i];
+            int want = (int)ceil(pow(g, round));
+            int next = R[i] + 1;
+            if (want > next) next = want;
+            if (next > sz[outer[i]]) next = sz[outer[i]];
+            R[i] = next;
+            if (R[i] < sz[outer[i]]) fully_saturated = 0;
+        }
+
+        for (i = 0; i < no; i++) idx[i] = 0;
+        while (1) {
+            int is_old = no > 0;  /* a single-part state (no==0) has no "old" box -- always new */
+            for (i = 0; i < no; i++) if (idx[i] >= Rprev[i]) { is_old = 0; break; }
+
+            if (!is_old) {
+                long S_outer = 0, X_outer = 0;
+                int *pick[P];
+                for (i = 0; i < no; i++) {
+                    pick[outer[i]] = sp[outer[i]]->splitsl[sp[outer[i]]->ind[BY_MAGIC3][idx[i]]];
+                    S_outer += sb_pairs[pick[outer[i]][0]];
+                    X_outer += sb_pairs[pick[outer[i]][1]] + sb_pairs[pick[outer[i]][2]];
+                }
+                int lj;
+                for (lj = 0; lj < sz[last]; lj++) {
+                    checked++;
+                    if (overall_deadline != NO_DEADLINE && (checked & 0xFFFFF) == 0
+                        && deadline_expired(overall_deadline, radio_budget_now())) {
+                        timed_out = 1;
+                        break;
+                    }
+                    pick[last] = sp[last]->splitsl[sp[last]->ind[BY_MAGIC3][lj]];
+                    long S = S_outer + sb_pairs[pick[last][0]];
+                    long X = X_outer + sb_pairs[pick[last][1]] + sb_pairs[pick[last][2]];
+                    long Cm = mass - S - X;
+                    if (!(S <= capc && X <= capc && Cm >= 0 && Cm <= capc)) continue;
+
+                    int sb0[P], sb2[P], sb1[P * 2];
+                    for (i = 0; i < P; i++) {
+                        sb0[i] = pick[i][0];
+                        sb2[i] = pick[i][3];
+                        sb1[i * 2] = pick[i][1];
+                        sb1[i * 2 + 1] = pick[i][2];
+                    }
+                    uint64_t d = query_budget_seconds
+                                     ? radio_budget_after_seconds(query_budget_seconds)
+                                     : NO_DEADLINE;
+                    int r0v = canSolveB(sb0, P, k - 1, d);
+                    int r2v = FALSE, r1v = FALSE;
+                    if (r0v != FALSE) {
+                        d = query_budget_seconds
+                                ? radio_budget_after_seconds(query_budget_seconds) : NO_DEADLINE;
+                        r2v = canSolveB(sb2, P, k - 1, d);
+                        if (r2v != FALSE) {
+                            d = query_budget_seconds
+                                    ? radio_budget_after_seconds(query_budget_seconds) : NO_DEADLINE;
+                            r1v = canSolveB(sb1, P * 2, k - 1, d);
+                        }
+                    }
+                    if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
+                        fprintf(resp, "WINNER");
+                        for (i = 0; i < P; i++) fprintf(resp, " %d:%d", pick[i][6], pick[i][7]);
+                        fprintf(resp, "\n");
+                        fflush(resp);
+                        respond("CONCENTRIC_END k=%d success=yes round=%d checked=%lld raw_space=%.0f frac=%.4f",
+                                k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0);
+                        return;
+                    }
+                }
+            }
+            if (timed_out) break;
+
+            if (no == 0) break;
+            i = no - 1;
+            while (i >= 0) {
+                idx[i]++;
+                if (idx[i] < R[i]) break;
+                idx[i] = 0; i--;
+            }
+            if (i < 0) break;
+        }
+        if (timed_out || fully_saturated) break;
+        if (no == 0) break;  /* single-part state: the "full" segment IS the whole state */
+    }
+    respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f%s",
+            k, round > max_rounds ? max_rounds : round, checked, raw_space,
+            raw_space > 0 ? checked / raw_space : 0.0, timed_out ? " reason=timeout" : "");
 }
 
 /* ---- binary snapshot -------------------------------------------------------------------------
@@ -522,7 +731,8 @@ int main(int argc, char **argv) {
         }
 
         int is_enumerate = !strncmp(line, "enumerate ", 10);
-        char *body = is_enumerate ? line + 10 : line;
+        int is_concentric = !is_enumerate && !strncmp(line, "concentric ", 11);
+        char *body = is_enumerate ? line + 10 : is_concentric ? line + 11 : line;
 
         // <k> <n1> <m1> [<n2> <m2> ...]
         int vals[512], nv = 0;
@@ -549,6 +759,10 @@ int main(int argc, char **argv) {
 
         if (is_enumerate) {
             enumerate_winning_splits(k, sb, size);
+            continue;
+        }
+        if (is_concentric) {
+            concentric_search(k, sb, size, 40);
             continue;
         }
 

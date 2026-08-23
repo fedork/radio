@@ -9340,3 +9340,74 @@ Not yet done: the segment-order comparison at this scale (used deficit only here
 tractable), and the multi-level round/radius propagation into children -- both still open.
 
 Evidence appended to [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt) (section 7).
+
+## 2026-08-23 (in progress) — native concentric round search: real, fast, correct, and two more real bugs found
+
+Direct follow-up to "let's take this further... implement, test, do a larger test" after accepting
+the concentric-round design as a working hypothesis at n=10. Ported it natively into radio_oracle.c
+as a new additive `concentric` command (same discipline as `enumerate`: radiobase.c untouched,
+every leaf check calls the existing, trusted `canSolveB`). This removes the Python/TCP oracle's
+network-round-trip ceiling entirely, making real k8-scale testing tractable for the first time.
+
+**A real bug found while porting, in the earlier Python work, not in new code**: `HOIST_ORDER`
+walks `BY_MAGIC3`'s index array forward from position 0, and `indexSpl` sorts that array
+DESCENDING by magic3 value -- so the real solver visits the LEAST balanced split first and the
+most balanced last. The prior session's Python port of `magic3_key` sorted ascending (ties
+Python's own default), the OPPOSITE direction. The "magic3 vs deficit, no clean winner" comparison
+in evidence/concentric_round_search_2026-08-22.txt section 6 therefore measured an untested
+direction of the real heuristic -- downgraded to inconclusive, not retracted, since the correct
+direction was never actually compared. The native version reads the real array directly and isn't
+exposed to this.
+
+**A second real bug, caught only by testing, not by reasoning about it first**: the first native
+version "simplified" the Python design by treating all P segments symmetrically (uniform
+round-shared radius, no special segment) on the theory that the asymmetric "one segment always
+full" treatment only existed to amortize an expensive ML score, and BY_MAGIC3 lookups are already
+free. Wrong: measured immediately on the same 10 already-validated k7 endpoints, still 10/10
+successes, but needing 64-99% of the FULL raw combinatorial space -- essentially `enumerate`'s own
+unpruned-walk problem again. The asymmetric structure isn't about scoring cost; it's that most
+winners in this population need exactly one part deep in its own order while the rest stay
+comfortable (independently confirmed by the per-part deficit saturation finding from two days
+earlier), and a symmetric radius box needs ALL segments simultaneously deep to catch that shape.
+Fixed by restoring the asymmetric structure (smallest segment always full, growth factor
+recalculated for P-1 segments) -- round-of-success stayed narrow (16-20) but the raw-space fraction
+did NOT meaningfully improve (still 64-96%). This forced an honest reframing (see below).
+
+**Real result at k7, native, cold, no cache**: same 10 endpoints as before, all 10 succeed, 36.7s
+TOTAL for all ten combined (vs. 58-481s EACH over the Python/TCP path) -- 2-3 orders of magnitude
+faster in wall-clock terms, despite doing far more raw work per query, purely because every check
+here is an in-process call rather than a network round trip.
+
+**The reframing this forced**: the original "round stays in a narrow band" framing had been read
+as "finds winners after checking only a small fraction of the space." That's wrong -- round is
+narrow, but the fraction of the TRUE raw space needed is 64-96%, not small (the Python version
+never measured against true raw_space, only against R_0-survivor counts and oracle-call counts).
+The honest value of this design is a predictable, non-arbitrary STOPPING POINT plus native C speed
+making even near-full coverage practically fast -- not "avoids most of the search space." Whether a
+genuinely sound early-stopping design exists is still an open question this work does not answer.
+
+**The larger test, k8 real census endpoints**: 8 highest-mass 4-part endpoints (mass 642-643/729,
+confirmed genuine solvable states with 2 known census winners each, not arbitrary picks) -- all 8
+succeed, round 23-24 (even tighter than k7), 55.4s total. Six of eight land EXACTLY on the
+census's own recorded literal winner -- independent correctness confirmation beyond "canSolveB
+says yes," since these are facts the census committed to before this code existed.
+
+**A real safety gap found and fixed**: `concentric_search` had no overall deadline at all, unlike
+every other search path in this codebase. A broader 60-endpoint random sample hit a state with an
+unusually lopsided part (43:2) that ran past 4 CPU-minutes with no way to stop it short of killing
+the process. Added an overall deadline (reusing the existing `budget <seconds>` knob) that bails
+out with `reason=timeout` instead of running unbounded. The specific triggering state turned out to
+complete fine standalone (112s) once re-tested outside a long-lived process with accumulated
+cache -- consistent with this repo's own already-documented "cache cost is hump-shaped, don't
+extrapolate" trap, now shown to apply to per-query lookup cost within a batch, not just bulk
+loading. The deadline fix stands regardless: a lucky single-case measurement isn't a bound.
+
+A broader 60-endpoint random sample (not just highest-mass) was launched after the fix to check
+robustness across the k8 population more broadly; still running -- see the SUMMARY in this entry
+if completed, or evidence/native_concentric_2026-08-23.txt directly, or the next entry.
+
+Explicitly NOT attempted, by design: the literal cold Sa(193) canonical run (~4.85 CPU-days
+historically) -- a real, expensive, high-stakes production benchmark this repo's own conventions
+say needs a check-in before launching, not something to run unsupervised overnight.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt).
