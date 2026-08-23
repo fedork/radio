@@ -342,3 +342,56 @@ means the earlier per-part "deficit" signal's population-level 0.9961 AUC (see
 evidence/deficit_order_and_bestfirst_2026-08-22.txt) is a more promising candidate to try in
 BY_MAGIC3's place for the OUTER segments specifically than anything tested so far -- untested here,
 recommended as the next concrete experiment rather than assumed.
+
+=====================================================================================
+12. THE TOP LEVEL NOW FORCES REFUTATION: RESOLVE AMBIGUOUS CANDIDATES BEFORE DECLARING "NO"
+=====================================================================================
+Follow-up correction to section 11's MAYBE handling, from further review: tagging a saturated "no"
+with `reason=unresolved_children` was honest but incomplete -- the design goal is that the top level
+"expands until either a solution is found or refutation is achieved," not that it gives up and
+labels the uncertainty. The fix does not require reimplementing canSolveB_ctx's recursion: this
+codebase's search budget is deterministic by default (RADIO_WORK_BUDGET, radiobase.c) -- a count of
+accepted split prefixes, not wall-clock time -- and canSolveB_ctx already implements exactly the
+parent-to-child budget propagation this needed ("a child consumes its parent's allowance," and
+"budget exhaustion returns MAYBE rather than FALSE" per radiobase.c's own comment). So a MAYBE from
+canSolveB during the sweep is already a bounded-effort, honestly-caveated answer, not a wall-clock
+artifact; the only missing piece was making the top level spend MORE of that same trusted mechanism
+on genuinely ambiguous candidates before giving up.
+
+Added: every candidate whose children include a MAYBE during the sweep is now remembered (bounded
+at 4096 entries; more sets an honest overflow flag rather than growing unbounded). Once the round
+loop reaches full saturation with no confirmed winner, if any candidates were left ambiguous, the
+top level re-verifies each one's children with NO_DEADLINE (unbounded, using canSolveB's own
+existing, cached, trusted recursion, unmodified) before finalizing. Only if every remembered
+candidate resolves to a genuine FALSE (and the list never overflowed) does "no" go out clean; a
+resolve-pass TRUE is reported as a real winner (tagged `resolved_ambiguous=yes`); anything still
+ambiguous after that (overflow, or the rare case NO_DEADLINE's own 1000-nominal-second per-level
+cap still isn't enough) keeps the `reason=unresolved_children` tag rather than silently becoming a
+false refutation.
+
+VALIDATION. Natural MAYBEs proved too rare to trigger by chance: budget 1 (20,000,000 work units per
+child, the tightest the `budget <seconds>` protocol command can express) never produced a single
+MAYBE across all 43 real endpoints tested so far (10 k7 + 8 k8-hardest + 20 k8-diverse + 5
+previously-timed-out) -- this population's child checks all resolve well within that budget in
+practice, consistent with the earlier "0.000 seconds, totalsplits<100" character of the great
+majority of sub-solves seen in these logs. Exercised the resolve-pass code directly instead with a
+temporary, reverted-before-commit test hook (an env var forcing an arbitrarily tiny child budget,
+in raw work units rather than whole seconds) on two already-validated endpoints:
+
+  - Forcing every child check to ~1 work unit against a 21.75M-raw_space k7 endpoint: every
+    candidate went MAYBE, the ambiguous list hit its 4096 cap immediately, and the search correctly
+    reported `success=no ... resolved_ambiguous=4096 reason=unresolved_children` rather than a false
+    clean refutation -- the overflow-honesty path works.
+  - Forcing every child check to ~80,000-130,000 work units against a smaller (299,520-raw_space)
+    k7 endpoint: the ambiguous list still overflowed at the lower end of that range, but the search
+    still correctly located and confirmed a genuine winner (34:15,71:0,0:24,0:27 -- a different
+    valid split from the one the unbounded sweep finds first, evidence this state has more than one
+    literal winner) via the resolve pass, reporting `success=yes ... resolved_ambiguous=yes`; at the
+    upper end (130,000, no overflow) the same winner was found cleanly. The "promote an ambiguous
+    candidate to a confirmed winner" path is confirmed working, not just theorized.
+
+Reran the full 10-endpoint k7 regression after removing the test hook: byte-for-byte identical
+round/checked/frac numbers to the pre-hook build. No behavior change for the realistic default
+budget (60 nominal seconds = 1.2 billion work units per child check), where MAYBE essentially never
+arises in this population -- the correction matters for correctness guarantees and for any future
+run at a tighter budget, not for today's default numbers.

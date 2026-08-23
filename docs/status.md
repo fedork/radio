@@ -1342,7 +1342,19 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    no deadline at all (round 15-16, 8 CPU-minutes combined) — they were never stuck, just under a
    deadline too tight for how much raw space this design generically needs. (2) MAYBE is fine at
    the per-candidate level (an unresolved child just isn't a confirmed winner) but a saturated "no"
-   built on one is now tagged `reason=unresolved_children` rather than reading like a proof. (3)
+   built on one is tagged `reason=unresolved_children` rather than reading like a proof — **and,
+   per a further same-day correction, the top level now forces refutation instead of stopping at
+   the tag**: every ambiguous candidate found during the sweep is remembered (capped, with an
+   honest overflow flag), and once the sweep saturates with no winner, each one is re-verified with
+   NO_DEADLINE via canSolveB's own existing, cached recursion before "no" is finalized — reusing
+   the codebase's already-deterministic work-budget system (RADIO_WORK_BUDGET, the repo default;
+   MAYBE there is a bounded-effort answer, not a wall-clock artifact), not a reimplementation.
+   Natural MAYBEs proved too rare to trigger validation at realistic budgets (zero across 43 real
+   endpoints even at the tightest protocol-exposed budget); validated with a temporary, since-
+   reverted test hook forcing a tiny raw work-unit budget directly, confirming both the overflow-
+   honesty path and that an ambiguous candidate can be correctly promoted to a confirmed winner
+   (`resolved_ambiguous=yes`). No change to the realistic-budget numbers below (byte-for-byte
+   identical on the 10-endpoint k7 regression after the hook was removed). (3)
    widened the round-1 starting radius (R0=8, was ~2) and retested on a genuinely difficulty-diverse
    20-endpoint k8 sample (mass 497-638, wins 1-32, not just the hardest tier): all 20 succeed, but
    **round-of-success sits flat at 14-16 regardless of difficulty** — even the 32-winner endpoint
@@ -1351,7 +1363,7 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    winners early for either hard or easy states. Recommended next experiment, not yet run: swap in
    the earlier per-part deficit order (0.9961 population-level AUC) for the outer segments. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 11.
+   sections 11-12.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

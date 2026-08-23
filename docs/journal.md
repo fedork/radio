@@ -9484,3 +9484,32 @@ see the 2026-08-22 evidence file) for the outer segments and re-measure.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 11.
+
+## 2026-08-23 (same day, second follow-up) — top level now forces refutation instead of tagging uncertainty
+
+Further correction to the MAYBE handling above: tagging a saturated "no" with
+`reason=unresolved_children` was honest but stopped short of the actual goal -- "expand until a
+solution is found or refutation is achieved" means the top level must spend more effort resolving
+ambiguity, not just disclose it. No reimplementation needed: this codebase's search budget is
+deterministic by default (RADIO_WORK_BUDGET in radiobase.c counts accepted split prefixes, not
+wall-clock time), and canSolveB_ctx already propagates a shrinking budget from parent to child and
+returns MAYBE only on budget exhaustion, never as a correctness compromise. So the fix is additive:
+remember every candidate left ambiguous during the sweep (capped at 4096, with an honest overflow
+flag past that), and once the round loop saturates with no winner, re-verify each one with
+NO_DEADLINE using canSolveB's own unmodified recursion before finalizing -- a clean "no" only goes
+out if every remembered candidate resolves to a genuine FALSE and the list never overflowed.
+
+Natural MAYBEs turned out too rare to trigger for validation: even the tightest budget the protocol
+exposes (1 nominal second = 20,000,000 work units per child) produced zero MAYBEs across all 43 real
+endpoints tested today. Validated the resolve-pass code directly instead, with a temporary test hook
+(reverted before commit) forcing an arbitrarily tiny raw work-unit budget: confirmed both the
+overflow-honesty path (forced-MAYBE sweep correctly reports `reason=unresolved_children` rather than
+a false refutation) and the promotion path (a candidate left ambiguous during the sweep gets
+correctly resolved to a confirmed winner via the resolve pass, `resolved_ambiguous=yes`, including a
+case that found a second, different valid literal winner for the same state). Reran the 10-endpoint
+k7 regression after removing the hook: byte-for-byte identical to before -- no behavior change at
+the realistic default budget, where this correction is a correctness guarantee for the rare/tight
+case rather than a change to today's numbers.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 12.

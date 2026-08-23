@@ -384,6 +384,16 @@ static void concentric_search(int k, int *sb_in, int size_in) {
     int round;
     int has_maybe = 0;  /* did any evaluated, non-winning candidate leave a child unresolved? */
 
+    /* Candidates whose children hit MAYBE during the sweep, kept so the top level can force them
+       to a real answer before ever declaring refutation -- see the resolve pass after the round
+       loop. Bounded: a state with more genuinely ambiguous candidates than this is already an
+       unusual case worth its own honest tag (ambig_overflow) rather than unbounded stack growth. */
+    #define CONCENTRIC_MAX_AMBIGUOUS 4096
+    int ambig_sb0[CONCENTRIC_MAX_AMBIGUOUS][P > 0 ? P : 1];
+    int ambig_sb2[CONCENTRIC_MAX_AMBIGUOUS][P > 0 ? P : 1];
+    int ambig_sb1[CONCENTRIC_MAX_AMBIGUOUS][P > 0 ? P * 2 : 1];
+    int ambig_count = 0, ambig_overflow = 0;
+
     /* 2026-08-23 design correction: no overall deadline and no round cap. The round schedule IS
        the graceful effort-growth mechanism; a wall-clock or round-count cutoff layered on top of
        it just reintroduces, silently, the thing rounds were built to replace -- a search that
@@ -465,9 +475,21 @@ static void concentric_search(int k, int *sb_in, int size_in) {
                     }
                     /* Not a confirmed winner. If that's because a child hit its own deadline
                        (MAYBE) rather than a clean FALSE, this candidate's real status is still
-                       open -- record it so a "no" at full saturation can say so honestly instead
-                       of silently reading like a proof of unsolvability. */
-                    if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) has_maybe = 1;
+                       open -- remember it so the top level can force a real answer before ever
+                       declaring refutation, instead of letting an unresolved child pose as one. */
+                    if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) {
+                        has_maybe = 1;
+                        if (ambig_count < CONCENTRIC_MAX_AMBIGUOUS) {
+                            for (i = 0; i < P; i++) {
+                                ambig_sb0[ambig_count][i] = sb0[i];
+                                ambig_sb2[ambig_count][i] = sb2[i];
+                            }
+                            for (i = 0; i < P * 2; i++) ambig_sb1[ambig_count][i] = sb1[i];
+                            ambig_count++;
+                        } else {
+                            ambig_overflow = 1;
+                        }
+                    }
                 }
             }
 
@@ -483,14 +505,48 @@ static void concentric_search(int k, int *sb_in, int size_in) {
         if (fully_saturated) break;
         if (no == 0) break;  /* single-part state: the "full" segment IS the whole state */
     }
-    /* Reaching here means every R_0-admissible top-level split was checked -- the same candidate
-       set canSolveB_ctx itself would enumerate, so this "no" carries the same weight canSolveB's
-       own exhaustive negative would, UNLESS has_maybe is set: then at least one candidate's status
-       was never actually resolved (a child hit its own deadline), and "no" here means "no CONFIRMED
-       winner found," not "proven unsolvable." Tag it so nothing downstream conflates the two. */
-    respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f%s",
-            k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0,
-            has_maybe ? " reason=unresolved_children" : "");
+    /* Every R_0-admissible top-level split has now been checked -- the same candidate set
+       canSolveB_ctx itself would enumerate. If nothing was left ambiguous, this "no" already
+       carries canSolveB's own exhaustive weight. If has_maybe is set, the top level does not get
+       to stop here: it must force every remembered ambiguous candidate to a real answer -- a
+       genuine refutation, not a search that merely ran out of things to try. Reuses canSolveB's
+       existing, cached, trusted recursion unchanged; only the budget handed to it changes. */
+    if (has_maybe) {
+        fprintf(stderr, "concentric: saturated with no winner, resolving %d ambiguous candidate(s)"
+                         "%s\n", ambig_count, ambig_overflow ? " (list overflowed, some untracked)" : "");
+        int still_maybe = ambig_overflow;  /* an overflowed candidate can't be resolved -- it was never stored */
+        int j;
+        for (j = 0; j < ambig_count; j++) {
+            int r0v = canSolveB(ambig_sb0[j], P, k - 1, NO_DEADLINE);
+            int r2v = FALSE, r1v = FALSE;
+            if (r0v != FALSE) {
+                r2v = canSolveB(ambig_sb2[j], P, k - 1, NO_DEADLINE);
+                if (r2v != FALSE) r1v = canSolveB(ambig_sb1[j], P * 2, k - 1, NO_DEADLINE);
+            }
+            if (r0v == TRUE && r2v == TRUE && r1v == TRUE) {
+                fprintf(resp, "WINNER");
+                for (i = 0; i < P; i++) fprintf(resp, " %d:%d", ambig_sb0[j][i], ambig_sb2[j][i]);
+                fprintf(resp, "\n");
+                fflush(resp);
+                respond("CONCENTRIC_END k=%d success=yes round=%d checked=%lld raw_space=%.0f "
+                        "frac=%.4f resolved_ambiguous=yes", k, round, checked, raw_space,
+                        raw_space > 0 ? checked / raw_space : 0.0);
+                return;
+            }
+            /* NO_DEADLINE still only hands each recursive child 1000 nominal seconds' worth of
+               work (search_deadline's own NO_DEADLINE case, radiobase.c) -- generous, but not
+               literally infinite, so a residual MAYBE here, though rare, is possible and must
+               still be reported honestly rather than folded into a clean refutation. */
+            if (r0v == MAYBE || r2v == MAYBE || r1v == MAYBE) still_maybe = 1;
+        }
+        respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f "
+                "resolved_ambiguous=%d%s",
+                k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0, ambig_count,
+                still_maybe ? " reason=unresolved_children" : "");
+        return;
+    }
+    respond("CONCENTRIC_END k=%d success=no round=%d checked=%lld raw_space=%.0f frac=%.4f",
+            k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0);
 }
 
 /* ---- binary snapshot -------------------------------------------------------------------------
