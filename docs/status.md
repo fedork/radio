@@ -1282,7 +1282,16 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    verification of the three children themselves (the multi-level half of the design) — this only
    validates the single-level mechanism. See
    [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt).
-   Still open: the multi-level propagation test, composing the cross-part pair condition and
+   **Benchmarked against the actual production heuristic, not just deficit/blind**: ported
+   `BY_MAGIC3` (radiobase.c's real, already-deployed choice for exactly this situation — a
+   >3-segment state's outermost split level) faithfully into Python and re-ran the same real-oracle
+   comparison. No clean winner — magic3 needs fewer real oracle calls on one endpoint (1.8x),
+   deficit needs fewer on two (1.2x-1.8x), and the fourth is an effective tie (that endpoint's
+   smallest segment saturates its own tiny list within a few rounds regardless of ordering). Both
+   succeed on all 4 endpoints regardless of which order is used — the round structure's own
+   exhaustiveness carries the robustness result, segment order is a real but modest (~20-80%)
+   efficiency lever on top of it, not a correctness question. See section 6 of the same evidence
+   file. Still open: the multi-level propagation test, composing the cross-part pair condition and
    deeper `R_d` on the same stratification, confirming the win survives once scoring is not paid
    for in unoptimized Python, and — now with a genuinely promising single-level design in hand —
    sketching what a native `radiobase.c` prototype of concentric round expansion would look like.

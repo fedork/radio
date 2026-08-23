@@ -53,6 +53,30 @@ from proto_deficit_bestfirst import part_options, raw_children, part_deficit
 from proto_coord_descent import totals, feasible, pooled_score
 
 
+def _c_trunc_div(num, den):
+    """C's `int / int` truncates toward zero; Python's `//` floors. Matches radiobase.c's
+    distance() exactly, which matters for a fair comparison against the real heuristic."""
+    q = num // den
+    if q < 0 and q * den != num:
+        q += 1
+    return q
+
+
+def magic3_key(n1, n2, m1, m2):
+    """Direct port of radiobase.c's magic3()/distance() (radiobase.c:2829-2840): squared
+    distance from the geometric midpoint (n1/2, n2/2), in per-mille units, taking whichever of
+    the two symmetric formulations is smaller (protects against odd/even rounding). This is the
+    ACTUAL heuristic radiobase.c uses today for a >3-segment state's outermost split level
+    (`splitincr[0] = size<=3 ? BY_SP1 : BY_MAGIC3`, radiobase.c:2109) -- lower is "closer to
+    balanced," not validated against any solvability data."""
+    magicm1, magicm2 = n1 // 2, n2 // 2
+    dx = _c_trunc_div((m1 - magicm1) * 1000, n1)
+    dy = _c_trunc_div((m2 - magicm2) * 1000, n2)
+    dx2 = _c_trunc_div((m1 - (n1 - magicm1)) * 1000, n1)
+    dy2 = _c_trunc_div((m2 - (n2 - magicm2)) * 1000, n2)
+    return min(dx * dx + dy * dy, dx2 * dx2 + dy2 * dy2)
+
+
 def concentric_round_search(parts, mass, capc, k_child, V, oracle, growth_G=2.0, R0=1,
                              max_rounds=30, outer_order="deficit", log=print):
     P = len(parts)
@@ -63,6 +87,11 @@ def concentric_round_search(parts, mass, capc, k_child, V, oracle, growth_G=2.0,
     if outer_order == "deficit":
         sorted_opts = [
             sorted(raw_opts[i], key=lambda ab: part_deficit(parts[i][0], parts[i][1], ab[0], ab[1], k_child))
+            for i in range(P)
+        ]
+    elif outer_order == "magic3":
+        sorted_opts = [
+            sorted(raw_opts[i], key=lambda ab: magic3_key(parts[i][0], parts[i][1], ab[0], ab[1]))
             for i in range(P)
         ]
     else:  # "blind" -- natural enumeration order, no per-part scoring at all

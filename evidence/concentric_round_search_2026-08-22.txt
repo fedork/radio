@@ -119,3 +119,40 @@ cap already in the implementation.
 
 Reproduce: `tools/ml/proto_concentric_rounds.py [endpoint_name ...]` (defaults to all 4), with an
 SSM tunnel open to the oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).
+
+=====================================================================================
+6. FOLLOW-UP: THE ACTUAL PROVEN HEURISTIC (BY_MAGIC3), BENCHMARKED FOR REAL
+=====================================================================================
+Section 3 above tested deficit vs. blind order, both DIFFERENT from what radiobase.c actually
+uses. Ported `magic3`/`distance` (radiobase.c:2829-2857 -- the exact heuristic already selected
+for a >3-segment state's outermost split level today, `splitincr[0] = size<=3 ? BY_SP1 :
+BY_MAGIC3`, radiobase.c:2109) faithfully into Python, including C's truncate-toward-zero integer
+division (verified against radiobase.c's `distance()` line by line; a quick sanity check confirmed
+the port is symmetric and minimized exactly at the true midpoint). Ran it as a third `outer_order`
+option and repeated the full real-oracle comparison on all 4 endpoints:
+
+  endpoint   deficit oracle calls (round)   magic3 oracle calls (round)   winner (margin)
+  U000368    1,539 (16)                     844 (15)                     magic3, 1.8x fewer calls
+  U000535    4,399 (18)                     5,226 (18)                   deficit, 1.2x fewer calls
+  U000607    3,173 (17)                     5,735 (17)                   deficit, 1.8x fewer calls
+  U000068    2,652 (16)                     2,654 (16)                   tie -- same split found
+
+Totals: deficit 11,763, magic3 14,459 across the 4 endpoints (~19% less for deficit in aggregate),
+but genuinely mixed per-endpoint: magic3 wins one outright, deficit wins two, and the fourth is
+effectively a tie because that endpoint's 3rd segment has only 12 admissible options and saturates
+by round 11 regardless of which order sorts it -- both methods converge to walking nearly the same
+small space and land on the identical split.
+
+**No clean winner.** The "proven, unvalidated" production heuristic is not obviously worse than
+the data-driven deficit signal for this specific purpose (ordering concentric segments), directly
+contradicting any assumption that a data-driven replacement is automatically better just because
+BY_MAGIC3 was never validated against solvability data. Both succeeded on all 4 endpoints
+regardless of which order was used -- the round structure's own exhaustiveness (section 2) is what
+carries the robustness result, not the specific per-segment quality signal. The choice of segment
+order is a real but modest (roughly 20-80%) efficiency lever on top of an already-working method,
+not a correctness or robustness question. Worth more data (more endpoints, and testing `BY_SP0/1/2`
+too, even though those exist for the counting-bound cut rather than quality) before picking a
+default, but there is no basis yet to prefer the new signal over the old one outright.
+
+Reproduce: `tools/ml/proto_concentric_rounds.py` with `outer_order='magic3'` (see `magic3_key` in
+the module, a direct port of radiobase.c's `magic3()`/`distance()`).

@@ -9273,3 +9273,43 @@ the single-level mechanism; the multi-level composition is the natural next step
 judged worth pursuing into an actual C prototype.
 
 Evidence: [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt).
+
+## 2026-08-22 (done) — benchmarking the concentric segment order against the actual production heuristic: no clean winner
+
+Direct follow-up to a fair pushback on the concentric-round result above: the "deficit" and
+"blind" orders tested there are BOTH different from what `radiobase.c` actually uses today
+(`BY_MAGIC3`, selected for exactly this situation -- a >3-segment state's outermost split level,
+`splitincr[0] = size<=3 ? BY_SP1 : BY_MAGIC3`). Fair point that a genuinely new signal should be
+benchmarked against the existing, already-proven heuristic before being preferred. Ported
+`magic3`/`distance` (radiobase.c:2829-2857) faithfully into Python, including C's
+truncate-toward-zero integer division, verified the port is symmetric and minimized exactly at
+the true midpoint, then re-ran the full real-oracle comparison on all 4 tier-sample endpoints.
+
+  endpoint   deficit oracle calls (round)   magic3 oracle calls (round)   winner
+  U000368    1,539 (16)                     844 (15)                     magic3, 1.8x fewer
+  U000535    4,399 (18)                     5,226 (18)                   deficit, 1.2x fewer
+  U000607    3,173 (17)                     5,735 (17)                   deficit, 1.8x fewer
+  U000068    2,652 (16)                     2,654 (16)                   tie, same split found
+
+**No clean winner.** Totals favor deficit by ~19% in aggregate (11,763 vs 14,459), but the
+per-endpoint picture is genuinely mixed -- magic3 wins outright once, deficit wins twice, and the
+fourth is an effective tie because that endpoint's smallest segment (12 options) saturates by
+round 11 regardless of ordering, so both methods converge to walking nearly the same space. The
+unvalidated production heuristic is not obviously worse than the data-driven signal for this
+specific purpose. Both succeeded on all 4 endpoints regardless of which order was used -- the
+round structure's own exhaustiveness is what carries the robustness result (see the entry above),
+not the specific per-segment quality signal riding on top of it. Segment order is a real but modest
+(roughly 20-80%) efficiency lever, not a correctness question, and there is no basis yet to prefer
+either signal as a default.
+
+Also settled two smaller design questions raised in the same conversation: (1) mixed children have
+up to 2x the segments of pure children, which matters for recomputing the round-growth factor from
+each state's own actual segment count when recursing (a general rule, not a mixed-specific one) --
+separately, the existing "mixed-largest law" (docs/status.md item 4: mixed is strictly the largest
+child in all 26,876 known winners) suggests a possible necessary-condition prefilter, untested; and
+(2) checking mixed first to fail fast was a bad instinct on my part -- mixed being larger makes it
+MORE expensive to resolve either way, so checking cheaper children first likely wins on expected
+cost even though mixed fails more often, which the pooled last-segment score (already a `min` over
+all three children) already implicitly biases toward without needing an explicit check-order rule.
+
+Evidence appended to [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt) (section 6).
