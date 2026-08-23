@@ -449,6 +449,21 @@ static void concentric_search(int k, int *sb_in, int size_in, int max_rounds) {
                                 k, round, checked, raw_space, raw_space > 0 ? checked / raw_space : 0.0);
                         return;
                     }
+                    /* Checked here too, not just on the `checked & 0xFFFFF` counter above: THIS
+                       codebase's own documented behavior is that an individual canSolveB call can
+                       legitimately run up to its full per-call budget (up to query_budget_seconds,
+                       sometimes far longer in real wall-clock terms per an existing trap already on
+                       record) -- a handful of such calls in a row, each on a mass-feasible but hard
+                       candidate, can burn through the whole overall deadline before the raw-check
+                       counter ever reaches its next multiple of 2^20 (found live 2026-08-23: a k8
+                       endpoint's search ran well past its intended bound this way). Checking after
+                       every real canSolveB attempt is cheap -- these are already the rare, expensive
+                       branch -- and closes the gap. */
+                    if (overall_deadline != NO_DEADLINE
+                        && deadline_expired(overall_deadline, radio_budget_now())) {
+                        timed_out = 1;
+                        break;
+                    }
                 }
             }
             if (timed_out) break;

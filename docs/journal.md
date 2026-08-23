@@ -9341,7 +9341,7 @@ tractable), and the multi-level round/radius propagation into children -- both s
 
 Evidence appended to [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt) (section 7).
 
-## 2026-08-23 (in progress) — native concentric round search: real, fast, correct, and two more real bugs found
+## 2026-08-23 (done) — native concentric round search: real, fast, correct, and two more real bugs found
 
 Direct follow-up to "let's take this further... implement, test, do a larger test" after accepting
 the concentric-round design as a working hypothesis at n=10. Ported it natively into radio_oracle.c
@@ -9402,9 +9402,42 @@ cache -- consistent with this repo's own already-documented "cache cost is hump-
 extrapolate" trap, now shown to apply to per-query lookup cost within a batch, not just bulk
 loading. The deadline fix stands regardless: a lucky single-case measurement isn't a bound.
 
-A broader 60-endpoint random sample (not just highest-mass) was launched after the fix to check
-robustness across the k8 population more broadly; still running -- see the SUMMARY in this entry
-if completed, or evidence/native_concentric_2026-08-23.txt directly, or the next entry.
+**A second, subtler deadline gap, also caught only by testing**: the first fix checked the
+deadline once per 2^20 candidate combinations, which assumes roughly uniform per-candidate cost.
+Wrong whenever the expensive branch (an actual `canSolveB` call, reached only after the cheap
+mass/cap filter passes) dominates: a run of several multi-second `canSolveB` calls in a row can
+blow past the deadline before the counter next lands on a multiple of 2^20. Found live on the SAME
+lopsided-part shape as above, this time inside a fresh 60-endpoint batch, running past 11 CPU-minutes
+even with the first fix in place. Fixed by adding a second deadline check immediately after every
+completed `canSolveB` attempt, win or lose, independent of the counter. Verified with a standalone
+`budget 15` retest on the triggering endpoint: clean `reason=timeout` at 123s (some bounded
+overshoot from the single longest in-flight `canSolveB` call remains, but it is no longer unbounded).
+
+**The completed 60-endpoint random sample** (uniform draw from all 471 forced 4-part k8 endpoints,
+`budget 20`, both deadline fixes in place): 55/60 (91.7%) succeed, 5/60 (8.3%) time out -- a genuine
+MAYBE, not a claimed failure, exactly like `canSolveB`'s own tri-state. Round of success: median 24,
+range 21-24 (tighter than either earlier test). Fraction of the true raw combinatorial space needed:
+median 0.963, range 0.677-0.999 -- confirms the reframing above at population scale, not just on 8
+cherry-picked endpoints. **55/55 (100%) of the successes match a known census literal winner
+exactly** -- the strongest correctness signal in this whole thread: every single result reproduces
+an external fact the census committed to independently, before this code existed, across a real
+random sample rather than a hand-picked one. (A first pass at this check wrongly reported 0/55 due
+to an off-by-one in my own verification script, not the C code -- the meta file has a header line
+at index 0 that wasn't being skipped; corrected and re-run.)
+
+The 5 timeouts all share a distinctive, reproducible pattern: an unusually lopsided part (large n,
+small m -- e.g. 41:4,51:1 or 32:6,45:3,36:2), the same shape that triggered both deadline bugs above.
+Worth investigating further as a real, characterized limitation rather than random variance -- a
+lopsided part likely carries a disproportionately large admissible-option count relative to its own
+information content, inflating the space that must be walked without a matching gain in how fast a
+winner turns up.
+
+**Where this leaves the thread**: the native `concentric` command is correct (100% exact-match
+against independent ground truth on a random sample), practically fast (tens of seconds per k8
+endpoint, in-process, no network round trip), and has an honestly-characterized rather than
+unexplained failure mode. It has not been integrated into `canSolveB_ctx` itself as an actual
+split-ordering strategy -- that would mean touching trusted solving logic, and was deliberately left
+for a future, reviewed step rather than folded into an unattended overnight session.
 
 Explicitly NOT attempted, by design: the literal cold Sa(193) canonical run (~4.85 CPU-days
 historically) -- a real, expensive, high-stakes production benchmark this repo's own conventions

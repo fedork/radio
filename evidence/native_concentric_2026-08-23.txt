@@ -187,3 +187,74 @@ bounded; the deadline is the actual safety net, not this one measurement.
 Reproduce: build with `tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=300 radio_oracle.c -o oracle`,
 then feed `concentric <k> <n1> <m1> ...` lines on stdin. No AWS/warm cache needed -- every
 measurement in this file ran cold, locally, in well under two minutes total.
+
+=====================================================================================
+9. THE TIMEOUT FIX FROM SECTION 7 HAD A GAP TOO -- FOUND BY WATCHING IT FAIL LIVE
+=====================================================================================
+Section 7's fix (deadline checked every 2^20 raw combinations) assumed roughly uniform per-check
+cost. Watching the 60-endpoint batch live exposed why that assumption is wrong: the mass/cap
+feasibility check is cheap, but a candidate that PASSES it triggers up to three real `canSolveB`
+calls, and this codebase's own already-documented behavior is that an individual canSolveB call
+can legitimately run up to its full per-call budget in real wall-clock terms (docs/status.md's
+existing "queries budgeted at 5 nominal seconds took up to 270 real seconds" trap). A handful of
+such slow, feasible candidates in a row can burn through several minutes before the 2^20-counter
+checkpoint is ever reached again, since between two feasible candidates there can be hundreds of
+thousands of cheap infeasible ones incrementing the counter quickly, but the checkpoint's timing
+was calibrated for uniform-cost work, not for a mix dominated by rare expensive calls. A k8 state
+with parts (26:7),(41:4),(27:5),(51:1) ran to 11+ CPU-minutes past the intended 300s bound before
+being killed by hand.
+
+FIX: check the deadline again immediately after every completed canSolveB attempt (not just on
+the raw-check counter) -- these are already the rare, expensive branch, so the extra check costs
+nothing on the common fast path. Re-tested the SAME triggering state standalone with a tighter
+`budget 15` (75s intended overall bound): now bails out cleanly with `reason=timeout` at 123s
+(some overshoot remains, bounded by roughly one more slow canSolveB call's own budget beyond the
+deadline -- not the previous unbounded 11+ minutes). This is the second real, live-caught gap in
+the safety net this session, not the design itself -- worth remembering as a general lesson: a
+periodic-counter deadline check is only as good as its assumption about per-iteration cost being
+roughly uniform, and any codebase with a documented "some individual operations are much slower
+than typical" behavior needs the check anchored to those expensive operations directly, not to a
+counter that assumes they don't exist.
+
+The 60-endpoint broader sample was relaunched a second time with this fix and an explicit tighter
+`budget 20` (100s overall bound per endpoint) -- see the SUMMARY appended below, or
+docs/journal.md's dated entry, for the completed result.
+
+=====================================================================================
+10. THE COMPLETED 60-ENDPOINT RANDOM SAMPLE: 55/60 SUCCEED, 55/55 MATCH THE CENSUS EXACTLY
+=====================================================================================
+Ran to completion with the section 9 fix and an explicit `budget 20` (20s/canSolveB-call, 100s
+overall per endpoint). Sample: 60 endpoints drawn uniformly at random from all 471 forced 4-part
+k8 endpoints (not mass-sorted this time -- a genuine cross-section of the population, not just the
+hardest-by-mass tier).
+
+  55/60 (91.7%) succeed within budget
+   5/60 (8.3%) time out (genuinely inconclusive within this budget -- NOT failures, no claim of
+               unsolvability is made; a MAYBE, exactly like canSolveB's own tri-state)
+
+  Among the 55 successes:
+    round of success:  median 24, range 21-24 -- an even tighter band than either prior test
+    raw-space fraction: median 0.963, range 0.677-0.999 -- confirms section 5's reframing at
+                         population scale, not just on 8 cherry-picked endpoints: this design
+                         needs most of the true search space, not a small fraction of it
+    **55/55 (100%) match a known census literal winner EXACTLY** -- every single native result
+    independently reproduces ground truth the census committed to before this code existed. This
+    is the strongest correctness signal in this whole session: not just "canSolveB says yes,"
+    but "reproduces an external, independently-derived fact," at 100% across a real random sample.
+
+  The 5 timeouts all share a distinctive pattern: an unusually lopsided part (large n, small m --
+  the SAME shape as the section 7/9 triggering case). Specifically: (31:6,38:3), (41:4,51:1),
+  (32:3,42:2), (32:6,45:3,36:2), (29:5,39:3) among their four parts. This is a real, honest,
+  reproducible characterization of where the design currently struggles -- not random variance --
+  worth investigating further (a lopsided part likely has a disproportionately large admissible
+  option count relative to its own information content, inflating raw_space without a
+  corresponding gain in how quickly a winner is found).
+
+CONCLUSION FOR THIS SESSION'S WORK: the native concentric round search command is correct (100%
+exact-match rate against independent ground truth on a random real sample), practically fast
+(median wall-clock per endpoint on the order of seconds to tens of seconds, all 60 endpoints
+combined completing well under 20 minutes total), and has an honestly-characterized failure mode
+(lopsided parts) rather than an unexplained one. It is ready to be reviewed and, if judged
+worthwhile, considered as a genuine candidate split-ordering strategy for `canSolveB_ctx` itself --
+that integration step was not attempted here, deliberately, since it would mean modifying trusted
+solving logic rather than adding a new, isolated, additive command.

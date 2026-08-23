@@ -1317,7 +1317,23 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    walks forward from position 0) — downgraded to inconclusive, not retracted; and the native
    search loop had no overall deadline at all (unlike every other search path here), found when a
    lopsided-part (43:2) k8 endpoint ran past 4 CPU-minutes — fixed by reusing the existing `budget
-   <seconds>` knob as an overall bound. See
+   <seconds>` knob as an overall bound. A second, subtler gap surfaced after that fix: the
+   deadline was only checked every 2^20 candidates, which assumes uniform per-candidate cost — a
+   run of several multi-second `canSolveB` calls in a row (the same lopsided-part shape as above)
+   blew past 11 CPU-minutes before the counter next tripped. Fixed by also checking immediately
+   after every completed `canSolveB` attempt; verified via a standalone `budget 15` retest, clean
+   `reason=timeout` at 123s. **The completed larger test — 60 endpoints drawn uniformly at random
+   from all 471 forced 4-part k8 endpoints**, `budget 20`, both fixes in place: 55/60 (91.7%)
+   succeed, 5/60 (8.3%) time out (a genuine MAYBE, not a claimed failure). Round of success median
+   24 (range 21-24); fraction of the true raw space needed median 0.963 (range 0.677-0.999),
+   confirming the reframing above at population scale. **55/55 (100%) of the successes match a
+   known census literal winner exactly** — every result reproduces a fact the census committed to
+   independently, before this code existed, on a random rather than cherry-picked sample; the
+   strongest correctness signal in this thread. The 5 timeouts all share one reproducible shape:
+   an unusually lopsided part (large n, small m), the same pattern that triggered both deadline
+   bugs — a real, characterized limitation, not unexplained variance. Not yet done: integrating
+   this as an actual split-ordering strategy inside `canSolveB_ctx` — deliberately left for a
+   future, reviewed step rather than folded into an unattended overnight session. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt).
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
