@@ -9686,3 +9686,38 @@ the rest together.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 16.
+
+## 2026-08-23 (same day, seventh follow-up) — asymmetric capping tried and reverted: two hypotheses tested and falsified
+
+Implemented the asymmetric-capping fix proposed after section 16's diagnosis: identify each
+level's smallest-true-size segment and exempt it from radius_N capping, mirroring
+concentric_search's own design. Result: SLOWER, not faster (532.97s/230.44s vs. the pre-fix
+433.17s/217.76s on the same two lopsided-part states). The section 16 diagnosis was incomplete.
+
+Captured real instrumentation (canSolveB_ctx's own progress printer) rather than guessing a third
+time: at 60s and 120s into the run, the search was STILL on pass=7 (radius_N=128, unchanged) --
+not cycling through many doublings, but stuck deep inside a single large pass, advancing only 8
+positions of splitindex[0] in 60 seconds. Rules out "needs too many doublings" as the mechanism;
+the real cost is per-candidate overhead within one exhaustive pass, compounding across tens of
+millions of combinations.
+
+Tested a second hypothesis per feedback: the newly-added eager segment-table-building (needed to
+find the smallest segment) ran on every recursive invocation, not just the one call that received
+NO_DEADLINE -- unlike concentric_search, which only ever does this bookkeeping once. Gated it to
+radius_grows only. Retested: 541.08s/223.20s, statistically indistinguishable from before. Also
+falsified.
+
+Reverted both changes entirely -- neither helped, and both added real complexity for no measured
+benefit. radiobase.c is back to exactly the post-section-16 state (widen only at the top, symmetric
+single-pass propagation, existing per-level heuristic). Confirmed via diff and a regression check.
+
+**Left open, with two falsified hypotheses on record** so neither is re-attempted blindly: the
+~500s/220s timing for these two states is remarkably stable across every capping strategy and
+build-eagerness variation tried today, suggesting the bottleneck is something more fundamental --
+possibly the sheer node count this specific state shape's recursion tree generates, or the
+existing per-level heuristic re-selection's genuine per-node cost (it depends on accumulated
+p0/p1/p2 state, so it can't simply be memoized per level the way a static property could be).
+concentric_search remains the better-performing option for this shape until a real fix is found.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 17.

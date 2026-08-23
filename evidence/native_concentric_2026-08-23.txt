@@ -638,3 +638,49 @@ canSolveB_ctx's own radius-mode capping -- at each level, identify the segment w
 true admissible-split size and always explore it in full regardless of radius_N, growing only the
 remaining segments together. Left for explicit direction before implementing, since it is a further
 nontrivial change to already-delicate, heavily-modified code.
+
+=====================================================================================
+17. ASYMMETRIC CAPPING TRIED AND REVERTED -- TWO HYPOTHESES TESTED AND FALSIFIED
+=====================================================================================
+Implemented section 16's proposed fix: at each level, eagerly build every segment's split table,
+identify the one with the smallest true size, and exempt it from radius_N capping (mirroring
+concentric_search's own "smallest segment always fully explored, rest grow together"). Result:
+SLOWER, not faster -- 532.97s/230.44s versus 433.17s/217.76s (the pre-fix symmetric numbers) on
+the same two lopsided-part states. The section 16 diagnosis (symmetric growth wastefully re-growing
+an already-small segment) was incomplete or wrong as a full explanation.
+
+Investigated with real instrumentation rather than a third guess: captured canSolveB_ctx's own
+"still solving" progress print during the run. At 60s: pass=7 (radius_N=128, the 6th doubling from
+an initial 4), totalsplits=112472 so far in the level-0 sweep for THIS pass, splitindex[0] only
+advanced from its start toward 117 remaining. At 120s: still pass=7 (not yet advanced to pass 8),
+splitindex[0] only down to 109 (8 positions in 60 seconds). This rules out "too many doublings
+needed" as the mechanism -- the run was stuck deep inside a SINGLE pass at a fixed radius, not
+cycling through many passes. The real cost is per-candidate overhead inside that one large pass,
+compounding across the tens of millions of combinations a radius_N=128 exhaustive sweep implies.
+
+Hypothesis 2 (per feedback): the newly-added eager segment-table-building code (needed to find the
+smallest segment) was itself the overhead, since -- unlike concentric_search, which only ever did
+this bookkeeping once at its single top-level sweep -- the first implementation ran it on EVERY
+canSolveB_ctx invocation across the whole recursion tree, not just the one call that actually
+received NO_DEADLINE. Gated it to `radius_grows` only (matching concentric_search's actual scope:
+asymmetric bookkeeping happens once, at the top; every recursive descendant still gets plain,
+symmetric, single-pass capping). Retested: 541.08s/223.20s -- statistically indistinguishable from
+the ungated version. This hypothesis was ALSO falsified: the eager-build overhead, while real, is
+not the dominant cost either.
+
+REVERTED both the asymmetric-capping change and its eager-build code entirely -- neither helped,
+and both added real complexity to already-delicate, heavily-modified code for no measured benefit.
+radiobase.c is back to exactly the state committed after section 16 (widen only at the top,
+symmetric single-pass propagation to children, existing per-level heuristic order). Confirmed via
+diff and a default-path regression check.
+
+WHERE THIS LEAVES THINGS: the ~500s/220s timing for these two specific lopsided-part states appears
+remarkably stable across every variation tried today (symmetric, asymmetric, eager vs lazy
+segment-table building). This is itself informative -- it suggests the bottleneck is neither the
+capping STRATEGY nor the extra bookkeeping cost, but something more fundamental about how many
+recursion-tree nodes this specific state shape generates, or the per-node cost of canSolveB_ctx's
+existing per-level heuristic re-selection (the pass>=2/size>3 `chosen` logic, which genuinely
+depends on accumulated p0/p1/p2 state and so cannot simply be memoized per level the way a static
+property could be). Left open, with two falsified hypotheses now on record so neither gets
+re-attempted blindly; concentric_search remains the better-performing option for this specific
+shape until a real fix is found.

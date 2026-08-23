@@ -1449,6 +1449,23 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    that asymmetric structure into `canSolveB_ctx`'s own radius-mode capping. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 16.
+   **Tried the asymmetric-capping generalization and reverted it — two hypotheses tested and
+   falsified, not one.** Implementing it made the two lopsided-part states SLOWER (533s/230s vs.
+   433s/218s), not faster. Real instrumentation (canSolveB_ctx's own progress printer) showed the
+   run stuck deep inside a single large pass (pass=7, radius_N=128 unchanged across 60+ seconds),
+   ruling out "too many doublings" as the mechanism. A second hypothesis — that the new eager
+   segment-table-building ran on every recursive call instead of only the growing top level, unlike
+   concentric_search's own once-only bookkeeping — was also tested (gated to `radius_grows` only)
+   and also falsified (541s/223s, no real change). Reverted both changes entirely; `radiobase.c` is
+   back to exactly the post-widening-fix state. **Left open, with two falsified hypotheses on
+   record**: the ~500s/220s timing for these two states is remarkably stable across every capping
+   strategy and build-eagerness variation tried, suggesting something more fundamental than segment
+   capping — possibly sheer recursion-tree node count for this shape, or the existing per-level
+   heuristic's genuine per-node re-selection cost (it depends on accumulated state, not memoizable
+   per level). `concentric_search` remains the better-performing option for this shape until a real
+   fix is found. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 17.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.
