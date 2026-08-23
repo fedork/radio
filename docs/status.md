@@ -1261,13 +1261,34 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    tier where it is a real bias — the two tiers' numbers are not directly comparable as
    hardest-vs-hardest. See
    [../evidence/tier_sample_via_aws_2026-08-22.txt](../evidence/tier_sample_via_aws_2026-08-22.txt).
-   Still open: compose the cross-part pair condition and deeper `R_d` on the same stratification,
-   factor the policy per part, decode top-k with the `(S,X)` DP, confirm the win survives once
-   scoring is not paid for in unoptimized Python, and put either scorer in front of `canSolveB`'s
-   actual split loop — judged on end-to-end CPU seconds, now with real numbers to beat rather than
-   only offline selectivity. **Guidance remains correctness-free only for achievability** — a
-   witness found under guidance is still checked by `check_witness.py`, whereas pruning an
-   OR-branch by a learned value would manufacture false negatives.
+   **2026-08-22, two more prototypes tested, one negative and one positive.** Block coordinate
+   descent (fix 2 of 4 segments, jointly re-optimize the other 2 against the real pooled score —
+   a genuine "packing problem" framing, since the mass/cap constraint is a solved multiple-choice
+   knapsack and the open problem is the non-separable joint quality signal) succeeded on the two
+   endpoints where the pooled model itself ranked easily, but failed decisively — not just slowly —
+   after 150 restarts (up to 774,712 evaluations) on the two endpoints where the pooled model
+   itself struggled. See
+   [../evidence/deficit_order_and_bestfirst_2026-08-22.txt](../evidence/deficit_order_and_bestfirst_2026-08-22.txt)
+   section 6. Concentric round expansion — split a state's segments into concentric ones (grown
+   together each round via a shared radius, per-segment growth factor `G^(1/(P-1))` for a target
+   total-work growth `G`, derived from first principles to avoid the naive `G^P` blowup) and one
+   "last" segment (always full, scored with the real pooled score) — **succeeded on all 4
+   endpoints, including both where coordinate descent failed**: it is exhaustive within its
+   current radius by construction, so it cannot get stuck in the wrong basin the way restart-based
+   local search can. Real oracle-call cost was strikingly consistent (1,032-4,399) across a ~700x
+   range in pooled-model difficulty, unlike coordinate descent's cheap-win-or-decisive-collapse
+   pattern — a genuinely non-arbitrary, gracefully-degrading stopping signal, which was the whole
+   point of the proposal. Not yet tested: propagating the round/radius down into the recursive
+   verification of the three children themselves (the multi-level half of the design) — this only
+   validates the single-level mechanism. See
+   [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt).
+   Still open: the multi-level propagation test, composing the cross-part pair condition and
+   deeper `R_d` on the same stratification, confirming the win survives once scoring is not paid
+   for in unoptimized Python, and — now with a genuinely promising single-level design in hand —
+   sketching what a native `radiobase.c` prototype of concentric round expansion would look like.
+   **Guidance remains correctness-free only for achievability** — a witness found under guidance
+   is still checked by `check_witness.py`, whereas pruning an OR-branch by a learned value would
+   manufacture false negatives.
 
 4. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is

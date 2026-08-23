@@ -9219,3 +9219,57 @@ full-list scoring at the tested scale. Untried, and worth a future look: simulat
 3+-block moves to see if either closes the gap on the hard half specifically.
 
 Evidence appended to [../evidence/deficit_order_and_bestfirst_2026-08-22.txt](../evidence/deficit_order_and_bestfirst_2026-08-22.txt) (section 6).
+
+## 2026-08-22 (done) — concentric round expansion: succeeds on all 4 endpoints, including both where coordinate descent failed
+
+Direct follow-up to a specific critique of the current solver: `canSolveB_ctx` walks a state's
+segments (parts) with a shared CPU-unit budget that has no clean relationship to how far into any
+one segment's own list has actually been covered. Proposed replacement, worked out analytically
+before writing any code: split a state's P segments into P-1 "concentric" segments (grown together
+each round via a shared radius) and 1 "last" segment (always walked in full, scored with the real
+pooled recursive-V score -- the coordinate-descent "single free block" trick, cheap here since only
+that one segment is free). Two design points settled by first-principles reasoning first: the
+per-segment growth factor must be G^(1/(P-1)) for a target total-work growth G, not G itself (else
+total work explodes as G^(P-1) per round); and propagating the ABSOLUTE radius down to children
+(not a relative fraction) should automatically give children more relative effort as state size
+shrinks, since the same absolute radius covers more of a smaller list -- reasoned through but not
+simulated (single level tested here, not the recursive propagation).
+
+**Real result, all 4 tier-sample endpoints, real oracle verification:**
+
+  U000368 (pooled rank 1):   SUCCESS, round 16, 1,032-1,539 oracle calls
+  U000535 (pooled rank 13):  SUCCESS, round 18, 4,399 oracle calls
+  U000607 (pooled rank 85):  SUCCESS, round 17, 3,173 oracle calls  -- coord. descent FAILED here
+  U000068 (pooled rank 687): SUCCESS, round 16, 2,652 oracle calls  -- coord. descent FAILED here
+
+All 4 succeed, including both endpoints where block coordinate descent failed decisively (150
+restarts, up to 774,712 evaluations, zero success). This is the headline finding: round-based
+expansion is exhaustive within its current radius by construction, so it cannot get permanently
+stuck in the wrong basin the way restart-based local search can -- it eventually covers every
+combination as the radius grows, full stop. The oracle-call cost is also strikingly consistent
+(1,032-4,399) across a ~700x range in how hard the endpoint was for the pooled model, unlike
+coordinate descent's bimodal cheap-win-or-decisive-collapse pattern or blind order's cliff into
+"didn't resolve at all." All 4 successes landed in a narrow round band (16-18) despite very
+different underlying difficulty -- graceful degradation instead of a cliff, which is exactly the
+"non-arbitrary, principled stopping point" property this design was proposed to get.
+
+An offline dry run before spending real oracle calls had been a sobering signal (round-based
+coverage of a known winner cost about as many pooled-score evaluations as directly scoring the
+full R_0-survivor list) -- worth recording because it shows the METRIC THAT MATTERS is real oracle
+calls, not Python-side scoring cost, and the two are not the same story here.
+
+The self-limiting segment-saturation refinement (cap a segment's radius at its own list size, no
+special-case code needed) worked exactly as designed in practice: U000068's two size-12 segments
+saturated by round 11, leaving only 2 segments still expanding for the rest of the search.
+
+One inconclusive comparison: U000368 tested with both deficit-ordered and blind outer segments;
+both succeeded at the same round, blind used somewhat fewer real oracle calls (1,032 vs 1,539) --
+not enough data (n=1) to call this a real preference either way.
+
+**Not tested**: propagating the round/radius down into the recursive verification of the three
+children themselves -- the "propagate effort to the level below" half of the original design,
+which is where the absolute-vs-relative-effort argument actually bites. This note only validates
+the single-level mechanism; the multi-level composition is the natural next step if this result is
+judged worth pursuing into an actual C prototype.
+
+Evidence: [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt).

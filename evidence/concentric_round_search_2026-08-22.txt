@@ -1,0 +1,121 @@
+Concentric round expansion (iterative deepening over segment radius), tested against the real
+persistent oracle, 2026-08-22
+Status: measured. Tool: tools/ml/proto_concentric_rounds.py.
+
+DESIGN. Prompted by a specific critique of the current solver's arbitrariness: `canSolveB_ctx`
+walks a state's segments (parts) as nested loops with a shared CPU-unit budget that has no clean
+relationship to "how far into each segment's own list have we gotten." The proposal: split a
+state's P segments into P-1 "concentric" segments and 1 "last" segment; grow each concentric
+segment's own radius R_i(r) geometrically each round; try every new joint combination within the
+current radius; and for each, walk the last segment IN FULL, scored with the real, accurate pooled
+recursive-V score (cheap here -- only that one segment's own list is free, the coordinate-descent
+"single free block" trick). Two design refinements worked out analytically before any code:
+
+  - the per-segment growth factor must be G^(1/(P-1)) for a target TOTAL per-round work growth G
+    (not G itself) -- growing every segment by the same factor G makes total work grow by G^(P-1)
+    per round, an explosion the conversation flagged before building anything;
+  - propagating the ABSOLUTE radius down to child levels (not a relative fraction) automatically
+    gives children more RELATIVE effort as state size shrinks, since the same absolute R covers
+    an ever-larger fraction of a smaller list -- untested here (single level only, see below), but
+    the reasoning is sound: ambiguous (MAYBE) children are actively costly to a parent's own
+    search, and children are cheaper to resolve definitively because their spaces are smaller.
+
+Both design points are in the module docstring and the conversation record; this note only tests
+the concentric-round mechanism at a single level of the AND-OR tree, not the multi-level
+propagation.
+
+=====================================================================================
+1. OFFLINE SANITY CHECK BEFORE SPENDING ORACLE CALLS
+=====================================================================================
+A dry run against known census winners (membership check, no real oracle calls) on U000368 found
+both winners reachable at round 16 (radius ~41 in each of 3 outer segments), costing ~7,500-8,000
+pooled-score evaluations -- roughly the SAME order as directly scoring the endpoint's full
+7,666-candidate R_0-survivor list. This was a sobering signal before running anything real: the
+round STRUCTURE alone does not obviously save pooled-scoring work at this scale. The real question
+was always whether it saves ORACLE calls (the expensive resource this is meant to reduce), not
+Python-side scoring -- which is what the real test below actually measures.
+
+=====================================================================================
+2. REAL RESULT: ALL 4 CHARACTERIZED ENDPOINTS SUCCEED
+=====================================================================================
+Same 4 real k7-census endpoints as evidence/deficit_order_and_bestfirst_2026-08-22.txt (parts
+looked up live from CORPORA["k7"]). Outer segments ordered by the deficit signal (U000368 also
+tested with blind/natural outer order for comparison -- see section 3).
+
+  endpoint   pooled rank_learned  rank_natural (blind)  coord.descent (section 6, prior note)  concentric round search
+  U000368    1                    6,041                 SUCCESS, 18,447 evals                   SUCCESS, round 16, 1,539 oracle calls  [99s]
+  U000535    13                   >8,000 (capped)       SUCCESS, 7,046 evals                     SUCCESS, round 18, 4,399 oracle calls  [267s]
+  U000607    85                   5,860                 FAILED, 150 restarts, 257,591 evals       SUCCESS, round 17, 3,173 oracle calls  [192s]
+  U000068    687                  >8,000 (capped)       FAILED, 150 restarts, 774,712 evals       SUCCESS, round 16, 2,652 oracle calls  [217s]
+
+**All 4 succeed, including both endpoints (U000607, U000068) where block coordinate descent failed
+decisively even after 150 restarts and up to 774,712 evaluations.** This is the headline result:
+unlike a stochastic local-search method that can get permanently stuck in the wrong basin,
+round-based expansion is exhaustive within its current radius by construction -- it cannot get
+"stuck" the way restart-based local search can, because every round eventually covers every
+combination close enough to the segments' own good orderings, and the radius keeps growing until
+it does.
+
+**The oracle-call cost is also far more consistent than either alternative**: 1,539-4,399 across
+all 4 endpoints, spanning pooled ranks from 1 to 687 -- a ~3x range in cost across a ~700x range in
+how hard the endpoint was for the pooled model. Compare to natural/blind order (5,860 to >8,000,
+sometimes not resolving at all) and to coordinate descent (7,046-18,447 where it succeeds at all,
+or complete failure costing hundreds of thousands of evaluations where it doesn't). Round-based
+search degrades GRACEFULLY with difficulty instead of falling off a cliff -- exactly the
+"non-arbitrary, principled stopping point" property the design was proposed for: a round cap
+around 20 would very likely resolve this entire tested population, and hitting that cap would be a
+meaningful signal (this endpoint needs more than typical), unlike the current CPU-unit cutoff.
+
+All rounds of success fell in a narrow band (16-18) despite the endpoints' otherwise very
+different difficulty for the pooled model -- worth more data before treating that narrowness as a
+general property rather than a coincidence of this specific population (4 endpoints, all near-cap
+mass, all from the same k7 census tier sample).
+
+=====================================================================================
+3. OUTER-SEGMENT ORDERING: DEFICIT VS. BLIND, INCONCLUSIVE AT n=1
+=====================================================================================
+U000368 was tested with both deficit-ordered and blind (natural enumeration) outer segments.
+Both succeeded at exactly round 16; blind actually used FEWER real oracle calls (1,032 vs 1,539).
+Not read as "blind order is better" -- at n=1 this is well within noise from which specific new
+combinations a round happens to enumerate first before hitting the actual winner. Worth checking
+on more endpoints before drawing a conclusion either way; the design's own literature-grounded
+expectation (a per-segment order shaping WHICH combinations round r contains) predicts deficit
+order should help on average, even if this one comparison didn't show it.
+
+=====================================================================================
+4. SELF-LIMITING SEGMENT SATURATION WORKED AS DESIGNED
+=====================================================================================
+The "cap a segment's radius at its own list size" refinement (discussed before building anything)
+showed up correctly in practice: U000535's smallest segment (44 options) saturated at round 17,
+after which only the other two segments' radii kept growing (R=[44,51,51] then [44,60,62]).
+U000068's two size-12 segments saturated as early as round 11 (R=[13,13,12]), leaving only 2
+segments still expanding for the rest of the search. This is exactly the intended effect -- fewer
+effectively-growing dimensions as segments exhaust, which should accelerate coverage of what
+remains -- and required no special-case code, just the plain min(computed_radius, segment_size)
+cap already in the implementation.
+
+=====================================================================================
+5. WHAT THIS DOES AND DOES NOT ESTABLISH
+=====================================================================================
+* n=4 real endpoints, single level of the AND-OR tree, all from the same near-cap-mass k7-census
+  population this whole track has focused on. All 4 real, oracle-verified successes -- one matches
+  a known census literal winner exactly, the other 3 do not match either known winner for their
+  endpoint, confirming (again) these states have more valid solving splits than the census
+  recorded.
+* Costed in real oracle .ask() calls (each ~50-100ms over the SSM tunnel in this test harness) --
+  the wall-clock numbers here (99-267s) reflect Python-plus-network round-trip overhead, NOT what
+  an in-process C implementation would cost per equivalent check (which would be orders of
+  magnitude faster per call). The call COUNT (1,032-4,399) is the number that would carry over to
+  a native implementation's relative cost, not the wall-clock seconds.
+* NOT tested: propagating the round/radius down into the recursive verification of the three
+  children themselves (the "propagate effort to the level below" half of the original design).
+  This test only checked whether ONE state's own segments could be searched this way; the deeper
+  claim (this composes well recursively, and absolute-radius propagation gives children
+  appropriately more relative effort) is argued from first principles in conversation but not yet
+  simulated. That is the natural next step if this single-level result is judged worth pursuing
+  further.
+* Only one growth target (G=2, doubling total work per round) and one starting radius (R0=1) were
+  tried. Not swept.
+
+Reproduce: `tools/ml/proto_concentric_rounds.py [endpoint_name ...]` (defaults to all 4), with an
+SSM tunnel open to the oracle-serve instance on 127.0.0.1:7777 (see docs/aws-run.md).
