@@ -9652,3 +9652,37 @@ silently.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 15.
+
+## 2026-08-23 (same day, sixth follow-up) — widening only at the top; lopsided-part slowness precisely diagnosed
+
+Correction per direct feedback: propagating NO_DEADLINE to children (each level independently
+widening) was wrong. Progressive widening should happen ONLY at the level that actually received
+NO_DEADLINE from outside; every child gets the current attempt's concrete radius_N, does exactly
+one pass at it, and passes that same number on unchanged. Fixed: the child cd computation in
+radius mode is now simply `radius_N`, not `radius_grows ? NO_DEADLINE : deadline`. Regression:
+byte-identical on the default path and concentric_search's own 43-endpoint battery.
+
+Retested the direct canSolveB_ctx(NO_DEADLINE) call (no concentric_search) on all 25 previously-
+timed endpoints. All 25 still correctly resolve TRUE. The two lopsided-part outliers improved
+modestly (494s->433s, 300s->218s) but remained far slower than concentric_search's own handling --
+the fix was correct and worth keeping, but didn't solve the core problem.
+
+**Diagnosed the remaining gap by measuring, not guessing further**: printed each part's true
+admissible-split-list size for both slow states. (26:7,41:4,27:5,51:1) at k=6: sizes 196, 90, 164,
+28. (30:6,35:5,46:2,50:1): sizes 167, 128, 53, 30. In both, the lopsided part has by far the
+SMALLEST list -- it was never the bottleneck. Symmetric radius_N growth (same cap on every part)
+means once radius_N exceeds ~30 the lopsided part is fully covered and further growth buys it
+nothing, but growth continues anyway to reach whatever the largest part needs (196 here) -- and
+since the same radius_N multiplies across all four parts jointly, by the time it's large enough for
+the largest part, the exploration is already near the full raw space. This is exactly the
+degeneracy the 2026-08-22 naive-symmetric prototype hit, and exactly what concentric_search's own
+asymmetric "smallest segment always full, others grow together" design already solves -- now
+confirmed as the precise, measured reason, not a vague heuristic-quality gap.
+
+Natural next step, left for explicit direction rather than implemented unilaterally: generalize
+concentric_search's asymmetric structure into canSolveB_ctx's own radius-mode capping -- at each
+level, always fully explore the segment with the smallest true admissible-split size, growing only
+the rest together.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 16.

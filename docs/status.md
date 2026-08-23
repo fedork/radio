@@ -1431,6 +1431,24 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    heuristic's lopsided-part weakness directly is a decision for next steps. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 15.
+   **Corrected per feedback: widening happens ONLY at the level that received NO_DEADLINE, never
+   propagated to children.** Every child now gets the current attempt's concrete `radius_N` (one
+   pass, no independent re-widening); only the literal top-level call retries with a doubled
+   radius_N, re-trying the whole subtree at a larger uniform bound (cheap — already-resolved facts
+   are cache hits). No regression on the default path or concentric_search's own battery. Retested
+   direct `canSolveB_ctx(NO_DEADLINE)` on the 25 previously-timed endpoints: all still correctly
+   resolve TRUE; the two lopsided-part outliers improved modestly (494s→433s, 300s→218s) but
+   remained far slower than concentric_search. **Diagnosed precisely by measuring, not guessing
+   further**: both slow states' lopsided part (51:1 / 50:1) has by far the *smallest* true
+   admissible-split-list size (28, 30 vs. up to 196 for other parts) — it was never the bottleneck.
+   Symmetric radius_N growth means once N exceeds ~30 that part is fully covered for free, but N
+   keeps growing anyway to reach whatever the largest part needs, and since the same N multiplies
+   across all four parts jointly, by then the exploration is already near the full raw space — the
+   exact degeneracy concentric_search's own asymmetric "smallest segment always full, rest grow
+   together" design already solves. Natural next step, left for explicit direction: generalize
+   that asymmetric structure into `canSolveB_ctx`'s own radius-mode capping. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 16.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

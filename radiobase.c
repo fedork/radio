@@ -289,9 +289,10 @@ static uint64_t search_deadline(const radio_search_context *ctx, uint64_t parent
     /* Radius mode propagates a child's cap unchanged: absolute, not relative. The design relies on
        a child's own per-part candidate lists naturally being no larger than its parent's, so the
        same numeric radius self-scales instead of needing to be divided the way a shared work-time
-       budget does. NO_DEADLINE is a deliberate, meaningful value here (unlike work-budget mode's
-       search_deadline below): it means "progressively widen your own radius until resolved, and
-       tell your children to do the same" -- see radius_N/radius_grows in the caller. */
+       budget does. NO_DEADLINE here means "this is the top-level call that gets to progressively
+       widen" (see radius_N/radius_grows in the caller) -- it is NEVER propagated to children, who
+       always receive a concrete radius_N and do exactly one pass at it; only the level that
+       actually received NO_DEADLINE from outside retries with a growing radius. */
     if (ctx->radius_mode) return parent_deadline;
     if (parent_deadline == NO_DEADLINE)
         return radio_budget_add(start, radio_budget_seconds(1000));
@@ -333,8 +334,8 @@ static inline uint64_t radio_effort_now_ctx(const radio_search_context *ctx, lon
 static uint64_t probe_child_deadline(const radio_search_context *ctx, uint64_t child_cap,
                                      uint64_t now, unsigned int probe_seconds, int size) {
     /* Only ever called in work-budget mode -- canSolveB_ctx computes cd directly for radius_mode
-       (see the cd computation there), since radius mode's child cap depends on radius_grows, which
-       this function has no way to see. `ctx` is still accepted, unused, to keep call sites uniform. */
+       (always radius_N, the current attempt's concrete cap; see the cd computation there). `ctx`
+       is still accepted, unused, to keep call sites uniform. */
     (void)ctx;
     if (size <= 2) return child_cap;
     uint64_t quantum = radio_budget_seconds(probe_seconds);
@@ -2096,15 +2097,16 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
        genuine TRUE (a witness found within the cap is unconditionally valid regardless of what was
        skipped elsewhere). */
     int radius_truncated;
-    /* radius_grows: this call was asked (via NO_DEADLINE) to progressively widen its own radius
-       until it gets a definitive answer, and to tell its children to do the same -- radius mode's
-       analogue of the work-budget clock's own NO_DEADLINE/probe_seconds-doubling iterative
-       deepening. radius_N is the actual per-segment cap used below (see splitindex[] capping):
-       starts small and doubles on every unresolved exhaustive pass when radius_grows, or is just
-       the caller's fixed cap otherwise (bounded probe, one pass, MAYBE is an acceptable answer --
-       the intermediate-level case). Kept separate from `deadline` itself, which stays NO_DEADLINE
-       (2) for the whole call so no_deadline/search_deadline/probe_child_deadline's own sentinel
-       checks keep working unmodified. */
+    /* radius_grows: true only for the level that was actually invoked with NO_DEADLINE from
+       outside -- never for a recursive descendant, since a child always receives a concrete
+       radius_N as its own parent_deadline, not the sentinel (see the cd computation below).
+       radius_N is the actual per-segment cap used for splitindex[] capping: starts small and
+       doubles on every unresolved exhaustive pass when radius_grows (progressive widening, but
+       only at this one level -- each retry re-tries the WHOLE subtree at the new, larger, uniform
+       radius_N, not "ask children to widen independently"), or is just the caller's fixed cap
+       otherwise (bounded probe, one pass, MAYBE is an acceptable answer -- the intermediate-level
+       case). Kept separate from `deadline` itself, which stays NO_DEADLINE (2) for the whole call
+       so no_deadline/search_deadline's own sentinel checks keep working unmodified. */
     int radius_grows = ctx->radius_mode && parent_deadline == NO_DEADLINE;
     uint64_t radius_N = radius_grows ? 4 : deadline;
     /* Start the frozen audit at pass 2: there is no point running the solver's deliberately
@@ -2261,14 +2263,18 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                             if (ctx->radius_mode) {
                                 /* Bounded (non-growing) radius calls never retry: they were asked
                                    for exactly one pass at a fixed cap, and MAYBE is an acceptable
-                                   answer at that intermediate level. Growing calls retry with a
-                                   doubled radius_N -- real widening, not a repeat of the same
-                                   attempt -- until either resolved or radius_N exceeds every
-                                   level's own true size (radius_truncated then reads false and the
-                                   !skipped_some branch above takes over, since skipped_some is also
-                                   false once no child can return MAYBE any more -- see radius_grows
-                                   propagation at the cd computation below). Guard the multiply the
-                                   same way probe_seconds guards its own doubling. */
+                                   answer at that intermediate level. Growing calls (radius_grows,
+                                   true only at the level that actually received NO_DEADLINE) retry
+                                   with a doubled radius_N -- real widening of the WHOLE subtree,
+                                   not just this level, since the cd computation below always hands
+                                   children the current radius_N as a concrete number rather than
+                                   propagating NO_DEADLINE further down. A retry can be triggered by
+                                   either skipped_some (a child returned MAYBE at the old, smaller
+                                   radius_N -- expected and normal, not a sign of trouble) or
+                                   radius_truncated (this level's own candidate range was capped);
+                                   either way the retry is cheap, since anything already resolved on
+                                   the smaller radius_N is a cache hit on the bigger one. Guard the
+                                   multiply the same way probe_seconds guards its own doubling. */
                                 if (radius_grows) {
                                     if (radius_N <= UINT64_MAX / 2) radius_N *= 2;
                                     else radius_N = UINT64_MAX;
@@ -2515,14 +2521,23 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                     progress = cpu_now + PROGRESS_INTERVAL;
                                 }
                             }
-                            /* radius_grows propagates recursively: a child of a progressively-
-                               widening call gets NO_DEADLINE itself (not radius_N or deadline,
-                               either of which could be a plain finite number by now) so it does
-                               its own widen-until-resolved, all the way down. A bounded radius
-                               call (radius_grows false) still propagates its fixed cap unchanged,
-                               absolute, exactly as before. */
+                            /* Progressive widening happens ONLY at the level that actually
+                               received NO_DEADLINE from outside -- never propagated further down.
+                               A child always gets this attempt's CURRENT radius_N as a concrete
+                               number, does exactly one pass at it, and (if it has its own
+                               children) passes that same number on unchanged -- absolute
+                               propagation, single iteration, no independent re-widening at any
+                               depth. This is deliberately NOT "give the child NO_DEADLINE too":
+                               that would make every child pay for a full independent resolution
+                               even while THIS level is still on its own cheap early attempt (small
+                               radius_N), which is wasteful and was measured to make lopsided-part
+                               states slower than concentric_search's own top-level sweep. Instead,
+                               the whole subtree is bounded together at whatever radius_N this
+                               attempt is on, and retrying (radius_N doubling, above) re-tries the
+                               whole subtree at a larger uniform bound -- cheap, since anything
+                               already resolved TRUE/FALSE on a prior attempt is a cache hit. */
                             uint64_t cd = ctx->radius_mode
-                                ? (radius_grows ? NO_DEADLINE : deadline)
+                                ? radius_N
                                 : probe_child_deadline(ctx, deadline,
                                       radio_effort_now_ctx(ctx, totalsplits), probe_seconds, size);
                             /* MAYBE in one branch must not hide an easy refutation in another.

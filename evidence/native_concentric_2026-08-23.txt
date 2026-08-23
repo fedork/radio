@@ -588,3 +588,53 @@ solving a real problem the existing per-level heuristic does not. This is now a 
 backed design fork rather than an obvious simplification, and is left open rather than resolved
 unilaterally: whether to retire concentric_search, keep it as a fallback for lopsided-part shapes,
 or investigate why canSolveB_ctx's own heuristic struggles specifically with those.
+
+=====================================================================================
+16. WIDENING ONLY AT THE TOP -- AND THE LOPSIDED-PART SLOWNESS PRECISELY DIAGNOSED
+=====================================================================================
+Correction per direct feedback to section 15's design: propagating NO_DEADLINE to children (so
+each level independently widens) was wrong. Progressive widening should happen ONLY at the level
+that actually received NO_DEADLINE from outside; every child should receive the CURRENT attempt's
+concrete radius_N, do exactly one pass at it, and pass that same number on unchanged to its own
+children. Retrying (radius_N doubling) re-tries the WHOLE subtree at a larger uniform bound, not
+"ask every level to widen on its own" -- cheap because anything already resolved on the smaller
+radius_N is a cache hit on the bigger one.
+
+Fixed: the child cd computation is now simply `radius_N` unconditionally in radius mode (previously
+`radius_grows ? NO_DEADLINE : deadline`). radius_grows itself is now true ONLY for the literal
+top-level call (the one whose parent_deadline came in as NO_DEADLINE from outside canSolveB_ctx) --
+never for a recursive descendant, since descendants always receive a concrete number as their own
+parent_deadline. Regression: byte-identical on the default path and on concentric_search's own
+43-endpoint battery (both still route entirely through the unchanged, bounded/absolute-propagation
+path this fix doesn't touch).
+
+RETESTED the direct canSolveB_ctx(&radius_ctx, sb, size, k, NO_DEADLINE) call (bypassing
+concentric_search) on all 25 non-trivial-timing endpoints from section 15 with this fix. All 25
+still correctly resolve TRUE. Most times unchanged or slightly better; the two lopsided-part
+outliers improved modestly (494s -> 433s, 300s -> 218s) but remained far slower than
+concentric_search's own handling of the same states -- the fix was correct and worth keeping, but
+did not resolve the core problem.
+
+DIAGNOSED THE REMAINING GAP PRECISELY, by measuring rather than guessing further: printed
+ensure_splits(...)->size for every part of both slow states at k=6.
+
+  (26:7, 41:4, 27:5, 51:1):  sizes 196, 90, 164, 28
+  (30:6, 35:5, 46:2, 50:1):  sizes 167, 128, 53, 30
+
+In both, the lopsided part (51:1 / 50:1) has BY FAR the smallest admissible-split list (28, 30) --
+it is not the bottleneck. Symmetric radius_N growth (the same cap applied to every part at a level)
+means: once radius_N exceeds ~30, the lopsided part is already fully covered and further growth
+buys it nothing, but growth continues anyway to reach whatever the LARGEST part needs (up to 196
+here) -- and because the SAME radius_N multiplies across all four parts jointly, by the time it is
+large enough for the largest part, the total combinatorial exploration is already close to the FULL
+raw space for the joint state. This is exactly the degeneracy the earlier (2026-08-22) native
+prototype hit with naive symmetric treatment, and exactly what concentric_search's own asymmetric
+"smallest segment always fully explored, the rest grow together" design was built to avoid --
+confirmed now to be the real, measured reason canSolveB_ctx's current radius-mode capping is
+specifically worse than concentric_search on this shape, not a vague "heuristic weakness."
+
+Natural next step, not yet implemented: generalize concentric_search's asymmetric structure INTO
+canSolveB_ctx's own radius-mode capping -- at each level, identify the segment with the smallest
+true admissible-split size and always explore it in full regardless of radius_N, growing only the
+remaining segments together. Left for explicit direction before implementing, since it is a further
+nontrivial change to already-delicate, heavily-modified code.
