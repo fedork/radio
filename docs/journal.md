@@ -9755,3 +9755,73 @@ perform comparably on this shape.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 18.
+
+## 2026-08-23/24 (overnight) — cold Sa(192) exposed a real exponential-blowup bug in radius
+## mode; chasing two fixes for it led to a first-principles result that ends the thread
+
+Per direct request, benchmarked the old engine against radius mode on a real workload instead of
+synthetic endpoints: cold Sa(192) in k=10 (confirmed cold via init(); no pre-loaded sa_can/
+sa_cant facts). **Old engine (plain canSolveA -> canSolveB, work-budget, NO_DEADLINE): SOLVABLE
+in 290.8 CPU seconds.** Radius mode (the "widen only at the top" design committed after section
+16, absolute propagation to every child): killed after 60+ minutes, unresolved.
+
+Per direct instruction to stop the run and analyze the choices it made rather than keep waiting,
+found the mechanism by reading the log directly: one state, an 8-part
+Sb(17:8,16:8,27:4,18:5,13:5,16:4,19:3,27:2), alone consumed 7,168 CPU seconds and **32.7 billion**
+totalsplits. Root cause: canSolveB_ctx's recursion builds a "mixed" child whose part-count is
+double the "pure" children's; propagating radius_N unchanged to it means the same per-segment cap
+applies to an exponentially larger space (cost is radius_N^size), and Sa(n)'s own recursion
+chains several such doublings in sequence -- exactly the blowup the old engine's additive,
+divisible work-budget currency was designed to prevent, and radius mode had no equivalent for.
+
+Tested two proposed fixes for the mixed child's propagated radius:
+- **sqrt** (`cd_mixed = ceil(sqrt(cd))`, keeping radius_N^size invariant across a doubling):
+  fixed the blowup completely (max totalsplits for any state: 1.75 million, ~18,700x smaller)
+  but introduced a new problem -- a sqrt-scaled child's radius grows only sqrt(2)~=1.41x per
+  parent retry instead of the parent's own 2x, so resolving it took far more retries the deeper
+  the mixed-nesting (one tiny state, Sb(65:62), needed pass=19). Still killed after 60+ min.
+- **/2** (`cd_mixed = (cd+1)/2`, matching the parent's growth rate exactly): fixed the retry-rate
+  problem (99.8% of states resolve in pass 1-2, matching the old engine) but partially
+  reintroduced blowup risk -- max totalsplits 7.39 billion (4.4x better than the original bug,
+  but ~4,200x worse than sqrt's peak). Also killed after 60+ min.
+
+**This is a genuine, empirically-confirmed, two-way trade-off** -- neither fix was adopted;
+both fully reverted (radiobase.c confirmed byte-identical to d77f148, no cd_mixed distinction,
+no `#include <math.h>`).
+
+Per direct instruction to think from first principles about why the old engine is fast, rather
+than trying a third propagation-scaling rule: work-units are additive and size-invariant by
+construction (one unit per accepted split, globally), so search_deadline's existing division
+rule already composes safely across the mixed child's size-doubling -- something a per-segment,
+multiplicative radius currency (cost exponential in part-count) cannot do without patches like
+sections 20-21's. Sections 19-21 were, in effect, teaching an exponential currency to imitate
+what an additive one already does for free.
+
+This motivated the one test that had not actually been run today: **does plain, unmodified
+`canSolveB(sb, size, k, NO_DEADLINE)` -- no radius mode, no concentric_search wrapper -- also
+resolve today's "hard" states quickly?** Every earlier comparison had been radius-mode vs.
+concentric_search; the untouched default engine had never itself been the thing under test.
+
+**Result: yes, dramatically, on every case tried.** The 8 "hardest" flat 4-part endpoints (the
+same ones radius mode resolved in 0.02-0.27s each) all resolve in under 0.1s under plain
+canSolveB. The 2 lopsided-part endpoints that sections 15-18 spent the whole day chasing --
+217-554s under every radius-mode variant, 187-510s under concentric_search itself in isolation
+-- resolve in **64.7s and 25.3s** under plain canSolveB: **7-8x faster than either alternative**,
+on the exact states both were built to handle well.
+
+**Conclusion, for this class of query (top-level Sb verification and Sa(n) recursion): do not
+use radius_mode or concentric_search -- call `canSolveB(..., NO_DEADLINE)` directly.** The old
+engine is fast not because of anything concentric_search's rounds or radius-mode's per-segment
+capping added; it is fast because its existing per-level heuristic ordering combined with its
+existing additive, size-safe work-budget division already handles these shapes well, including
+the lopsided-part shape that motivated most of today's investigation. `radius_mode` remains in
+`radiobase.c` as a default-off, zero-impact field (confirmed by every regression run today) --
+left in place as a validated-but-not-recommended feature and a record of what was tried, not
+torn out mid-investigation. `concentric_search` in `radio_oracle.c` is likewise left in place
+pending an explicit decision on whether it is still worth maintaining.
+
+Not yet done: broader validation beyond the 10 states above (a 25-state mass-diverse battery was
+still running at write time -- see evidence file for its outcome if it completed in time).
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+sections 19-22.

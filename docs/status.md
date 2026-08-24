@@ -1478,6 +1478,36 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    `canSolveB_ctx`-specific weakness — no further optimization attempted. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 18.
+   **THREAD CONCLUDED (2026-08-23/24 overnight): do not use `radius_mode` or `concentric_search` —
+   call `canSolveB(..., NO_DEADLINE)` directly.** Cold `Sa(192)` in `k=10` (a real workload, not a
+   synthetic endpoint) exposed a genuine exponential-blowup bug: radius mode propagates its
+   per-segment cap unchanged to `canSolveB_ctx`'s "mixed" child, whose part-count is double the
+   "pure" children's, so cost (`radius_N^size`) compounds across `Sa(n)`'s chained doublings — one
+   real 8-part state alone hit 32.7 billion totalsplits and 7,168 CPU seconds; the old engine
+   solved all of `Sa(192)` in 290.8 CPU seconds. Two proposed fixes for the mixed child's
+   propagated radius were tested and both are real, genuine trade-offs: `sqrt` scaling fixed the
+   blowup (max totalsplits down to 1.75M) but broke the retry growth-rate match with the parent
+   (some states needed pass=19-38 to resolve); `/2` scaling fixed the retry rate (99.8% resolve in
+   pass 1-2) but partially reintroduced blowup (max totalsplits 7.39 billion). Neither was adopted;
+   both fully reverted (`radiobase.c` confirmed byte-identical to `d77f148`). First-principles read:
+   work-units are additive and size-invariant, so the old engine's existing `search_deadline`
+   division rule already composes safely across a size-doubling child, which a per-segment
+   multiplicative radius currency cannot do without patches like the two above — sections 20-21
+   were teaching an exponential currency to imitate what an additive one already does for free.
+   This motivated the one test not yet run: plain, unmodified `canSolveB(sb, size, k, NO_DEADLINE)`,
+   no wrapper at all. **Result: it beats every variant tried today, on every case tried** — the 8
+   hardest flat 4-part endpoints all resolve in <0.1s; the 2 lopsided-part endpoints that sections
+   15-18 spent a full day on (217-554s under radius-mode variants, 187-510s under
+   `concentric_search` alone) resolve in **64.7s and 25.3s** under plain `canSolveB` — confirmed on
+   a second, independent run of the same two states within a fresh 25-state mixed-difficulty
+   battery (55.2s, 23.2s; all 25 states TRUE, 117.0s combined, no failures or blowups) — **7-8x
+   faster than either alternative, on the exact states both were built to handle well.**
+   `radius_mode` stays in `radiobase.c` as a default-off, zero-impact field (confirmed by every
+   regression today) — a validated-but-not-recommended feature and a record of what was tried, not
+   torn out mid-investigation; `concentric_search` likewise stays in `radio_oracle.c` pending an
+   explicit decision on whether it is still worth maintaining. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   sections 19-22.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.
