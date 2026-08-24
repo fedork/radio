@@ -29,3 +29,9 @@ __pycache__/
 !witnesses/*.tree
 !data/**/*.csv
 !docs/**/*.md
+
+# Training data for the BY_ML split-ordering model (radiobase_ml_order_model.h is generated from
+# this by tools/ml/export_ordering_model.py) - small (tens of KB), labeled by the trusted solver
+# itself, and now the reproducibility source for weights embedded in radiobase.c. Committed
+# 2026-08-24 rather than left as a /tmp artifact, same reasoning as the evidence/*.txt rule above.
+!data/ml_order/*.txt

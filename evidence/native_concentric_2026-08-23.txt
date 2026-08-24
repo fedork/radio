@@ -1176,3 +1176,122 @@ schedules again. This is a different, and on this evidence more promising, direc
 anything tried in sections 19-24 -- and since both engines share the exact same per-level
 heuristic, an ordering improvement would help plain canSolveB too, not just radius mode. Not
 attempted yet; a materially different piece of work, left for explicit direction.
+
+=====================================================================================
+26. WIRING THE RECURSIVE-VALUE MODEL INTO canSolveB_ctx: A REAL, TESTED MECHANISM --
+    AND A CLEAR, MECHANISTICALLY-EXPLAINED NEGATIVE RESULT ON THE PRIMARY TARGET
+=====================================================================================
+Per direct instruction, following section 25's finding that the shared BY_SP0/1/2/BY_MAGIC3
+heuristic has real but limited skill (median winner position ~20% into a level's order,
+Sb(112:80) itself at 41.35%): wire the repo's own, already-validated recursive value model
+(tools/ml/recursive_value.py, docs/ml-guided-search.md) into canSolveB_ctx's actual split loop,
+something the ML thread's own documentation had explicitly flagged as "the remaining step" since
+2026-08-20.
+
+CORRECTED SCOPE, TWICE, BEFORE WRITING ANY C:
+  1. First correction: the model's own training data (data/ml_order/labeled_k{4,5,6,7}.txt) turned
+     out to be EXCLUSIVELY 4-part states (verified directly: 300/300/300/300 rows, all nparts=4).
+     The validated pipeline scores a 4-part parent's cut by min(V(selected:4), V(mixed:8),
+     V(complement:4)) -- nothing like our actual target's size=1 leaf-query shape (children
+     1/2/1). Applying it there would have been an untested extrapolation, not a reapplication of
+     validated results.
+  2. Per direct instruction ("we need... corpuses for different segment counts... test combined
+     or separate"): generated fresh matched corpora at nparts in {1,2,3} x k in {4,5,6,7}
+     (tools/ml/value_gen_states.py generalized from a hardcoded 4 parts; tools/ml/
+     label_multi_size.py, same bisect-to-~50%-solvable methodology as the original). Caught and
+     fixed a real bug in the generator itself first: WIDTHCAP's k/nparts scaling could exceed the
+     labeling oracle's own compiled MAX_N (k=7 nparts=2 hit "side sum 195 exceeds MAX_N=193"),
+     fixed by an explicit ceiling parameter.
+  3. Combined-vs-separate comparison (train k<=6, test k=7, both protocols): the COMBINED model
+     (all sizes pooled, nparts a real feature) tied or beat separate per-size models on every
+     size measured -- n=1: 1.0000 vs 1.0000 (tie, see the coverage caveat below); n=2: 0.9922 vs
+     0.9892; n=3: 0.9972 vs 0.9958; n=4: 0.9978 vs 0.9861. Combined was adopted for the embedded
+     model.
+  4. A crucial, second correction on the n=1 corpus specifically: its AUC=1.0 is a TRIVIAL
+     artifact, not a genuine result. Verified directly: for nparts=1, the sampler's own n>=m
+     floor combined with a ~45%-of-cap mass target mathematically forces m <= sqrt(hi*cap) --
+     32 at k=7, matching the deficit table's own proven coverage (m<=32) EXACTLY, and re-verified
+     at k=8 (m<=55, again exactly the table's own ceiling). Every single n=1 test state landed
+     inside already-fully-decided territory; the AUC says nothing about whether the model adds
+     value beyond the sound bound for a genuinely hard case. Our real target, Sb(112:80) (m=80,
+     k=9), sits far outside ANY of this -- k=9's own proven table only reaches m=6.
+
+GENUINE k=9 DATA REQUIRES THE REAL REGIME, AND A REAL AWS RESOURCE WAS ALREADY RUNNING FOR IT:
+An initial cold-oracle attempt at k=9 labeling was abandoned mid-flight per direct guidance ("k=9
+will take a while... let more run in background"; separately, a direct question about a
+previously-terminated AWS instance corrected a wrong first answer -- that instance's termination
+was a different, correctly-completed corpus-load job, but a SEPARATE, persistent `oracle-serve`
+instance (`i-002cabc654b2078ed`, launched 2026-08-21 at Fedor's own explicit request, "no fixed
+end date") turned out to be live and running the whole time; an initial EC2 query missed it by
+filtering the wrong tag). Verified it directly, live: `stats` returned instantly
+(queries=280404, loaded=2846568 -- the sa193 certificate correctly warm-started on top of the
+base snapshot). Its S3 STATUS object had not updated since the moment it launched three days
+earlier (still showing "restoring from base.snap") despite the server itself being healthy and
+actively serving -- a real, separate bug in the status-upload path worth fixing so this doesn't
+read as "might be dead" again. k=9 n=1 labeling was redirected to this live server via
+tools/oracle_tcp_client.py (a TCPOracle mode added to label_multi_size.py) instead of a fresh
+cold-local restore, and left running in the background while the C implementation proceeded in
+parallel on already-available data.
+
+C IMPLEMENTATION (radiobase.c, gated behind a new `ml_order_mode` context flag, default off,
+matching `radius_mode`'s own precedent exactly):
+  - Confirmed first (separate exploration): the ML pipeline's R_0 filter is the IDENTICAL
+    predicate already enforced on every recursive call by star_expansion_majorization_can_solve/
+    singleton_majorization_can_solve -- no porting needed for that half.
+  - Confirmed the exact mapping, byte-for-byte against both fill_split and the independent
+    all_solutions reference implementation: sb0=selected, sb1 (two entries per part)=mixed,
+    sb2=complement -- no reversal, no permutation.
+  - `ml_feat`/`ml_score`: exact port of feat()'s 31-feature pooling (closed-form for the
+    count-in-{1,2} shapes BY_ML ever scores, including numpy's specific s[len(s)//2] "median"
+    convention on a 2-element array, not the textbook average) and the trained
+    StandardScaler+LogisticRegression's standardize-then-dot-product, skipping the sigmoid since
+    only relative order is ever used.
+  - `BY_ML`: a new static ordering added exactly where BY_MAGIC3 already lives -- same
+    `ensure_splits`/`indexSpl` table-build machinery, same per-(sbb,k) memoization, `ORDER_MONO_P
+    = -1` (the correctness invariant: never admits the counting-bound early-abandon, so a wrong
+    score costs time, never correctness). A module-static `g_ml_child_k`, set immediately before
+    the `indexSpl` call, carries k into a scoring-function signature that (like every existing
+    BY_* scorer) only takes (sbb, row).
+  - Selected via `splitincr[0]` ONLY when `ctx->ml_order_mode && size==1` -- the one case where
+    an (sbb,k)-only score is a correct match: no accumulated prefix exists yet, so the "selected/
+    mixed/complement" scored is genuinely the complete decomposition, exactly the unit the model
+    was trained on. Not applied at any other level or size in this pass.
+  - Header (`radiobase_ml_order_model.h`) generated by a new, checked-in
+    `tools/ml/export_ordering_model.py`, which retrains from committed data
+    (`data/ml_order/labeled_k{4,5,6,7}.txt` and the new `labeled_n{1,2,3}_k{4,5,6,7}.txt`) and
+    refuses to write output if the reproduced k<=6->k=7 holdout AUC drifts from the documented
+    0.986 by more than 0.02 -- a regression gate, not a one-time hand copy.
+
+REGRESSION: `ml_order_mode=0` (every existing caller) is unaffected -- reran the 25-state battery,
+123.0s vs the 117.0-117.9s baseline (noise-level machine-load difference, not attributable to
+this change; the code path is byte-identical).
+
+RESULT -- correctness holds, benefit does not, and the failure has a clear mechanism:
+  Sb(67:46) in 8 (UNSOLVABLE): FALSE in 88.445s under BY_ML, vs 87.644s default -- within noise,
+    exactly as expected: proving a state UNSOLVABLE requires exhausting every candidate
+    regardless of order, so no ordering change can help a negative proof. This is a correctness
+    check (right answer), not an efficiency one.
+  Sb(112:80) in 9 (SOLVABLE, the actual target): BY_ML did NOT finish within 900 CPU-seconds
+    (killed, no verdict) -- worse than default's 293.3s successful resolution. A genuine
+    regression on the one case that was supposed to benefit.
+
+DIAGNOSIS: Sb(112:80) has m=80 at k=9, and k=9's own proven-bound table only reaches m=6 --
+meaning its deficit feature silently defaults to the crude "no proven bound, treat as 0"
+fallback discovered in the corpus-coverage analysis above. Every single one of the model's
+training examples (k<=7, confirmed exhaustively) fell WITHIN table coverage -- the model has
+never once seen this fallback regime during training, and `deficit`/`headroom` carry two of the
+three largest-magnitude learned coefficients (-2.17, -3.87 in the exported header). A model
+extrapolating a heavily-weighted feature into a regime it was never trained on can plausibly rank
+worse than an untrained heuristic on exactly that regime -- which is what the timing shows.
+
+CONCLUSION: the wiring itself is a real, tested, correct deliverable -- BY_ML is mechanically
+sound (verdicts unchanged, default path unaffected, an ordering-only change by construction) and
+follows the exact scoping the model's own validated methodology supports. The CURRENTLY EMBEDDED
+weights, trained only on k<=7 data that never exercises the out-of-coverage deficit regime, do
+not help and actively hurt on the one case that matters most. This is not yet the final word: k=9
+n=1 labeling (the genuine, in-regime training data) was still running via the live oracle-serve
+instance when this section was written. The natural, already-anticipated next step is to retrain
+including that data and re-measure -- left for the next session or a follow-up in this one, not
+run yet. Not yet attempted: extending BY_ML's scope to size>1 states (would require dynamic,
+per-call scoring of the accumulated prefix, not the static per-(sbb,k) table this pass uses --
+noted in the code as explicitly out of scope for now).

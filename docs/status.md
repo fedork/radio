@@ -1595,6 +1595,46 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    explicit direction, a materially different piece of work. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 25.
+   **2026-08-24 fourth follow-up — wired the recursive-value model into `canSolveB_ctx` as a new
+   `BY_ML` ordering (`ml_order_mode`, default off): the mechanism is real and correct, but the
+   currently-embedded weights make the primary target WORSE, with a clear diagnosed cause.**
+   Corrected scope twice first: the model's training data was exclusively 4-part states, nothing
+   like the size=1 target's own 1/2/1 children — generated fresh matched corpora at nparts in
+   {1,2,3} (fixing a real generator bug, `WIDTHCAP` exceeding the labeling oracle's `MAX_N`); a
+   combined model (all sizes pooled) tied or beat separate per-size models on every size measured.
+   Second correction: the n=1 corpus's AUC=1.0 is a trivial artifact — the sampler's `n>=m` floor
+   plus its mass target mathematically forces `m <= sqrt(hi*cap)`, which lands EXACTLY on each
+   level's own proven-bound coverage ceiling (32 at k=7, 55 at k=8, both verified directly) — every
+   test state sat inside already-decided territory. `Sb(112:80)` (m=80, k=9) sits far outside all
+   of it — k=9's own table only reaches m=6. Mid-thread, corrected a wrong first answer about AWS:
+   a persistent `oracle-serve` instance (launched 2026-08-21 at explicit request, no fixed end
+   date) turned out to be live the whole time — an initial EC2 query missed it via the wrong tag
+   filter. Verified it live (280K+ real queries served, sa193 certificate correctly loaded) but
+   found its S3 STATUS object hadn't updated since launch three days earlier despite the server
+   being healthy — a real, separate status-upload bug, flagged for a fix. Redirected k=9 labeling
+   to this live server via a new TCPOracle mode rather than a cold local restore.
+   **C implementation**: confirmed `R_0` needs no porting (identical to the already-enforced
+   majorization checks) and the `sb0`/`sb1`/`sb2` ↔ selected/mixed/complement mapping has no
+   reversal (verified against two independent implementations). Added `BY_ML` exactly where
+   `BY_MAGIC3` lives (same table-build machinery), `ORDER_MONO_P=-1` (the correctness invariant —
+   never admits the counting-bound early-abandon, so a wrong score costs time, never correctness),
+   selected only when `size==1` (the one case with no accumulated-prefix mismatch). A new
+   `tools/ml/export_ordering_model.py` regenerates the embedded header from committed data and
+   refuses to write output if the reproduced holdout AUC drifts from the documented 0.986 by more
+   than 0.02. **Regression**: `ml_order_mode=0` unaffected (25-state battery 123.0s vs
+   117.0-117.9s, noise-level). **Result**: `Sb(67:46)` (UNSOLVABLE) — 88.4s under BY_ML vs 87.6s
+   default, within noise, exactly as expected (proving unsolvability needs exhaustion regardless
+   of order). `Sb(112:80)` (SOLVABLE, the actual target) — BY_ML did NOT finish in 900 CPU-seconds,
+   worse than default's 293.3s successful resolution. **Diagnosis**: `Sb(112:80)`'s deficit
+   feature silently defaults to a crude fallback outside k=9's proven coverage — a regime literally
+   absent from every training example (confirmed exhaustively), and `deficit`/`headroom` carry two
+   of the three largest-magnitude learned coefficients. **Conclusion**: the wiring is real, tested,
+   correct — mechanically sound and scoped exactly to what the model's own methodology supports —
+   but the currently-embedded weights actively hurt the case that matters most. Not the final word:
+   genuine k=9 n=1 labeling was still running via the live oracle-serve instance when this was
+   written; retrain including it and re-measure is the natural next step. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 26.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

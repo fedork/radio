@@ -9996,3 +9996,75 @@ for explicit direction -- a materially different piece of work from anything tri
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 25.
+
+## 2026-08-24 (same session, fourth follow-up) -- wired the recursive-value model into
+## canSolveB_ctx: the mechanism is real and tested, the current weights make it worse on the
+## primary target, and the failure has a clear cause
+
+Wired the repo's own already-validated recursive value model into canSolveB_ctx's split loop,
+something docs/ml-guided-search.md had called "the remaining step" since 2026-08-20. Corrected
+scope twice before writing C: (1) the model's training data turned out to be exclusively 4-part
+states, matching nothing like our size=1 target's own children shape (1/2/1); generated fresh
+matched corpora at nparts in {1,2,3} x k in {4,5,6,7} to fix this, per direct instruction to test
+combined-vs-separate models rather than assume. Caught a real generator bug first (WIDTHCAP could
+exceed the labeling oracle's MAX_N). Combined model (all sizes pooled) tied or beat separate
+per-size models on every size measured. (2) A second, more important correction: the n=1
+corpus's AUC=1.0 is a trivial artifact -- the sampler's own n>=m floor combined with a ~45%-of-
+cap mass target mathematically forces m <= sqrt(hi*cap), which lands EXACTLY on each level's own
+proven-bound coverage ceiling (32 at k=7, 55 at k=8, both verified directly). Every test state
+sat inside already-fully-decided territory. Our real target, Sb(112:80) (m=80, k=9), sits far
+outside all of this -- k=9's own table only reaches m=6.
+
+Getting genuine k=9 data required the real regime. Also resolved, mid-thread, a direct question
+about AWS history: the instance I'd checked was a different, correctly-terminated one-time
+corpus-load job -- but a SEPARATE, persistent oracle-serve instance (launched 2026-08-21 at
+Fedor's own explicit request, no fixed end date) turned out to be live the whole time; my first
+EC2 query missed it by filtering the wrong tag. Verified it directly and live (stats responded
+instantly, sa193 certificate correctly loaded) -- but its S3 STATUS object hadn't updated since
+the moment it launched three days earlier, despite the server being healthy and actively serving
+280K+ real queries. A real, separate bug in the status-upload path, flagged for a fix. Redirected
+k=9 labeling to this live server (a new TCPOracle mode in the labeling driver) and left it running
+in the background while the C work proceeded on already-available data, per direct instruction to
+work with what's available rather than block on the slow labeling.
+
+**C implementation** (radiobase.c, gated behind a new `ml_order_mode` context flag, default off,
+exactly matching `radius_mode`'s own precedent): confirmed first that R_0 needs no porting (it's
+the identical predicate already enforced on every recursive call); confirmed the sb0/sb1/sb2
+mapping is selected/mixed/complement with no reversal, byte-for-byte against two independent
+implementations. Ported feat()'s 31-feature pooling in closed form for the count-in-{1,2} shapes
+BY_ML ever scores (matching numpy's specific "median" convention on a 2-element array), and the
+trained logistic model's standardize-then-dot-product (sigmoid skipped, only relative order is
+used). Added `BY_ML` as a new static ordering exactly where `BY_MAGIC3` lives, reusing the same
+table-build machinery, `ORDER_MONO_P = -1` (never admits the counting-bound early-abandon -- the
+correctness invariant that makes a wrong score cost time, never correctness). Selected only when
+`ml_order_mode && size==1` -- the one case where a per-(sbb,k) score is valid, since no
+accumulated prefix exists yet at that point. A new, checked-in `tools/ml/export_ordering_model.py`
+generates the embedded header from committed data and refuses to write output if the reproduced
+holdout AUC drifts from the documented 0.986 by more than 0.02.
+
+**Regression**: `ml_order_mode=0` unaffected (25-state battery 123.0s vs 117.0-117.9s baseline,
+noise-level, byte-identical code path).
+
+**Result**: correctness holds, benefit does not. `Sb(67:46)` (UNSOLVABLE): 88.4s under BY_ML vs
+87.6s default -- within noise, and expected, since proving unsolvability requires exhausting
+every candidate regardless of order; no ordering change can help a negative proof. `Sb(112:80)`
+(SOLVABLE, the actual target): BY_ML did NOT finish in 900 CPU-seconds -- worse than default's
+293.3s successful resolution. A genuine regression on the one case meant to benefit.
+
+**Diagnosis**: `Sb(112:80)` has m=80 at k=9, entirely outside k=9's own proven-bound coverage
+(m<=6) -- its deficit feature silently defaults to the crude fallback, a regime the model has
+literally never seen in training (every training example, confirmed exhaustively, fell within
+coverage). `deficit`/`headroom` carry two of the three largest-magnitude learned coefficients.
+Extrapolating a heavily-weighted feature into an unseen regime can plausibly rank worse than an
+untrained heuristic there.
+
+**Conclusion**: the wiring is a real, tested, correct deliverable -- mechanically sound, verdicts
+unchanged, an ordering-only change by construction, scoped exactly to what the model's own
+validated methodology supports. The currently embedded weights, trained only on data that never
+exercises the out-of-coverage regime, actively hurt on the case that matters most. Not the final
+word: k=9 n=1 labeling (genuine in-regime data) was still running via the live oracle-serve
+instance when this was written. Retrain including it and re-measure is the natural next step, not
+yet done.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 26.

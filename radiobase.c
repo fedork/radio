@@ -14,6 +14,8 @@
 #include <sys/sysctl.h>
 #endif
 
+#include "radiobase_ml_order_model.h"
+
 /*
  * Build provenance is normally injected by tools/build_radio.py through a generated forced-include
  * header.  Keep an explicit fallback for direct compiler invocations: old habits must produce an
@@ -78,8 +80,9 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #define BY_SP0_DESC 7
 #define BY_SP1_DESC 8
 #define BY_SP2_DESC 9
+#define BY_ML 10
 
-#define INDEX_COUNT 10
+#define INDEX_COUNT 11
 
 #define PROGRESS_INTERVAL CLOCKS_PER_SEC*60
 
@@ -147,6 +150,15 @@ typedef struct radio_search_context {
        never pass the NO_DEADLINE sentinel in this mode (it would be misread as a radius cap of 2);
        pass a large finite value instead for "run until genuinely resolved." */
     int radius_mode;
+    /* When set, canSolveB_ctx orders its level-0 candidates by a learned score (BY_ML, see
+       radiobase_ml_order_model.h) instead of the default heuristic, but ONLY for a size==1
+       initial state -- the one case where the model's own validated scoring unit (a complete
+       selected/mixed/complement decomposition) exactly matches what gets scored, with no
+       accumulated-prefix mismatch. Off (0, the default) leaves every caller unaffected. This is
+       an ORDERING change only: BY_ML's ORDER_MONO_P is -1 (not monotone), so the counting-bound
+       early-abandon never fires for it, and no path that could conclude FALSE is gated on it --
+       a wrong score only costs time, never correctness. See docs/journal.md 2026-08-24. */
+    int ml_order_mode;
 } radio_search_context;
 
 #define RADIO_WORK_CLOCK_ORIGIN 1024ULL
@@ -373,6 +385,7 @@ static const unsigned char ORDER_BASE[INDEX_COUNT] = {
     [BY_MAGIC3] = BY_MAGIC3,
     [BY_SP0] = BY_SP0, [BY_SP1] = BY_SP1, [BY_SP2] = BY_SP2,
     [BY_SP0_DESC] = BY_SP0, [BY_SP1_DESC] = BY_SP1, [BY_SP2_DESC] = BY_SP2,
+    [BY_ML] = BY_ML,
 };
 static const unsigned char ORDER_REVERSED[INDEX_COUNT] = {
     [BY_SP0_DESC] = 1, [BY_SP1_DESC] = 1, [BY_SP2_DESC] = 1,
@@ -392,6 +405,7 @@ static const signed char ORDER_MONO_P[INDEX_COUNT] = {
     [BY_MAGIC] = -1, [BY_MAX] = -1, [BY_MAGIC2] = -1, [BY_MAGIC3] = -1,
     [BY_SP2] = 0, [BY_SP1] = 1, [BY_SP0] = 2,
     [BY_SP0_DESC] = -1, [BY_SP1_DESC] = -1, [BY_SP2_DESC] = -1,
+    [BY_ML] = -1,  /* a learned score, not a pair-count key -- never admits the counting-bound cut */
 };
 
 /* The ordering is chosen once per level, so resolve base/direction there rather than on
@@ -2178,7 +2192,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
            everywhere): it is already a decent, segment-count/index-conditioned baseline, and the
            2026-08-23 direction-consistency argument for forcing a single order was premature --
            iterate on ordering separately, against this as the baseline, rather than discarding it. */
-        splitincr[0] = size<=3 ? BY_SP1 : BY_MAGIC3;
+        splitincr[0] = (ctx->ml_order_mode && size == 1) ? BY_ML : (size<=3 ? BY_SP1 : BY_MAGIC3);
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP1 : BY_MAGIC3);
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP2_DESC : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
@@ -3025,6 +3039,145 @@ int magic3(int sbb, int spl[]) {
     return distance(spl, magicm1, magicm2, n1, n2);
 }
 
+/* ================================================================================================
+   BY_ML: a learned ordering score, ported from tools/ml/export_ordering_model.py's feat()/model.
+   Ordering only -- see ORDER_MONO_P[BY_ML] above and the ml_order_mode comment on
+   radio_search_context. Scores an up-to-2-part list of (n,m) pairs; that covers exactly the
+   three children (selected: 1 part, mixed: 2 parts, complement: 1 part) a size==1 initial
+   state's own level-0 candidate produces -- the one case where this matches what the model was
+   actually trained and validated on (see docs/journal.md 2026-08-24). Not used, and not
+   validated, for any other size or level.
+   ================================================================================================ */
+
+/* ml_deficit: max over parts of (n - proven_max_n1(k,m)), matching export_ordering_model.py's
+   deficit(). Missing (k,m) entries default to 0 (bound "not proven", not "zero tolerance") --
+   same default the training-data generator used, so the model was trained against exactly this
+   convention, not a stricter one. */
+static double ml_deficit(const int ns[], const int ms[], int count, int k) {
+    double best = -1.0;
+    int i;
+    if (count == 0) return -1.0;
+    for (i = 0; i < count; i++) {
+        int n = ns[i], m = ms[i];
+        int bound = 0;
+        if (k >= 0 && k <= ML_MAXN1_KMAX && m >= 0 && m <= ML_MAXN1_MMAX && ml_maxn1[k][m] >= 0)
+            bound = ml_maxn1[k][m];
+        double d = (double)n - (double)bound;
+        if (i == 0 || d > best) best = d;
+    }
+    return best;
+}
+
+/* ml_feat: exact port of feat() for count in {1,2} (the only sizes BY_ML ever scores). Closed-
+   form pooling instead of a general sort: count==1 collapses sum=mean=max=min to the one value
+   with std=0; count==2's "median" is deliberately s[1] (the larger element after ascending
+   sort), matching numpy s[len(s)//2] on a 2-element array -- NOT the textbook average of two
+   middles. Reproducing that exactly matters: retraining the model would fold in whatever this
+   function actually computes, but re-using ALREADY-trained coefficients requires matching the
+   convention they were fit against. */
+static void ml_feat(const int ns[], const int ms[], int count, int k, double out[ML_NFEAT]) {
+    double C = pow(3.0, (double)k);
+    double R = sqrt(C);
+    double area[2], nn[2], mm[2], asp[2];
+    double d;
+    int i;
+
+    if (count == 0) {
+        out[0] = 0.0; out[1] = 0.0;
+        for (i = 2; i < 26; i++) out[i] = 0.0;
+        out[26] = -1.0; out[27] = 0.0; out[28] = 1.0; out[29] = 0.0; out[30] = 0.0;
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        double n = (double)ns[i], m = (double)ms[i];
+        area[i] = n * m / C;
+        nn[i] = n / R;
+        mm[i] = m / R;
+        asp[i] = n / (m > 1.0 ? m : 1.0);
+    }
+    out[0] = (double)count;
+    {
+        double area_sum = area[0], area_max_v, area_min_v, area_std, area_med;
+        if (count == 1) {
+            area_max_v = area_min_v = area_med = area[0]; area_std = 0.0;
+        } else {
+            area_sum = area[0] + area[1];
+            area_max_v = area[0] > area[1] ? area[0] : area[1];
+            area_min_v = area[0] < area[1] ? area[0] : area[1];
+            area_med = area_max_v;  /* s[len//2]=s[1] on a sorted 2-array */
+            area_std = (area_max_v - area_min_v) / 2.0;
+        }
+        out[1] = area_sum;  /* mass == area_sum, duplicated same as the Python feature vector */
+    }
+    {
+        /* Generic pooling for area/nn/mm/asp, writing 6 slots each starting at `base`. */
+        const double *vecs[4] = { area, nn, mm, asp };
+        int base;
+        for (base = 0; base < 4; base++) {
+            const double *v = vecs[base];
+            double sum, mean, vmax, vmin, std, med;
+            int oi = 2 + base * 6;
+            if (count == 1) {
+                sum = mean = vmax = vmin = med = v[0]; std = 0.0;
+            } else {
+                double a = v[0], b = v[1];
+                double hi = a > b ? a : b, lo = a > b ? b : a;
+                sum = a + b; mean = sum / 2.0;
+                vmax = hi; vmin = lo; med = hi; std = (hi - lo) / 2.0;
+            }
+            out[oi + 0] = sum; out[oi + 1] = mean; out[oi + 2] = vmax;
+            out[oi + 3] = vmin; out[oi + 4] = std; out[oi + 5] = med;
+        }
+    }
+    d = ml_deficit(ns, ms, count, k);
+    out[26] = d / R;
+    out[27] = d > 0.0 ? 1.0 : 0.0;
+    out[28] = 1.0 - out[1];
+    {
+        double area_max_v = count == 1 ? area[0] : (area[0] > area[1] ? area[0] : area[1]);
+        out[29] = area_max_v;
+        out[30] = area_max_v / (out[1] > 1e-9 ? out[1] : 1e-9);
+    }
+}
+
+/* ml_score: standardize + logistic-regression dot product. Returns the raw logit (monotonic in
+   the model's own probability, so the sigmoid is skippable -- BY_ML only ever compares scores
+   against each other for ordering, never against a decision threshold). */
+static double ml_score(const int ns[], const int ms[], int count, int k) {
+    double f[ML_NFEAT];
+    double z = ml_intercept;
+    int i;
+    ml_feat(ns, ms, count, k, f);
+    for (i = 0; i < ML_NFEAT; i++)
+        z += ((f[i] - ml_scaler_mean[i]) / ml_scaler_scale[i]) * ml_coef[i];
+    return z;
+}
+
+/* Set by ensure_splits immediately before the BY_ML indexSpl call, since indexSpl's scoring
+   functions take only (sbb, row) -- matching every existing BY_* scorer's signature -- with no
+   room for the child k the model needs. Single-threaded table build only; see the parallel-
+   solver prerequisite note in docs/status.md before this code ever runs concurrently. */
+static int g_ml_child_k = 0;
+
+int ml_order_key(int sbb, int spl[]) {
+    int n_sel[1] = { sbb_to_n1[spl[0]] }, m_sel[1] = { sbb_to_n2[spl[0]] };
+    int n_comp[1] = { sbb_to_n1[spl[3]] }, m_comp[1] = { sbb_to_n2[spl[3]] };
+    int n_mix[2] = { sbb_to_n1[spl[1]], sbb_to_n1[spl[2]] };
+    int m_mix[2] = { sbb_to_n2[spl[1]], sbb_to_n2[spl[2]] };
+    double s_sel = ml_score(n_sel, m_sel, 1, g_ml_child_k);
+    double s_comp = ml_score(n_comp, m_comp, 1, g_ml_child_k);
+    double s_mix = ml_score(n_mix, m_mix, 2, g_ml_child_k);
+    double worst = s_sel < s_comp ? s_sel : s_comp;
+    if (s_mix < worst) worst = s_mix;
+    /* indexSpl sorts descending by this int key (see descSpl) -- quantize generously, since only
+       relative order matters and logits here stay well within a modest range. */
+    double scaled = worst * 1000.0;
+    if (scaled > 1000000000.0) scaled = 1000000000.0;
+    if (scaled < -1000000000.0) scaled = -1000000000.0;
+    (void)sbb;
+    return (int)scaled;
+}
+
 /* Unconditional counters make memory experiments possible without changing table layout.
    They are not printed during normal runs; small probe drivers can inspect them directly. */
 unsigned long long split_level_fanouts;
@@ -3105,7 +3258,7 @@ static int split_admissible(const int sp[SPLIT_FIELD_COUNT], int child_k) {
 }
 
 splits *ensure_splits(int sbb, int k) {
-    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3 };
+    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3, BY_ML };
     const int live_count = (int)(sizeof(live_orderings) / sizeof(live_orderings[0]));
     split_levels *levels;
     splits *s;
@@ -3218,6 +3371,8 @@ splits *ensure_splits(int sbb, int k) {
     indexSpl(sbb, s, BY_SP1, pairs1);
     indexSpl(sbb, s, BY_SP2, pairs2);
     indexSpl(sbb, s, BY_MAGIC3, magic3);
+    g_ml_child_k = k - 1;
+    indexSpl(sbb, s, BY_ML, ml_order_key);
 
     levels->at[k] = s;
     split_tables_built[k]++;
