@@ -684,3 +684,58 @@ depends on accumulated p0/p1/p2 state and so cannot simply be memoized per level
 property could be). Left open, with two falsified hypotheses now on record so neither gets
 re-attempted blindly; concentric_search remains the better-performing option for this specific
 shape until a real fix is found.
+
+=====================================================================================
+18. THE PERFORMANCE GAP WAS MOSTLY AN ARTIFACT OF A FLAWED COMPARISON
+=====================================================================================
+Before attempting a fourth fix, profiled the slow cases directly (macOS `sample`, real stack
+traces on a standalone canSolveB_ctx(NO_DEADLINE) run) instead of continuing to guess. Corrected
+the earlier print-based inference: of the samples actually inside the solve (excluding init()),
+~80% were in canSolveB_ctx's OWN code -- not star_expansion_majorization_can_solve (14.6%) or
+memmove (3.2%), both red herrings from section 17's guess. Line-level attribution pointed at the
+function's entry sequence (building tmp[], sort1, the L1 cache probe, the star-expansion check,
+the trie-cache walk) -- paid on every recursive invocation, including a "single-part viability"
+precheck that also recurses into canSolveB_ctx per candidate split at every level, separate from
+the final 3-children verification.
+
+Implemented the resulting fix: canSolveB_ctx ALREADY has a joint mass/cap feasibility check
+(`within_cap = p0<=max_pairs_1 && p1<=max_pairs_1 && p2<=max_pairs_1`, mirroring
+concentric_search's own direct S/X/Cm check) -- but it only fires AFTER the single-part viability
+precheck has already run. Hoisted an equivalent check to right after the existing (single-
+dimension) counting-bound cut, using fresh local variables so nothing else in the existing flow
+is touched, rejecting doomed candidates before paying for the precheck. Regression: byte-
+identical on the default path and concentric_search's own full battery (round/checked/frac
+unchanged, matching every earlier result today).
+
+RESULT: still no meaningful change -- 554.05s/230.01s, statistically indistinguishable from every
+other variation tried today (433-554s / 217-230s across the symmetric, asymmetric, and hoisted-
+check versions). This is the THIRD fix attempt, informed by increasingly precise profiling, that
+failed to move these two numbers. Reverted (git stash + drop), same as the prior two.
+
+Rather than guess a fourth time, checked whether the comparison itself was fair: ran
+concentric_search on EACH of the two states IN ISOLATION (not as part of a 5-state batch), timed
+directly, on the current committed code (208af42):
+
+  (26:7,41:4,27:5,51:1): concentric_search alone = 510s.  Every canSolveB_ctx-based variant tried
+    today on this same state: 433-554s. NO REAL GAP -- these are the same, within run-to-run noise.
+  (30:6,35:5,46:2,50:1): concentric_search alone = 187s.  canSolveB_ctx-based variants: 217-230s.
+    A real but modest ~15-25% gap, not the ~5x this section's investigation was originally chasing.
+
+THE ORIGINAL COMPARISON WAS FLAWED. Section 15's "8 CPU-minutes combined for all 5, ~96s average"
+figure was a batch total across 5 states of very different difficulty; treating it as "each state
+takes about 96s" (implicitly, by comparing individual per-state times against it) was the mistake
+that motivated three rounds of fixing a gap that mostly did not exist. Both of the two hardest
+states in that batch are, by themselves, genuinely expensive -- 510s and 187s under
+concentric_search's OWN design, not just under canSolveB_ctx's radius-mode generalization. This
+also means concentric_search's own child-verification (which is exactly canSolveB_ctx, unmodified)
+was affected by every radiobase.c change made today just as much as the "unified" design was,
+since both share the identical underlying machinery for the part that actually dominates cost --
+so a same-day, cross-version comparison was never going to be apples-to-apples in the first place.
+
+CONCLUSION: the lopsided-part shape is genuinely, structurally expensive to verify -- under EITHER
+design -- not a canSolveB_ctx-specific weakness worth chasing further with targeted micro-fixes.
+The three reverted attempts were not wasted effort in the sense of "wrong ideas" (the joint-check
+hoist in particular is a real, defensible optimization in isolation) -- they were solving a
+problem whose measured scale turned out to be mostly an artifact of the comparison basis, not the
+implementation. No further optimization attempted; concentric_search and the unified radius-mode
+design are now understood to perform comparably on this shape, within the range measured today.

@@ -1457,15 +1457,27 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    segment-table-building ran on every recursive call instead of only the growing top level, unlike
    concentric_search's own once-only bookkeeping — was also tested (gated to `radius_grows` only)
    and also falsified (541s/223s, no real change). Reverted both changes entirely; `radiobase.c` is
-   back to exactly the post-widening-fix state. **Left open, with two falsified hypotheses on
-   record**: the ~500s/220s timing for these two states is remarkably stable across every capping
-   strategy and build-eagerness variation tried, suggesting something more fundamental than segment
-   capping — possibly sheer recursion-tree node count for this shape, or the existing per-level
-   heuristic's genuine per-node re-selection cost (it depends on accumulated state, not memoizable
-   per level). `concentric_search` remains the better-performing option for this shape until a real
-   fix is found. See
+   back to exactly the post-widening-fix state. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 17.
+   **Corrected the comparison itself, and the ~5x gap mostly disappeared.** Profiled the two slow
+   states directly (macOS `sample`) instead of guessing a fourth time: ~80% of actual solving time
+   is in `canSolveB_ctx`'s own entry-sequence code, not `star_expansion_majorization_can_solve`
+   (14.6%) or memmove (3.2%) as earlier print-based inference suggested. Implemented the resulting,
+   well-targeted fix — hoisting `canSolveB_ctx`'s existing joint mass/cap check (equivalent to
+   `concentric_search`'s own S/X/Cm check) to before the expensive single-part viability precheck,
+   as a pure addition — and it STILL made no measurable difference (554s/230s). Rather than guess a
+   fourth time, timed `concentric_search` on each state IN ISOLATION rather than as part of a
+   5-state batch average: 510s and 187s respectively — essentially the SAME range every
+   `canSolveB_ctx`-based variant measured (433-554s, 217-230s). **The original ~5x gap was mostly
+   an artifact of comparing individual states against a 5-state batch total** ("8 CPU-minutes
+   combined, ~96s average") rather than each state's own isolated cost — both states are
+   genuinely, structurally expensive under `concentric_search`'s own design too, and since its
+   child verification IS `canSolveB_ctx` unmodified, every change made today affected both designs'
+   dominant cost identically. This lopsided-part shape is expensive under either design, not a
+   `canSolveB_ctx`-specific weakness — no further optimization attempted. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 18.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

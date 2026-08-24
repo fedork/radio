@@ -9721,3 +9721,37 @@ concentric_search remains the better-performing option for this shape until a re
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 17.
+
+## 2026-08-23 (same day, eighth follow-up) — the performance gap was mostly a flawed comparison
+
+Profiled the slow lopsided-part states directly (macOS `sample`, real stack traces) instead of
+guessing a fourth time. Corrected the earlier print-based inference: ~80% of actual solving time
+(excluding init()) is inside canSolveB_ctx's own entry-sequence code, not
+star_expansion_majorization_can_solve (14.6%, a red herring) or memmove (3.2%, also a red herring).
+
+Implemented the resulting, well-targeted fix: canSolveB_ctx already has a joint mass/cap
+feasibility check equivalent to concentric_search's own S/X/Cm check, but it only fires after an
+expensive single-part viability precheck. Hoisted an equivalent check earlier, as a pure addition
+touching nothing else. Regression: byte-identical everywhere. Result: still no meaningful change
+(554s/230s) -- the THIRD fix attempt, despite increasingly precise profiling, to fail. Reverted.
+
+Rather than guess a fourth time, checked the comparison itself: ran concentric_search on each of
+the two states IN ISOLATION rather than as part of a 5-state batch average. Result: 510s and 187s
+respectively -- essentially the SAME range every canSolveB_ctx-based variant measured today (433-
+554s and 217-230s). **The original ~5x gap that motivated three rounds of fixing was mostly an
+artifact of comparing individual state times against a 5-state BATCH AVERAGE** ("8 CPU-minutes
+combined for all 5, ~96s average") rather than that state's own isolated cost. Both states are
+genuinely, structurally expensive under concentric_search's OWN design too -- and since
+concentric_search's child verification IS canSolveB_ctx, unmodified, every radiobase.c change made
+today affected both designs' performance identically for the part that actually dominates cost, so
+a same-day comparison was never apples-to-apples to begin with.
+
+**Conclusion**: this lopsided-part shape is genuinely expensive under either design, not a
+canSolveB_ctx-specific weakness. The three reverted fixes were not wrong ideas -- the joint-check
+hoist in particular remains a defensible optimization on its own terms -- they were solving a
+problem whose measured scale turned out to be mostly a comparison artifact. No further
+optimization attempted; concentric_search and the unified radius-mode design are now understood to
+perform comparably on this shape.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 18.
