@@ -903,3 +903,99 @@ without failure) is no longer resting on a single run.
 Still not tested: whether this holds for shapes with more than 4 parts, larger k, or n well
 beyond today's range. See docs/status.md and docs/journal.md for the standing recommendation and
 what a next session should check before trusting this conclusion beyond the tested cases.
+
+=====================================================================================
+23. NEW EXPERIMENT: SQUARING THE TOP-LEVEL RETRY RATE INSTEAD OF DOUBLING -- REAL,
+    MEASURED PROGRESS. RADIUS MODE NOW BEATS THE DEFAULT ENGINE ON THE MULTI-PART BATTERY.
+=====================================================================================
+Per direct request to keep experimenting toward making radius-mode "at least comparable, ideally
+better" than the default engine, rather than stopping at section 22's recommendation.
+
+HYPOTHESIS: sqrt-scaling (section 20) is reapplied at every mixed-child boundary a canSolveB_ctx
+recursion crosses, so a child nested d levels deep inside chained mixed doublings sees only
+radius_N^(1/2^d) of the top level's own radius. Since only the TOP level of a NO_DEADLINE call
+actually retries (doubling radius_N -> 2*radius_N per unresolved pass; every level below gets one
+fixed pass, per the "widen only at the very top" design), a doubling of the top radius grows a
+depth-d nested child by only 2^(1/2^d) -- for d=3 that is 2^(1/8) ~= 1.09x per retry, which
+matches section 20's observed pass=19-38 exactly. FIX: square the top level's radius_N on retry
+(radius_N -> radius_N^2) instead of doubling it. A depth-d child then sees radius_N^(2^(t-d))
+after t top-level retries -- once t>=d this doubles in lockstep with the top level's own growth,
+so a handful of retries reaches useful values regardless of nesting depth, while sqrt-scaling
+still keeps cost mathematically invariant across each doubling (unchanged from section 20's
+already-verified math).
+
+IMPLEMENTED: `#include <math.h>` added; the top-level retry (`if (radius_grows) radius_N *= 2`)
+changed to `radius_N *= radius_N` with an overflow guard (radius_N <= UINT64_MAX/radius_N);
+cd_mixed = ceil(sqrt(cd)) reintroduced for the sb1 (mixed-child) recursive call only, sb0/sb2
+unchanged, at the same site as section 20/21's reverted experiments.
+
+REGRESSION: default path (radius_mode=0, untouched code path) unaffected -- 25-state battery
+117.948s vs the pre-change 117.031s baseline, noise-level difference, confirming the new
+`#include <math.h>` and the radius_mode-gated changes have zero effect outside radius mode.
+
+RESULT 1 -- cold Sa(192) in k=10, squaring+sqrt: retry-count problem SOLVED. Max pass observed
+across the whole run: 7 (versus 19-38 under pure sqrt+doubling in section 20). Max totalsplits
+for any single state: 6,419,119 -- worse than pure sqrt's 1.75M but ~5,100x better than the
+original unscaled bug's 32.7 billion, and much better than /2's 7.39 billion, while achieving
+this with dramatically fewer retries than either prior attempt.
+
+RESULT 2 -- but a NEW, different bottleneck appeared: the run (15 min, then a fresh 25-min
+continuation, 2,502 CPU-seconds total across both attempts) still did not produce a final
+verdict. Log analysis pinpointed exactly where: it had already correctly rejected all infeasible
+top-level n1 candidates (191 down to 113) and found the winning n1=112, and was stuck verifying
+the resulting leaf query -- Sb(112:80) in k=9, a single-part state (mass 8960, 192 pairs) --
+which was still unresolved at pass=5, cpu=1256s, work=32.9 billion accumulated work-units printed
+via the shared diagnostic path.
+
+DECISIVE ISOLATED TEST: built a standalone harness calling canSolveB(sb=[getSbb(112,80)], 1, 9,
+NO_DEADLINE) directly under the DEFAULT (unmodified, work-budget) engine, the exact same query.
+Result: TRUE in 293.326 CPU seconds -- essentially the ENTIRE 290.8s the default engine needed
+for the WHOLE Sa(192) computation (section 19) is spent on this one leaf verification; every
+other step (rejecting n1=191..113, the recursive Sa(112) check) is comparatively cheap. Radius
+mode (squaring+sqrt) took over 1256 CPU-seconds on the IDENTICAL query without finishing --
+>4.3x slower and still unresolved. THIS PROVES THE REMAINING GAP IS NOT A CURRENCY/PROPAGATION
+BUG ANYMORE (both known bugs are now fixed) -- it is that radius-mode's hard per-level candidate
+cap, even correctly scaled and correctly retried, explores this specific large single-part state's
+split space in a different, much less efficient order than the default engine's heuristic
+ordering combined with its shared, globally-divided work-budget currency.
+
+RESULT 3 -- BUT: reran the 25-state mixed-difficulty multi-part battery (section 22's follow-up
+validation battery) through canSolveB_ctx with radius_mode=1 and the squaring+sqrt design, cold:
+
+  TOTAL: 85.823s across 25 states, mismatches(non-TRUE)=0  (vs. plain canSolveB's 117.031s/
+  117.948s on the identical battery, two independent runs -- squaring+sqrt is ~27% FASTER overall)
+
+  Per-state highlights (same two lopsided-part states that motivated the whole investigation):
+    state  2 (26:7,41:4,27:5,51:1): 28.892s  (vs. plain canSolveB: 55.212s/64.666s -- ~2x faster)
+    state  6 (30:6,35:5,46:2,50:1):  7.895s  (vs. plain canSolveB: 23.243s/25.265s -- ~3x faster)
+
+  Not uniformly better: a few individual states are modestly SLOWER under radius mode (state 3:
+  9.482s vs 5.036s/5.141s; state 12: 11.560s vs 5.179s/5.349s) -- but the aggregate, and the two
+  hardest cases specifically, favor radius mode clearly. Zero incorrect verdicts across all 25.
+
+INTERPRETATION -- the workload shape matters. The 25-state battery is canSolveB_ctx's/
+concentric_search's actual intended use case: verifying an ALREADY-SPLIT, moderate-size (here:
+4-part) Sb state. The Sb(112:80) leaf query is a fundamentally different shape: a single large
+UNSPLIT pair (mass 8960) that canSolveA's own recursion must break down through many chained
+levels of internal splitting before reaching moderate sizes -- more nesting depth, launched from
+a much larger raw combinatorial space at the top. Squaring+sqrt has clearly fixed the mechanism
+that was broken (currency propagation across mixed-doublings) and now WINS on the workload class
+it was designed for -- but a large single-part verification still exposes a different limitation
+(search-order quality under a hard per-level cap, not a scaling bug) that squaring+sqrt does not
+address.
+
+CONCLUSION -- section 22's blanket "use canSolveB(NO_DEADLINE) directly, do not use radius_mode"
+recommendation is SUPERSEDED for the multi-part-battery workload class: squaring+sqrt radius mode
+is now measurably better there (85.8s vs 117.0-117.9s, zero mismatches), a genuine "comparable,
+ideally better" result for that shape. For the single-large-part / deep-internal-splitting shape
+(canSolveA's own leaf verification, e.g. inside future Sa(n) work), plain canSolveB(NO_DEADLINE)
+remains clearly better (293s vs >1256s unresolved) and should still be preferred there. The
+squaring+sqrt code change is committed to radiobase.c, gated entirely behind radius_mode (default
+off, confirmed zero regression on the default path).
+
+NOT YET DONE: a targeted fix for the single-large-part shape. The likely direction, given the
+decisive isolated test above, is search-ORDER quality under a hard per-level cap (e.g. reusing
+the earlier per-part deficit-score ranking, ~0.9961 population-level AUC at ranking likely
+winners early, referenced in docs/status.md sections 11-12) rather than further propagation-
+scaling arithmetic -- a materially bigger piece of work than anything tried in sections 19-23,
+left for explicit direction before starting.

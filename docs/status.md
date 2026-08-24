@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-23** (the published exact `m=5` result is now reconstructed
+don't know it. Last refreshed **2026-08-24** (the published exact `m=5` result is now reconstructed
 inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
 and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
 for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
@@ -1478,8 +1478,9 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    `canSolveB_ctx`-specific weakness — no further optimization attempted. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 18.
-   **THREAD CONCLUDED (2026-08-23/24 overnight): do not use `radius_mode` or `concentric_search` —
-   call `canSolveB(..., NO_DEADLINE)` directly.** Cold `Sa(192)` in `k=10` (a real workload, not a
+   **(SUPERSEDED below — see the 2026-08-24 follow-up.) 2026-08-23/24 overnight: do not use
+   `radius_mode` or `concentric_search`, call `canSolveB(..., NO_DEADLINE)` directly.** Cold
+   `Sa(192)` in `k=10` (a real workload, not a
    synthetic endpoint) exposed a genuine exponential-blowup bug: radius mode propagates its
    per-segment cap unchanged to `canSolveB_ctx`'s "mixed" child, whose part-count is double the
    "pure" children's, so cost (`radius_N^size`) compounds across `Sa(n)`'s chained doublings — one
@@ -1508,6 +1509,40 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    explicit decision on whether it is still worth maintaining. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    sections 19-22.
+   **2026-08-24 follow-up — squaring the top-level retry rate fixes the retry-count problem, and
+   radius mode now beats the default engine on the multi-part battery (a real "comparable, ideally
+   better" result for that shape).** Diagnosed the pure-sqrt design precisely: sqrt-scaling is
+   reapplied at every mixed-child boundary, so a child nested `d` levels deep sees only
+   `radius_N^(1/2^d)` of the top level's radius — doubling the top radius therefore grows a
+   depth-3 child by only `2^(1/8)~=1.09x` per retry, matching the pass=19-38 observed earlier
+   exactly. Fix: square `radius_N` on retry instead of doubling it (overflow-guarded). A depth-`d`
+   child then sees `radius_N^(2^(t-d))` after `t` top-level retries — once `t>=d` this doubles in
+   lockstep with the top level, so a handful of retries suffices regardless of nesting depth,
+   while sqrt-scaling still keeps per-level cost mathematically invariant. Default path unaffected
+   (117.9s vs 117.0s baseline, noise-level). Cold `Sa(192)` in `k=10`: max pass down to 7 (from
+   19-38), max totalsplits per state 6.4M (far below the original 32.7B bug) — but the run still
+   didn't finish (2,502 CPU-s across two attempts), pinned by log analysis on one leaf query,
+   `Sb(112:80)` in `k=9`. **Decisive isolated test**: the plain default engine resolves that exact
+   query in 293.3 CPU-s — essentially the WHOLE 290.8s `Sa(192)` needed, meaning every other step
+   is cheap by comparison — while squaring+sqrt radius mode took 1256+ CPU-s on the identical
+   query without finishing (4.3x+ slower, still open). This confirms the remaining gap is no
+   longer a currency bug — radius-mode's hard per-level cap, even correctly scaled and retried,
+   explores this large single-part state's split space far less efficiently than the default
+   engine's heuristic ordering plus shared work-budget currency. **But** the 25-state multi-part
+   battery (radius-mode's actual intended shape — an already-split, moderate-size state) tells a
+   different story under squaring+sqrt: **85.823s total, zero incorrect verdicts, ~27% faster than
+   plain `canSolveB`'s 117.0-117.9s on the identical battery**, and 2-3x faster on the two hardest
+   lopsided-part states specifically (28.9s vs 55-65s; 7.9s vs 23-25s). **Conclusion: the workload
+   shape matters.** For an already-split multi-part state, squaring+sqrt radius mode is now the
+   better choice. For a single large unsplit pair needing many chained levels of internal
+   splitting (e.g. `canSolveA`'s own leaf verification), plain `canSolveB(NO_DEADLINE)` remains
+   clearly better and should still be preferred there. The squaring+sqrt change is committed,
+   gated entirely behind `radius_mode`. Not yet attempted: a fix for the single-large-part shape —
+   the likely direction is search-ORDER quality under a hard per-level cap (e.g. the per-part
+   deficit-score ranking, ~0.9961 AUC, from sections 11-12), not further propagation-scaling
+   arithmetic — left for explicit direction. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 23.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

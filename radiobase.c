@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
+#include <math.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/resource.h>
@@ -2276,7 +2277,20 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                    the smaller radius_N is a cache hit on the bigger one. Guard the
                                    multiply the same way probe_seconds guards its own doubling. */
                                 if (radius_grows) {
-                                    if (radius_N <= UINT64_MAX / 2) radius_N *= 2;
+                                    /* EXPERIMENT 2026-08-24: squaring instead of doubling. A
+                                       mixed child gets sqrt(cd) (below), reapplied at every
+                                       mixed-doubling level of nesting -- so a child d levels deep
+                                       inside chained mixed doublings sees only radius_N^(1/2^d).
+                                       Doubling the top radius_N therefore grows that child by only
+                                       2^(1/2^d), which is why the pure-sqrt experiment needed
+                                       pass=19-38 to resolve some states (evidence section 20).
+                                       Squaring instead (radius_N -> radius_N^2) makes the top
+                                       sequence N^(2^t) after t retries; a depth-d child sees
+                                       N^(2^(t-d)), which starts squaring itself as soon as t>=d --
+                                       a handful of retries reaches usefully large values instead
+                                       of dozens, regardless of nesting depth. */
+                                    if (radius_N != 0 && radius_N <= UINT64_MAX / radius_N)
+                                        radius_N *= radius_N;
                                     else radius_N = UINT64_MAX;
                                 } else {
                                     cont2 = 0;
@@ -2540,6 +2554,19 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                 ? radius_N
                                 : probe_child_deadline(ctx, deadline,
                                       radio_effort_now_ctx(ctx, totalsplits), probe_seconds, size);
+                            /* EXPERIMENT 2026-08-24: the mixed child (sb1) has DOUBLE the pure
+                               children's part-count, so propagating cd unchanged makes cost
+                               (cd^size) compound across Sa(n)'s chained mixed-doublings -- one real
+                               8-part state hit 32.7B totalsplits this way (evidence section 19).
+                               cd_mixed = ceil(sqrt(cd)) keeps total cost invariant across a
+                               doubling (sqrt(R)^(2*size) = R^size), reapplied at every level this
+                               site is reached -- see the squaring change above for why the top
+                               level's own retry growth had to change to match. */
+                            uint64_t cd_mixed = cd;
+                            if (ctx->radius_mode) {
+                                double r = ceil(sqrt((double)cd));
+                                cd_mixed = r < 1.0 ? 1 : (uint64_t)r;
+                            }
                             /* MAYBE in one branch must not hide an easy refutation in another.
                                Probe all still-possible children, stopping only after a FALSE. */
                             if (cs0 == MAYBE)
@@ -2547,7 +2574,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                             if (cs0 != FALSE && cs2 == MAYBE)
                                 cs2 = canSolveB_ctx(ctx, sb2, i+1, k_1, cd);
                             if (cs0 != FALSE && cs2 != FALSE && cs1 == MAYBE)
-                                cs1 = canSolveB_ctx(ctx, sb1, (i+1) * 2, k_1, cd);
+                                cs1 = canSolveB_ctx(ctx, sb1, (i+1) * 2, k_1, cd_mixed);
 
                             if (cs0 == TRUE && cs2 == TRUE && cs1 == TRUE) {
                                 //can solve

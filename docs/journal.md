@@ -9825,3 +9825,56 @@ still running at write time -- see evidence file for its outcome if it completed
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 sections 19-22.
+
+## 2026-08-24 (same session, follow-up) -- squaring the top-level retry rate: radius mode now
+## beats the default engine on the multi-part battery, though a different shape still loses
+
+Per direct request to keep pushing radius-mode toward "at least comparable, ideally better"
+rather than stop at the prior conclusion. Diagnosed the pure-sqrt design's retry-count problem
+precisely: sqrt-scaling is reapplied at every mixed-child boundary, so a child nested d levels
+deep sees only radius_N^(1/2^d) of the top level's radius -- doubling the top radius therefore
+grows a depth-3 child by only 2^(1/8)~=1.09x per retry, exactly matching the pass=19-38 observed
+earlier. Fix: square the top level's radius_N on retry instead of doubling it (with an overflow
+guard). A depth-d child then sees radius_N^(2^(t-d)) after t top-level retries -- once t>=d this
+doubles in lockstep with the top level, so a handful of retries suffices regardless of nesting
+depth, while sqrt-scaling still keeps per-level cost mathematically invariant across a doubling
+(unchanged math from the earlier sqrt fix).
+
+Regression: default path unaffected (117.9s vs the 117.0s baseline, noise-level). Cold Sa(192) in
+k=10 with squaring+sqrt: retry-count problem solved (max pass 7, versus 19-38 under plain sqrt),
+and max totalsplits per state (6.4M) stayed far below the original unscaled bug's 32.7 billion.
+But the run still didn't finish (2,502 CPU-seconds across two attempts) -- log analysis pinned it
+on one specific leaf query, Sb(112:80) in k=9 (the verification the winning n1=112 split needs),
+stuck at pass=5 and 32.9 billion accumulated work-units.
+
+**Decisive isolated test**: ran that exact query, Sb(112:80) in 9, under the plain default engine
+directly. Result: TRUE in 293.3 CPU-seconds -- essentially the WHOLE 290.8s the default engine
+needed for all of Sa(192), meaning every other step of that computation is cheap by comparison.
+Squaring+sqrt radius mode took over 1256 CPU-seconds on the identical query without finishing --
+4.3x+ slower and still open. This proves the remaining gap is no longer a currency-propagation
+bug (both known bugs are now fixed) -- it's that radius-mode's hard per-level cap, even correctly
+scaled and retried, explores this large single-part state's split space far less efficiently than
+the default engine's heuristic ordering plus shared work-budget currency.
+
+**But**: reran the 25-state multi-part battery (the follow-up validation battery from the prior
+entry) through squaring+sqrt radius mode. Result: **85.823s total, zero incorrect verdicts across
+25 states -- about 27% FASTER than plain canSolveB's 117.0-117.9s on the identical battery**, and
+dramatically faster on the two hardest lopsided-part states specifically: 28.9s vs 55-65s (~2x),
+7.9s vs 23-25s (~3x). Not uniformly better (a couple of small states are modestly slower), but the
+aggregate and the two hardest cases both favor radius mode clearly.
+
+**Conclusion: the workload shape matters, and the prior blanket recommendation is superseded for
+one shape.** The 25-state battery is radius-mode's actual intended use case -- verifying an
+already-split, moderate-size multi-part state -- and squaring+sqrt now wins there, a genuine
+"comparable, ideally better" result. The Sb(112:80) leaf query is a different shape: a single
+large unsplit pair that needs many chained levels of internal splitting from a much bigger raw
+combinatorial space, and there plain `canSolveB(NO_DEADLINE)` remains clearly better (293s vs
+>1256s unresolved) and should still be preferred. The squaring+sqrt change is committed to
+`radiobase.c`, gated entirely behind `radius_mode` (default off, zero regression confirmed on the
+default path). Not yet attempted: a targeted fix for the single-large-part shape -- the isolated
+test points at search-ORDER quality under a hard per-level cap (e.g. the earlier per-part
+deficit-score ranking, ~0.9961 AUC, referenced in docs/status.md sections 11-12) as the likely
+direction, not further propagation-scaling arithmetic -- left for explicit direction.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 23.
