@@ -999,3 +999,109 @@ the earlier per-part deficit-score ranking, ~0.9961 population-level AUC at rank
 winners early, referenced in docs/status.md sections 11-12) rather than further propagation-
 scaling arithmetic -- a materially bigger piece of work than anything tried in sections 19-23,
 left for explicit direction before starting.
+
+=====================================================================================
+24. WHERE THE TIME ACTUALLY GOES INSIDE Sb(112:80): INSTRUMENTED, AND A LINEAR-GROWTH
+    EXPERIMENT THAT WINS DECISIVELY ON ONE SHAPE AND LOSES DECISIVELY ON ANOTHER
+=====================================================================================
+Per direct request to keep digging into whether the Sb(112:80) stall is wrong choices, too many
+wrong choices, or too much time per choice -- rather than stop at section 23's conclusion.
+
+INSTRUMENTATION: built an offline copy of radiobase.c (not the committed one) adding two global
+counters, incremented only in radius_mode: g_total_calls (every entry to canSolveB_ctx) and
+g_cache_hit_calls (entries that return via the l1/trie cache, a theorem shortcut, or CACHE_ONLY,
+before reaching the real split-search machinery). g_real = g_total - g_cache_hit is the count of
+calls that actually build split tables and iterate a level. A print fires at every top-level
+retry, reporting both counters' running totals and elapsed cpu.
+
+METHODOLOGY BUG FOUND AND FIXED FIRST: an early version of this instrumentation compared DEFAULT
+and RADIUS on the same query inside one process, DEFAULT first. Both engines share the same
+global cache trie, so RADIUS's "instant" result was just a free ride on DEFAULT's own answer,
+already cached from the immediately-preceding call -- not a real measurement. Every timing
+number below is from a query run ALONE, cold, in its own fresh process (matching the discipline
+already used in section 22).
+
+RESULT (Sb(112:80) in 9, current committed squaring+sqrt design, instrumented): confirms and
+sharpens section 23's finding. Pass 1-2 (radius_N=4,16) are nearly free (7 real calls total). Pass
+3 (radius_N=256) alone did 219 million real (non-cache-hit) calls and cost ~120 CPU-seconds. By
+pass 4 (radius_N=65536) g_total had reached 5.02 BILLION (95.6% cache hits) at cpu=122s. This is
+the mechanism, precisely: cache-hit fraction is consistently 91-99% throughout -- so the cost is
+NOT individual calls being slow. It is that the SAME already-resolved sub-questions get re-asked
+at billions-of-calls scale, because "widen only at the very top, single pass below" means every
+top-level retry re-walks the ENTIRE top-level candidate range from scratch (mostly landing on
+cache hits, but the sheer volume of that re-walk is itself the cost). Confirmed the same
+signature on a smaller analog, Sb(67:46) in 8 (a real sub-state of Sb(112:80)'s own recursion):
+cold, radius_mode alone (methodology-bug-free): FALSE in 232.334s, g_total=8,466,949,803,
+g_cache_hit=8,390,349,465 (99.1%), g_real=76,600,338 (0.9%). Plain default: FALSE in 87.644s --
+squaring+sqrt is 2.65x slower on this smaller, fully-resolved case, driven by the identical
+mechanism at a scale small enough to actually finish.
+
+LINEAR-GROWTH EXPERIMENT (direct request): tests whether squaring/doubling itself is the problem
+-- overshooting past whatever smaller radius would actually have sufficed, wasting effort
+exploring a combinatorially larger space than necessary. Implemented: radius_N grows by +1 each
+retry (not *2 or ^2), and cd_mixed = cd (no sqrt scaling -- absolute, unchanged propagation to
+every child including the mixed one, reverting to the ORIGINAL pre-section-20 propagation rule,
+paired with a much gentler growth schedule instead of a scaling fix).
+
+BUG FOUND IN THE EXPERIMENT ITSELF: radius_N started at 1 and incremented by 1, so it passed
+directly through 1, 2, 3, 4 -- exactly NO_DEADLINE(2)/CACHE_ONLY(1)/FAST_ONLY(3)/FROZEN_REFUTE(4).
+A child handed cd==2 as its concrete parent_deadline misread it as the NO_DEADLINE sentinel and
+incorrectly started its OWN independent growing/retry sequence. Symptom: multiple interleaved,
+resetting "pass" counters instead of one monotone sequence, and a runaway blowup that WASN'T
+representative of the actual idea being tested. Fixed by starting radius_N at 5, clear of the
+reserved [1,4] range; the sequence is monotone and collision-free from then on. Recorded here so
+nobody re-derives this the hard way: any experiment giving radius_mode a caller-chosen concrete
+cd sequence must keep every value outside 1-4.
+
+RESULT 1 -- Sb(67:46) in 8, linear+absolute, cold: **FALSE in 88.599s** (pass=1949, final
+radius_N~1954) -- matches plain default's 87.644s almost exactly (within 1%, noise-level), and is
+2.65x FASTER than the committed squaring+sqrt design's 232.334s on the identical query. This
+directly confirms the "overshoot" hypothesis for this state: squaring jumps 4->16->256->65536,
+paying for exploring a much larger space than the ~1954 that was actually sufficient; linear
+growth pays for many more retries but each stays cheap enough (thanks to never overshooting) that
+the total matches default's own adaptive efficiency.
+
+RESULT 2 -- the same design tried on the actual target, Sb(112:80) in 9, cold: DID NOT WIN.
+Tracked cleanly via the same instrumentation: cheap through pass ~600 (radius~600, cpu~7s), then a
+series of jumps -- cpu 7->21->43->87->198->208->270->413->441->487->587s by pass~1276
+(radius~1280) -- still unresolved when stopped. Already 2x plain default's 293.326s with no sign
+of finishing. The state's true necessary radius (whatever unlocks the final chained-mixed
+descendant) is apparently large enough that a +1-per-retry schedule needs so many retries to
+reach it that the cumulative full-top-level-rewalk cost (identical mechanism to section 19-23)
+now dominates worse than squaring's overshoot did.
+
+RESULT 3 -- reran the 25-state multi-part battery (radius_mode's own intended shape, where
+squaring+sqrt currently WINS at 85.823s total) under linear+absolute: state 0 was faster (2.355s
+vs squaring's 4.128s) but state 1 was much slower (5.621s vs 0.301s), and it was still stuck on
+state 2 -- the hardest lopsided-part state, which squaring+sqrt resolves in 28.892s -- after 9+
+CPU-minutes with no verdict. Stopped; the battery total under linear+absolute would clearly be
+far worse than squaring+sqrt's 85.8s.
+
+CONCLUSION -- neither a fast (squaring) nor a slow (linear) fixed growth schedule is uniformly
+better; each wins decisively on states where its own bias happens to match where the true
+necessary radius lies, and loses decisively otherwise. This is the SAME shape of trade-off as
+sections 20-21's sqrt-vs-/2 result, one level up: there, the mixed-child SCALING exponent traded
+blowup-safety for retry-speed; here, the top-level GROWTH RATE trades overshoot-waste for
+plateau-crawl-waste. Both trade-offs share a root cause, now precisely instrumented rather than
+inferred: "widen only at the very top, one pass below, retry re-walks the whole subtree" forces
+EVERY retry to pay for a full top-level sweep (cheap per call, but billions of calls at scale),
+and the total cost is (retries needed to reach the true necessary radius) x (cost of one sweep at
+the current scale) -- and no FIXED schedule can minimize that product without knowing the true
+necessary radius in advance, which varies unpredictably by state.
+
+NOT YET ATTEMPTED: an ADAPTIVE schedule -- grow gently (linear-like) while g_real keeps finding
+genuinely new information each pass, but detect a plateau (g_real unchanged from the previous
+pass, the exact signature observed repeatedly in this section's runs) and jump ahead aggressively
+(e.g. multiply by 10, or square) once one is detected, reverting to gentle growth again once new
+progress resumes. This could plausibly capture linear's no-overshoot benefit on states like
+Sb(67:46) while avoiding linear's slow-crawl cost on states like Sb(112:80) and the battery's
+hardest state -- but it is a materially bigger design change than anything tried in sections
+19-24, and changes the shared retry mechanism that both this section's wins and losses depend on,
+so it is left for explicit direction before implementing.
+
+The committed radiobase.c is unaffected by this section: every experiment here ran against an
+offline instrumented copy, never against the committed file. radius_mode's committed design
+remains squaring+sqrt (section 23), still the better choice for the multi-part battery shape and
+still worse than plain canSolveB(NO_DEADLINE) for the single-large-part shape -- this section adds
+a precise mechanistic explanation for both facts, and one tested alternative (linear+absolute)
+that is not a net improvement to adopt as-is.

@@ -1543,6 +1543,36 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    arithmetic — left for explicit direction. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 23.
+   **2026-08-24 second follow-up — instrumented WHERE the time goes, and tried linear growth
+   instead of squaring: wins decisively on one shape, loses decisively on another.** Built an
+   offline instrumented copy (never the committed file) counting canSolveB_ctx entries vs.
+   cache-shortcut returns in radius mode. Mechanism confirmed precisely: cache-hit fraction is
+   91-99% throughout every measured run — the cost isn't individual calls being slow, it's that
+   "widen only at the top, one pass below" forces every retry to re-walk the ENTIRE top-level
+   range from scratch, mostly cache hits, but at billions-of-calls scale that re-walk itself is
+   the cost (confirmed on `Sb(67:46)` in 8, a real sub-state of `Sb(112:80)`'s own recursion:
+   squaring+sqrt takes 232.3s with 8.47B total calls, 99.1% cache hits, vs. default's 87.6s).
+   Tested linear growth (`radius_N += 1` per retry, absolute/unscaled propagation to the mixed
+   child too — reverting section 20's sqrt fix, paired with a much gentler schedule). Found and
+   fixed a bug in the experiment itself: starting at `radius_N=1` collides with the reserved
+   sentinel range (`CACHE_ONLY`=1, `NO_DEADLINE`=2, `FAST_ONLY`=3, `FROZEN_REFUTE`=4) — a child
+   handed `cd==2` misread it as `NO_DEADLINE` and ran its own incorrect independent growing
+   sequence; fixed by starting at 5. Results: on `Sb(67:46)`, linear **wins decisively** — 88.6s,
+   matching default within 1%, 2.65x faster than squaring+sqrt. On `Sb(112:80)` (the actual
+   target), linear **does not win** — already 2x default's 293.3s (587s+) with no sign of
+   finishing when stopped. On the 25-state battery (squaring+sqrt's own winning shape), linear
+   **loses** — stuck on the hardest lopsided state for 9+ CPU-minutes (squaring+sqrt: 28.9s).
+   **Conclusion: neither a fast (squaring) nor a slow (linear) fixed growth schedule is uniformly
+   better** — same shape of trade-off as sections 20-21's sqrt-vs-/2, one level up: total cost is
+   (retries needed to reach a state's true necessary radius) × (cost of one full top-level sweep
+   at the current scale), and no fixed schedule minimizes that without knowing the true necessary
+   radius in advance. Not yet attempted: an ADAPTIVE schedule — grow gently while new information
+   keeps appearing, jump ahead aggressively on a detected plateau (no new real work vs. the
+   previous pass), revert to gentle growth when progress resumes — a materially bigger design
+   change, left for explicit direction. Committed `radiobase.c` is unaffected; `radius_mode`
+   remains squaring+sqrt. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 24.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

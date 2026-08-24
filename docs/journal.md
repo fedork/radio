@@ -9878,3 +9878,71 @@ direction, not further propagation-scaling arithmetic -- left for explicit direc
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 23.
+
+## 2026-08-24 (same session, second follow-up) -- instrumented where the time actually goes
+## inside Sb(112:80), and a linear-growth experiment that wins decisively on one shape and loses
+## decisively on another
+
+Per direct request to keep digging into whether the stall is wrong choices, too many wrong
+choices, or too much time per choice. Built an offline instrumented copy of radiobase.c (not the
+committed one) counting, in radius_mode only: every canSolveB_ctx entry, and how many return via
+a cache/theorem shortcut before reaching the real split-search machinery. Found a methodology bug
+first: comparing default and radius mode on the same query in one process is invalid, because they
+share the same global cache trie -- whichever runs second gets a free ride on the first's answer.
+Every number below is from a query run alone, cold, in its own process.
+
+**The mechanism, precisely**: cache-hit fraction is consistently 91-99% throughout every run
+measured. The cost is not individual calls being slow -- it's that "widen only at the top, single
+pass below" means every top-level retry re-walks the ENTIRE top-level candidate range from
+scratch, mostly landing on cache hits, but at billions-of-calls scale that re-walk itself is the
+cost. Confirmed on a smaller, fully-resolved analog, Sb(67:46) in 8 (a real sub-state of
+Sb(112:80)'s own recursion): squaring+sqrt resolves it (FALSE) in 232.3s with 8.47 billion total
+calls, 99.1% cache hits -- versus plain default's 87.6s. Same mechanism, small enough to actually
+finish and measure end to end.
+
+**Linear-growth experiment** (direct request): does squaring/doubling itself overshoot past
+whatever smaller radius would have sufficed? Implemented radius_N growing by +1 per retry instead
+of *2/^2, paired with absolute (unscaled) propagation to the mixed child too, reverting to the
+original pre-sqrt-fix propagation rule but with a much gentler schedule. Found and fixed a bug in
+the experiment itself first: starting at radius_N=1 passes straight through 1,2,3,4 -- exactly
+CACHE_ONLY/NO_DEADLINE/FAST_ONLY/FROZEN_REFUTE's sentinel values -- so a child handed cd==2
+misread it as NO_DEADLINE and started its own incorrect independent growing sequence (visible as
+multiple interleaved, resetting pass counters). Fixed by starting at 5, clear of the reserved
+range.
+
+Results, three shapes:
+- **Sb(67:46) in 8: linear wins decisively.** FALSE in 88.6s (pass=1949) -- matches plain
+  default's 87.6s within 1%, and is 2.65x faster than squaring+sqrt's 232.3s on the identical
+  query. Confirms the overshoot hypothesis for this state.
+- **Sb(112:80) in 9 (the actual target): linear does NOT win.** Tracked cleanly: cheap through
+  pass ~600, then a series of jumps -- cpu climbing 7->21->43->87->198->270->413->487->587s by
+  pass~1276 -- still unresolved when stopped, already 2x plain default's 293.3s with no sign of
+  finishing.
+- **25-state battery (radius mode's own intended shape, where squaring+sqrt currently wins at
+  85.8s total): linear loses.** One state faster (2.4s vs 4.1s), one much slower (5.6s vs 0.3s),
+  and stuck on the hardest lopsided-part state (squaring+sqrt: 28.9s) for 9+ CPU-minutes with no
+  verdict before being stopped.
+
+**Conclusion: neither a fast (squaring) nor a slow (linear) fixed growth schedule is uniformly
+better** -- each wins decisively on states where its own bias happens to match where the state's
+true necessary radius lies, and loses decisively otherwise. Same shape of trade-off as the earlier
+sqrt-vs-/2 result, one level up: there the mixed-child scaling exponent traded blowup-safety for
+retry-speed; here the top-level growth rate trades overshoot-waste for plateau-crawl-waste. Root
+cause in both cases: "widen only at the top, one pass below, retry re-walks the whole subtree"
+makes total cost = (retries needed to reach the true necessary radius) x (cost of one full sweep
+at the current scale), and no fixed schedule can minimize that without knowing the true necessary
+radius in advance, which varies unpredictably by state.
+
+Not yet attempted: an ADAPTIVE schedule -- grow gently while new information keeps appearing each
+pass, detect a plateau (no new real work vs the previous pass, the exact signature observed
+repeatedly here) and jump ahead aggressively once one is detected, reverting to gentle growth when
+progress resumes. Could plausibly capture linear's no-overshoot benefit without linear's
+slow-crawl cost -- but it's a materially bigger design change than anything tried so far, left for
+explicit direction. The committed radiobase.c is unaffected by this entire follow-up: every
+experiment ran against an offline instrumented copy, never the committed file. Committed
+radius_mode remains squaring+sqrt -- still the better choice for the multi-part battery shape,
+still worse than plain canSolveB(NO_DEADLINE) for the single-large-part shape, now with a precise
+mechanistic explanation for both facts.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 24.
