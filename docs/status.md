@@ -1573,6 +1573,28 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    remains squaring+sqrt. See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
    section 24.
+   **2026-08-24 third follow-up — is the shared per-level ordering heuristic (BY_SP0/1/2, used by
+   both engines) actually good? Real skill, but nowhere near "the first few rounds," and it
+   degrades exactly on the hardest states.** Three tests: (1) verified, alone and cold, the three
+   children default's own winning split produced for `Sb(112:80)` in k=9 — 23.8s total, 8% of the
+   full run's 293.3s, confirming the winner itself is cheap and the other 92% goes to ~1256
+   rejected candidates at ~0.21s each. (2) instrumented the success path to find exactly how deep
+   in the raw order the winner sits: **fraction_from_top=0.4135** (41.35% through 6247 raw
+   candidates) — nowhere close to "the first few." (3) sampled 726 recursive successes inside the
+   easy `Sb(48:32)`'s own exploration tree to see if 41% is typical: mean=0.220, median=0.206,
+   p10=0.036, p90=0.417 — the heuristic has real, measurable skill (median far below the 0.5 a
+   no-information order gives), but `Sb(112:80)`'s own top-level fraction (0.4135) sits right at
+   this distribution's p90 — the hardest, costliest state landed in the worst tail of the same
+   heuristic that does reasonably well on average. **Conclusion: the growth-schedule dilemma
+   (sections 19-24: squaring, sqrt, /2, linear) is a symptom, not the disease** — every one of
+   those experiments was guessing, blind, how deep into an unknown-quality order the winner sits.
+   If ordering reliably put a winner in the first few candidates, a small fixed radius would
+   already succeed on pass 1, matching what's actually hoped for. Points at the earlier,
+   un-integrated per-part deficit-score ranking (~0.9961 AUC, sections 11-12) as the natural next
+   test — would help plain `canSolveB` too, since both engines share this heuristic — left for
+   explicit direction, a materially different piece of work. See
+   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+   section 25.
    Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
    historically) — a real, expensive, high-stakes production benchmark that needs a check-in
    before launching, not an unsupervised overnight decision.

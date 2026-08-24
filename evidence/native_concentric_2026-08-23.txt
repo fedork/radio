@@ -1105,3 +1105,74 @@ remains squaring+sqrt (section 23), still the better choice for the multi-part b
 still worse than plain canSolveB(NO_DEADLINE) for the single-large-part shape -- this section adds
 a precise mechanistic explanation for both facts, and one tested alternative (linear+absolute)
 that is not a net improvement to adopt as-is.
+
+=====================================================================================
+25. IS THE ORDERING ACTUALLY GOOD? YES, WITH REAL SKILL -- BUT NOT NEARLY ENOUGH, AND IT
+    DEGRADES EXACTLY ON THE HARDEST STATES WHERE IT MATTERS MOST
+=====================================================================================
+Per direct question: the hope is an algorithm that finds a solution in the first few rounds,
+ideally the very first, avoiding the whole scanning/rescanning trap sections 19-24 kept running
+into. Central question: why do we keep missing a solution for so long -- is the existing
+per-level ordering heuristic (BY_SP0/1/2 + adaptive "chosen" selection, shared by both engines)
+actually any good?
+
+TEST 1 -- is the winning candidate itself intrinsically expensive, or just late in the queue?
+Took the exact three children DEFAULT's own winning split produced for Sb(112:80) in k=9 --
+[48:32] -> Sb(48:32) (pure), Sb(64:48) (pure), Sb(48:48,64:32) (mixed) -- and verified each ALONE,
+cold, with no other candidate ever considered:
+  Sb(48:32) in 8:          TRUE   0.361s
+  Sb(64:48) in 8:          TRUE   0.004s
+  Sb(48:48,64:32) in 8:    TRUE  23.479s
+  TOTAL:                        23.844s
+-- versus the full run's 293.3s. Confirming the winning candidate is cheap: verifying it alone
+costs 8% of the full run's time. The other 92% (~269s) is spent examining ~1256 OTHER, ultimately
+rejected top-level candidates before/around reaching this one -- at roughly 0.21s average each,
+individually cheap, but numerous.
+
+TEST 2 -- exactly how deep in the raw order does the winner sit? Instrumented the success path to
+print splitindex[0] (remaining candidates) against splitsarr[0]->size (the full raw range) at the
+moment of success, giving fraction_from_top = 1 - splitindex[0]/full_size. For Sb(112:80):
+  splitsarr[0]->size=6247  splitindex[0]=3664  fraction_from_top=0.4135  totalsplits=1257
+The winning split sits 41.35% of the way through the raw candidate order -- roughly 2583 raw
+candidates walked (1257 of them fully accepted and verified) before finding it. Nowhere close to
+"the first few."
+
+TEST 3 -- is 41% typical, or specific to this hard state? Ran the same instrumentation on
+Sb(48:32) in 8 (the easy, 0.388s-total child from test 1) and captured EVERY recursive success
+inside its own exploration tree, not just the top-level one -- 726 data points, a real sample of
+how this heuristic performs across many different sub-states of varying size:
+  mean = 0.220   median = 0.206   min = 0.0035   max = 0.750
+  p10 = 0.036    p90 = 0.417
+  12.4% resolve within the first 5% of their local order; 27.8% within the first 10%
+  7.7% need more than 45% of their local order
+The heuristic has REAL, measurable skill -- a median of 0.206 is far from the 0.5 a
+no-information random order would produce, and the tightly-clustered low end (p10=0.036) shows it
+frequently gets a winner very early. But the median case still needs roughly a fifth of the local
+range, and the top-level Sb(112:80) query itself -- the actual hard case that costs real money --
+sits at 0.4135, right at the p90 mark of this distribution. The one clean top-level number
+available for Sb(48:32) itself (fraction=0.1181, totalsplits=96) is well BETTER than its own
+distribution's median, suggesting easier/smaller states get an easier ride from the same
+heuristic, while the heuristic's real-world effectiveness seems to CONCENTRATE its worst cases on
+exactly the largest, hardest, most expensive states -- precisely where a bad fraction costs the
+most in absolute candidates explored.
+
+CONCLUSION: ordering is not bad, but it is not remotely what the user is hoping for either. It
+has genuine positive skill, not noise, but that skill visibly weakens on the hardest states, and
+even a "good" median result (fraction ~0.2) is a different order of magnitude from "the very
+first round." This reframes sections 19-24 in an important way: EVERY growth-schedule experiment
+tried so far (squaring, sqrt, /2, linear) was fundamentally trying to guess, blind, how deep into
+an UNKNOWN-quality order the winner sits, and pay however many retries that takes. If the order
+itself reliably put a winner in the first few candidates, NONE of that machinery would be needed
+-- a small, fixed, non-growing radius would already succeed on pass 1, which is exactly the
+outcome hoped for. The growth-schedule dilemma is a symptom; the ordering quality is closer to
+the actual disease.
+
+NOT YET DONE: this points squarely at the earlier, still-un-integrated per-part deficit-score
+ranking idea (~0.9961 population-level AUC at ranking likely winners early, referenced in
+docs/status.md sections 11-12) as the natural next thing to test -- replacing or augmenting
+BY_SP0/1/2's ranking with that score, and re-measuring where the winner lands in the resulting
+order for the SAME test states measured here (Sb(112:80) foremost), before touching growth
+schedules again. This is a different, and on this evidence more promising, direction than
+anything tried in sections 19-24 -- and since both engines share the exact same per-level
+heuristic, an ordering improvement would help plain canSolveB too, not just radius mode. Not
+attempted yet; a materially different piece of work, left for explicit direction.

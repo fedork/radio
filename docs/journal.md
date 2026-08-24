@@ -9946,3 +9946,53 @@ mechanistic explanation for both facts.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 24.
+
+## 2026-08-24 (same session, third follow-up) -- is the ordering actually good? Yes, with real
+## skill, but nowhere near "the first few rounds," and it degrades exactly on the hardest states
+
+Direct question: the hope is an algorithm that finds a solution in the first few rounds, ideally
+the very first, avoiding the scanning/rescanning trap sections 19-24 kept running into. Why do we
+keep missing a solution for so long -- is the shared per-level ordering heuristic (BY_SP0/1/2 +
+adaptive selection, used by both engines) actually good?
+
+Three tests, all on real data:
+
+1. **Is the winning candidate itself expensive, or just late in the queue?** Verified, alone and
+   cold, the exact three children default's own winning split produced for Sb(112:80) in k=9:
+   Sb(48:32) TRUE 0.361s, Sb(64:48) TRUE 0.004s, Sb(48:48,64:32) [mixed] TRUE 23.479s -- 23.8s
+   total, against the full run's 293.3s. The winner is cheap: verifying it alone is 8% of the
+   total time. The other 92% (~269s) goes to ~1256 other, ultimately-rejected candidates examined
+   before/around reaching it, at ~0.21s average each -- individually cheap, just numerous.
+
+2. **Exactly how deep in the raw order does it sit?** Instrumented the success path to print the
+   remaining-vs-total candidate count at the moment of success. Result: Sb(112:80)'s winner sits
+   at fraction_from_top = **0.4135** -- 41.35% of the way through the raw order (splitsarr[0]
+   size=6247, splitindex[0]=3664, totalsplits=1257). Nowhere close to "the first few."
+
+3. **Is 41% typical, or specific to this hard state?** Ran the same instrumentation on the easy,
+   0.388s-total Sb(48:32) and captured every recursive success in its own exploration tree -- 726
+   data points. mean=0.220, median=0.206, min=0.0035, max=0.750, p10=0.036, p90=0.417; 12.4%
+   resolve within the first 5% of their local order, 27.8% within the first 10%, 7.7% need more
+   than 45%. **The heuristic has real, measurable skill** -- a median of 0.206 is far from the 0.5
+   a no-information order would give, and the low end is often very early. But the median case
+   still needs roughly a fifth of the local range, and Sb(112:80)'s own top-level fraction (0.4135)
+   sits right at this distribution's p90 -- the hardest, most expensive state landed in the worst
+   tail of the same heuristic that does reasonably well on average.
+
+**Conclusion**: ordering is not bad, but it is not remotely what's hoped for, and it appears to
+weaken exactly on the states where that costs the most. This reframes sections 19-24: every
+growth-schedule experiment (squaring, sqrt, /2, linear) was fundamentally guessing, blind, how
+deep into an unknown-quality order the winner sits, and paying however many retries that takes.
+If the order itself reliably put a winner in the first few candidates, none of that machinery
+would be needed -- a small, fixed, non-growing radius would already succeed on pass 1. The
+growth-schedule dilemma is a symptom; ordering quality looks like the actual disease.
+
+Not yet done: this points at the earlier, still-un-integrated per-part deficit-score ranking idea
+(~0.9961 population-level AUC, docs/status.md sections 11-12) as the natural next test --
+replace or augment BY_SP0/1/2's ranking with that score and re-measure where the winner lands for
+the same states measured here, before touching growth schedules again. Since both engines share
+this exact heuristic, an ordering fix would help plain canSolveB too, not just radius mode. Left
+for explicit direction -- a materially different piece of work from anything tried so far.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+section 25.
