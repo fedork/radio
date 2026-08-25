@@ -10068,3 +10068,177 @@ yet done.
 
 Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
 section 26.
+
+## 2026-08-24 -- Aigner 1988 scan indexed
+
+Inspected the supplied image-only scan of Martin Aigner's *Combinatorial Search*. Its continuous
+content is Chapter 3, book pp. 123--191, not the book's Chapter 2 “Weighing Problems”; PDF pp.
+74--76 add the answer pages used below. Section 3.3 directly states the ternary edge-search model,
+the `K_{m,n}` three-child decomposition, and subgraph monotonicity. Its `N(k)` star-forest
+sequence is the repository's `G_k`, with Proposition 3.24 giving its recursive construction.
+
+The scan provides direct book-source checks for `n(k,2)=2^k-1` (Corollary 3.26, p. 150) and
+`n(k,3)=2^k-k` (answer to Exercise 3.3.1, p. 345). It also records an important historical limit:
+Proposition 3.25 proves only the necessary majorization direction and explicitly leaves the
+converse open, so the repository's later singleton-majorization iff result must not be credited to
+this source. Detailed page locators and scope are in [aigner-1988-scan.md](aigner-1988-scan.md).
+
+No solver ran; OCR and rendered pages were temporary inspection artifacts. `check_tables.py`,
+`check_witness.py witnesses/*.tree`, and `check_docs.py` all passed after the documentation update.
+
+## 2026-08-24 -- modern asymptotic literature indexed
+
+Checked the supplied WCC 2019 paper by Jiang, Polyanskii and Vorobyev and the Florin--Ho--Jiang
+paper against their PDFs. The former supplies an explicit `K_{n,n}` construction with a
+`1.2938 log_2(n)(1+o(1))` worst-case bound; its mixed residual-matching construction is useful
+context for multipart strategies, but is not a finite fixed-`m` boundary proof. The latter,
+published in *IEEE Transactions on Information Theory* in 2022, settles the sharp asymptotic
+one-set leading constant at `1.26624...` and proves the equal-side bipartite/binary-adder-channel
+correspondence. It likewise provides no finite `Sb(n:m)` table cell.
+
+Recorded both sources in [literature.md](literature.md), added compact context to the paper and
+P5, and left `data/*.csv` unchanged. No solver ran; the PDF extraction and rendered-page files
+are temporary inspection artifacts. The usual three documentation checks were rerun after this
+update.
+
+## 2026-08-24 -- literature trail beyond the supplied papers
+
+Followed the references and model-equivalence trail beyond the WCC and Florin--Ho--Jiang papers.
+Directly checked Zhang--Berger--Massey (1987), the early full-feedback binary-adder-channel
+construction source, and Hwang--Lee (2001), an exact same-test-model result for paths and cycles.
+Neither changes the complete-graph or complete-bipartite finite tables. Added both to
+[literature.md](literature.md), along with an acquisition queue for the two Belokopytov papers:
+the 1987 explicit `1.3277` construction and the 1989 nonconstructive `1.2662` capacity bound as
+attributed by WCC. The 2018 Karimi et al. paper was classified as non-comparable, because it is
+average-case and permits a weight-2 coin.
+
+The comparison conclusion is now clear: exact local frontiers are the repository's contribution;
+the published modern asymptotic optimum is already Florin--Ho--Jiang's `1.26624... log_2(n)`.
+The old ternary counting lower bound is `1.26186... log_2(n)`, so it was close but not sharp.
+No solver ran. Documentation checks follow this note.
+
+## 2026-08-24 -- conservative publication-claim inventory
+
+Created [publishable-claims.md](publishable-claims.md) to separate a viable finite-results paper
+from theorem candidates, supporting infrastructure and explicitly excluded conjectures. The
+recommended headline is the computer-assisted exact theorem `Sa(10)=192`, supported by a checked
+positive witness and a solver-free-to-check compact `Sa(193)` certificate. The complete exact
+`Sb` frontier through k=8 and the exact `m=6` boundaries at k=9 and k=10 form the finite-results
+package. Singleton majorization, unit-group elimination and full-star pullback are the strongest
+theory candidates; the decomposition lemma/citation and a focused novelty audit remain required
+before submission. The aligned-profile D-lineage result is deliberately labelled restricted-model
+only. No solver ran; documentation checks follow.
+
+## 2026-08-24 -- publication scope tightened
+
+Removed the aligned-profile D-lineage obstruction from the prospective-publication inventory. It
+is a restricted-model research tool with no current unrestricted consequence, so it should not be
+presented as a paper claim. The recommended structure is one finite-results paper centred on the
+exact `Sa(10)=192` theorem, the complete exact `Sb` frontier through k=8, the exact `m=6`
+boundaries, and the directly supporting majorization theory. A separate theory paper is justified
+only if the synchronized hierarchy later yields an independent unrestricted result. No solver ran;
+documentation checks follow.
+
+## 2026-08-24 -- closing the fast-solver thread: concentric search / radius mode / BY_ML moved to
+## a branch, `main`'s solver reverted to the plain, understood engine
+
+This closes out a long, multi-session thread (native concentric search -> radius mode -> BY_ML
+learned ordering) rather than continuing to carry its experimental machinery on `main`. Everything
+below is preserved, in full, on branch `concentric-search-radius-ml-exploration` (pushed,
+`b71a5e3`) for anyone who wants to pick the thread back up; `main`'s `radiobase.c` and
+`radio_oracle.c` are reverted to their state just before this thread began (`e206766` and
+`c7bc503` respectively) -- the plain `canSolveA`/`canSolveB` engine this whole project has always
+run on. Verified directly post-revert: cold `Sa(192)` in `k=10` solves in **292.4 CPU seconds**
+(4.87 min), matching the pre-thread baseline (290.8s) within normal run-to-run noise, and every
+standard check (`check_tables.py`, `check_docs.py`, `check_witness.py`) passes.
+
+**What the thread found, in order:**
+
+1. **Concentric round search, native in `radio_oracle.c`**: exhaustive-within-a-growing-radius
+   search, validated to 55/55 exact census match. Real, correct, but round-of-success sits flat
+   at 14-16 regardless of difficulty, and the fraction of the true raw space needed before success
+   is 64-99%, not small -- "finds winners early" was the wrong read of its own data.
+
+2. **Unifying it into `canSolveB_ctx` as `radius_mode`**: absolute (unscaled) propagation to the
+   "mixed" child (whose part-count doubles at every level) makes cost compound catastrophically
+   across `Sa(n)`'s chained doublings -- one real 8-part state hit 32.7 billion totalsplits.
+   Tested sqrt-scaling (fixes cost, breaks retry-rate: pass=19-38 to resolve some states), `/2`
+   scaling (fixes retry-rate, partially reintroduces cost: 7.39B worst case), and squaring the
+   top-level growth instead of doubling it (fixes retry-rate correctly this time, cost bounded) --
+   each a real, measured trade-off, not a clean win in isolation.
+
+3. **The decisive comparison, run directly rather than assumed**: plain, unmodified
+   `canSolveB(..., NO_DEADLINE)` beat every one of the above, and `concentric_search` itself, on
+   every case tried -- often 7-8x faster on the states the whole thread was built to handle well.
+   Squaring+sqrt radius mode DID eventually win on one shape specifically (an already-split,
+   moderate-size multi-part state -- the 25-state battery, 85.8s vs 117.0s) but lost badly on a
+   different shape (a single large unsplit pair needing many chained levels of internal
+   splitting -- `Sb(112:80)` in k=9, our actual hard target: radius mode did not finish in 900s
+   where default solved it in 293s).
+
+4. **Instrumented WHERE the time goes, per direct question**: cache-hit fraction is 91-99%
+   throughout every measured run -- the cost is not individual calls being slow, it's that
+   "widen only at the top" forces every retry to re-walk the entire top-level candidate range
+   from scratch, and at billions-of-calls scale that re-walk itself is the cost.
+
+5. **Measured whether the shared ordering heuristic (`BY_SP0/1/2`/`BY_MAGIC3`) is actually good**,
+   per direct question: real, measurable skill (median winner position ~20% into a level's order,
+   far below the 0.5 a no-information order would give), but nowhere near "the first few
+   candidates," and it visibly degrades on the hardest, most expensive states specifically
+   (`Sb(112:80)`'s own winner sits at 41.35%, right at the p90 of the measured distribution).
+   This reframed the whole growth-schedule investigation as chasing a symptom -- every schedule
+   tried was guessing, blind, how deep into an unknown-quality order the winner sits.
+
+6. **Wired the repo's own already-validated recursive value model in as `BY_ML`**, a real, tested,
+   correctness-preserving addition (`ORDER_MONO_P=-1`, ordering-only by construction). Corrected
+   scope twice first (the model's training data was exclusively 4-part states, nothing like the
+   target's 1/2/1 shape; generated fresh matched corpora at multiple part counts to fix this,
+   catching a real generator bug and a real "AUC=1.0 is a trivial coverage artifact" trap along the
+   way). Result: correctness held, benefit did not, on the primary target -- `Sb(112:80)`'s deficit
+   feature falls entirely outside k=9's proven-bound coverage (m=80 vs. table to m=6), a regime
+   absent from every training example, and the model actively hurt there (did not finish in 900s).
+
+7. **Along the way**: corrected a wrong claim about AWS history (the persistent `oracle-serve`
+   instance from 2026-08-21 was live the whole time; an EC2 query missed it via the wrong tag
+   filter) and found its S3 status-reporting had silently stopped updating despite the server
+   being healthy -- flagged, not yet fixed. Also generated and committed genuine k=8 (now complete,
+   100/100 labeled) and k=9 (100 states, 45 definitive + 55 MAYBE) n=1 in-regime training data via
+   the live oracle -- the one ingredient BY_ML never had.
+
+**Why revert rather than leave it gated off on `main`.** Every piece above is real, gated behind a
+default-off flag, and provably non-regressing on the default path -- leaving it in place would
+not be *incorrect*. But none of it is a net win for the workload this project actually needs
+(`Sa(n)`-shaped, single-large-part recursion), and carrying ~700 lines of unused, only-partially-
+successful machinery on the trusted core is a cost with no offsetting benefit right now. The
+branch keeps every line, every commit message, and every piece of evidence available without
+main paying rent on it.
+
+**Future exploration avenues, left for explicit direction, roughly in order of what the evidence
+already points at:**
+
+- **Retrain BY_ML with the new k=8/k=9 in-regime data and re-test `Sb(112:80)` directly.** This is
+  the most immediately actionable item: the model that failed had *zero* training examples outside
+  proven-bound coverage; there are now 140 real ones (100 k=8, complete; 45 of 100 k=9,
+  definitive). Whether this closes the gap, narrows it, or does nothing is currently unmeasured.
+- **Resolve the remaining 55 k=9 MAYBEs** if a cheap path exists (the 5 remaining k=8 MAYBEs
+  resolved as free instant cache hits against the live oracle's broader history; the k=9 ones
+  already made first contact and hit real budget exhaustion, so a plain retry is unlikely to help
+  -- a longer per-query budget or the oracle's own richer future cache might).
+- **An adaptive growth schedule for radius mode** (grow gently while new information keeps
+  appearing each pass; jump ahead aggressively on a detected plateau -- no new real work vs. the
+  previous pass, the exact signature observed repeatedly this thread) was proposed but never
+  built. Could plausibly capture linear growth's no-overshoot benefit without its slow-crawl cost.
+- **Extend `BY_ML` beyond `size==1`.** The current scope is deliberately narrow (no accumulated-
+  prefix mismatch); a `size>1` version needs dynamic, per-call scoring of the accumulated prefix
+  rather than the static per-`(sbb,k)` table this pass used, and was noted as explicitly out of
+  scope rather than attempted.
+- **Fix the `oracle-serve` instance's S3 status-reporting gap** so a genuinely idle/hung server
+  doesn't read identically to a healthy one that's just working on a hard query, the confusion
+  this thread ran into directly.
+- **Whether concentric-style capping has value for a genuinely different shape** -- e.g. real K=9
+  residual work, where the raw space is large enough that even default's heuristic-plus-work-
+  budget struggles -- was never tested; every comparison this thread ran used `Sa(192)`-scale or
+  smaller states specifically because that was the concrete, available benchmark.
+
+Evidence: [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
+sections 1-26 (the complete thread). Branch: `concentric-search-radius-ml-exploration` (`b71a5e3`).

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
-#include <math.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/resource.h>
@@ -13,8 +12,6 @@
 #include <crt_externs.h>
 #include <sys/sysctl.h>
 #endif
-
-#include "radiobase_ml_order_model.h"
 
 /*
  * Build provenance is normally injected by tools/build_radio.py through a generated forced-include
@@ -80,9 +77,8 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #define BY_SP0_DESC 7
 #define BY_SP1_DESC 8
 #define BY_SP2_DESC 9
-#define BY_ML 10
 
-#define INDEX_COUNT 11
+#define INDEX_COUNT 10
 
 #define PROGRESS_INTERVAL CLOCKS_PER_SEC*60
 
@@ -140,25 +136,6 @@ typedef struct radio_search_context {
     unsigned long long cache_l1_replacements;
 #endif
     long long cant_solve_count;
-    /* When set, every canSolveB_ctx call sharing this context measures and bounds its own effort
-       against ITS OWN LOCAL totalsplits count (candidate splits tried at that level) rather than
-       the shared, cross-call-tree work clock, and a child's cap propagates from its parent
-       unchanged (absolute, not divided) instead of being sliced by search_deadline/
-       probe_child_deadline's work-time-tuned policy. Off (0, the default for every existing
-       context) leaves every current caller's behavior exactly as it was -- see radio_effort_now_ctx
-       and the radius branches in search_deadline/probe_child_deadline. A caller opting in must
-       never pass the NO_DEADLINE sentinel in this mode (it would be misread as a radius cap of 2);
-       pass a large finite value instead for "run until genuinely resolved." */
-    int radius_mode;
-    /* When set, canSolveB_ctx orders its level-0 candidates by a learned score (BY_ML, see
-       radiobase_ml_order_model.h) instead of the default heuristic, but ONLY for a size==1
-       initial state -- the one case where the model's own validated scoring unit (a complete
-       selected/mixed/complement decomposition) exactly matches what gets scored, with no
-       accumulated-prefix mismatch. Off (0, the default) leaves every caller unaffected. This is
-       an ORDERING change only: BY_ML's ORDER_MONO_P is -1 (not monotone), so the counting-bound
-       early-abandon never fires for it, and no path that could conclude FALSE is gated on it --
-       a wrong score only costs time, never correctness. See docs/journal.md 2026-08-24. */
-    int ml_order_mode;
 } radio_search_context;
 
 #define RADIO_WORK_CLOCK_ORIGIN 1024ULL
@@ -297,16 +274,7 @@ static uint64_t radio_budget_after_milliseconds(uint64_t milliseconds) {
 /* A finite child gets a fraction of the allowance still owned by its parent.  In particular, an
    exhausted parent never manufactures a fresh MIN_DEADLINE interval for each child it tries; that
    was the source of zero-work retry loops. */
-static uint64_t search_deadline(const radio_search_context *ctx, uint64_t parent_deadline,
-                                uint64_t start, int size) {
-    /* Radius mode propagates a child's cap unchanged: absolute, not relative. The design relies on
-       a child's own per-part candidate lists naturally being no larger than its parent's, so the
-       same numeric radius self-scales instead of needing to be divided the way a shared work-time
-       budget does. NO_DEADLINE here means "this is the top-level call that gets to progressively
-       widen" (see radius_N/radius_grows in the caller) -- it is NEVER propagated to children, who
-       always receive a concrete radius_N and do exactly one pass at it; only the level that
-       actually received NO_DEADLINE from outside retries with a growing radius. */
-    if (ctx->radius_mode) return parent_deadline;
+static uint64_t search_deadline(uint64_t parent_deadline, uint64_t start, int size) {
     if (parent_deadline == NO_DEADLINE)
         return radio_budget_add(start, radio_budget_seconds(1000));
     if (parent_deadline <= start)
@@ -326,30 +294,13 @@ static int deadline_expired(uint64_t deadline, uint64_t now) {
     return now > deadline;
 }
 
-/* Radius mode's actual bound is structural (each level's own splitindex range is capped at
-   radius_N directly, see canSolveB_ctx and radius_truncated) rather than a running-total compared
-   against a deadline -- "radius_N per segment" scales as N^size, not as a single shared count, so
-   a totalsplits-vs-N comparison here would fire almost immediately for any size > 1 and defeat the
-   cap's own purpose. Returning 0 makes every deadline_expired(...) call site below permanently
-   false in radius mode, i.e. inert; totalsplits is accepted but unused, kept only so callers don't
-   need their own radius_mode branch. Off (radius_mode == 0), this is exactly radio_budget_now_ctx:
-   no behavior change for any existing caller. */
-static inline uint64_t radio_effort_now_ctx(const radio_search_context *ctx, long long totalsplits) {
-    (void)totalsplits;
-    return ctx->radius_mode ? 0 : radio_budget_now_ctx(ctx);
-}
-
 /* Long states give each speculative child the current local quantum as well as sharing their
    absolute cap.  Short states keep the cap itself: those are the reliable constructive spine, and
    slicing it at every level prevents the first long child from ever receiving enough total time.
    The caller doubles the long-state quantum after every unresolved exhaustive pass, so a saturated
    cache cannot repeat the same bounded work forever and no split history is needed. */
-static uint64_t probe_child_deadline(const radio_search_context *ctx, uint64_t child_cap,
-                                     uint64_t now, unsigned int probe_seconds, int size) {
-    /* Only ever called in work-budget mode -- canSolveB_ctx computes cd directly for radius_mode
-       (always radius_N, the current attempt's concrete cap; see the cd computation there). `ctx`
-       is still accepted, unused, to keep call sites uniform. */
-    (void)ctx;
+static uint64_t probe_child_deadline(uint64_t child_cap, uint64_t now,
+                                     unsigned int probe_seconds, int size) {
     if (size <= 2) return child_cap;
     uint64_t quantum = radio_budget_seconds(probe_seconds);
     uint64_t local = radio_budget_add(now, quantum);
@@ -385,7 +336,6 @@ static const unsigned char ORDER_BASE[INDEX_COUNT] = {
     [BY_MAGIC3] = BY_MAGIC3,
     [BY_SP0] = BY_SP0, [BY_SP1] = BY_SP1, [BY_SP2] = BY_SP2,
     [BY_SP0_DESC] = BY_SP0, [BY_SP1_DESC] = BY_SP1, [BY_SP2_DESC] = BY_SP2,
-    [BY_ML] = BY_ML,
 };
 static const unsigned char ORDER_REVERSED[INDEX_COUNT] = {
     [BY_SP0_DESC] = 1, [BY_SP1_DESC] = 1, [BY_SP2_DESC] = 1,
@@ -405,19 +355,11 @@ static const signed char ORDER_MONO_P[INDEX_COUNT] = {
     [BY_MAGIC] = -1, [BY_MAX] = -1, [BY_MAGIC2] = -1, [BY_MAGIC3] = -1,
     [BY_SP2] = 0, [BY_SP1] = 1, [BY_SP0] = 2,
     [BY_SP0_DESC] = -1, [BY_SP1_DESC] = -1, [BY_SP2_DESC] = -1,
-    [BY_ML] = -1,  /* a learned score, not a pair-count key -- never admits the counting-bound cut */
 };
 
 /* The ordering is chosen once per level, so resolve base/direction there rather than on
    every one of the ~108M split-loop iterations. `ordp` points at the first element in
-   iteration order and `ords` is the step, so the lookup is a single indexed load.
-
-   NOTE (2026-08-23): this solver's own BY_MAGIC3 walk (via the countdown-index pattern in
-   canSolveB_ctx's split loop) goes most-balanced-first, the OPPOSITE of concentric_search's own
-   top-level sweep (which reads ind[BY_MAGIC3] forward from index 0, least-balanced-first). Not
-   reconciled here -- radius mode no longer forces BY_MAGIC3 everywhere (kept as prior art, see
-   docs/journal.md 2026-08-23), so this discrepancy only matters if/when a future change makes the
-   two share an order again. */
+   iteration order and `ords` is the step, so the lookup is a single indexed load. */
 #define HOIST_ORDER(lvl) do {                                                        \
     int _o = splitincr[lvl];                                                         \
     int _rev = ORDER_REVERSED[_o];                                                   \
@@ -2047,12 +1989,8 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 //        debug_printf("returning ck=%d\n", ck);
         return ck;
     }
-    /* radio_effort_now_ctx(ctx, 0): in radius mode this is always 0, so the check below never
-       fires here -- an entry-time "has the shared budget already been spent by a sibling" bail is
-       a work-currency-specific optimization (radius isn't shared across siblings the way work-time
-       is), not a mathematical necessity this call must reproduce. */
     if (!frozen_refute && parent_deadline != NO_DEADLINE && parent_deadline != FAST_ONLY
-        && deadline_expired(parent_deadline, radio_effort_now_ctx(ctx, 0)))
+        && deadline_expired(parent_deadline, radio_budget_now_ctx(ctx)))
         return MAYBE;
     
     int size_1 = size-1;
@@ -2098,32 +2036,13 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
        never cache the tempting shorter one.  Keep this local across iterative-deepening passes. */
     int rb_tainted_contraction = 0;
     uint64_t deadline = frozen_refute
-        ? UINT64_MAX : search_deadline(ctx, parent_deadline, budget_start, size);
+        ? UINT64_MAX : search_deadline(parent_deadline, budget_start, size);
     
     //    printf("k=%d parent_budget=%llu start=%llu limit=%llu\n",
     //           k, parent_deadline, budget_start, deadline);
     
     int cont2=1;
     int skipped_some;
-    /* Radius mode caps each level's own candidate range at radius_N (see below) instead of always
-       exploring its full size -- set the moment any level actually gets truncated below its true
-       size. Must gate every path that would otherwise conclude a clean FALSE: a truncated search
-       proves nothing about the candidates it never looked at, so it can only ever be MAYBE or a
-       genuine TRUE (a witness found within the cap is unconditionally valid regardless of what was
-       skipped elsewhere). */
-    int radius_truncated;
-    /* radius_grows: true only for the level that was actually invoked with NO_DEADLINE from
-       outside -- never for a recursive descendant, since a child always receives a concrete
-       radius_N as its own parent_deadline, not the sentinel (see the cd computation below).
-       radius_N is the actual per-segment cap used for splitindex[] capping: starts small and
-       doubles on every unresolved exhaustive pass when radius_grows (progressive widening, but
-       only at this one level -- each retry re-tries the WHOLE subtree at the new, larger, uniform
-       radius_N, not "ask children to widen independently"), or is just the caller's fixed cap
-       otherwise (bounded probe, one pass, MAYBE is an acceptable answer -- the intermediate-level
-       case). Kept separate from `deadline` itself, which stays NO_DEADLINE (2) for the whole call
-       so no_deadline/search_deadline's own sentinel checks keep working unmodified. */
-    int radius_grows = ctx->radius_mode && parent_deadline == NO_DEADLINE;
-    uint64_t radius_N = radius_grows ? 4 : deadline;
     /* Start the frozen audit at pass 2: there is no point running the solver's deliberately
        incomplete FAST witness pass before an exhaustive refutation-only traversal. */
     int pass = frozen_refute ? 1 : 0;
@@ -2184,15 +2103,10 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
 //        int no_deadline = (pass==1);
         
         skipped_some = 0;
-        radius_truncated = 0;
         totalsplits=0;
         skiptop = 0;
         cont=1;
-        /* Radius mode keeps this heuristic exactly as-is (no longer overridden to force BY_MAGIC3
-           everywhere): it is already a decent, segment-count/index-conditioned baseline, and the
-           2026-08-23 direction-consistency argument for forcing a single order was premature --
-           iterate on ordering separately, against this as the baseline, rather than discarding it. */
-        splitincr[0] = (ctx->ml_order_mode && size == 1) ? BY_ML : (size<=3 ? BY_SP1 : BY_MAGIC3);
+        splitincr[0] = size<=3 ? BY_SP1 : BY_MAGIC3;
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP1 : BY_MAGIC3);
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_SP2_DESC : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
 //        splitincr[0] = size == 1 ? BY_MAGIC : (size<=3 ? BY_MAGIC2 : ((sb_pairs[tmp[0]] < pairs / 3) ? BY_MAGIC3 : BY_MAX));
@@ -2204,14 +2118,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         
         
         memset(splitindex, 0, size * sizeof(int));
-        if (ctx->radius_mode) {
-            int full0 = splitsarr[0]->size;
-            int capped0 = radius_N < (uint64_t)full0 ? (int)radius_N : full0;
-            splitindex[0] = capped0;
-            if (capped0 < full0) radius_truncated = 1;
-        } else {
-            splitindex[0] = splitsarr[0]->size;
-        }
+        splitindex[0] = splitsarr[0]->size;
         HOIST_ORDER(0);
         
 #ifdef DEBUG1
@@ -2256,61 +2163,19 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                     }
 #endif
                     cont=0;
-                    if (!skipped_some && !radius_truncated) {
+                    if (!skipped_some) {
                         cont2=0; // really can't solve
 //                    } else if (parent_deadline==FAST_ONLY) {
 //                        cache(tmp, size, MAYBE_SLOW, k, pairs);
 //                        return MAYBE;
                     } else {
-                        /* Radius mode's own NO_DEADLINE growth (radius_N doubling, below) is
-                           separate from this work-budget doubling and must never touch `deadline`
-                           itself: deadline stays the NO_DEADLINE sentinel (2) for the whole call in
-                           that mode, so budget_start (a work-clock value, unrelated to radius
-                           currency) would underflow the subtraction and, after radio_budget_add's
-                           overflow clamp, corrupt deadline to UINT64_MAX -- silently breaking the
-                           child's own no_deadline recognition (UINT64_MAX != NO_DEADLINE) at the cd
-                           computation below. */
-                        if (!ctx->radius_mode && parent_deadline == NO_DEADLINE) {
+                        if (parent_deadline == NO_DEADLINE) {
                             // double this root's absolute allowance
                             deadline = radio_budget_add(deadline, deadline - budget_start);
                         }
                         if (pass >= 2) {
-                            if (ctx->radius_mode) {
-                                /* Bounded (non-growing) radius calls never retry: they were asked
-                                   for exactly one pass at a fixed cap, and MAYBE is an acceptable
-                                   answer at that intermediate level. Growing calls (radius_grows,
-                                   true only at the level that actually received NO_DEADLINE) retry
-                                   with a doubled radius_N -- real widening of the WHOLE subtree,
-                                   not just this level, since the cd computation below always hands
-                                   children the current radius_N as a concrete number rather than
-                                   propagating NO_DEADLINE further down. A retry can be triggered by
-                                   either skipped_some (a child returned MAYBE at the old, smaller
-                                   radius_N -- expected and normal, not a sign of trouble) or
-                                   radius_truncated (this level's own candidate range was capped);
-                                   either way the retry is cheap, since anything already resolved on
-                                   the smaller radius_N is a cache hit on the bigger one. Guard the
-                                   multiply the same way probe_seconds guards its own doubling. */
-                                if (radius_grows) {
-                                    /* EXPERIMENT 2026-08-24: squaring instead of doubling. A
-                                       mixed child gets sqrt(cd) (below), reapplied at every
-                                       mixed-doubling level of nesting -- so a child d levels deep
-                                       inside chained mixed doublings sees only radius_N^(1/2^d).
-                                       Doubling the top radius_N therefore grows that child by only
-                                       2^(1/2^d), which is why the pure-sqrt experiment needed
-                                       pass=19-38 to resolve some states (evidence section 20).
-                                       Squaring instead (radius_N -> radius_N^2) makes the top
-                                       sequence N^(2^t) after t retries; a depth-d child sees
-                                       N^(2^(t-d)), which starts squaring itself as soon as t>=d --
-                                       a handful of retries reaches usefully large values instead
-                                       of dozens, regardless of nesting depth. */
-                                    if (radius_N != 0 && radius_N <= UINT64_MAX / radius_N)
-                                        radius_N *= radius_N;
-                                    else radius_N = UINT64_MAX;
-                                } else {
-                                    cont2 = 0;
-                                }
-                            } else if (!no_deadline
-                                && deadline_expired(deadline, radio_effort_now_ctx(ctx, totalsplits))) {
+                            if (!no_deadline
+                                && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
                                 cont2=0;
                             } else if (probe_seconds <= UINT_MAX / 2) {
                                 /* Monotone work allowance replaces the old cache-progress gate:
@@ -2399,10 +2264,10 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                        loop.  A NO_DEADLINE proof is never stopped here, so exact work stays exact. */
 #ifdef RADIO_WORK_BUDGET
                     if (!no_deadline
-                        && deadline_expired(deadline, radio_effort_now_ctx(ctx, totalsplits))) {
+                        && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
 #else
                     if (!no_deadline && !(totalsplits & DEADLINE_POLL_MASK)
-                        && deadline_expired(deadline, radio_effort_now_ctx(ctx, totalsplits))) {
+                        && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
 #endif
                         if (rb_here) rb_release_mode(rb, frozen_refute);
                         return MAYBE;
@@ -2504,7 +2369,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                 return MAYBE;
                             }
                             if (cs0 != TRUE || cs1 != TRUE || cs2 != TRUE) {
-                                uint64_t budget_now = radio_effort_now_ctx(ctx, totalsplits);
+                                uint64_t budget_now = radio_budget_now_ctx(ctx);
                                 if (deadline_expired(deadline, budget_now)) {
                                     if (no_deadline) {
                                         deadline = radio_budget_add(
@@ -2549,38 +2414,8 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                     progress = cpu_now + PROGRESS_INTERVAL;
                                 }
                             }
-                            /* Progressive widening happens ONLY at the level that actually
-                               received NO_DEADLINE from outside -- never propagated further down.
-                               A child always gets this attempt's CURRENT radius_N as a concrete
-                               number, does exactly one pass at it, and (if it has its own
-                               children) passes that same number on unchanged -- absolute
-                               propagation, single iteration, no independent re-widening at any
-                               depth. This is deliberately NOT "give the child NO_DEADLINE too":
-                               that would make every child pay for a full independent resolution
-                               even while THIS level is still on its own cheap early attempt (small
-                               radius_N), which is wasteful and was measured to make lopsided-part
-                               states slower than concentric_search's own top-level sweep. Instead,
-                               the whole subtree is bounded together at whatever radius_N this
-                               attempt is on, and retrying (radius_N doubling, above) re-tries the
-                               whole subtree at a larger uniform bound -- cheap, since anything
-                               already resolved TRUE/FALSE on a prior attempt is a cache hit. */
-                            uint64_t cd = ctx->radius_mode
-                                ? radius_N
-                                : probe_child_deadline(ctx, deadline,
-                                      radio_effort_now_ctx(ctx, totalsplits), probe_seconds, size);
-                            /* EXPERIMENT 2026-08-24: the mixed child (sb1) has DOUBLE the pure
-                               children's part-count, so propagating cd unchanged makes cost
-                               (cd^size) compound across Sa(n)'s chained mixed-doublings -- one real
-                               8-part state hit 32.7B totalsplits this way (evidence section 19).
-                               cd_mixed = ceil(sqrt(cd)) keeps total cost invariant across a
-                               doubling (sqrt(R)^(2*size) = R^size), reapplied at every level this
-                               site is reached -- see the squaring change above for why the top
-                               level's own retry growth had to change to match. */
-                            uint64_t cd_mixed = cd;
-                            if (ctx->radius_mode) {
-                                double r = ceil(sqrt((double)cd));
-                                cd_mixed = r < 1.0 ? 1 : (uint64_t)r;
-                            }
+                            uint64_t cd = probe_child_deadline(
+                                deadline, radio_budget_now_ctx(ctx), probe_seconds, size);
                             /* MAYBE in one branch must not hide an easy refutation in another.
                                Probe all still-possible children, stopping only after a FALSE. */
                             if (cs0 == MAYBE)
@@ -2588,7 +2423,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                             if (cs0 != FALSE && cs2 == MAYBE)
                                 cs2 = canSolveB_ctx(ctx, sb2, i+1, k_1, cd);
                             if (cs0 != FALSE && cs2 != FALSE && cs1 == MAYBE)
-                                cs1 = canSolveB_ctx(ctx, sb1, (i+1) * 2, k_1, cd_mixed);
+                                cs1 = canSolveB_ctx(ctx, sb1, (i+1) * 2, k_1, cd);
 
                             if (cs0 == TRUE && cs2 == TRUE && cs1 == TRUE) {
                                 //can solve
@@ -2604,7 +2439,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                allowance.  Unwind now instead of starting another candidate with
                                an already-expired parent budget. */
                             if (!no_deadline
-                                && deadline_expired(deadline, radio_effort_now_ctx(ctx, totalsplits))) {
+                                && deadline_expired(deadline, radio_budget_now_ctx(ctx))) {
                                 if (rb_here) rb_release_mode(rb, frozen_refute);
                                 return MAYBE;
                             }
@@ -2619,14 +2454,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                 max_solvable_maybe = i;
                                 debug_printf("max_solvable_maybe=%d\n", max_solvable_maybe);
                             }
-                            if (ctx->radius_mode) {
-                                int fulli = splitsarr[i]->size;
-                                int cappedi = radius_N < (uint64_t)fulli ? (int)radius_N : fulli;
-                                splitindex[i] = cappedi;
-                                if (cappedi < fulli) radius_truncated = 1;
-                            } else {
-                                splitindex[i] = splitsarr[i]->size;
-                            }
+                            splitindex[i] = splitsarr[i]->size;
                             {
                                 /* Pass 2 is exhaustive, so iteration order carries no
                                    solution-finding value and can be chosen purely to retire the
@@ -2637,8 +2465,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                    smallest. The _DESC variants are never chosen here: they have
                                    ORDER_MONO_P = -1, so they get no early termination at all.
                                    Measured 2026-08-08 on the cheapest monster: 3.5x fewer candidate
-                                   evaluations than the gap heuristic below. Radius mode keeps this
-                                   heuristic unchanged -- see the level-0 comment above. */
+                                   evaluations than the gap heuristic below. */
                                 int chosen = -1;
                                 if (pass >= 2 && size > 3) {
                                     splits *sp_ = splitsarr[i];
@@ -2688,8 +2515,8 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     
     if (frozen_refute) {
         if (rb_here) rb_release_mode(rb, frozen_refute);
-        if (!canSolve && !skipped_some && !radius_truncated) ctx->cant_solve_count++;
-        return (skipped_some || radius_truncated) ? MAYBE : canSolve;
+        if (!canSolve && !skipped_some) ctx->cant_solve_count++;
+        return skipped_some ? MAYBE : canSolve;
     }
 
     if (canSolve) {
@@ -2723,7 +2550,7 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         //        printf("totalsplits=%llu\n", totalsplits);
         //        fflush(stdout);
         
-    } else if (skipped_some || radius_truncated) {
+    } else if (skipped_some) {
         if (rb_here) rb_release_mode(rb, frozen_refute);
         return MAYBE;
     } else {
@@ -3039,145 +2866,6 @@ int magic3(int sbb, int spl[]) {
     return distance(spl, magicm1, magicm2, n1, n2);
 }
 
-/* ================================================================================================
-   BY_ML: a learned ordering score, ported from tools/ml/export_ordering_model.py's feat()/model.
-   Ordering only -- see ORDER_MONO_P[BY_ML] above and the ml_order_mode comment on
-   radio_search_context. Scores an up-to-2-part list of (n,m) pairs; that covers exactly the
-   three children (selected: 1 part, mixed: 2 parts, complement: 1 part) a size==1 initial
-   state's own level-0 candidate produces -- the one case where this matches what the model was
-   actually trained and validated on (see docs/journal.md 2026-08-24). Not used, and not
-   validated, for any other size or level.
-   ================================================================================================ */
-
-/* ml_deficit: max over parts of (n - proven_max_n1(k,m)), matching export_ordering_model.py's
-   deficit(). Missing (k,m) entries default to 0 (bound "not proven", not "zero tolerance") --
-   same default the training-data generator used, so the model was trained against exactly this
-   convention, not a stricter one. */
-static double ml_deficit(const int ns[], const int ms[], int count, int k) {
-    double best = -1.0;
-    int i;
-    if (count == 0) return -1.0;
-    for (i = 0; i < count; i++) {
-        int n = ns[i], m = ms[i];
-        int bound = 0;
-        if (k >= 0 && k <= ML_MAXN1_KMAX && m >= 0 && m <= ML_MAXN1_MMAX && ml_maxn1[k][m] >= 0)
-            bound = ml_maxn1[k][m];
-        double d = (double)n - (double)bound;
-        if (i == 0 || d > best) best = d;
-    }
-    return best;
-}
-
-/* ml_feat: exact port of feat() for count in {1,2} (the only sizes BY_ML ever scores). Closed-
-   form pooling instead of a general sort: count==1 collapses sum=mean=max=min to the one value
-   with std=0; count==2's "median" is deliberately s[1] (the larger element after ascending
-   sort), matching numpy s[len(s)//2] on a 2-element array -- NOT the textbook average of two
-   middles. Reproducing that exactly matters: retraining the model would fold in whatever this
-   function actually computes, but re-using ALREADY-trained coefficients requires matching the
-   convention they were fit against. */
-static void ml_feat(const int ns[], const int ms[], int count, int k, double out[ML_NFEAT]) {
-    double C = pow(3.0, (double)k);
-    double R = sqrt(C);
-    double area[2], nn[2], mm[2], asp[2];
-    double d;
-    int i;
-
-    if (count == 0) {
-        out[0] = 0.0; out[1] = 0.0;
-        for (i = 2; i < 26; i++) out[i] = 0.0;
-        out[26] = -1.0; out[27] = 0.0; out[28] = 1.0; out[29] = 0.0; out[30] = 0.0;
-        return;
-    }
-    for (i = 0; i < count; i++) {
-        double n = (double)ns[i], m = (double)ms[i];
-        area[i] = n * m / C;
-        nn[i] = n / R;
-        mm[i] = m / R;
-        asp[i] = n / (m > 1.0 ? m : 1.0);
-    }
-    out[0] = (double)count;
-    {
-        double area_sum = area[0], area_max_v, area_min_v, area_std, area_med;
-        if (count == 1) {
-            area_max_v = area_min_v = area_med = area[0]; area_std = 0.0;
-        } else {
-            area_sum = area[0] + area[1];
-            area_max_v = area[0] > area[1] ? area[0] : area[1];
-            area_min_v = area[0] < area[1] ? area[0] : area[1];
-            area_med = area_max_v;  /* s[len//2]=s[1] on a sorted 2-array */
-            area_std = (area_max_v - area_min_v) / 2.0;
-        }
-        out[1] = area_sum;  /* mass == area_sum, duplicated same as the Python feature vector */
-    }
-    {
-        /* Generic pooling for area/nn/mm/asp, writing 6 slots each starting at `base`. */
-        const double *vecs[4] = { area, nn, mm, asp };
-        int base;
-        for (base = 0; base < 4; base++) {
-            const double *v = vecs[base];
-            double sum, mean, vmax, vmin, std, med;
-            int oi = 2 + base * 6;
-            if (count == 1) {
-                sum = mean = vmax = vmin = med = v[0]; std = 0.0;
-            } else {
-                double a = v[0], b = v[1];
-                double hi = a > b ? a : b, lo = a > b ? b : a;
-                sum = a + b; mean = sum / 2.0;
-                vmax = hi; vmin = lo; med = hi; std = (hi - lo) / 2.0;
-            }
-            out[oi + 0] = sum; out[oi + 1] = mean; out[oi + 2] = vmax;
-            out[oi + 3] = vmin; out[oi + 4] = std; out[oi + 5] = med;
-        }
-    }
-    d = ml_deficit(ns, ms, count, k);
-    out[26] = d / R;
-    out[27] = d > 0.0 ? 1.0 : 0.0;
-    out[28] = 1.0 - out[1];
-    {
-        double area_max_v = count == 1 ? area[0] : (area[0] > area[1] ? area[0] : area[1]);
-        out[29] = area_max_v;
-        out[30] = area_max_v / (out[1] > 1e-9 ? out[1] : 1e-9);
-    }
-}
-
-/* ml_score: standardize + logistic-regression dot product. Returns the raw logit (monotonic in
-   the model's own probability, so the sigmoid is skippable -- BY_ML only ever compares scores
-   against each other for ordering, never against a decision threshold). */
-static double ml_score(const int ns[], const int ms[], int count, int k) {
-    double f[ML_NFEAT];
-    double z = ml_intercept;
-    int i;
-    ml_feat(ns, ms, count, k, f);
-    for (i = 0; i < ML_NFEAT; i++)
-        z += ((f[i] - ml_scaler_mean[i]) / ml_scaler_scale[i]) * ml_coef[i];
-    return z;
-}
-
-/* Set by ensure_splits immediately before the BY_ML indexSpl call, since indexSpl's scoring
-   functions take only (sbb, row) -- matching every existing BY_* scorer's signature -- with no
-   room for the child k the model needs. Single-threaded table build only; see the parallel-
-   solver prerequisite note in docs/status.md before this code ever runs concurrently. */
-static int g_ml_child_k = 0;
-
-int ml_order_key(int sbb, int spl[]) {
-    int n_sel[1] = { sbb_to_n1[spl[0]] }, m_sel[1] = { sbb_to_n2[spl[0]] };
-    int n_comp[1] = { sbb_to_n1[spl[3]] }, m_comp[1] = { sbb_to_n2[spl[3]] };
-    int n_mix[2] = { sbb_to_n1[spl[1]], sbb_to_n1[spl[2]] };
-    int m_mix[2] = { sbb_to_n2[spl[1]], sbb_to_n2[spl[2]] };
-    double s_sel = ml_score(n_sel, m_sel, 1, g_ml_child_k);
-    double s_comp = ml_score(n_comp, m_comp, 1, g_ml_child_k);
-    double s_mix = ml_score(n_mix, m_mix, 2, g_ml_child_k);
-    double worst = s_sel < s_comp ? s_sel : s_comp;
-    if (s_mix < worst) worst = s_mix;
-    /* indexSpl sorts descending by this int key (see descSpl) -- quantize generously, since only
-       relative order matters and logits here stay well within a modest range. */
-    double scaled = worst * 1000.0;
-    if (scaled > 1000000000.0) scaled = 1000000000.0;
-    if (scaled < -1000000000.0) scaled = -1000000000.0;
-    (void)sbb;
-    return (int)scaled;
-}
-
 /* Unconditional counters make memory experiments possible without changing table layout.
    They are not printed during normal runs; small probe drivers can inspect them directly. */
 unsigned long long split_level_fanouts;
@@ -3258,7 +2946,7 @@ static int split_admissible(const int sp[SPLIT_FIELD_COUNT], int child_k) {
 }
 
 splits *ensure_splits(int sbb, int k) {
-    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3, BY_ML };
+    static const int live_orderings[] = { BY_SP0, BY_SP1, BY_SP2, BY_MAGIC3 };
     const int live_count = (int)(sizeof(live_orderings) / sizeof(live_orderings[0]));
     split_levels *levels;
     splits *s;
@@ -3371,8 +3059,6 @@ splits *ensure_splits(int sbb, int k) {
     indexSpl(sbb, s, BY_SP1, pairs1);
     indexSpl(sbb, s, BY_SP2, pairs2);
     indexSpl(sbb, s, BY_MAGIC3, magic3);
-    g_ml_child_k = k - 1;
-    indexSpl(sbb, s, BY_ML, ml_order_key);
 
     levels->at[k] = s;
     split_tables_built[k]++;

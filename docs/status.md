@@ -100,6 +100,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   [sa193-certificate.md](sa193-certificate.md). Cold run9 remains the proof *source*; the certificate
   is the compact replay artifact, and it cannot answer anything outside its own claim set — the
   complete corpus is retained for that.
+- **Sharp asymptotic `Sa` rate** — Florin--Ho--Jiang (2022) determine the exact leading
+  constant, while Jiang--Polyanskii--Vorobyev (2019) give an explicit near-optimal construction.
+  These are asymptotic statements, not finite-cell evidence; see [literature.md](literature.md).
 - **Three theorems plus the lift-box lemma** — Singleton Majorization, Unit-Group Elimination and
   Subgraph Monotonicity are proved; so is the new geometric core of recursive Pareto lifting. The
   latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
@@ -108,7 +111,10 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   on, and what lets a negative certificate store antichains instead of closures.
 - **Exact small-`m` frontiers** — Aigner gives `m=2,3`; Li--Wu--Triesch gives `m=4` and the
   piecewise `m=5` formula; the retained local replay gives the `m=6` upper boundary.  Thus the
-  K=9 column is exact through `m=6`, with values 512, 511, 503, 496, 481, 473.
+  K=9 column is exact through `m=6`, with values 512, 511, 503, 496, 481, 473. The newly
+  inspected Aigner 1988 Chapter 3 scan independently verifies the graph model and its `m=2,3`
+  results; it does not include the book's Chapter 2 weighing material. See
+  [aigner-1988-scan.md](aigner-1988-scan.md).
 - **18 verified witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
   `Sb(473:6)@9`, their two-sided variants where available, and the singleton-majorized proof
@@ -1269,378 +1275,31 @@ case.  This formula comes from a checked 19-node symbolic tree, not from promoti
    after 150 restarts (up to 774,712 evaluations) on the two endpoints where the pooled model
    itself struggled. See
    [../evidence/deficit_order_and_bestfirst_2026-08-22.txt](../evidence/deficit_order_and_bestfirst_2026-08-22.txt)
-   section 6. Concentric round expansion — split a state's segments into concentric ones (grown
-   together each round via a shared radius, per-segment growth factor `G^(1/(P-1))` for a target
-   total-work growth `G`, derived from first principles to avoid the naive `G^P` blowup) and one
-   "last" segment (always full, scored with the real pooled score) — **succeeded on all 4
-   endpoints, including both where coordinate descent failed**: it is exhaustive within its
-   current radius by construction, so it cannot get stuck in the wrong basin the way restart-based
-   local search can. Real oracle-call cost was strikingly consistent (1,032-4,399) across a ~700x
-   range in pooled-model difficulty, unlike coordinate descent's cheap-win-or-decisive-collapse
-   pattern — a genuinely non-arbitrary, gracefully-degrading stopping signal, which was the whole
-   point of the proposal. Not yet tested: propagating the round/radius down into the recursive
-   verification of the three children themselves (the multi-level half of the design) — this only
-   validates the single-level mechanism. See
-   [../evidence/concentric_round_search_2026-08-22.txt](../evidence/concentric_round_search_2026-08-22.txt).
-   **Benchmarked against the actual production heuristic, not just deficit/blind**: ported
-   `BY_MAGIC3` (radiobase.c's real, already-deployed choice for exactly this situation — a
-   >3-segment state's outermost split level) faithfully into Python and re-ran the same real-oracle
-   comparison. No clean winner — magic3 needs fewer real oracle calls on one endpoint (1.8x),
-   deficit needs fewer on two (1.2x-1.8x), and the fourth is an effective tie (that endpoint's
-   smallest segment saturates its own tiny list within a few rounds regardless of ordering). Both
-   succeed on all 4 endpoints regardless of which order is used — the round structure's own
-   exhaustiveness carries the robustness result, segment order is a real but modest (~20-80%)
-   efficiency lever on top of it, not a correctness question. See section 6 of the same evidence
-   file. **Scaled from n=4 to n=10** (`tools/ml/concentric_tier_sample.py`, 6 freshly-sampled
-   endpoints excluding the original 4): all 6 also succeed, for **10/10 overall**, real oracle
-   calls median 2,154 (range 886-6,971), round of success median 17 (range 16-18) — a strikingly
-   tight round band now backed by a real sample rather than 4 anecdotes, across a ~700x spread in
-   pooled-model difficulty. See section 7 of the same evidence file. Still open: the segment-order
-   comparison at this scale, the multi-level propagation test, composing the cross-part pair
-   condition and deeper `R_d` on the same stratification, confirming the win survives once scoring
-   is not paid for in unoptimized Python.
-   **2026-08-23, ported natively into `radio_oracle.c`** (additive `concentric` command,
-   radiobase.c untouched, every leaf check calls the existing trusted `canSolveB`) — removes the
-   Python/TCP oracle's round-trip ceiling entirely. All 10 k7 endpoints still succeed, cold, 36.7s
-   TOTAL (vs. 58-481s EACH over TCP) — genuinely 2-3 orders of magnitude faster. **A real reframing
-   forced by measuring against the true raw space for the first time**: round-of-success is narrow
-   (16-20), but the FRACTION of the true combinatorial space needed before success is 64-96%, not
-   small — the earlier "narrow round band" framing had been read as "finds winners early," which
-   this shows is wrong; the actual value is a predictable stopping point plus native speed making
-   near-full coverage practically fast, not avoiding most of the space. Whether a genuinely sound
-   early-stopping design exists is still open. **The larger test**: 8 highest-mass real k8
-   4-part endpoints (confirmed genuine solvable states, 2 known winners each) all succeed, round
-   23-24, 55.4s total — 6 of 8 land EXACTLY on the census's own recorded literal winner, a strong
-   independent correctness check. Two more real bugs caught in the process: the earlier Python
-   `BY_MAGIC3` benchmark (section 6 above) walked the heuristic's index array in the OPPOSITE
-   direction from what `HOIST_ORDER` actually uses (`indexSpl` sorts descending, `HOIST_ORDER`
-   walks forward from position 0) — downgraded to inconclusive, not retracted; and the native
-   search loop had no overall deadline at all (unlike every other search path here), found when a
-   lopsided-part (43:2) k8 endpoint ran past 4 CPU-minutes — fixed by reusing the existing `budget
-   <seconds>` knob as an overall bound. A second, subtler gap surfaced after that fix: the
-   deadline was only checked every 2^20 candidates, which assumes uniform per-candidate cost — a
-   run of several multi-second `canSolveB` calls in a row (the same lopsided-part shape as above)
-   blew past 11 CPU-minutes before the counter next tripped. Fixed by also checking immediately
-   after every completed `canSolveB` attempt; verified via a standalone `budget 15` retest, clean
-   `reason=timeout` at 123s. **The completed larger test — 60 endpoints drawn uniformly at random
-   from all 471 forced 4-part k8 endpoints**, `budget 20`, both fixes in place: 55/60 (91.7%)
-   succeed, 5/60 (8.3%) time out (a genuine MAYBE, not a claimed failure). Round of success median
-   24 (range 21-24); fraction of the true raw space needed median 0.963 (range 0.677-0.999),
-   confirming the reframing above at population scale. **55/55 (100%) of the successes match a
-   known census literal winner exactly** — every result reproduces a fact the census committed to
-   independently, before this code existed, on a random rather than cherry-picked sample; the
-   strongest correctness signal in this thread. The 5 timeouts all share one reproducible shape:
-   an unusually lopsided part (large n, small m), the same pattern that triggered both deadline
-   bugs — a real, characterized limitation, not unexplained variance. Not yet done: integrating
-   this as an actual split-ordering strategy inside `canSolveB_ctx` — deliberately left for a
-   future, reviewed step rather than folded into an unattended overnight session.
-   **Same-day review produced three corrections**, all applied and retested: (1) the overall
-   deadline and the `max_rounds` cap were both removed — they silently reintroduce the early-return
-   the round schedule exists to replace, since a capped "no" and a genuinely exhaustive one are
-   indistinguishable to the caller; the search now only stops on a confirmed winner or true
-   `fully_saturated`. Retested directly: the 5 previously-timed-out endpoints now all succeed with
-   no deadline at all (round 15-16, 8 CPU-minutes combined) — they were never stuck, just under a
-   deadline too tight for how much raw space this design generically needs. (2) MAYBE is fine at
-   the per-candidate level (an unresolved child just isn't a confirmed winner) but a saturated "no"
-   built on one is tagged `reason=unresolved_children` rather than reading like a proof — **and,
-   per a further same-day correction, the top level now forces refutation instead of stopping at
-   the tag**: every ambiguous candidate found during the sweep is remembered (capped, with an
-   honest overflow flag), and once the sweep saturates with no winner, each one is re-verified with
-   NO_DEADLINE via canSolveB's own existing, cached recursion before "no" is finalized — reusing
-   the codebase's already-deterministic work-budget system (RADIO_WORK_BUDGET, the repo default;
-   MAYBE there is a bounded-effort answer, not a wall-clock artifact), not a reimplementation.
-   Natural MAYBEs proved too rare to trigger validation at realistic budgets (zero across 43 real
-   endpoints even at the tightest protocol-exposed budget); validated with a temporary, since-
-   reverted test hook forcing a tiny raw work-unit budget directly, confirming both the overflow-
-   honesty path and that an ambiguous candidate can be correctly promoted to a confirmed winner
-   (`resolved_ambiguous=yes`). No change to the realistic-budget numbers below (byte-for-byte
-   identical on the 10-endpoint k7 regression after the hook was removed). (3)
-   widened the round-1 starting radius (R0=8, was ~2) and retested on a genuinely difficulty-diverse
-   20-endpoint k8 sample (mass 497-638, wins 1-32, not just the hardest tier): all 20 succeed, but
-   **round-of-success sits flat at 14-16 regardless of difficulty** — even the 32-winner endpoint
-   needs round 15. This rules out "starting point too narrow" and points at "the ordering doesn't
-   rank by winner-likelihood" — BY_MAGIC3 evidently doesn't concentrate this population's real
-   winners early for either hard or easy states. Recommended next experiment, not yet run: swap in
-   the earlier per-part deficit order (0.9961 population-level AUC) for the outer segments. See
+   section 6.
+
+   **What followed from here (concentric round expansion through radius mode through BY_ML) is
+   closed, per direct instruction 2026-08-24 -- see below.**
+
+   **2026-08-24: this whole native-concentric-search / radius-mode / BY_ML thread is now closed.**
+   `main`'s `radiobase.c`/`radio_oracle.c` are reverted to their pre-thread state (`e206766`/
+   `c7bc503`) -- the plain, understood `canSolveA`/`canSolveB` engine, verified post-revert to
+   still solve cold `Sa(192)` in k=10 in 292.4 CPU seconds. Every experiment described above
+   (concentric round search, radius mode in all its propagation variants, the BY_ML learned
+   ordering) is real, was measured honestly, and is preserved in full -- code, data, and commit
+   history -- on branch `concentric-search-radius-ml-exploration` (`b71a5e3`), not deleted. The
+   short version: plain `canSolveB(NO_DEADLINE)` beat every alternative tried on the actual hard
+   target (`Sb(112:80)`, a single large unsplit pair -- the `Sa(n)` leaf-verification shape), and
+   while squaring+sqrt radius mode did win on a different shape (an already-split multi-part
+   battery state), and BY_ML's wiring is mechanically sound, neither was a net win worth carrying
+   as unused weight on the trusted core. Full findings, the mechanistic diagnoses (why ordering
+   quality degrades on the hardest states; why radius currency can't compose safely across size-
+   changing recursion; why BY_ML's deficit feature failed on an out-of-coverage regime it never
+   trained on), and a concrete list of future exploration avenues (retraining BY_ML with newly-
+   acquired k=8/k=9 in-regime data chief among them) are in the 2026-08-24 journal entry "closing
+   the fast-solver thread." See
    [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   sections 11-12.
-   **The deadline-propagation currency inside `canSolveB_ctx` itself is now radius, not work-units**
-   — a new `radius_mode` field on `radio_search_context` (default off, zero change for every
-   existing caller) makes the trusted solver's own recursion bound each level by "top-N candidates
-   per segment" (N per part, so N^size total — uniform across depth and part count) instead of the
-   deterministic work clock, capping each level's own `splitindex[]` range directly rather than
-   comparing an aggregate counter. Two real correctness/liveness issues surfaced and were fixed
-   while building this: an infinite retry loop (canSolveB_ctx's iterative-deepening assumes each
-   retry grows the child's budget; radius mode's unchanged propagation broke that — fixed by
-   stopping after one exhaustive pass) and a genuine false-negative hazard from capping a level's
-   candidate range below its true size (fixed with a `radius_truncated` flag threaded into every
-   path that could otherwise conclude FALSE, verified directly: `radius_mode=1, N=1` on a real
-   solvable state returns MAYBE, `N=2^40` returns TRUE). Also found, by tracing the exact index
-   arithmetic: `canSolveB_ctx`'s own BY_MAGIC3 walk is most-balanced-first, the *opposite* of
-   concentric_search's own top-level least-balanced-first sweep — reconciled by reversing BY_MAGIC3
-   in radius mode so every level walks the same direction. Reran all 43 previously-tested endpoints
-   under this design: every one is byte-for-byte identical (round, checked, frac, and the literal
-   winner) to the work-unit-currency results above, which transitively carries the same 55/55
-   census-match correctness weight to this design. No regression to the default path (plain VERDICT
-   queries, `enumerate`) throughout. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 13. **Simplified per feedback**: dropped the bounded ambiguous-candidate storage (and its
-   overflow risk) in favor of just re-sweeping the whole candidate space once more with an unbounded
-   radius when `has_maybe` — no bookkeeping needed, since the shared trie makes every already-
-   resolved candidate an instant cache hit on the re-sweep. Validated with a forced-constant-radius
-   test hook (reverted before commit): radius=2 matched the real schedule exactly (many recursive
-   calls bottom out via theorem-based base cases that never consult radius at all); radius=0
-   (guarantees truncation everywhere) correctly exhausted to full saturation, triggered exactly one
-   re-sweep, and found the same previously-validated winner via the unbounded radius, with no
-   meaningful slowdown. Two clarifications on record from the same round of feedback: (a)
-   `canSolveB_ctx`'s own existing per-level heuristic already conditions ordering on segment count
-   and index (its BY_SP0/1/2/DESC choice, size<=3 special-cased) — radius mode currently overrides
-   this with a blanket BY_MAGIC3 rule for direction-consistency only, not as a claim it's optimal;
-   this existing heuristic is prior art the eventual ordering experiment should study, not discard.
-   (b) two distinct "growing" mechanisms exist — concentric_search's own outer rounds (unaffected,
-   still correct) and `canSolveB_ctx`'s separate internal pass-retry (disabled in radius mode
-   because its widening assumption no longer held once child propagation went absolute) — the
-   re-sweep above now provides that widening role at the outer layer instead, so the inner
-   mechanism is redundant here, not broken. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 14.
-   **NO_DEADLINE now means "progressively widen your own radius, recursively," per direct
-   feedback** — reverted the BY_MAGIC3-forcing from above (kept `canSolveB_ctx`'s own pre-existing,
-   segment-count/index-conditioned heuristic as the baseline instead, no regression on any of the
-   43 endpoints) and implemented real widening for a NO_DEADLINE call: `radius_N` starts small and
-   doubles on every unresolved exhaustive pass, and children of a growing call get NO_DEADLINE
-   themselves rather than a finite slice, so the widening recurses all the way down. Found and
-   fixed a real corruption bug along the way: the pre-existing work-budget doubling logic and
-   `probe_child_deadline` both read `deadline` directly, which stays the NO_DEADLINE sentinel in
-   radius mode by design — an unsigned underflow silently corrupted it to UINT64_MAX, which would
-   have broken a child's ability to recognize it should also widen.
-   **This made a direct architectural test possible: is concentric_search's bespoke sweep even
-   still needed?** Called `canSolveB_ctx(&radius_ctx, sb, size, k, NO_DEADLINE)` directly — no
-   wrapper, no asymmetric last-segment structure — on all 43 previously-tested endpoints. All 43
-   correctly resolve TRUE. The 10 k7 and 8 k8-hardest endpoints resolve in 0.00-0.27s each, two to
-   three orders of magnitude faster than concentric_search's own times for the identical states;
-   most of the 20 k8-diverse set resolves in under a second. **But** 2 of the 5 previously-hardest
-   endpoints — the ones with the most extreme lopsided parts (41:4/51:1, 46:2/50:1 — the same shape
-   that triggered both deadline bugs earlier today) — took 494s and 300s, slower than
-   concentric_search's own 8-CPU-minutes-combined handling of those same 5 endpoints. Correct, not
-   a false answer, just slow. **Left open, not resolved unilaterally**: a real, evidence-backed
-   fork — baking widening into `canSolveB_ctx` is a dramatic win for most states and could retire
-   concentric_search's bespoke code, but its asymmetric "last segment always full" structure
-   appears to solve a real problem for the lopsided-part shape that the existing heuristic doesn't.
-   Whether to retire concentric_search, keep it as a fallback for that shape, or investigate the
-   heuristic's lopsided-part weakness directly is a decision for next steps. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 15.
-   **Corrected per feedback: widening happens ONLY at the level that received NO_DEADLINE, never
-   propagated to children.** Every child now gets the current attempt's concrete `radius_N` (one
-   pass, no independent re-widening); only the literal top-level call retries with a doubled
-   radius_N, re-trying the whole subtree at a larger uniform bound (cheap — already-resolved facts
-   are cache hits). No regression on the default path or concentric_search's own battery. Retested
-   direct `canSolveB_ctx(NO_DEADLINE)` on the 25 previously-timed endpoints: all still correctly
-   resolve TRUE; the two lopsided-part outliers improved modestly (494s→433s, 300s→218s) but
-   remained far slower than concentric_search. **Diagnosed precisely by measuring, not guessing
-   further**: both slow states' lopsided part (51:1 / 50:1) has by far the *smallest* true
-   admissible-split-list size (28, 30 vs. up to 196 for other parts) — it was never the bottleneck.
-   Symmetric radius_N growth means once N exceeds ~30 that part is fully covered for free, but N
-   keeps growing anyway to reach whatever the largest part needs, and since the same N multiplies
-   across all four parts jointly, by then the exploration is already near the full raw space — the
-   exact degeneracy concentric_search's own asymmetric "smallest segment always full, rest grow
-   together" design already solves. Natural next step, left for explicit direction: generalize
-   that asymmetric structure into `canSolveB_ctx`'s own radius-mode capping. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 16.
-   **Tried the asymmetric-capping generalization and reverted it — two hypotheses tested and
-   falsified, not one.** Implementing it made the two lopsided-part states SLOWER (533s/230s vs.
-   433s/218s), not faster. Real instrumentation (canSolveB_ctx's own progress printer) showed the
-   run stuck deep inside a single large pass (pass=7, radius_N=128 unchanged across 60+ seconds),
-   ruling out "too many doublings" as the mechanism. A second hypothesis — that the new eager
-   segment-table-building ran on every recursive call instead of only the growing top level, unlike
-   concentric_search's own once-only bookkeeping — was also tested (gated to `radius_grows` only)
-   and also falsified (541s/223s, no real change). Reverted both changes entirely; `radiobase.c` is
-   back to exactly the post-widening-fix state. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 17.
-   **Corrected the comparison itself, and the ~5x gap mostly disappeared.** Profiled the two slow
-   states directly (macOS `sample`) instead of guessing a fourth time: ~80% of actual solving time
-   is in `canSolveB_ctx`'s own entry-sequence code, not `star_expansion_majorization_can_solve`
-   (14.6%) or memmove (3.2%) as earlier print-based inference suggested. Implemented the resulting,
-   well-targeted fix — hoisting `canSolveB_ctx`'s existing joint mass/cap check (equivalent to
-   `concentric_search`'s own S/X/Cm check) to before the expensive single-part viability precheck,
-   as a pure addition — and it STILL made no measurable difference (554s/230s). Rather than guess a
-   fourth time, timed `concentric_search` on each state IN ISOLATION rather than as part of a
-   5-state batch average: 510s and 187s respectively — essentially the SAME range every
-   `canSolveB_ctx`-based variant measured (433-554s, 217-230s). **The original ~5x gap was mostly
-   an artifact of comparing individual states against a 5-state batch total** ("8 CPU-minutes
-   combined, ~96s average") rather than each state's own isolated cost — both states are
-   genuinely, structurally expensive under `concentric_search`'s own design too, and since its
-   child verification IS `canSolveB_ctx` unmodified, every change made today affected both designs'
-   dominant cost identically. This lopsided-part shape is expensive under either design, not a
-   `canSolveB_ctx`-specific weakness — no further optimization attempted. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 18.
-   **(SUPERSEDED below — see the 2026-08-24 follow-up.) 2026-08-23/24 overnight: do not use
-   `radius_mode` or `concentric_search`, call `canSolveB(..., NO_DEADLINE)` directly.** Cold
-   `Sa(192)` in `k=10` (a real workload, not a
-   synthetic endpoint) exposed a genuine exponential-blowup bug: radius mode propagates its
-   per-segment cap unchanged to `canSolveB_ctx`'s "mixed" child, whose part-count is double the
-   "pure" children's, so cost (`radius_N^size`) compounds across `Sa(n)`'s chained doublings — one
-   real 8-part state alone hit 32.7 billion totalsplits and 7,168 CPU seconds; the old engine
-   solved all of `Sa(192)` in 290.8 CPU seconds. Two proposed fixes for the mixed child's
-   propagated radius were tested and both are real, genuine trade-offs: `sqrt` scaling fixed the
-   blowup (max totalsplits down to 1.75M) but broke the retry growth-rate match with the parent
-   (some states needed pass=19-38 to resolve); `/2` scaling fixed the retry rate (99.8% resolve in
-   pass 1-2) but partially reintroduced blowup (max totalsplits 7.39 billion). Neither was adopted;
-   both fully reverted (`radiobase.c` confirmed byte-identical to `d77f148`). First-principles read:
-   work-units are additive and size-invariant, so the old engine's existing `search_deadline`
-   division rule already composes safely across a size-doubling child, which a per-segment
-   multiplicative radius currency cannot do without patches like the two above — sections 20-21
-   were teaching an exponential currency to imitate what an additive one already does for free.
-   This motivated the one test not yet run: plain, unmodified `canSolveB(sb, size, k, NO_DEADLINE)`,
-   no wrapper at all. **Result: it beats every variant tried today, on every case tried** — the 8
-   hardest flat 4-part endpoints all resolve in <0.1s; the 2 lopsided-part endpoints that sections
-   15-18 spent a full day on (217-554s under radius-mode variants, 187-510s under
-   `concentric_search` alone) resolve in **64.7s and 25.3s** under plain `canSolveB` — confirmed on
-   a second, independent run of the same two states within a fresh 25-state mixed-difficulty
-   battery (55.2s, 23.2s; all 25 states TRUE, 117.0s combined, no failures or blowups) — **7-8x
-   faster than either alternative, on the exact states both were built to handle well.**
-   `radius_mode` stays in `radiobase.c` as a default-off, zero-impact field (confirmed by every
-   regression today) — a validated-but-not-recommended feature and a record of what was tried, not
-   torn out mid-investigation; `concentric_search` likewise stays in `radio_oracle.c` pending an
-   explicit decision on whether it is still worth maintaining. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   sections 19-22.
-   **2026-08-24 follow-up — squaring the top-level retry rate fixes the retry-count problem, and
-   radius mode now beats the default engine on the multi-part battery (a real "comparable, ideally
-   better" result for that shape).** Diagnosed the pure-sqrt design precisely: sqrt-scaling is
-   reapplied at every mixed-child boundary, so a child nested `d` levels deep sees only
-   `radius_N^(1/2^d)` of the top level's radius — doubling the top radius therefore grows a
-   depth-3 child by only `2^(1/8)~=1.09x` per retry, matching the pass=19-38 observed earlier
-   exactly. Fix: square `radius_N` on retry instead of doubling it (overflow-guarded). A depth-`d`
-   child then sees `radius_N^(2^(t-d))` after `t` top-level retries — once `t>=d` this doubles in
-   lockstep with the top level, so a handful of retries suffices regardless of nesting depth,
-   while sqrt-scaling still keeps per-level cost mathematically invariant. Default path unaffected
-   (117.9s vs 117.0s baseline, noise-level). Cold `Sa(192)` in `k=10`: max pass down to 7 (from
-   19-38), max totalsplits per state 6.4M (far below the original 32.7B bug) — but the run still
-   didn't finish (2,502 CPU-s across two attempts), pinned by log analysis on one leaf query,
-   `Sb(112:80)` in `k=9`. **Decisive isolated test**: the plain default engine resolves that exact
-   query in 293.3 CPU-s — essentially the WHOLE 290.8s `Sa(192)` needed, meaning every other step
-   is cheap by comparison — while squaring+sqrt radius mode took 1256+ CPU-s on the identical
-   query without finishing (4.3x+ slower, still open). This confirms the remaining gap is no
-   longer a currency bug — radius-mode's hard per-level cap, even correctly scaled and retried,
-   explores this large single-part state's split space far less efficiently than the default
-   engine's heuristic ordering plus shared work-budget currency. **But** the 25-state multi-part
-   battery (radius-mode's actual intended shape — an already-split, moderate-size state) tells a
-   different story under squaring+sqrt: **85.823s total, zero incorrect verdicts, ~27% faster than
-   plain `canSolveB`'s 117.0-117.9s on the identical battery**, and 2-3x faster on the two hardest
-   lopsided-part states specifically (28.9s vs 55-65s; 7.9s vs 23-25s). **Conclusion: the workload
-   shape matters.** For an already-split multi-part state, squaring+sqrt radius mode is now the
-   better choice. For a single large unsplit pair needing many chained levels of internal
-   splitting (e.g. `canSolveA`'s own leaf verification), plain `canSolveB(NO_DEADLINE)` remains
-   clearly better and should still be preferred there. The squaring+sqrt change is committed,
-   gated entirely behind `radius_mode`. Not yet attempted: a fix for the single-large-part shape —
-   the likely direction is search-ORDER quality under a hard per-level cap (e.g. the per-part
-   deficit-score ranking, ~0.9961 AUC, from sections 11-12), not further propagation-scaling
-   arithmetic — left for explicit direction. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 23.
-   **2026-08-24 second follow-up — instrumented WHERE the time goes, and tried linear growth
-   instead of squaring: wins decisively on one shape, loses decisively on another.** Built an
-   offline instrumented copy (never the committed file) counting canSolveB_ctx entries vs.
-   cache-shortcut returns in radius mode. Mechanism confirmed precisely: cache-hit fraction is
-   91-99% throughout every measured run — the cost isn't individual calls being slow, it's that
-   "widen only at the top, one pass below" forces every retry to re-walk the ENTIRE top-level
-   range from scratch, mostly cache hits, but at billions-of-calls scale that re-walk itself is
-   the cost (confirmed on `Sb(67:46)` in 8, a real sub-state of `Sb(112:80)`'s own recursion:
-   squaring+sqrt takes 232.3s with 8.47B total calls, 99.1% cache hits, vs. default's 87.6s).
-   Tested linear growth (`radius_N += 1` per retry, absolute/unscaled propagation to the mixed
-   child too — reverting section 20's sqrt fix, paired with a much gentler schedule). Found and
-   fixed a bug in the experiment itself: starting at `radius_N=1` collides with the reserved
-   sentinel range (`CACHE_ONLY`=1, `NO_DEADLINE`=2, `FAST_ONLY`=3, `FROZEN_REFUTE`=4) — a child
-   handed `cd==2` misread it as `NO_DEADLINE` and ran its own incorrect independent growing
-   sequence; fixed by starting at 5. Results: on `Sb(67:46)`, linear **wins decisively** — 88.6s,
-   matching default within 1%, 2.65x faster than squaring+sqrt. On `Sb(112:80)` (the actual
-   target), linear **does not win** — already 2x default's 293.3s (587s+) with no sign of
-   finishing when stopped. On the 25-state battery (squaring+sqrt's own winning shape), linear
-   **loses** — stuck on the hardest lopsided state for 9+ CPU-minutes (squaring+sqrt: 28.9s).
-   **Conclusion: neither a fast (squaring) nor a slow (linear) fixed growth schedule is uniformly
-   better** — same shape of trade-off as sections 20-21's sqrt-vs-/2, one level up: total cost is
-   (retries needed to reach a state's true necessary radius) × (cost of one full top-level sweep
-   at the current scale), and no fixed schedule minimizes that without knowing the true necessary
-   radius in advance. Not yet attempted: an ADAPTIVE schedule — grow gently while new information
-   keeps appearing, jump ahead aggressively on a detected plateau (no new real work vs. the
-   previous pass), revert to gentle growth when progress resumes — a materially bigger design
-   change, left for explicit direction. Committed `radiobase.c` is unaffected; `radius_mode`
-   remains squaring+sqrt. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 24.
-   **2026-08-24 third follow-up — is the shared per-level ordering heuristic (BY_SP0/1/2, used by
-   both engines) actually good? Real skill, but nowhere near "the first few rounds," and it
-   degrades exactly on the hardest states.** Three tests: (1) verified, alone and cold, the three
-   children default's own winning split produced for `Sb(112:80)` in k=9 — 23.8s total, 8% of the
-   full run's 293.3s, confirming the winner itself is cheap and the other 92% goes to ~1256
-   rejected candidates at ~0.21s each. (2) instrumented the success path to find exactly how deep
-   in the raw order the winner sits: **fraction_from_top=0.4135** (41.35% through 6247 raw
-   candidates) — nowhere close to "the first few." (3) sampled 726 recursive successes inside the
-   easy `Sb(48:32)`'s own exploration tree to see if 41% is typical: mean=0.220, median=0.206,
-   p10=0.036, p90=0.417 — the heuristic has real, measurable skill (median far below the 0.5 a
-   no-information order gives), but `Sb(112:80)`'s own top-level fraction (0.4135) sits right at
-   this distribution's p90 — the hardest, costliest state landed in the worst tail of the same
-   heuristic that does reasonably well on average. **Conclusion: the growth-schedule dilemma
-   (sections 19-24: squaring, sqrt, /2, linear) is a symptom, not the disease** — every one of
-   those experiments was guessing, blind, how deep into an unknown-quality order the winner sits.
-   If ordering reliably put a winner in the first few candidates, a small fixed radius would
-   already succeed on pass 1, matching what's actually hoped for. Points at the earlier,
-   un-integrated per-part deficit-score ranking (~0.9961 AUC, sections 11-12) as the natural next
-   test — would help plain `canSolveB` too, since both engines share this heuristic — left for
-   explicit direction, a materially different piece of work. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 25.
-   **2026-08-24 fourth follow-up — wired the recursive-value model into `canSolveB_ctx` as a new
-   `BY_ML` ordering (`ml_order_mode`, default off): the mechanism is real and correct, but the
-   currently-embedded weights make the primary target WORSE, with a clear diagnosed cause.**
-   Corrected scope twice first: the model's training data was exclusively 4-part states, nothing
-   like the size=1 target's own 1/2/1 children — generated fresh matched corpora at nparts in
-   {1,2,3} (fixing a real generator bug, `WIDTHCAP` exceeding the labeling oracle's `MAX_N`); a
-   combined model (all sizes pooled) tied or beat separate per-size models on every size measured.
-   Second correction: the n=1 corpus's AUC=1.0 is a trivial artifact — the sampler's `n>=m` floor
-   plus its mass target mathematically forces `m <= sqrt(hi*cap)`, which lands EXACTLY on each
-   level's own proven-bound coverage ceiling (32 at k=7, 55 at k=8, both verified directly) — every
-   test state sat inside already-decided territory. `Sb(112:80)` (m=80, k=9) sits far outside all
-   of it — k=9's own table only reaches m=6. Mid-thread, corrected a wrong first answer about AWS:
-   a persistent `oracle-serve` instance (launched 2026-08-21 at explicit request, no fixed end
-   date) turned out to be live the whole time — an initial EC2 query missed it via the wrong tag
-   filter. Verified it live (280K+ real queries served, sa193 certificate correctly loaded) but
-   found its S3 STATUS object hadn't updated since launch three days earlier despite the server
-   being healthy — a real, separate status-upload bug, flagged for a fix. Redirected k=9 labeling
-   to this live server via a new TCPOracle mode rather than a cold local restore.
-   **C implementation**: confirmed `R_0` needs no porting (identical to the already-enforced
-   majorization checks) and the `sb0`/`sb1`/`sb2` ↔ selected/mixed/complement mapping has no
-   reversal (verified against two independent implementations). Added `BY_ML` exactly where
-   `BY_MAGIC3` lives (same table-build machinery), `ORDER_MONO_P=-1` (the correctness invariant —
-   never admits the counting-bound early-abandon, so a wrong score costs time, never correctness),
-   selected only when `size==1` (the one case with no accumulated-prefix mismatch). A new
-   `tools/ml/export_ordering_model.py` regenerates the embedded header from committed data and
-   refuses to write output if the reproduced holdout AUC drifts from the documented 0.986 by more
-   than 0.02. **Regression**: `ml_order_mode=0` unaffected (25-state battery 123.0s vs
-   117.0-117.9s, noise-level). **Result**: `Sb(67:46)` (UNSOLVABLE) — 88.4s under BY_ML vs 87.6s
-   default, within noise, exactly as expected (proving unsolvability needs exhaustion regardless
-   of order). `Sb(112:80)` (SOLVABLE, the actual target) — BY_ML did NOT finish in 900 CPU-seconds,
-   worse than default's 293.3s successful resolution. **Diagnosis**: `Sb(112:80)`'s deficit
-   feature silently defaults to a crude fallback outside k=9's proven coverage — a regime literally
-   absent from every training example (confirmed exhaustively), and `deficit`/`headroom` carry two
-   of the three largest-magnitude learned coefficients. **Conclusion**: the wiring is real, tested,
-   correct — mechanically sound and scoped exactly to what the model's own methodology supports —
-   but the currently-embedded weights actively hurt the case that matters most. Not the final word:
-   genuine k=9 n=1 labeling was still running via the live oracle-serve instance when this was
-   written; retrain including it and re-measure is the natural next step. See
-   [../evidence/native_concentric_2026-08-23.txt](../evidence/native_concentric_2026-08-23.txt)
-   section 26.
-   Deliberately NOT attempted: the literal cold Sa(193) canonical run (~4.85 CPU-days
-   historically) — a real, expensive, high-stakes production benchmark that needs a check-in
-   before launching, not an unsupervised overnight decision.
-   **Guidance remains correctness-free only for achievability** — a witness found under guidance
-   is still checked by `check_witness.py`, whereas pruning an OR-branch by a learned value would
-   manufacture false negatives.
+   (the complete 26-section record) and
+   [journal.md](journal.md#2026-08-24-closing-the-fast-solver-thread-concentric-search--radius-mode--by_ml-moved-to-a-branch-mains-solver-reverted-to-the-plain-understood-engine).
 
 4. **Follow up the mixed-largest law.** The k=8 corpus is analysed (below); the one result worth
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
