@@ -14,6 +14,7 @@ states from that band and label them for real via the same oracle.
 Usage: tools/ml/label_multi_size.py <oracle_binary> [--out-dir data/ml_order]
 """
 import argparse
+import socket
 import subprocess
 import sys
 import time
@@ -27,7 +28,13 @@ from contextlib import contextmanager
 
 @contextmanager
 def _tcp_oracle(host, port):
-    o = TCPOracle(host=host, port=port, timeout=180)
+    # 2026-08-24: a single k=9 n=1 query exceeded the old 180s client timeout and crashed the
+    # whole run with an unhandled socket.timeout (see label() below for the other half of this
+    # fix -- catching it there and treating it as MAYBE, since the server's own documented
+    # per-query budget already makes MAYBE the correct semantic for "took too long to decide").
+    # 900s gives real headroom above the server's own ~60s budget for the queueing/network
+    # latency of a live remote server serving other traffic too, not just this job.
+    o = TCPOracle(host=host, port=port, timeout=900)
     o.ready = o.stats()  # cheap round-trip that also confirms the server is actually reachable
     yield o
 
@@ -63,7 +70,19 @@ def gen(k, n, lo, hi, nparts, m_lo, m_hi):
 
 
 def label(o, k, states):
-    return [{"SOLVABLE": 0, "UNSOLVABLE": 1, "MAYBE": 2}[o.ask(k, parts)] for parts in states]
+    """A single slow query must never crash the whole batch. socket.timeout on the TCP path (the
+    remote server's own per-query budget already makes "took too long" a real, expected outcome,
+    not a bug) is caught and mapped to MAYBE -- the same code the server itself would have
+    returned had ITS budget expired first; load()'s callers already drop MAYBE from training."""
+    out = []
+    for parts in states:
+        try:
+            out.append({"SOLVABLE": 0, "UNSOLVABLE": 1, "MAYBE": 2}[o.ask(k, parts)])
+        except socket.timeout:
+            print(f"  (client timeout on k={k} {parts} -- treating as MAYBE, not a crash)",
+                  file=sys.stderr); sys.stderr.flush()
+            out.append(2)
+    return out
 
 
 def probe(o, k, lo, nparts, m_lo, m_hi, n=30):
