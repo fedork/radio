@@ -25,6 +25,11 @@ sequence used below ([Aigner 1986](https://doi.org/10.1016/0166-218X(86)90026-0)
 ([1990](https://doi.org/10.1016/0166-218X(90)90022-5)) and the explicit recursive algorithm of
 Gargano, Montuori, Setaro and Vaccaro
 ([1992](https://doi.org/10.1016/0166-218X(92)90260-H)) provide the scalable asymptotic context.
+Jiang, Polyanskii and Vorobyev give an explicit near-optimal mixed construction
+([2019](https://www.lebesgue.fr/sites/default/files/proceedings_WCC/WCC_2019_paper_65.pdf));
+Florin, Ho and Jiang determine the sharp leading asymptotic rate
+([2022](https://doi.org/10.1109/TIT.2021.3137965)). Neither result is a finite fixed-`m` Pareto
+maximum.
 Hwang's survey ([1987](https://doi.org/10.2307/2322412)) is a concise historical introduction
 to the two-coin quantitative model.  Full source notes and cautions are maintained in
 `../docs/literature.md`.

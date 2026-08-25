@@ -5,9 +5,9 @@ Aigner and Li--Wu--Triesch, our state `Sb(n:m)` is the complete bipartite graph 
 their search number `c(K_{m,n})` is the minimum number of adaptive ternary tests.  Thus their
 largest `n` with `c(K_{m,n}) <= k` is exactly our `n(k,m)`.
 
-The seven PDFs below were read directly, not inferred from abstracts or secondary citations.
-Bibliographic links point to the version of record; local download paths are deliberately not
-committed.
+The eleven sources below and the scoped Aigner book scan were read directly, not inferred from
+abstracts or secondary citations. Bibliographic links point to the version of record; local
+download paths are deliberately not committed.
 
 ## Primary sources read
 
@@ -35,6 +35,19 @@ M. Aigner, “Search problems on graphs,” *Discrete Applied Mathematics* 14 (1
   `N(3)=(8,7,4,4,1,1,1,1)`, the direct predecessor of this repository's `G_k`.
 - Gives the exact complete-bipartite results for `m=2` and `m=3`.  These upgrade the `k=9`
   values 511 and 503 from lower bounds to published maxima.
+
+### Aigner 1988 (scoped book scan)
+
+M. Aigner, *Combinatorial Search* (Wiley--Teubner, 1988). The supplied scan is Chapter 3 and
+the relevant answers-to-exercises pages, rather than the book's Chapter 2 on weighing. Its
+directly checked details are in [aigner-1988-scan.md](aigner-1988-scan.md).
+
+- Section 3.3 explicitly identifies quantity testing with ternary edge search, derives the
+  three `K_{m,n}` child graphs, and gives the historical singleton sequence `N(k) = G_k`.
+- Corollary 3.26 gives the exact `m=2` result, while the answer to Exercise 3.3.1 gives the
+  exact `m=3` result. This independently cross-checks the corresponding Aigner 1986 claims.
+- Proposition 3.25 is only a necessary majorization condition. Its stated open converse is a
+  useful guard against overstating what this older source proves.
 
 ### Andreae 1989
 
@@ -121,6 +134,60 @@ This is the decisive source for the correction in this repository.
   corrected rectangle algebra and exact D-slice consequence are in
   [the m=5 Pareto-assembly calibration](theorems/m5-pareto-assembly.md).
 
+### Jiang--Polyanskii--Vorobyev 2019
+
+Z. Jiang, N. Polyanskii and I. Vorobyev, “A near-optimal algorithm for adaptive searching of
+two counterfeit coins,” *Workshop on Coding and Cryptography* (2019).
+[Proceedings PDF](https://www.lebesgue.fr/sites/default/files/proceedings_WCC/WCC_2019_paper_65.pdf).
+
+- Gives an **explicit** asymptotic construction for the same ternary edge-search model.  Its
+  mixed strategy over disjoint copies of `K_{n,n}` gives
+  `N_wc(K_{n,n}) <= 1.2938 log_2(n)(1+o(1))`.
+- The reusable structural idea is to mix many bipartite instances, then resolve a bounded
+  matching of residual candidate edges.  This is useful conceptual precedent for this
+  repository's multipart constructions, but it is not a finite fixed-`m` `Sb` frontier proof.
+- The paper conjectured the smaller `1.2662` leading constant; the next source establishes the
+  sharp asymptotic rate.
+
+### Florin--Ho--Jiang 2022
+
+S. H. Florin, M. H. Ho and Z. Jiang, “On the Binary Adder Channel With Complete Feedback, With
+an Application to Quantitative Group Testing,” *IEEE Transactions on Information Theory* 68(5)
+(2022), 2839–2856. [DOI 10.1109/TIT.2021.3137965](https://doi.org/10.1109/TIT.2021.3137965).
+
+- Establishes the exact asymptotic rate for the adaptive one-set problem:
+  `Sa(n)` needs `1.26624... log_2(n)(1+o(1))` tests.  This settles the leading constant left
+  open by the 2019 explicit construction.
+- Its Theorem 10 gives a direct bijection between strategies with one defective in each of two
+  disjoint equal-size sets and uniquely decodable binary-adder-channel codes with complete
+  feedback.  This is a clean modern source for the bipartite model's coding-theoretic analogue.
+- These are asymptotic results, not finite exact values of `Sa(n)` or fixed-`m` `Sb(n:m)`.
+  They therefore do not change the project tables or the evidence behind their maxima.
+
+### Zhang--Berger--Massey 1987
+
+Z. Zhang, T. Berger and J. L. Massey, “Some Families of Zero-Error Block Codes for the Two-User
+Binary Adder Channel with Feedback,” *IEEE Transactions on Information Theory* 33(5) (1987),
+613–619. [DOI 10.1109/TIT.1987.1057358](https://doi.org/10.1109/TIT.1987.1057358).
+
+- An early coding-theoretic treatment of the full-feedback binary-adder channel. Its Fibonacci
+  and difference-equation code families are direct equivalents of adaptive bipartite strategies;
+  the paper's best displayed symmetric full-feedback rate is about `0.717` bits per user per use.
+- The later WCC paper translates its refined construction to the `1.3954 log_2(n)(1+o(1))`
+  explicit worst-case bound. It is historical construction context only: it supplies neither a
+  finite fixed-`m` maximum nor the now-known optimal asymptotic constant.
+
+### Hwang--Lee 2001
+
+F. K. Hwang and J. S. Lee, “Optimal quantitative group testing on cycles and paths,” *Discrete
+Applied Mathematics* 113 (2001), 299–302.
+[DOI 10.1016/S0166-218X(01)00188-3](https://doi.org/10.1016/S0166-218X(01)00188-3).
+
+- Uses exactly the same ternary induced-subgraph test, but for candidate graphs that are unions
+  of paths and cycles. It determines their optimal test counts up to a one-test cycle effect.
+- This is useful confirmation that the repository's graph formulation is standard. It does not
+  address `K_n`, `K_{m,n}`, or the present complete-graph/bipartite frontiers.
+
 ## Consequences imported into this project
 
 | claim | prior record | corrected status | source |
@@ -141,15 +208,28 @@ tree in `witnesses/majorized_481_5_at9.tree`, and the root-type scan in
 
 These are cited by the papers above but have not yet been checked directly here:
 
-- M. Aigner, *Combinatorial Search* (Wiley–Teubner, 1988): likely the cleanest single source
-  for the graph framework and exact `m<=4` material.  Check Oxford SOLO first, then
-  interlibrary loan; it is a book rather than a ScienceDirect article.
+- The *full* Chapter 2, “Weighing Problems,” of Aigner's *Combinatorial Search* (1988): the
+  newly supplied scan begins instead at Chapter 3. Chapter 3 is enough for the graph framework
+  and exact `m=2,3` cross-check; Chapter 2 would add the original balance/spring-scale account.
 - C. A. Christen's earlier Fibonaccian-search reports and the original papers behind Hwang's
   survey: useful only if the historical development becomes part of the paper.  Search Oxford
   SOLO by title/author or request scans through Bodleian document delivery.
 - D.-Z. Du and F. K. Hwang, *Combinatorial Group Testing and Its Applications*: useful for a
   modern group-testing overview, but lower priority than the primary exact papers already in
   hand.
+- A. Ya. Belokopytov and V. N. Luzgin, “Block transmission of information in a summing
+  multiple access channel with feedback,” *Problems of Information Transmission* 23(4) (1987),
+  347–351: WCC 2019 attributes the then-best explicit asymptotic constant `1.3277` to it.
+  Obtain the primary paper before treating that attribution as a project source.
+- A. Ya. Belokopytov, “On the zero error feedback capacity region of the binary adder channel,”
+  *Problems of Control and Information Theory* 18(2) (1989), 125–133: WCC 2019 attributes the
+  nonconstructive `1.2662` worst-case bound to it. Florin--Ho--Jiang now gives the exact modern
+  result, but the original is worth obtaining for the historical proof trail.
+- E. Karimi, F. Kazemi, A. Heidarzadeh and A. Sprintson, “A Simple and Efficient Strategy for
+  the Coin Weighing Problem with a Spring Scale,” *ISIT* (2018), 1730–1734,
+  [arXiv:1805.02977](https://arxiv.org/abs/1805.02977): relevant only as an **average-case**
+  study of a broader `d=k=2` weight model, which permits a weight-2 coin. It is not a comparison
+  bound for this repository's two distinct-defective, worst-case model.
 
 For the current theorem and implementation work, no paywalled article is blocking progress:
 the primary exact `m=5` paper and the main scalable-algorithm papers have all been obtained.

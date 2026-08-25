@@ -146,8 +146,10 @@ pursue it at all.
   `n(9,5)=481` / `n(9,5)<482` boundary and the `3+2` to `4+1` structural switch.
 - Add the primary-source discussion from [literature.md](literature.md): Aigner for the graph
   model and exact `m=2,3`, Li--Wu--Triesch for `m=4,5`, and Hao/Gargano et al. for scalable
-  product constructions.  Do not copy Li et al.'s apparently inconsistent intermediate
-  equations (69)–(70) without recomputing their indices.
+  product constructions; also distinguish the modern asymptotic results of
+  Jiang--Polyanskii--Vorobyev and Florin--Ho--Jiang from finite fixed-`m` claims. Do not copy
+  Li et al.'s apparently inconsistent intermediate equations (69)–(70) without recomputing
+  their indices.
 - State that every `Sa` table entry through `k=10` is proven maximal, and cite the distinct
   witness/exhaustive sources for the new last cell.
 
