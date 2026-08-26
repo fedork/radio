@@ -90,7 +90,7 @@ Agreement is a consistency check, not a transfer of proof status from run9 to ru
 
 `radio_verify.c` is a separate checker sharing no solver search code. It treats a negative proof as
 a k-stratified DAG of refuted facts and verifies that every split has a refuted child one level
-down, using only the split semantics and the proved Singleton Majorization, Unit-Group Elimination
+down, using only the split semantics and the proved Singleton Majorization Necessity, Unit-Group Elimination
 and Subgraph Monotonicity theorems. It has verified the full `Sa(113)` k=9 ladder—304,105 negative
 facts across k=2..8—with zero unverified.
 

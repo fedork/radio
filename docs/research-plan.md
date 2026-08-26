@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-18.
+entries. Last revised 2026-08-26.
 
 ## High-level goals
 
@@ -34,9 +34,10 @@ conditional excess-`q` Pareto-assembly programme is **parked as of 2026-08-16**:
 local reductions and conditional constructions, but do not treat further normalization/rank scans
 as a proximate goal.  The literature now settles `m=5`: the old formula/`BBBD` equality is refuted
 at `k=9`, and the exact
-piecewise theorem changes the root from `3+2` to `4+1`.  That theorem is now reconstructed inside
-the corrected Pareto assembly: complete finite enumeration finds the crossing, and the winning
-`4+1` family reduces to a sharp piecewise D slice.  This is the known-answer standard for every
+piecewise theorem changes the root from `3+2` to `4+1`.  The corrected Pareto assembly finds the
+crossing, but its arbitrary singleton-majorization terminals are conditional on the open converse;
+the published theorem, not that reconstruction, is the unconditional source.  It remains the
+known-answer standard for every
 proposed generalization: retain competing outer triples, solve each D problem, and take their
 guarded envelope.  Its first eventual decisive singleton-majorized leaf has sharp exact and
 distinct-slot-embedded depth three.  No fixed exact depth at most five can work uniformly at every
@@ -44,7 +45,7 @@ sufficiently large level; depth six is the first compatible per-component invent
 synchronized packing and the uniform embedded minimum are open.  This is deliberately separate
 from the published formula, whose quantified `k>=11` range excludes later numerical transitions
 without asserting a unique or aligned `AABD` strategy.  The old `m=6` closed form and `BBCD`
-profile are refuted by the exact `n(10,6)=973` frontier.  A checked
+profile are refuted by the unconditional upper bound `n(10,6)<=973`.  A checked
 sixteen-atom aligned tree now gives the different conditional continuation
 `2^k-k^2+7k-21` for `k>=12`; global equality and the finite `k=11` case remain open.  Inside the
 fixed `(4,3,2)` aligned height-6 slice, the unresolved excessive-`q` question narrowed sharply: a
@@ -92,7 +93,8 @@ missing/incomplete provenance unless a historical override is explicit.
 ### P2 - Extend the K=9 column constructively
 
 Canonical search for `m = 7` (predicted 457) and `m = 8` (predicted 447), where both models
-agree. Each success is a proof standing on the Singleton Majorization Theorem alone.
+agree. Each success is a proof standing on Aigner's explicit `G_k` strategy and Subgraph
+Monotonicity.
 
 ```
 ./run_radio_canon_search_generic.sh 4 9 457 7
@@ -158,6 +160,17 @@ contains no number absent from `data/*.csv`.
 
 ### P6 - Full star expansion and synchronized majorization for long states
 
+**Foundational singleton subproblem (corrected 2026-08-26).**  Weak majorization by `G_K` is
+proved necessary, but its converse is open.  The exact target is the Row-Coloring Lemma (C) in
+[the theorem note](theorems/singleton-majorization.md#the-exact-remaining-row-coloring-lemma).
+The best bottom-up route is to prove that the legal demand family `F_(G_r)` has the discrete-
+polymatroid augmentation property, equivalently to construct a global balanced row orientation of
+the doubled Pascal/dyadic columns.  Strict alternation, lower-load assignment, local safe-next
+assignment, fixed half-mixed reservation, two-class exchange, and even the broader class of all
+`2`-flat bases now have explicit counterexamples.  Do not spend more time on another memoryless
+coloring rule; an advance must exploit the full Pascal multiplicities via a global augmenting path,
+or prove niceness of the transcript graph `Q_K` by another method.
+
 **Delivered 2026-08-09.** The useful child-profile feature was not merely an ordering score. The
 [Vertex-Splitting Pullback Lemma](theorems/singleton-majorization.md#vertex-splitting-pullback-lemma-2026-08-09)
 proves that every part `(n:m)`, `n>=m`, may be lifted to `m` disjoint singleton stars `(n:1)`.
@@ -184,12 +197,13 @@ The old pair/triple/quad deployment remains rejected: its information is already
 upward-closed prefix cache. The full star filter is different—it is a global arbitrary-part-count
 theorem and directly proves 40.6% of the recorded k=5 negatives.
 
-**The synchronized theory is now characterised, but not deployed.** Define `R_0` as full-star
+**The synchronized predicates are now characterised, but not deployed.** Define `R_0` as full-star
 majorization and `R_d` by requiring one legal synchronized split whose three children pass
-`R_{d-1}`. These conditions are nested and sound, and `R_k` is exact solvability. The first level is
+`R_{d-1}`. Each condition is necessary and `R_k` is exact solvability; the previously claimed
+nesting between adjacent depths is unproved. The first level is
 an additive hinge-capacity problem. The full theorem, a worked `Sb(16:1,12:2)` ladder, and a
 width-two counterexample to any single-base majorization rule are in
-[the theorem note](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
+[the theorem note](theorems/singleton-majorization.md#the-synchronized-majorization-predicates-corrected-2026-08-26).
 
 Do not add `R_1` as a production pre-pass. The current recursive prefix checks already enforce its
 child inequalities, and on the residual four-part positive the first `R_1` witness is dead and
@@ -232,9 +246,9 @@ should the minimal production form be tried: a transient lineage-aware hint, one
 a bounded pass, and unchanged fallback.  Split hints must influence order only; they are not cache
 facts.  Use `tools/pareto_census_status.sh` for a one-shot progress query.
 
-**Separate theoretical m=6 thread (updated 2026-08-15).** The first large-`k` classification is
-complete: `n(10,6)=973`, with exact rejection at 974 and an independently verified
-singleton-majorized tree at 973.  This refutes both the closed form and `BBCD` profile, which
+**Separate theoretical m=6 thread (corrected 2026-08-26).** The first large-`k` upper bound is
+`n(10,6)<=973`, from an exact rejection at 974.  The singleton-majorized tree at 973 is
+conditional on the open converse.  The upper bound already refutes both the closed form and `BBCD` profile, which
 predict 976.  The separate finite recurrence, when fed the corrected `n(9,5)=481`, predicts
 977 and misses by four.  The working root is `[477:2]`, with mixed child
 `Sb(496:2,477:4)@9`; it avoids the `Z_7` kernel rather than repairing it.  The separate aligned
@@ -242,8 +256,9 @@ atom track now supplies a structural
 continuation `2^k-k^2+7k-21` for `k>=12`, conditional on the outer assembly; it is not a fit to this
 stored subtree.  Next:
 
-1. classify the working root splits at 973 and express the `m=4 + m=2` mixed-child boundary in
-   deficit coordinates;
+1. find an unconditional 973 construction (or prove the singleton Row-Coloring Lemma), then
+   classify working root splits and express the `m=4 + m=2` mixed-child boundary in deficit
+   coordinates;
 2. decide the proposed one-level lift, whose only new hard child is
    `Sb(503:1,495:2,478:3)@9` (the first five-minute run was inconclusive, and the literal scaled
    continuation is refuted by the exact negative `Sb(247:1,247:1,240:2,231:2)@8`);
@@ -261,13 +276,14 @@ every fixed labelled A/B/C/D pattern eventually reaches a stable atomic-leaf reg
 the corrected diagram gives a concrete branch rather than a missing map.  For
 `A=(a:alpha)@k-1` and `B=(b:beta),C=(c:gamma)@k-2`, maximize `d` in
 `Sb(d:beta,b:alpha-beta,c:m-alpha-gamma,a-c:gamma)@k-2`, then score the candidate `a+b+d`.
-The known-answer `m=5` calibration is now complete.  Exact enumeration chooses `(3,2,2)` through
+The known-answer `m=5` algebraic calibration is complete, but its arbitrary-majorized terminal
+construction is conditional.  Enumeration within that terminal model chooses `(3,2,2)` through
 parent `k=7`, ties it with `(4,3,1)` at `k=8`, and switches to `(4,3,1)` at `k=9`.  For the latter
-family, the published proof reduces to an exact D frontier
-`Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`: its maximum is
+family, the local program proposes the D frontier
+`Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`: its candidate value and unconditional upper ceiling are
 `2^t-binomial(t-2,2)` at `t=7,8` and one larger from `t=9`.  The latter has a direct two-test
 reduction to singleton-majorized leaves, whose decisive prefix inequality first holds at `t=9`.
-This proves that a scalable state must
+Conditional on the singleton converse, this shows that a scalable state must
 store a guarded family envelope, not one atom word or one preferred height triple.  See
 [the exact calibration](theorems/m5-pareto-assembly.md).
 For the stronger atom interpretation, the first eventual decisive leaf

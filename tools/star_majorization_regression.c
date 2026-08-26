@@ -84,6 +84,33 @@ int main(void) {
         compare_one(sb, size, k, &checked);
     }
 
+    /* Historical tries can contain positives created solely by the former singleton-converse
+       shortcut.  A nonembedded majorized singleton must ignore such a hit and do real work. */
+    {
+        int sb[4] = {getSbb(3, 1), getSbb(2, 1), getSbb(2, 1), getSbb(2, 1)};
+        sort1(sb, 4);
+        cache(sb, 4, TRUE, 2, 9); /* Deliberately seed the untrusted historical fact. */
+        uint64_t before = radio_budget_now_ctx(&radio_default_search_context);
+        int verdict = canSolveB(sb, 4, 2, NO_DEADLINE);
+        uint64_t work = radio_budget_now_ctx(&radio_default_search_context) - before;
+        if (verdict != TRUE || work == 0) {
+            fprintf(stderr,
+                    "nonembedded singleton cache bypass failed: verdict=%d work=%llu\n",
+                    verdict, (unsigned long long)work);
+            return 1;
+        }
+        /* The exact result was stored in the process-local L1 and may now be reused safely. */
+        before = radio_budget_now_ctx(&radio_default_search_context);
+        verdict = canSolveB(sb, 4, 2, NO_DEADLINE);
+        work = radio_budget_now_ctx(&radio_default_search_context) - before;
+        if (verdict != TRUE || work != 0) {
+            fprintf(stderr,
+                    "exact singleton L1 reuse failed: verdict=%d work=%llu\n",
+                    verdict, (unsigned long long)work);
+            return 1;
+        }
+    }
+
     printf("star majorization endpoint regression: %llu states agree\n", checked);
     return 0;
 }

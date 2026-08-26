@@ -6,7 +6,7 @@ It is Python and therefore slow; a production verifier would be C. The point is 
 reduction ratios and the verification cost on real logs at small k before anything expensive
 depends on them.
 
-The trust base is exactly: Singleton Majorization, the Vertex-Splitting Pullback Lemma,
+The trust base is exactly: Singleton Majorization Necessity, the Vertex-Splitting Pullback Lemma,
 Unit-Group Elimination, Subgraph Monotonicity, and the split semantics of docs/problem.md.
 Nothing about the solver - not its orderings, not FAST, not deadlines, not its cache.
 
@@ -75,7 +75,7 @@ def mass(s) -> int:
 
 
 def maj_refutes(s, k: int) -> bool:
-    """Refute s using its full star expansion and Singleton Majorization.
+    """Refute s using its full star expansion and Singleton Majorization Necessity.
 
     The Vertex-Splitting Pullback Lemma replaces every oriented part (n:m) by m disjoint copies
     of (n:1). Pulling a strategy back to all vertex clones preserves the transcript of every edge,

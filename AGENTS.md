@@ -20,7 +20,7 @@ Then, before changing anything:
 
 ```
 tools/check_tables.py                    # facts, formulas, generated blocks, sources
-tools/check_witness.py witnesses/*.tree  # re-derive every proof from first principles
+tools/check_witness.py witnesses/*.tree  # verify structure and flag conditional terminals
 ```
 
 Both are seconds and dependency-free. If either is red on arrival, fix that first and say so.
@@ -52,8 +52,8 @@ of truth. Status vocabulary and column meanings: [docs/README.md](docs/README.md
 Prefer, in order:
 
 1. A **canonical witness tree** whose leaves are sub-multisets of `G_k`. This is a proof
-   resting on the Singleton Majorization Theorem alone - the solver could be wrong and the
-   result would stand. Produce with `radio_canon_search_generic`, verify with
+   resting on Aigner's explicit recursive strategy for `G_k` plus Subgraph Monotonicity - the
+   solver could be wrong and the result would stand. Produce with `radio_canon_search_generic`, verify with
    `tools/check_witness.py`, commit to `witnesses/`.
 2. A **solver log line pair** - `can solve Sb(n:m) in k` plus `can't solve Sb(n+1:m) in k` -
    located in a retained, archived artifact.

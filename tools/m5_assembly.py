@@ -3,8 +3,8 @@
 
 Li--Wu--Triesch prove the exact piecewise value of n(k,5).  This module rewrites
 their two construction types in the corrected A/B/C/D assembly notation used by
-this repository.  It also verifies a self-contained singleton-majorization
-construction for the eventual D branch.  The words BBBD, ABBD and AABD below
+this repository.  It also verifies the singleton-majorization inequalities for a
+conditional eventual D-branch construction; sufficiency is the open converse.  The words BBBD, ABBD and AABD below
 remain mass identities, not assertions that a symmetric aligned atom tree exists.
 
 Run without arguments for the transition levels, or name levels explicitly:
@@ -58,7 +58,7 @@ def singleton_prefix(level: int, count: int) -> Tuple[int, ...]:
 
 
 def singleton_majorized(state: State, level: int) -> bool:
-    """Singleton Majorization for a state whose every surviving part has height one."""
+    """Necessary singleton-majorization test for a state whose parts have height one."""
     if any(m != 1 for _, m in state):
         return False
     widths = sorted((n for n, _ in state), reverse=True)
@@ -136,8 +136,8 @@ def eventual_d_template_works(t: int) -> bool:
     """Check the uniform two-test D construction for the +1 regime.
 
     The target is R_t(2^t-binomial(t-2,2)+1).  The template is legal already at
-    t=7,8 but one singleton outcome fails majorization there.  It succeeds for
-    every t>=9, exactly where the published frontier gains its second coin.  All
+    t=7,8 but one singleton outcome fails majorization there.  The necessary
+    inequalities succeed for every t>=9, exactly where the published frontier gains its second coin.  All
     terminal states are checked directly against G_(t-1) or G_(t-2).
     """
     if t < 7:

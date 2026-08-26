@@ -37,35 +37,36 @@ to C1 rather than as an isolated large table.
 Before submission: establish which cells, if any, already appeared in an accessible exact table;
 include both boundary verdicts and their artifact hashes in supplementary material.
 
-### C3 — exact `m=6` boundaries and the failure of the former continuation
+### C3 — an exact `m=6` boundary, a new upper bound, and failure of the former continuation
 
-The exact values `n(9,6)=473` and `n(10,6)=973` have checked achievability witnesses and retained
-rejections at the next value; see [pareto_sb.csv](../data/pareto_sb.csv) and
+The value `n(9,6)=473` has a canonical achievability witness and retained rejection at 474.
+At the next level, exhaustive search proves `n(10,6)<=973`; the present 973 construction stops at
+arbitrary majorized singleton leaves and is conditional on the open converse.  See
+[pareto_sb.csv](../data/pareto_sb.csv) and
 [special-cases.md](theorems/special-cases.md#10-sb2k---kk-12---3-6---refuted). In particular,
 the former `m=6` continuation fits through nine tests but predicts 976 at ten, and is false.
 
 Publication value: this is a compact, interpretable new finite theorem and a useful warning
 against inferring global formulae from low-depth data. It belongs beside C1/C2.
 
-Before submission: package the `m=6` rejection logs and the majorized witness checker as a
-self-contained supplement; do not call the observed nine-test formula an eventual theorem.
+Before submission: package the `m=6` rejection logs and the canonical 473 witness; do not present
+973 as achievable unless the singleton converse or an unconditional 973 tree is supplied.
 
 ## Theory suitable for a theorem section or a companion paper
 
-### T1 — Singleton Majorization Theorem
+### T1 — Singleton Majorization Necessity and the open converse
 
-Singleton states are solvable in `K` tests exactly when their group-size sequence is weakly
-majorized by the explicit base sequence `G_K`; see
-[singleton-majorization.md](theorems/singleton-majorization.md). This makes every canonical
-witness leaf independently checkable and provides the closed binomial-block form of `G_K`.
+Every singleton state solvable in `K` tests is weakly majorized by the explicit base sequence
+`G_K`.  The converse remains open.  The transcript-conflict graph and Fixed-Color Hall Lemma reduce
+it to one precise Row-Coloring Lemma; see
+[singleton-majorization.md](theorems/singleton-majorization.md).  Canonical and distinct-slot
+witness leaves remain independently checkable from the explicit strategy for `G_K`.
 
-Publication value: potentially the most reusable structural result. It converts a large class
-of strategy-existence questions into a finite majorization test.
+Publication value: the necessity theorem gives a reusable obstruction, while the graph/Hall
+reduction is a clean formulation of the open sufficiency problem.
 
-Before submission: either prove the stated Three-Way Majorization Decomposition Lemma in the
-paper or cite a precise standard source. Also perform a direct novelty audit against Aigner's
-necessary majorization result; the supplied Aigner scan explicitly leaves the converse open, but
-that does not rule out later rediscovery.
+Before submission: do not state the converse as a theorem.  Cite Aigner for the historical
+necessity result and present the transcript/Hall reduction only after a focused novelty audit.
 
 ### T2 — Unit-Group Elimination Theorem
 
@@ -88,11 +89,12 @@ format and a major solver reduction. It is a strong theory/algorithm bridge.
 Before submission: distinguish clearly between this necessary condition and exact solvability;
 the width-two counterexample in the same note shows why no naive one-sequence extension is exact.
 
-### T4 — synchronized-majorization hierarchy
+### T4 — synchronized-majorization predicates
 
-The hierarchy `R_0,R_1,...,R_K` is sound and reaches exact solvability at depth `K`; it also
-shows that width-two solvability is not captured by any one fixed base sequence. See
-[singleton-majorization.md](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
+Every predicate `R_d` is necessary for solvability, and `R_K` is exact.  The previously claimed
+nesting `R_(d+1)=>R_d` is unproved because its base step used the open singleton converse.  The
+width-two counterexample to any one fixed base sequence remains valid. See
+[singleton-majorization.md](theorems/singleton-majorization.md#the-synchronized-majorization-predicates-corrected-2026-08-26).
 
 Publication value: promising, but presently a secondary theorem. Its importance depends on
 whether the hierarchy yields a usable characterization, a nontrivial complexity result, or new
@@ -124,7 +126,7 @@ finite boundaries beyond the current implementation use.
 
 ## Sensible paper package
 
-1. **Main paper:** C1, C2, C3, T1--T3, with the finite tables and certificates as the central
+1. **Main paper:** C1, C2, the unconditional part of C3, and T1--T3, with the finite tables and certificates as the central
    contribution.
 2. **Supplement:** raw/provenanced solver artifacts, machine-readable frontiers, witness trees,
    independent checkers, and a command-by-command reproduction guide.

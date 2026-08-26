@@ -12,7 +12,7 @@ Two input formats are auto-detected:
                `<state> @k [canonical U_k]` leaves (atom sub-multisets),
                `<state> @k [embedded G_k]` leaves (coordinatewise fits in distinct
                slots), or `<state> @k [majorized G_k]` leaves (arbitrary singleton
-               sequences).
+               sequences, conditional on the open singleton-majorization converse).
 
   numbered   - output of radio_print.c
                `N. (in k) (used r) <state> take[...]:` followed by three
@@ -31,9 +31,12 @@ What is checked, in both formats:
 
 Format-specific:
 
-  canonical  * every leaf is a singleton state certified either as a sub-multiset of
-               G_k or by direct weak majorization against G_k.  In both cases the
-               Singleton Majorization Theorem makes the tree a self-contained proof.
+  canonical  * every leaf is checked as a sub-multiset of G_k, a coordinatewise embedding
+               in distinct G_k slots, or a sequence weakly majorized by G_k.  The first two
+               are unconditional proofs by the explicit strategy for G_k and subgraph
+               monotonicity.  The third is reported as structurally valid but conditional
+               on the open singleton-majorization converse unless the checker can independently
+               upgrade that leaf to a distinct-slot embedding.
 
   numbered   * a `(line M)` reference is legal iff the state at line M dominates the child
                after deleting unit groups (1:1), by the Unit-Group Elimination Theorem
@@ -62,7 +65,7 @@ def singleton_base(k: int) -> List[int]:
     """G_k, the maximal singleton state solvable in k tests.
 
     G_0 = (1); G_k = sort(L + M + R) where L, M, R are the three zero-padded copies of
-    G_{k-1} described in the Singleton Majorization Theorem. Equivalently the atom in
+    G_{k-1} described in the singleton-base recurrence. Equivalently the atom in
     dyadic block r is sum_{i=0}^{k-r} C(k,i); the recurrence is used here so the checker
     does not depend on that identity.
     """
@@ -178,7 +181,7 @@ class CanonNode:
         self.kids: List["CanonNode"] = []
 
 
-def check_canonical(lines: List[str], errs: List[str]) -> str:
+def check_canonical(lines: List[str], errs: List[str]) -> Tuple[str, int]:
     seq = []
     for line in lines:
         m = CANON.match(line)
@@ -189,7 +192,7 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
                         m.group(1).strip()))
     if not seq:
         errs.append("no parseable nodes")
-        return "0 nodes"
+        return "0 nodes", 0
 
     # Rebuild from preorder + arity rather than indentation: a split node is followed by
     # exactly its three subtrees, a canonical node by nothing. This survives the
@@ -221,10 +224,11 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
         roots.append(r)
 
     leaves: Counter = Counter()
+    conditional_leaves = 0
     splits = 0
 
     def visit(n: CanonNode) -> None:
-        nonlocal splits
+        nonlocal splits, conditional_leaves
         if mass(n.state) > 3 ** n.k:
             errs.append(f"{n.text} @{n.k}: mass {mass(n.state)} exceeds 3^{n.k}")
         if n.terminal is not None:
@@ -260,8 +264,13 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
                         right += base_values[i]
                         if left > right:
                             errs.append(f"{n.text} @{n.k}: singleton prefix {i + 1} "
-                                        f"has sum {left} > {right} in G_{n.k}")
+                                            f"has sum {left} > {right} in G_{n.k}")
                             break
+                    embedded = (len(widths) <= len(base_values)
+                                and all(width <= base_values[i]
+                                        for i, width in enumerate(widths)))
+                    if not embedded:
+                        conditional_leaves += 1
             leaves[n.k] += 1
             return
         splits += 1
@@ -291,8 +300,11 @@ def check_canonical(lines: List[str], errs: List[str]) -> str:
     if pos != len(seq):
         errs.append(f"{len(seq) - pos} trailing nodes not attached to any tree")
     names = ", ".join(f"{r.text}@{r.k}" for r in roots[:3]) + ("..." if len(roots) > 3 else "")
+    qualification = (f", {conditional_leaves} conditional majorization terminal(s)"
+                     if conditional_leaves else "")
     return (f"{len(seq)} nodes, {len(roots)} tree(s) [{names}], "
-            f"{splits} splits, {sum(leaves.values())} certified leaves")
+            f"{splits} splits, {sum(leaves.values())} checked terminals{qualification}",
+            conditional_leaves)
 
 
 # -------------------------------------------------------------------- numbered format
@@ -306,7 +318,7 @@ HEAD = re.compile(r"^(\d+)\.\s+\(in (\d+)\)\s*(?:\(used (\d+)\)\s*)?(Sa|Sb)\(([^
 CHILD = re.compile(r"^([012])=>(Sa|Sb)\(([^)]*)\)\[(\d+),(\d+)\]\((?:line (-?\d+)|trivial)\)")
 
 
-def check_numbered(lines: List[str], errs: List[str]) -> str:
+def check_numbered(lines: List[str], errs: List[str]) -> Tuple[str, int]:
     nodes: Dict[int, dict] = {}
     cur = None
     for raw in lines:
@@ -336,7 +348,7 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
                 ref=int(m.group(6)) if m.group(6) and int(m.group(6)) >= 0 else None)
     if not nodes:
         errs.append("no parseable nodes")
-        return "0 nodes"
+        return "0 nodes", 0
 
     def expected(nd: dict):
         """Children of one line, as (kind, n_or_state) triples keyed by outcome digit."""
@@ -430,7 +442,7 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
 
     top = nodes[root]
     label = f"Sa({top['n']})" if top["kind"] == "Sa" else f"Sb{list(top['state'])}"
-    return f"{len(nodes)} nodes, root {label} in {top['k']}, all reachable"
+    return f"{len(nodes)} nodes, root {label} in {top['k']}, all reachable", 0
 
 
 # -------------------------------------------------------------------------------- cli
@@ -438,30 +450,41 @@ def check_numbered(lines: List[str], errs: List[str]) -> str:
 RESULTPRINT = re.compile(r"^\s*resultprint\s?")
 
 
-def check_file(path: str) -> bool:
+def check_file(path: str) -> Tuple[bool, int]:
     # radio_print.c tags its tree lines with a `resultprint` prefix so they can be grepped
     # out of a noisy log. Accept the raw form as well as the filtered one.
     lines = [RESULTPRINT.sub("", l.rstrip("\n"))
              for l in open(path) if not l.lstrip().startswith("#")]
     errs: List[str] = []
     numbered = any(HEAD.match(l.strip()) for l in lines)
-    summary = check_numbered(lines, errs) if numbered else check_canonical(lines, errs)
+    summary, conditional = (check_numbered(lines, errs) if numbered
+                            else check_canonical(lines, errs))
     kind = "numbered" if numbered else "canonical"
-    status = "OK" if not errs else f"{len(errs)} ERROR(S)"
+    status = (f"{len(errs)} ERROR(S)" if errs else
+              "STRUCTURALLY OK; CONDITIONAL" if conditional else "OK")
     print(f"{path}: [{kind}] {summary} -> {status}")
     for e in errs[:20]:
         print(f"    {e}")
     if len(errs) > 20:
         print(f"    ... and {len(errs) - 20} more")
-    return not errs
+    return not errs, conditional
 
 
 def main(argv: Sequence[str]) -> int:
     if not argv:
         print(__doc__)
         return 2
-    ok = all([check_file(p) for p in argv])
-    print(f"\n{'all trees verified' if ok else 'VERIFICATION FAILED'}")
+    results = [check_file(p) for p in argv]
+    ok = all(result[0] for result in results)
+    conditional_files = sum(bool(result[1]) for result in results)
+    if not ok:
+        message = "VERIFICATION FAILED"
+    elif conditional_files:
+        message = (f"all files structurally verified; {conditional_files} file(s) depend on "
+                   "the open singleton-majorization converse")
+    else:
+        message = "all trees verified unconditionally"
+    print(f"\n{message}")
     return 0 if ok else 1
 
 

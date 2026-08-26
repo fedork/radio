@@ -129,9 +129,9 @@ def main() -> int:
     import csv
     ntrees = len([f for f in os.listdir(os.path.join(ROOT, "witnesses"))
                   if f.endswith(".tree")])
-    m = re.search(r"\*\*(\d+) verified witness trees\*\*", status)
+    m = re.search(r"\*\*(\d+) (?:verified|structurally checked) witness trees\*\*", status)
     if not m:
-        warns.append("status.md does not state a verified-witness-tree count")
+        warns.append("status.md does not state a checked-witness-tree count")
     elif int(m.group(1)) != ntrees:
         errs.append(f"status.md says {m.group(1)} witness trees, witnesses/ has {ntrees}")
 

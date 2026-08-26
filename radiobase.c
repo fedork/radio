@@ -1400,6 +1400,25 @@ int singleton_majorization_can_solve(int *sb, int size, int k) {
     return TRUE;
 }
 
+/* Unconditional positive singleton terminal.  Aigner's explicit strategy solves the rows of
+   G_k.  If the requested sorted row widths fit coordinatewise in distinct G_k rows, delete the
+   unused leaves/edges from that construction.  Weak majorization alone is only a proved
+   necessary condition; its converse remains open. */
+static int singleton_embedded_can_solve(int *sb, int size, int k) {
+    int right_len = singleton_base_len[k];
+    int widths[size];
+    int i;
+    if (size > right_len) return FALSE;
+    for (i = 0; i < size; i++) widths[i] = sbb_to_n1[sb[i]];
+    sort1(widths, size);
+    for (i = 0; i < size; i++) {
+        int atom = singleton_base_prefix[k][i]
+            - (i > 0 ? singleton_base_prefix[k][i - 1] : 0);
+        if (widths[i] > atom) return FALSE;
+    }
+    return TRUE;
+}
+
 /* Check the star lift after `by_n` has been sorted by descending long side.  Within one part,
    the left profile adds `copies` equal values n.  If g[] is the non-increasing singleton base,
 
@@ -1460,7 +1479,7 @@ static int star_expansion_majorization_large(int *sb, int size, int k) {
 /* Necessary condition for an arbitrary Sb state.  Replace each oriented part (n:m), n >= m,
    by m disjoint singleton stars (n:1).  This is a vertex-splitting lift of the original graph:
    pulling every test back to all clones preserves every edge transcript, so a strategy for the
-   original would solve the lift.  The Singleton Majorization Theorem then decides the lift.
+   original would solve the lift.  Singleton Majorization Necessity then bounds the lift.
 
    Hot verifier children contain at most eight parts.  Keep their sort buffer fixed-size so the
    compiler does not emit variable-stack probing on every call; retain the general VLA path for
@@ -1942,6 +1961,8 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     int shared_probe = size <= 2;
     if (size>1) sort1(tmp, size);
     int query_size = size;
+    int singleton_exact_required = FALSE;
+    int singleton_ignored_positive_cache = FALSE;
     cache_l1_entry *l1_entry = NULL;
     uint32_t l1_hash = 0;
     int ck = MAYBE;
@@ -1952,12 +1973,20 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         if (ck == TRUE || ck == FALSE) return ck;
     }
     if (singleton_size == size) {
-        // Singleton states are decided exactly by majorization against G_k.
+        // Majorization is necessary.  A distinct-slot embedding is an unconditional positive
+        // terminal; arbitrary majorized singleton states must continue through exact recursion.
         ck = singleton_majorization_can_solve(tmp, size, k);
-        cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
-        return ck;
+        if (!ck) {
+            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, FALSE);
+            return FALSE;
+        }
+        if (singleton_embedded_can_solve(tmp, size, k)) {
+            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, TRUE);
+            return TRUE;
+        }
+        singleton_exact_required = TRUE;
     }
-    // Apply Singleton Majorization to the full star expansion: (n:m) becomes m copies of (n:1).
+    // Apply Singleton Majorization Necessity to the full star expansion: (n:m) becomes m copies of (n:1).
     // This strictly dominates the old one-copy downgrade, because it contains that downgraded
     // singleton sequence and adds only nonnegative entries.  It is a necessary condition, not an
     // ordering heuristic; see docs/theorems/singleton-majorization.md.
@@ -1974,14 +2003,30 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     if (!frozen_refute) {
         ck = RADIO_EXTERNAL_EXACT_LOOKUP(tmp, size, k);
         if (ck == TRUE || ck == FALSE) {
-            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
-            return ck;
+            /* An imported "exact" table may predate the proof-status correction and contain a
+               singleton positive produced solely by weak majorization.  Apply the same safety
+               boundary as for the dominance trie below. */
+            if (singleton_exact_required && ck == TRUE) {
+                ck = MAYBE;
+            } else {
+                cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
+                return ck;
+            }
         }
     }
 #endif
     //check cache
     if (!frozen_refute) {
         ck = checkCacheTrie_ctx(ctx, tmp, size, k);
+        /* Parsed/historical tries do not record why a positive singleton fact was accepted.
+           Older builds inserted every majorized singleton through the now-open converse.  Ignore
+           such positive trie hits and derive the state by exact recursion.  The process-local L1
+           remains safe: this build never seeds it from an ignored hit, and the final store below
+           records the result of the real recursion.  Negative hits remain sound. */
+        if (singleton_exact_required && ck == TRUE) {
+            singleton_ignored_positive_cache = TRUE;
+            ck = MAYBE;
+        }
         cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
     }
     //	printf("got from cache %d\n", ck);
@@ -2602,7 +2647,10 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     fflush(stdout);
 #endif
     cache_l1_store(ctx, l1_entry, l1_hash, tmp, query_size, k, canSolve);
-    cache(tmp, size, canSolve, k, pairs);
+    /* A stale positive dominance fact may already subsume this exact state.  Reinserting either
+       verdict would be redundant or contradictory in a trie that has no proof-provenance bit.
+       Keep the exact result in the process-local L1 and leave the persistent legacy trie alone. */
+    if (!singleton_ignored_positive_cache) cache(tmp, size, canSolve, k, pairs);
     //    fflush(stdout);
     printf("\n");
 #ifndef OPT_2

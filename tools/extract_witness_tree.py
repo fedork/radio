@@ -8,10 +8,13 @@ state using:
 
   1. exact logged solve lines;
   2. unit-group triviality, by deleting 1:1 parts when enabled;
-  3. singleton-majorization terminals for states whose all multiplicities are 1;
+  3. singleton terminals whose rows fit coordinatewise in distinct `G_k` rows, or
+     arbitrary singleton-majorization terminals explicitly marked conditional;
   4. logged superstates with extra parts deleted, when enabled.
 
 It deliberately does NOT rewrite `Sb(a:2)` as two copies of `Sb(a:1)`.
+An arbitrary weak-majorization terminal is not presently a proof: the converse is open.
+The qualification is propagated to the rendered root and reported on stderr.
 """
 from __future__ import annotations
 
@@ -224,6 +227,7 @@ class Proof:
     evidence: Optional[Evidence] = None
     children: List['Proof'] = field(default_factory=list)
     ref_id: Optional[int] = None
+    conditional: bool = False
 
 
 class WitnessExtractor:
@@ -391,7 +395,8 @@ class WitnessExtractor:
             cached = self._memo[key]
             if cached.status in ("failed", "cycle"):
                 return Proof(state=state, k=k, status=cached.status, detail="cached: " + cached.detail, ref_id=id(cached))
-            return Proof(state=state, k=k, status="see-earlier", ref_id=id(cached))
+            return Proof(state=state, k=k, status="see-earlier", ref_id=id(cached),
+                         conditional=cached.conditional)
         if key in self._active:
             return Proof(state=state, k=k, status="cycle", detail="recursive cycle avoided")
         self._active.add(key)
@@ -410,7 +415,15 @@ class WitnessExtractor:
             pass
         ok, why = singleton_majorized(state, k)
         if ok:
-            return Proof(state=state, k=k, status="terminal", detail="singleton majorization: " + why)
+            rows = sorted([n for n, _ in state], reverse=True)
+            g = base_sequence(k)
+            embedded = all(n <= slot for n, slot in zip(rows, g))
+            if embedded:
+                return Proof(state=state, k=k, status="terminal",
+                             detail="distinct-slot embedding: " + why)
+            return Proof(state=state, k=k, status="terminal",
+                         detail="CONDITIONAL singleton majorization: " + why,
+                         conditional=True)
         if k == 0:
             # Only empty or unit-stripped states should survive at k=0.
             return Proof(state=state, k=k, status="failed", detail="nonterminal at k=0")
@@ -422,7 +435,9 @@ class WitnessExtractor:
                 detail = f"{ev.kind} line {ev.line_no}, split [{','.join(f'{x}:{y}' for x,y in ev.splits)}]"
                 if ev.kind != "exact":
                     detail += f"; restricted from logged superstate on line {ev.restricted_from}"
-                return Proof(state=state, k=k, status="proved", detail=detail, evidence=ev, children=child_proofs)
+                return Proof(state=state, k=k, status="proved", detail=detail, evidence=ev,
+                             children=child_proofs,
+                             conditional=any(cp.conditional for cp in child_proofs))
             failures.append(f"line {ev.line_no}: " + "; ".join(f"child {i} {cp.status}" for i, cp in enumerate(child_proofs)))
 
         # Last resort: safe monotonicity with identical multiplicities.
@@ -459,7 +474,8 @@ def render_proof(proof: Proof, *, max_line_len: int = 220, _seen: Optional[Dict[
     node_no = len(_seen) + 1
     _seen[obj_id] = node_no
 
-    head = f"{indent}- #{node_no} {state_to_text(proof.state)} in {proof.k}: {proof.status}"
+    qualification = " [CONDITIONAL]" if proof.conditional else ""
+    head = f"{indent}- #{node_no} {state_to_text(proof.state)} in {proof.k}: {proof.status}{qualification}"
     if proof.detail:
         head += f" ({proof.detail})"
     lines.append(head)
@@ -500,6 +516,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             f.write(rendered + "\n")
     else:
         print(rendered)
+    if proof.conditional:
+        print("warning: result depends on the open singleton-majorization converse", file=sys.stderr)
     return 0 if proof.status in ("proved", "terminal") else 2
 
 

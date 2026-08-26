@@ -37,7 +37,7 @@ check of `n(9,11)`.
 
 Both models reproduce **every** proven value for `k = 1..8`, `m = 1..10`.  They are no longer
 globally viable models.  At `m=5` both predict 480 at `k=9`, while the exact maximum is 481;
-at `m=6` both give 976 at `k=10`, while the exact maximum is 973.  Their disagreement remains
+at `m=6` both give 976 at `k=10`, while the unconditional upper bound is 973.  Their disagreement remains
 useful for distinguishing the still-open *row-wise* `m=9,10` extrapolations, but neither model
 should be extrapolated wholesale.
 
@@ -57,7 +57,7 @@ So:
 The test is asymmetric and that matters for how to spend compute:
 
 - **Finding** a canonical witness tree for `Sb(432:9)` proves the profile prediction achievable
-  and refutes the 431 equality outright, via the Singleton Majorization Theorem, with no solver
+  and refutes the 431 equality outright, via the explicit `G_k` strategy and Subgraph Monotonicity, with no solver
   trust required.  It would not by itself prove 432 maximal.  This is cheap - the same tool
   already produced trees for `496:4`, `480:5` and `473:6` at `k=9`.
 - **Failing** to find one proves nothing. Ruling out 432 requires exhaustive search, which
@@ -119,12 +119,13 @@ After its two outer tests, the sole hard outcome is
 
     R_t(d) = Sb(d:3,(P-t):1,(P-2t):1) @t.
 
-The construction and published upper bound together make this D slice exact:
+The majorized-terminal construction conditionally matches this D-slice upper bound:
 `d*=P-Q` for `t=7,8`, and `d*=P-Q+1` for `t>=9`.  Exact local assembly also gives the tied
 base `d*=P-Q-1=57` at `t=6`.  The proof, including the recomputed off-by-one index in the paper's
 displayed descendants, is in
 [the m=5 Pareto-assembly calibration](theorems/m5-pareto-assembly.md).
-In particular, the eventual branch has a self-contained two-test reduction to singleton leaves.
+In particular, the eventual branch has a two-test reduction to majorized singleton leaves; this is
+not self-contained until those leaves are exactified or the converse is proved.
 One of its `G_(t-2)` prefix inequalities fails at `t=7,8` and all of them hold from `t=9`, so the
 second regime change is visible inside D rather than merely fitted to the theorem values.
 
@@ -132,9 +133,9 @@ The local exact replay sees the same transition.  For `Sb(481:5)@9`, every capac
 `3+2` root is negative: `[a:3]` fails for all 23 values `a=226..248`.  In the `4+1` class,
 `[a:4]` fails for `a=225..239` and succeeds for `a=240,241,242`.  A `5+0` split cannot fit
 481 because its two `k=8`, `m=5` pure branches total at most `2*231=462`.  Thus every feasible
-root is `4+1`, up to complement.  The compact verified witness begins with `[239:1]`, the
+root in the conditional terminal model is `4+1`, up to complement.  The compact conditional file begins with `[239:1]`, the
 complement of the paper's `[242:4]`.  Full diagnostic details are retained in
-`evidence/sb_m5_k9_root_transition.txt`; the 481/482 boundary and proof tree are in
+`evidence/sb_m5_k9_root_transition.txt`; the 481/482 boundary and conditional tree are in
 `evidence/sb_m5_k9_frontier.txt` and `witnesses/majorized_481_5_at9.tree`.
 
 There is a useful atom arithmetic behind the three regimes.  At normalization `t=k-2`, let
@@ -223,9 +224,10 @@ Sb(9:1)       mass  9   not solvable in 3
 ```
 
 obtained by moving a coin off the `1`-side of `(2:1)` (losing 2 edges) onto the `8`-side of
-`(8:1)` (gaining 1). Both states are singleton states, so this rests on the **Singleton
-Majorization Theorem**, not on a solver run: `(8,2)` has prefix sums `8, 10` against
-`G_3 = (8,7,4,4,1,1,1,1)` and passes; `(9)` fails at `9 > 8`. So there is no potential
+`(8:1)` (gaining 1). This does not rely on the open singleton converse: `(8,2)` fits
+coordinatewise in the first two rows `(8,7)` of the explicit solvable state
+`G_3 = (8,7,4,4,1,1,1,1)`, while `(9)` is impossible by the proved necessary inequality
+`9 > 8`. So there is no potential
 function of that shape, and (u1) is not the shadow of a more general monotonicity.
 
 ### What remains: the Extremal Split Lemma
@@ -445,7 +447,7 @@ uses the mirror form `[242:4]`, i.e. `a = n(8,4) = 242`, `n-a = n(8,5) = 231`.
 
 The apparent `m=6` recursion fails at its first extrapolation.  With the corrected exact
 `n(9,5)=481`, it predicts `496+481=977` at `k=10`, but exact synchronized search proves
-`n(10,6)=973`.  A verified tree uses root `[477:2]`, with children
+`n(10,6)<=973`.  A conditional majorized-terminal tree uses root `[477:2]`, with children
 
     Sb(477:2),  Sb(496:2,477:4),  Sb(496:4).
 
@@ -747,10 +749,10 @@ all `k>=7`.  This proves a lower bound only.  Equality is now **refuted** at `k=
 published exact answer and independent replay gain one coin via the `4+1` regime above.
 
 The complete height-5 calibration therefore retains both outer families rather than replacing this
-proof.  Exact assembly chooses `(3,2,2)` through `k=7`, ties it with `(4,3,1)` at `k=8`, and
-chooses `(4,3,1)` at `k=9`; the latter branch then realizes the published exact formula for every
-larger `k`.  Its D maximum is piecewise even though the outer height triple is unchanged.  See
-[the exact reconstruction](theorems/m5-pareto-assembly.md) and the locked finite controls in
+proof.  Conditional majorized-terminal assembly chooses `(3,2,2)` through `k=7`, ties it with
+`(4,3,1)` at `k=8`, and chooses `(4,3,1)` at `k=9`; it numerically matches the published exact
+formula.  Its proposed D maximum is piecewise even though the outer height triple is unchanged. See
+[the conditional reconstruction](theorems/m5-pareto-assembly.md) and the locked finite controls in
 `tools/singletonization_regression.sh`.
 
 **Height 6 is exactly the first synchronization obstruction.**  The repeated finite winner uses
@@ -760,8 +762,8 @@ branch
     Sb(ABBD:3, AABC:1, ABCC:2) @ r+2.             (6)
 
 It works through the finite `k<=9` data but fails at `k=10`: at `G_6`, its D word `ABBD` has width
-232 and would give the impossible parent width 976.  The exact height-6 frontier instead uses
-`d=229`, giving the verified hard state `Sb(229:3,241:2,248:1)@8` and parent width 973.  After one
+232 and would give the impossible parent width 976.  The conditional height-6 construction instead uses
+`d=229`, giving the hard state `Sb(229:3,241:2,248:1)@8` and parent width 973.  After one
 more refinement, at `G_5`, the failed D word is `AAAABBCD` (width 232), whereas one eight-atom
 accounting of the exact width 229 is `ABBBBBCD`: three `A` atoms have been replaced by three `B`
 atoms.  This is a precise finite synchronization loss of three, not evidence for a constant
@@ -846,7 +848,7 @@ with width
     2^k-k^2+7k-21,       k>=12.                                  (13)
 
 The compact `A^7B^7D^2@G[k-4]` spelling is the old spreadsheet's `p6'` row: it reproduces 473 at
-`k=9`, the exact 973 at `k=10`, and predicts 1983 at the still-open `k=11`.  The construction needs
+`k=9`, the upper-bound value 973 at `k=10`, and predicts 1983 at the still-open `k=11`.  The construction needs
 the twice-refined 64-atom realization; the compact spelling alone does not lower its proved atomic
 depth.  At 32 atoms, D lineage and a checked 504-core `(D,C+D)` kernel exclude ranks 1--1179 at
 every depth.  Rank 1181, `A^26BC^3D^2`, is the pure refinement of the rank-305 construction, leaving
@@ -1125,13 +1127,14 @@ Carried over from [journal.md](journal.md), unresolved:
   final branch-signature multisets. A second generator is needed and no candidate preserving
   the right invariants has been found. The depth-2 block clue is a conservative 3-block
   rewrite `{AACC, AB, BC} <-> {AA, AC, BBCC}`.
-- **What replaces the refuted `m=6` profile.** The exact `k=10` maximum is 973, reached through
-  `Sb(496:2,477:4)@9`, so the old `BBCD`/closed-form value 976 is dead.  The open problem is a
+- **What replaces the refuted `m=6` profile.** The unconditional `k=10` upper bound is 973, and a
+  conditional tree reaches `Sb(496:2,477:4)@9`, so the old `BBCD`/closed-form value 976 is dead.
+  The open problem is an unconditional 973 construction and then a
   parametric construction or obstruction for this `m=2 + m=4` mixed-state frontier; the parked
   aligned assembly is not presumed to supply it.  Do not fit
   the 973 witness's later subtree or infer either a constant three-unit correction to the old
   formula or a four-unit correction to the finite recurrence from one level.
 - **Proving rather than fitting the closed forms.** Lemmas 1-5 have real inductive proofs;
   Aigner and Li--Wu--Triesch supply published matching upper bounds through `m=5`.  No general
-  exact formula beyond `m=5` is known, although the retained replay makes the individual
-  `n(9,6)=473` and `n(10,6)=973` boundaries exact.
+  exact formula beyond `m=5` is known.  The retained replay and canonical tree make
+  `n(9,6)=473` exact; at `k=10` only `n(10,6)<=973` is unconditional.

@@ -1,30 +1,12 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-24** (the published exact `m=5` result is now reconstructed
-inside the corrected Pareto assembly: complete finite enumeration finds the `3+2` / `4+1` crossing,
-and finite witnesses plus a uniform singleton-majorization template yield a sharp symbolic D slice
-for the winning `4+1` branch; its first eventual five-part majorized leaf has sharp exact/embedded
-atomization depth three, while six is only the first arithmetically possible *uniform exact* depth
-and synchronized sufficiency is open; the broader excess-`q` assembly programme is now parked
-because this calibration requires a guarded family envelope and the height-6 continuation remains conditional;
-a 504-core certificate excludes 32-atom height-6
-ranks through 1179; rank 1181 is constructible by refinement, leaving only rank 1180 unresolved
-at all depths in that parked slice; exact loss-sliced cover excludes rank 1180 through depth four, while
-depth five and eventual constructibility remain open;
-the exact Li--Wu--Triesch `m=5` theorem and an independent 481/482 replay correct the old
-`n(9,5)=480` extrapolation to 481 and force a `3+2` to `4+1` root transition;
-proof-safe cold AWS `run9` has completed all sixteen roots and establishes `Sa(10)=192`; the
-separate resumed k=8 Pareto-prefix census remains live, while both old independent full-run9
-coloring attempts and the slower kd-indexed ordinary audit were stopped; a frozen, solver-core,
-read-only/refute-only replay verified all 3,126,190 normalized claims with zero gaps and is archived;
-its level-local successor and a separate citation-tracing colored build have both now **finished**
-with zero gaps and are archived and re-verified, and they settle the compression question
-negatively — the certificate is only 8.94% compressible and its dominant k=7 level is 97.3% cited,
-so coloring cost 3.5% more CPU than the complete replay; separately, the completed k=7 choice corpus was
-found to survive only in local scratch and is now archived, and its single-solution layer has been
-measured — split choice is recursive, not geometric, so scalar split scores are refuted while stacked
-sound necessary conditions multiply).
+don't know it. Last refreshed **2026-08-26**.  The central correction is that singleton
+majorization is proved only as a necessary condition: the former sufficiency proof used a false
+decomposition lemma.  Canonical/distinct-slot witness leaves remain unconditional, arbitrary
+`[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
+unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers
+through `k=8`, the exact `k=9,m=1..6` cells, and the published `m=5` theorem are unaffected.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -35,6 +17,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 
 | trap | why it matters |
 |---|---|
+| **Do not use arbitrary weak majorization by `G_k` as a positive singleton theorem.** | Necessity is proved; sufficiency is the open Row-Coloring Lemma.  The former Three-Way Decomposition Lemma is false already at `k=2`.  `[canonical U_k]` and `[embedded G_k]` leaves are unconditional because they delete edges from Aigner's explicit `G_k` strategy; `[majorized G_k]` leaves are conditional.  `tools/check_witness.py` reports the distinction. Fresh solver builds continue nonembedded majorized singletons through exact recursion and ignore positive dominance-trie hits for them, because historical caches do not record whether the old shortcut created a fact. Retain a checked unconditional tree for every positive claim. |
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
@@ -103,8 +86,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 - **Sharp asymptotic `Sa` rate** — Florin--Ho--Jiang (2022) determine the exact leading
   constant, while Jiang--Polyanskii--Vorobyev (2019) give an explicit near-optimal construction.
   These are asymptotic statements, not finite-cell evidence; see [literature.md](literature.md).
-- **Three theorems plus the lift-box lemma** — Singleton Majorization, Unit-Group Elimination and
-  Subgraph Monotonicity are proved; so is the new geometric core of recursive Pareto lifting. The
+- **Singleton necessity, two further theorems, plus the lift-box lemma** — Singleton Majorization
+  Necessity, Unit-Group Elimination and Subgraph Monotonicity are proved; the singleton converse is
+  open.  So is the new geometric core of recursive Pareto lifting. The
   latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
   but was load-bearing and unwritten: it is
   what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
@@ -115,12 +99,12 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   inspected Aigner 1988 Chapter 3 scan independently verifies the graph model and its `m=2,3`
   results; it does not include the book's Chapter 2 weighing material. See
   [aigner-1988-scan.md](aigner-1988-scan.md).
-- **18 verified witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
+- **18 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
-  `Sb(473:6)@9`, their two-sided variants where available, and the singleton-majorized proof
-  of the exact frontier `Sb(973:6)@10`, plus the exact three-level atomization of the decisive
-  `m=5` majorized leaf at `P_7`. All pass
-  `tools/check_witness.py`, which re-derives every step without consulting the solver.
+  `Sb(473:6)@9`, their two-sided variants where available, and the conditional
+  singleton-majorized construction for `Sb(973:6)@10`, plus the exact three-level atomization of
+  the decisive `m=5` majorized leaf at `P_7`. All pass structural checking; the two
+  `majorized_*` files are explicitly reported as conditional.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
 
@@ -128,7 +112,7 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 
 Kept on record so it is not re-derived: the old `m=5` closed form and `BBBD` profile as
 equalities (both predict 480 instead of exact 481 at `k=9`), the `m=6` closed form and `BBCD`
-profile (both predict `n(10,6)=976`, while the exact maximum is 973), the `m=11` closed form
+profile (both predict `n(10,6)=976`, while the unconditional upper bound is 973), the `m=11` closed form
 (violates monotonicity in m), the hand-typed `409?` as a *derivation* (though see below — it is
 *consistent* with the profile model), and 31 verdicts from the 2023 build.
 
@@ -149,20 +133,23 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   predictions are 457, 447 and 432 for `m=7,8,9`, then `414..416` for `m=10` (two fits),
   followed by 410, 395 and 388.
 - **The `m=5` transition is structural, not just +1.**  At `Sb(481:5)@9` all 23 feasible
-  `3+2` roots fail, while the `4+1` roots of selected width 240–242 succeed.  The verified
-  tree starts with the complementary `[239:1]`; Li--Wu--Triesch make the same root-type
+  `3+2` roots fail, while the conditional majorized-terminal search finds `4+1` roots of selected
+  width 240–242.  Its tree starts with the complementary `[239:1]`; Li--Wu--Triesch independently
+  make the same root-type
   switch.  Atom masses read `BBBD=480`, `ABBD=481`, `AABD=482`, but the latter words are
   presently arithmetic interpretations, not per-coin profiles extracted from the compressed
   witness.  See [conjectures.md](conjectures.md#exact-m5-transition-and-the-structural-break-updated-2026-08-16).
-- **The exact `m=5` result now calibrates the A/B/C/D assembly (2026-08-16).**  Complete exact
+- **The published exact `m=5` result calibrates the A/B/C/D assembly, conditionally (corrected
+  2026-08-26).**  Complete finite
   enumeration over proven lower frontiers chooses `(alpha,beta,gamma)=(3,2,2)` through parent
   `k=7`, ties it with `(4,3,1)` at `k=8`, and chooses `(4,3,1)` at `k=9`.  With `t=k-2`, the
   latter branch's only hard outcome is
-  `Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`.  Finite witnesses and a uniform two-test reduction to
-  singleton-majorized leaves construct its D maximum: `d*=2^t-binomial(t-2,2)` at `t=7,8`, then
-  one larger for every `t>=9`; the published upper bound makes those values sharp.  The uniform
+  `Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`.  Finite files and a uniform two-test reduction reach
+  singleton-majorized leaves at `d*=2^t-binomial(t-2,2)` for `t=7,8`, then one larger for every
+  `t>=9`; these local positive claims depend on the open singleton converse.  The uniform
   leaf inequality first succeeds at `t=9`, internally explaining the `k=11` breakpoint.
-  Direct exact construction checks reach the theorem's 985 and 2001 at `k=10,11`.  This validates
+  The published theorem independently supplies the final 985 and 2001 values.  Thus this supports,
+  but does not unconditionally validate,
   black-box A/B/C composition and D maximization for the known case, while refuting any restriction
   to one outer triple or one non-piecewise D formula.  Proof and reproduction are in
   [the m=5 calibration](theorems/m5-pareto-assembly.md).
@@ -226,11 +213,11 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   one-sided splits (verified in source: n-side spans `[0,n]`, m-side enumeration is a bijection,
   the mirror filter is top-level dedup only). But it *does* require every leaf to be a
   `G_k`-atom singleton state, so conclusions about tree interiors from those trees are
-  conditional on that hypothesis.
+  specialized to that terminal class; the resulting trees themselves are unconditional proofs.
 - **The apparent m=6 recursion is refuted at its first extrapolation.**
   `n(k,6) = n(k-1,4) + n(k-1,5)` is exact for `k=5..9` but, using the corrected
-  `n(9,5)=481`, predicts 977 at `k=10`; the exact
-  value is 973.  The verified construction still uses a `2+4` root and saturates the `m=4`
+  `n(9,5)=481`, predicts 977 at `k=10`; the unconditional upper bound is 973.  The conditional
+  construction file uses a `2+4` root and saturates the `m=4`
   pure child, but backs the other width down from 481 to 477.  The separate old `BBCD`
   closed form predicts 976.  This is one datum, not a new
   constant-correction formula.  See
@@ -245,7 +232,7 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   **refuted**: the multi-part generalisation is false (`Sb(15:2,5:4)` solvable in 4,
   `Sb(15:2,6:3)` not), which kills every induction that rewrites a strategy part by part; and no
   mass-based coin-move lemma exists (`Sb(8:1,2:1)` solvable in 3, `Sb(9:1)` not, at strictly
-  lower mass — by Singleton Majorization, not by solver). What remains is one lemma: *the winning
+  lower mass — by a direct embedding in `G_3`, not by solver). What remains is one lemma: *the winning
   split minimising `p−q` survives the coin move*, 187/187 at k ≤ 5 plus 28 at k = 6.
   [conjectures.md](conjectures.md#conjecture-u1---the-antidiagonal-conjecture).
 - **Parked construction track (opened 2026-08-14; parked 2026-08-16):** the working programme
@@ -287,7 +274,7 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   search finds a different 19-node exact tree with root-base threshold 6.  Rank 305 is consequently
   the exact sixteen-atom optimum.  Attaching the outer branches yields the conditional profile
   `A^49B^9C^4D^2@G_(k-6)`, equivalently `A^7B^7D^2@G_(k-4)`, and width
-  `2^k-k^2+7k-21` for `k>=12`.  This reproduces 473 at `k=9` and the exact 973 at `k=10`, but
+  `2^k-k^2+7k-21` for `k>=12`.  Its arithmetic reproduces 473 at `k=9` and 973 at `k=10`, but
   predicts the still-open 1983 at `k=11`; the symbolic threshold does not settle that finite case.
   At 32 atoms, lineage excludes ranks 1--1089 and a separately checked 504-core projected kernel
   excludes ranks 1090--1179 at every depth.  Rank 1181, `A^26BC^3D^2`, is constructible by pure
@@ -1025,12 +1012,13 @@ seconds**. The A+B monster is now refuted at the root by the prefix certificate 
 
 The condition is not sufficient: `Sb(16:1,12:2)` passes it but is unsolvable in 4. The residual is
 now formalised by the
-[synchronized-majorization hierarchy](theorems/singleton-majorization.md#the-synchronized-majorization-hierarchy-2026-08-09).
+[synchronized-majorization predicates](theorems/singleton-majorization.md#the-synchronized-majorization-predicates-corrected-2026-08-26).
 `R_0` is full star expansion; `R_d` requires one legal rectangle split whose children pass
-`R_{d-1}`. The relaxations are nested and sound, and `R_k` is exact solvability. `R_1` also has an
+`R_{d-1}`. Every predicate is necessary and `R_k` is exact solvability; adjacent intermediate
+predicates are not known to be nested. `R_1` also has an
 additive hinge-vector formulation, so it can be checked without sorting child profiles.
 
-The hierarchy is structurally sharp on the complete current-solver k=4 pair universe. Among its 238
+The predicates are structurally sharp on the complete current-solver k=4 pair universe. Among its 238
 canonical negatives, `R_0,R_1,R_2,R_3` reject respectively 68, 150, 229 and all 238, with zero
 rejections among 1,247 canonical positives. `Sb(16:1,12:2)` itself passes `R_0,R_1,R_2` and fails
 `R_3`. `tools/bundled_majorization.py` and `tools/pairtab.c` reproduce the census.
@@ -1102,7 +1090,7 @@ allocation and a redundant local necessary check, not an unconditional hierarchy
 remaining theoretical target is a genuinely cheap approximation to deeper synchronization for
 **ordering**.
 
-### Theoretical m=6 track: exact k=10 break beyond the fitted continuation (2026-08-10)
+### Theoretical m=6 track: exact k=10 upper break beyond the fitted continuation (corrected 2026-08-26)
 
 The `473:6@9` witness must not be treated as a canonical scalable object. Exhaustive data support
 only its early trunk: `Sb(110:3,115:2,121:1)@7` has two working splits, one outcome-complement pair.
@@ -1117,25 +1105,25 @@ where `A_t,C_t,D_t` are the first, third and fourth dyadic atom values of `G_t`.
 full-star mass is exactly one below the top-six capacity. This forces any `R_1`-feasible next test
 into row-count patterns `(2,6,4)`, `(3,6,3)` or `(4,6,2)`, with one unit of total child slack.
 
-The independent hierarchy checker exhausts every such first test without using a witness
+The independent predicate checker exhausts every such first test without using a witness
 continuation. `Z_6` passes `R_4`, as it must. `Z_7` has 356 `R_1`-feasible raw splits / 84 distinct
 normalized child triples and fails `R_4`; `Z_8` has 424 / 101 and also fails `R_4`. Since every
 solvable state satisfies every `R_d`, both kernels are unsolvable. Reproduce with
 `tools/bundled_majorization.py m6-kernel <t> 4` (21.2 and 57.5 CPU seconds in the recorded runs).
 
-The missing root classification is now settled at the first new level.  The exact small-m
-synchronized search exhausts every strategy for `Sb(974:6)@10`, while a 115-node tree proves
-`Sb(973:6)@10`; hence **`n(10,6)=973`**.  The old formula and `BBCD` profile both predict 976 and
-are refuted.  At the successful root `[477:2]`, the children are `Sb(477:2)`,
+The exact small-m synchronized search exhausts every strategy for `Sb(974:6)@10`, proving
+**`n(10,6)<=973`**.  The 115-node 973 file is conditional on the open singleton converse.  The old
+formula and `BBCD` profile both predict 976 and are therefore refuted.  In the conditional tree,
+the root `[477:2]` has children `Sb(477:2)`,
 `Sb(496:2,477:4)`, and `Sb(496:4)`: it keeps the saturated `m=4` side but avoids the dead
 `Z_7` continuation by giving up three units on the other width.  The centered `3+3` alternatives
 `Sb(488:3,488:3)@9` (total 976) and `Sb(487:3,486:3)@9` (total 973) are both exactly unsolvable;
 this does not classify every working root at 973.
 
-The proof sources are `evidence/sb_m6_k10_frontier.txt` and
-`witnesses/majorized_973_6_at10.tree`.  `tools/search_singletonization.cpp` is independent of the
-old fitted witness: at full depth its recurrence is exact solvability, it enumerates the complete
-short deficit interval for each cut, and its positive tree is re-derived by `check_witness.py`.
+The unconditional upper source is `evidence/sb_m6_k10_frontier.txt`; the conditional lower file is
+`witnesses/majorized_973_6_at10.tree`.  At full depth the default terminal mode of
+`tools/search_singletonization.cpp` is a permissive relaxation: a negative is an exact refutation,
+whereas a positive remains conditional unless embedded/canonical terminals are requested.
 The finite `k=11` target remains open.  The candidate reduces to
 `Sb(503:1,495:2,478:3)@9`; its first five-minute exact run timed out, and the literal scaled split
 is dead because it produces the exactly unsolvable residual

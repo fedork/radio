@@ -18,8 +18,10 @@ Checks performed:
   formulas        every closed form in conjectures.csv reproduces every known max value of
                   its row at or above its fits_from_k.
   m=5 theorem     the published piecewise formula matches every recorded maximum; its old/new
-                  Pareto-assembly splits and eventual singleton-majorization template remain
-                  consistent.
+                  Pareto-assembly splits and the conditional eventual singleton-majorization
+                  template remain arithmetically consistent.
+  singleton base  the recursive `G_k` has the claimed Pascal/dyadic conjugate columns, and
+                  `G_k'` is one doubled plus one single copy of every `G_(k-1)'` column.
   provenance      every row carries a status from the accepted vocabulary, and every
                   status that claims evidence names a source.
   rendered docs   any markdown block delimited by `<!-- generated:NAME -->` and
@@ -40,6 +42,7 @@ import glob
 import os
 import re
 import sys
+from math import comb
 from typing import Dict, List
 
 from m5_assembly import exact_width as exact_m5_width
@@ -61,6 +64,12 @@ def singleton_base(k: int) -> List[int]:
             nxt[2 * i + 1] += h
         cur = sorted(nxt, reverse=True)
     return cur
+
+
+def conjugate(partition: List[int]) -> List[int]:
+    """Column heights of a nonincreasing integer partition."""
+    return [sum(value >= height for value in partition)
+            for height in range(1, max(partition, default=0) + 1)]
 
 
 def dyadic_letters(k: int) -> Dict[str, int]:
@@ -149,6 +158,18 @@ def main() -> int:
 
     errs: List[str] = []
     warns: List[str] = []
+
+    # singleton-base structure --------------------------------------------------
+    for k in range(13):
+        actual = sorted(conjugate(singleton_base(k)), reverse=True)
+        closed = [2 ** (k - j) for j in range(k + 1) for _ in range(comb(k, j))]
+        if actual != closed:
+            errs.append(f"G_{k} conjugate disagrees with Pascal/dyadic closed form")
+        if k:
+            child = conjugate(singleton_base(k - 1))
+            lifted = sorted([2 * capacity for capacity in child] + child, reverse=True)
+            if actual != lifted:
+                errs.append(f"G_{k}' is not doubled-plus-single G_{k-1}'")
 
     # provenance -----------------------------------------------------------------
     for name, rows, keyf in (("pareto_sb", sb, lambda r: f"k={r['k']} m={r['m']}"),

@@ -297,7 +297,7 @@ within-level restart cursor, so the multi-hour k7 phase is intentionally not Spo
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, deterministic accepted-prefix budget, shared short-state allowance and geometric long-state probes | `canSolveB_ctx`; `canSolveB` is its default-context wrapper |
 | Joint suffix reachability; suppression of prefix contraction once it rejects | `rb_dead`, `rb_tainted_contraction` |
 | Unit-group stripping before search | start of `canSolveB` |
-| Exact singleton decision plus full star-expansion majorization for every state | `singleton_majorization_can_solve`, `star_expansion_majorization_can_solve` |
+| Singleton necessary-prefix test, unconditional distinct-slot shortcut, and full star-expansion obstruction | `singleton_majorization_can_solve`, `singleton_embedded_can_solve`, `star_expansion_majorization_can_solve` |
 | `Sa` recursion | `canSolveA` |
 | Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` |
 | Warm the cache from a previous run's parsed output | `parse_file` |
@@ -609,11 +609,12 @@ tools/check_tables.py --render             # rewrite the generated blocks in the
 Both are pure Python 3 with no dependencies. Reading the spreadsheets needs `openpyxl`;
 there is a venv at `.venv` for that.
 
-**Run `check_witness.py` before recording any new result.** A tree that passes is a proof
-that does not depend on the solver being correct; a solver log is not.  Recursive trees may
+**Run `check_witness.py` before recording any new result.** A tree using only canonical or
+distinct-slot terminals is a proof that does not depend on the solver being correct; a solver log
+is not.  Recursive trees may
 stop either at `[canonical U_k]` atom sub-multisets or at `[majorized G_k]` arbitrary singleton
 sequences.  The checker verifies the former by multiplicity and the latter by every weak-
-majorization prefix.
+majorization prefix, but reports the latter as conditional on the open converse.
 
 ## Budget and root-reachability diagnostics
 
@@ -693,8 +694,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_pliability_census.py` | reproduce the complete small-state exact/theorem pliability comparison |
 | `tools/rb_suffix_profile_regression.sh` | lock actual per-suffix call/prune accounting and the opt-in exact cutoff |
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
-| `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization hierarchy and compare it with a complete pair table |
-| `tools/search_singletonization.cpp` | exact small-m synchronized search with selectable majorized, distinct-slot embedded, or exact-atom terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
+| `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization predicates and compare them with a complete pair table |
+| `tools/search_singletonization.cpp` | exact-negative small-m synchronized search with selectable conditional-majorized, distinct-slot embedded, or exact-atom terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, the sharp m=5 leaf atomization depth, exact variable-width synchronization, and memo-exhaustion abort semantics |
 | `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8, 16 or 32 atoms, with all-depth D-lineage, finite-depth mixed-supply pruning, and finite `(D,C+D)` coinductive obstructions |
@@ -814,6 +815,9 @@ checked against the exact oracle or current solver, and a missing root is enumer
 optional exact cache is held in a flat full-state hash rather than inserted into the dominance trie.
 Exact hits are
 therefore cheap and memory-bounded, while misses still fall through to `canSolveB(...,NO_DEADLINE)`.
+As with the dominance trie, a current build ignores an imported positive for a nonembedded
+majorized singleton and derives it by exact recursion, because older exact-state tables do not
+record whether the former converse shortcut created that fact.
 Only a deliberately selected cache slice should be replayed into the dominance trie for partial-
 prefix pruning.  This is a research-driver hook compiled through `RADIO_EXTERNAL_EXACT_LOOKUP`; an
 ordinary `radiobase.c` build has no hook, storage or lookup overhead.
@@ -854,8 +858,9 @@ far every first/second choice lies below the corresponding one-part frontier at 
 shore.  A completed census is still empirical current-solver evidence, not an independent negative
 certificate, unless its oracle negatives have separately been proved.
 
-The bundled hierarchy starts at full star-expansion majorization (`R_0`), adds one synchronized
-rectangle split per level, and becomes exact at `R_k`. Its small regression case and complete k=4
+The bundled predicates start at full star-expansion majorization (`R_0`), add one synchronized
+rectangle split per level, and reach exact solvability at `R_k`.  Each is a sound necessary
+condition, but nesting between adjacent intermediate depths is not proved. Their small regression case and complete k=4
 pair census are:
 
 ```
@@ -871,17 +876,19 @@ remain exponential and can approach the cost of exact search.
 `m6-kernel` constructs the parametric four-part state reached by extending the tight
 `m=6` prefix, exhausts every first split whose children pass full-star majorization,
 deduplicates identical normalized child triples (including outcome symmetry), and checks
-them at the requested hierarchy depth. It does not inherit any continuation from a stored
+them at the requested predicate depth. It does not inherit any continuation from a stored
 witness tree.
 
-### Exact small-m singletonization search
+### Exact-negative small-m singletonization search
 
-`search_singletonization.cpp` is the scale-free counterpart of the hierarchy prototype for states
+`search_singletonization.cpp` is the scale-free counterpart of the predicate prototype for states
 with a small total narrow-side multiplicity.  Define `C_d(S,k)` to hold when `S` passes full-star
 majorization and either is already a singleton state, or has a legal rectangle split whose three
-children satisfy `C_(d-1)`.  A singleton terminal is decided exactly by the Singleton Majorization
-Theorem.  At `d=k`, this is exact solvability: any strategy supplies the recurrence, and at depth
-zero full-star majorization permits at most one edge.
+children satisfy `C_(d-1)`.  In the default mode, a singleton terminal is accepted by weak
+majorization; that is a relaxation, not a proved positive terminal.  Consequently a default-mode
+`NO` at `d=k` is an exact nonsolvability proof, while a `YES` is conditional.  The `embedded` and
+`canonical-exact` modes give unconditional positive certificates.  At depth zero full-star
+majorization permits at most one edge.
 
 The implementation's short cut range is complete, not heuristic.  In a viable first test on
 `(n:m)@k`, both wide-side pieces `a` and `n-a` are at most `2^(k-1)`; otherwise one of the three
@@ -917,8 +924,9 @@ tools/optimize_mixed_frontier.py 5 5 /tmp/mixed-frontier.out
 The first form checks one state with a bounded number of synchronized levels.  Its default terminal
 is an arbitrary singleton sequence weakly majorized by `G_s`.  Prefix it with `embedded` to require
 a coordinatewise injection into distinct `G_s` slots, or `canonical-exact` to require a literal
-sub-multiset of `G_s`; exact implies embedded implies majorized.  A negative in either stronger mode
-is exhaustive for that terminal predicate, not a nonsolvability verdict under the weaker theorem.
+sub-multiset of `G_s`; exact implies embedded implies majorized.  A positive in either stronger mode
+is unconditional.  A negative in either stronger mode is exhaustive only for that terminal
+predicate, while a full-depth negative in the default, more permissive mode refutes solvability.
 The `m=5` examples bracket the first eventual five-part leaf: embedded and exact both fail through
 depth two, while a committed exact tree succeeds at depth three.
 
@@ -926,7 +934,7 @@ depth two, while a committed exact tree succeeds at depth three.
 retains the exact memo between adjacent `n`, stops at the first positive, and prints its tree.  Cap
 frontier runs with `tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never
 a negative verdict.
-The retained `k=10,m=6` replay and independently checked tree are
+The retained `k=10,m=6` replay proves the upper bound 973; the checked 973 tree is conditional:
 `evidence/sb_m6_k10_frontier.txt` and `witnesses/majorized_973_6_at10.tree`.
 
 `assembly` is the corrected diagram directly.  Write

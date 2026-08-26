@@ -1,9 +1,12 @@
 # Exact `m=5` as a Pareto-assembly calibration
 
 Li--Wu--Triesch prove the exact piecewise frontier for `K_(5,n)`, equivalently `Sb(n:5)`.
-This note does not replace their upper-bound argument.  It recomputes their lower construction in
-the corrected A/B/C/D assembly coordinates and isolates the exact one-dimensional D problem.  The
-result is a known-correct calibration of the proposed construction method rather than another fit.
+This note does not replace their proof.  It recomputes a proposed lower construction in the
+corrected A/B/C/D assembly coordinates and isolates a one-dimensional D problem.  **Correction
+2026-08-26:** the arbitrary singleton-majorization terminals used in that reconstruction are
+conditional on the open converse.  The published theorem remains unconditional, as do the local
+upper-bound reduction and any branches explicitly exactified to canonical/distinct-slot leaves.
+The assembly is therefore a conditional calibration rather than an independent reconstruction.
 See [the primary-source summary](../literature.md#li-wu-triesch-2018).
 
 Throughout, put
@@ -88,16 +91,17 @@ Direct rectangle algebra gives the three level-`t` outcomes
     outcome 0: Sb(c:1,d:1),
     outcome 1: R_t(d) = Sb(d:3,b:1,a-c:1).                     (6)
 
-The first is the exact `m=3` construction.  The second is a singleton state majorized by `G_t`
-whenever `d<=P-1`.  Therefore the only synchronized obligation after the two outer tests is
+The first is the exact `m=3` construction.  The second embeds in the first two distinct rows
+`(P,P-1)` of `G_t` whenever `d<=P-1` and is therefore unconditionally solvable.  Thus the only
+synchronized obligation after the two outer tests is
 
     R_t(d) = Sb(d:3, (P-t):1, (P-2t):1) @t.                    (7)
 
 This is exactly the proposed variable-D slice, with no A/B/C witness-tree alignment involved.
 
-### Exact D-slice theorem
+### D-slice upper bound and conditional matching constructions
 
-For the branch (7), the exact maximum is
+The proposed matching value for the branch (7) is
 
     d*(t) = P-Q,       t=7,8,                                 (8)
             P-Q+1,     t>=9.
@@ -105,13 +109,14 @@ For the branch (7), the exact maximum is
 Equivalently, (8) covers parent levels `k=9,10` and `k>=11`.  At the transition base `k=8`
 (`t=6`), exact local assembly gives the tied value `d*=P-Q-1=57`.
 
-**Achievability.**  The independently checked `k=9` witness contains the literal state
+**Conditional achievability.**  The structurally checked `k=9` file contains the literal state
 `Sb(118:3,121:1,114:1)@7`; see
 [`majorized_481_5_at9.tree`](../../witnesses/majorized_481_5_at9.tree).  The exact construction
 regression checks `d=241` at `t=8` and the tied `t=6` base.  For every `t>=9`, the uniform
-construction below proves the `P-Q+1` lower bound directly from singleton majorization.  These are
-the finite and eventual lower-bound sources; Theorems 2 and 3 of Li--Wu--Triesch give a
-corresponding published construction in different coordinates.
+construction below reaches singleton states majorized by `G`; without the open converse this does
+not finish the lower bound.  Theorems 2 and 3 of Li--Wu--Triesch independently prove the parent
+frontier by their published construction, but this note has not established that their internal
+state is exactly (7).
 
 **Sharpness.**  Suppose `R_t(d*(t)+1)` were solvable.  For `t>=7`, both untouched outer branches
 would still be solvable:
@@ -120,10 +125,10 @@ would still be solvable:
 
 Composing that D solution with the two tests above and the exact `m=4` and `m=3` branches would
 solve `Sb(n(k,5)+1:5)@k`, contradicting the published exact upper bound.  Subgraph monotonicity then
-excludes every larger `d`.  Thus the global theorem supplies a matching upper bound for the local D
-slice, not merely for the final parent width.
+excludes every larger `d`.  Thus the global theorem supplies the displayed upper bound for the
+local D slice.  Equality still needs an unconditional construction of `R_t(d*(t))`.
 
-### A self-contained construction for `t>=9`
+### A conditional two-test template for `t>=9`
 
 The eventual `+1` is not only a consequence read backwards from the published answer.  Set
 
@@ -169,7 +174,9 @@ whereas the five reference deficits are
 Their total deficits agree.  For `t>=9`, `Q-t-2>=t`; the first four sorted deficit sums of the
 candidate are therefore at least the corresponding reference sums.  The three-entry leaf is also
 majorized because `Q>=2t+1`, and `U0` because `Q>=t+2`.  These inequalities all hold from `t=9`, so
-the Singleton Majorization Theorem completes the construction.
+the open Singleton Majorization Converse would complete the construction.  Where the decisive
+five-part leaf is subsequently replaced by an explicit canonical tree, that finite instance is
+unconditional.
 
 The same test dimensions are legal at `t=7,8`, but the three-entry `S` leaf already fails there:
 `J-Q+t+2 > J-t+1`.  Thus this one template exposes the real threshold.  The two earlier values need
@@ -193,8 +200,9 @@ At the first eventual case, parent `k=11`, this is
 
     P_7 = (127,119,119,118,111) @7.
 
-There are three distinct terminal notions here.  Singleton majorization merely certifies `P_7`
-itself.  An **embedded** terminal requires its sorted widths to fit coordinatewise into distinct
+There are three distinct terminal notions here.  Weak majorization verifies the necessary prefix
+condition for `P_7`, but is not by itself a positive certificate.  An **embedded** terminal requires
+its sorted widths to fit coordinatewise into distinct
 slots of `G_s`.  An **exact** terminal requires the widths to be a literal sub-multiset of `G_s`.
 Exact implies embedded, and both properties are hereditary on deleting parts, so the recursive
 partial-state exclusions remain sound.
@@ -282,9 +290,9 @@ transition, locked by `tools/singletonization_regression.sh`:
 - `(3,2,2)` and `(4,3,1)` tie at `k=8`; and
 - `(4,3,1)` is the sole winner at `k=9`.
 
-Direct exact construction checks of (7) give `d=241` and `d=492` at `k=10` and `k=11`, reaching
-the published maxima 985 and 2001.  These are construction checks; the published theorem is the
-upper-bound source.
+Default-terminal construction checks of (7) give `d=241` and `d=492` at `k=10` and `k=11`,
+matching the published maxima 985 and 2001 conditionally.  The published theorem is the
+unconditional source for both achievability and optimality.
 
 There is a compact mass interpretation.  At `G_t`, let
 
@@ -305,11 +313,12 @@ not be promoted to an atom-profile construction without such a tree.
 
 The known exact `m=5` result supports the general assembly mechanism but changes its state space:
 
-1. A/B/C really can be used as black boxes; only their outer dimensions enter (7).
+1. Conditional on an unconditional solution of the D state, A/B/C can be used as black boxes;
+   only their outer dimensions enter (7).
 2. Maximizing D for each outer triple remains the correct local problem.
 3. A global construction must retain competing outer triples and take their envelope; one repeated
    height choice is not enough.
-4. Even for a fixed winning triple, `d*` can change symbolic regime because a leaf-majorization
+4. In the conditional terminal model, `d*` can change symbolic regime because a leaf-majorization
    inequality changes truth value; here that happens exactly between `t=8` and `t=9`.
 5. None of this proves that every height has an eventual aligned atom regime or that the assembly
    exhausts every unrestricted strategy.

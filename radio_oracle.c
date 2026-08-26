@@ -155,11 +155,10 @@ static void respond_verdict(int r, int k, double ms, int *sb, int size) {
 
 /* ---- enumerate: every winning top-level split of a state, not just its own solvability -------
    New capability, additive only -- radiobase.c is untouched. Reuses the same building blocks
-   canSolveB itself trusts: `star_expansion_majorization_can_solve` (R_0, proved in
+   canSolveB itself trusts: `star_expansion_majorization_can_solve` (R_0 necessity, proved in
    docs/theorems/singleton-majorization.md) as a sound pre-filter before ever paying for a real
    solve, and canSolveB for the exact verdict. R_0 can only ever reject a true winner if the
-   theorem is wrong, which is the same trust every other positive result in this codebase already
-   rests on.
+   necessity theorem is wrong.
 
    Enumeration itself is the unfiltered mixed-radix walk `all_solutions` already uses (every raw
    (m1,m2) per part) -- correct and simple, but with no pruning of whole sub-trees, so its cost is

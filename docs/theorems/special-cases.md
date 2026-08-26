@@ -90,8 +90,9 @@ n(k,5) = F(k)       for 3 <= k <= 8,
 
 Thus the former formula was exact only through `k=8`: it predicts 480 at `k=9`, while the
 exact maximum is 481.  The old `BBBD` construction and its verified 480 tree remain valid
-lower bounds; they are not optimal from `k=9`.  The corrected 481 value has both the verified
-tree `witnesses/majorized_481_5_at9.tree` and an exact local rejection of 482 in
+lower bounds; they are not optimal from `k=9`.  The file
+`witnesses/majorized_481_5_at9.tree` is conditional on the open singleton converse; the published
+theorem is the unconditional lower source.  An exact local rejection of 482 is retained in
 `evidence/sb_m5_k9_frontier.txt`.  See
 [../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).  The paper's construction
 is translated into the competing `3+2` / `4+1` outer branches and an exact symbolic D slice in
@@ -103,10 +104,11 @@ Exact for `k = 4..9`: gives 7, 19, 46, 104, 225, 473.  At `k=9` the verified tre
 `witnesses/canon_473_6_at9.tree` supplies the lower proof and
 `evidence/sb_m6_k9_frontier.txt` retains the exact rejection at 474.
 
-It fails at `k=10`: the formula predicts 976, while exact synchronized search proves the maximum
-is 973.  The lower witness is `witnesses/majorized_973_6_at10.tree`; the exhaustive 974 rejection
-is retained in `evidence/sb_m6_k10_frontier.txt`.  Thus this row was a finite fit, not a
-construction valid for all `k`.
+It fails at `k=10`: the formula predicts 976, while exhaustive synchronized search proves the
+upper bound `n(10,6)<=973`.  The file `witnesses/majorized_973_6_at10.tree` is a conditional lower
+construction, because its arbitrary majorized singleton terminals use the open converse; the
+unconditional 974 rejection is retained in `evidence/sb_m6_k10_frontier.txt`.  The upper bound
+alone refutes the proposed formula.
 
 > **Correction, 2026-08-02.** An earlier write-up of this lemma had
 > `2^k - k(k-5)/2 - 3`, which yields 15, 29, 58, 118, 241 - above the true frontier at every

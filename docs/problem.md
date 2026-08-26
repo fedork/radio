@@ -67,8 +67,9 @@ solvable implies `Sb(n:m)` solvable - the latter is a substate.
 
 ## The singleton base sequence
 
-`G_k` is the largest singleton state solvable in `k` tests, written as a nonincreasing
-sequence of group sizes. It is defined by `G_0 = (1)` and a three-way recurrence given in
+`G_k` is an explicit solvable singleton state that weakly majorizes every singleton state
+solvable in `k` tests. It is written as a nonincreasing sequence of group sizes and defined by
+`G_0 = (1)` and a three-way recurrence given in
 [theorems/singleton-majorization.md](theorems/singleton-majorization.md).
 
 ```
@@ -98,8 +99,9 @@ leading atom of each successive dyadic block of `G_k`, so `A = 2^k`, `B = 2^k - 
 
 ## Why singleton states matter
 
-The Singleton Majorization Theorem decides them exactly: a singleton state is solvable in
-`k` if and only if its sequence of group sizes is weakly majorized by `G_k`. Any state
-whose parts form a sub-multiset of `G_k` is therefore solvable in `k`, with no search
-required. This is what makes a canonical witness tree - one whose every leaf is such a
-state - a self-contained proof rather than a solver transcript.
+Weak majorization by `G_k` is a proved necessary condition for singleton solvability; whether it
+is sufficient is the open Singleton Majorization Converse.  The important unconditional terminal
+is narrower: any state whose rows fit into distinct rows of the explicit solvable state `G_k` is
+solvable by deleting edges.  This is what makes a canonical witness tree—one whose every leaf is a
+sub-multiset or distinct-slot substate of `G_k`—a self-contained proof rather than a solver
+transcript.  A leaf certified only by arbitrary weak majorization is currently conditional.

@@ -195,12 +195,12 @@ Applied Mathematics* 113 (2001), 299–302.
 | `n(9,2)=511` | proved construction/lower bound | exact maximum | Aigner 1986 |
 | `n(9,3)=503` | proved construction/lower bound | exact maximum | Aigner 1986 |
 | `n(9,4)=496` | verified witness/lower bound | exact maximum | Li--Wu--Triesch 2018 |
-| `n(9,5)=481` | conjectured 480, witnessed 480 | exact maximum; 481 witnessed here | Li--Wu--Triesch 2018 plus local exact replay |
+| `n(9,5)=481` | conjectured 480, witnessed 480 | exact maximum; local arbitrary-majorization tree is conditional | Li--Wu--Triesch 2018 plus local exact rejection at 482 |
 | old `m=5` closed form / `BBBD` profile | conjectured equality | refuted as equality at `k=9`; still a lower construction | same |
 | `n(9,6)=473` | verified lower bound | exact maximum after retained 473/474 replay | local exact replay |
 
-The local replay is retained in `evidence/sb_m5_k9_frontier.txt`, its independently checked
-tree in `witnesses/majorized_481_5_at9.tree`, and the root-type scan in
+The local replay is retained in `evidence/sb_m5_k9_frontier.txt`, its structurally checked but
+conditional tree in `witnesses/majorized_481_5_at9.tree`, and the root-type scan in
 `evidence/sb_m5_k9_root_transition.txt`.  The adjacent exact `m=6` boundary is in
 `evidence/sb_m6_k9_frontier.txt`.
 

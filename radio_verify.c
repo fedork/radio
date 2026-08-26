@@ -6,8 +6,8 @@
 //
 //   * the split semantics of docs/problem.md: a test on (n:m) taking (a,b) yields children
 //     (a:b), (n-a:m-b) and the mixed pair {(a:m-b), (n-a:b)}
-//   * Singleton Majorization: an all-singleton state is unsolvable iff its n-sides are not
-//     weakly majorized by G_k -- applied to the full star expansion of every state through
+//   * Singleton Majorization Necessity: a prefix violation refutes an all-singleton state --
+//     applied to the full star expansion of every state through
 //     the Vertex-Splitting Pullback Lemma
 //   * Unit-Group Elimination: (1:1) parts never affect solvability
 //   * Subgraph Monotonicity: a <= b as sub-multisets with componentwise-smaller parts, and a
@@ -1160,7 +1160,7 @@ static int level_minimize(Level *L, int threads, int k) {
     return i;
 }
 
-/* Singleton Majorization applied to the full star expansion.  Replace each oriented part
+/* Singleton Majorization Necessity applied to the full star expansion.  Replace each oriented part
    (n:m), n >= m, by m disjoint copies of (n:1).  This lift has one edge for every original edge:
    map every cloned n-side vertex back to its source and pull each original test back to all clones.
    Corresponding edges then have identical transcripts, so solvability of the original state implies

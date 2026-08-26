@@ -191,16 +191,17 @@ n(k,5) = F(k)       for 3 <= k <= 8,
          F(k) + 2   for k >= 11.
 ```
 
-In particular `n(9,5)=481`, not 480.  The repository contains an independent exact replay:
-`witnesses/majorized_481_5_at9.tree` proves 481 achievable and
-`evidence/sb_m5_k9_frontier.txt` records the exact rejection of 482.  The root changes from
-type `3+2` through `k=8` to type `4+1` at `k=9`, matching the published construction.
+In particular `n(9,5)=481`, not 480.  The published theorem proves achievability, and
+`evidence/sb_m5_k9_frontier.txt` independently records the exact rejection of 482.  The file
+`witnesses/majorized_481_5_at9.tree` is conditional on the open singleton-majorization converse.
+The observed root changes from type `3+2` through `k=8` to type `4+1` at `k=9`, matching the
+published construction.
 (11) Sb(2^k-k^2+4k-10 : 7) solvable in k
 
 **Proposed and refuted lemmas:**  
 
 (10) `Sb(2^k-k(k-1)/2-3 : 6)` is solvable in `k`.  It matches `k=4..9` but is false at
-`k=10`: it predicts 976, whereas the exact maximum is 973.  See
+`k=10`: it predicts 976, whereas exhaustive search gives the unconditional upper bound 973.  See
 `../docs/theorems/special-cases.md` and `../evidence/sb_m6_k10_frontier.txt`.
 
 **Solution for 192 coins in 10 tests:**

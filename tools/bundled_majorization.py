@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Prototype the synchronized-majorization hierarchy R_d.
+"""Prototype the synchronized-majorization predicates R_d.
 
 R_0(S, k) is full-star majorization.  R_d, d>0, asks for one legal
 rectangle split whose three children satisfy R_{d-1}.  This is a research
 prototype: it favors transparent independent logic over solver integration.
+Every R_d is necessary for solvability and R_k is exact.  Nesting between
+adjacent intermediate depths is not currently proved.
 """
 
 from __future__ import annotations
@@ -56,6 +58,15 @@ def r0(state: State, k: int) -> bool:
     return True
 
 
+def singleton_embedded(state: State, k: int) -> bool:
+    """Unconditional singleton terminal: rows fit in distinct rows of canonical G_k."""
+    if any(m != 1 for _, m in state):
+        return False
+    widths = sorted((n for n, _ in state), reverse=True)
+    g = base(k)
+    return len(widths) <= len(g) and all(width <= g[i] for i, width in enumerate(widths))
+
+
 def children(part: Part, split: Part) -> tuple[State, State, State]:
     n, m = part
     a, b = split
@@ -101,8 +112,10 @@ def relax(state: State, k: int, depth: int) -> bool:
         return True
     if k == 0:
         return True  # r0 already implies at most one edge.
-    if all(m == 1 for _, m in state):
-        return True  # R_0 is exact for singleton states.
+    if singleton_embedded(state, k):
+        # Aigner's explicit G_k strategy plus subgraph monotonicity supplies a full
+        # strategy, so this state satisfies every necessary predicate depth.
+        return True
 
     # R_depth is subgraph-monotone.  Therefore each contribution from one parent
     # part must itself satisfy R_{depth-1} in every outcome.  This local filter is
