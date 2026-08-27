@@ -10458,3 +10458,39 @@ Measured cost: the provenance-built exhaustive prefix visited 564,421 coloring n
 seconds / 0.21 user CPU seconds on the M4 Pro.  A preceding 100,000-state uniform `K=4` request
 found a different failure at sample 2,044 and stopped; the concurrently launched `K=5` sample was
 interrupted once the `K=4` refutation was established, and no solver process was left running.
+
+## 2026-08-27 -- coalescence-shape calculus and exact scalar cut census
+
+The proposed “children of similar shape” idea has a canonical forest interpretation.  Define the
+hinge profile `E_a(t)=sum_i(a_i-t)_+`.  If a legal first cut splits a row `u=x+y`, its threshold-`t`
+removal is `min(x,t)+min(y,t)-min(u,t)`.  Summing gives the exact identity
+
+    sum_(children C) E_C(t)=E_a(t)-J_a(t).
+
+The largest removal available from one row is `min(t,max(u-t,0))`, hence the sharp aggregate cap
+`J_a(t)<=E_a(t)-E_a(2t)`.  At `t=1`, `E_a(1)=3^K-r`, `J_a(1)` is the number of split rows, the
+canonical top layer contains `2^(K-1)` joins, and the cap is exactly the number of nonunit rows.
+Thus the rule
+
+    split floor/ceiling(min(2^(K-1)(3^K-r)/(3^K-2^K), #{i:a_i>=2})) rows
+
+means retaining the same normalized join density at the next scale; it does not special-case unit
+rows arbitrarily.
+
+The new provenance-built `tools/singleton_shape_survey.cpp` reconstructs the cut directly and
+checks each child against `G_(K-1)`.  Exact censuses found no scalar-rule failure among all 1,206
+full-mass `K=3` states or all 5,997,038 `K=4` states.  The latter visited 16,639,423,162 search
+nodes in 1,854.89 user / 1,867.57 wall seconds.  A preliminary 100,000-state
+uniform `K=4` sample also passed.  A direct 1,000-request `K=5` sample was killed by its 60-CPU-
+second cap before a batch verdict and is an abort, not evidence.
+
+The tempting coordinatewise extension to the whole hinge profile is false.  Scaling the canonical
+top-layer removal independently at every `t`, capping by `E_a(t)-E_a(2t)`, and rounding each
+coordinate fails at the 61st `K=3` state, `(8,5,5,5,1^4)`.  Its scalar target is attainable with
+children `(4,3,1,1)/(4,2,2,1)/(4,3,1,1)`, but the independently rounded targets require `J(2)=6`
+where that cut has 7 and exhaustive search finds no all-coordinate match.  The profile is intrinsic,
+but its coordinates are lattice-coupled.  The scalar rule is now a plausible stronger finite
+invariant, not a proof; the exact general target remains Pascal orthant saturation/no lattice holes.
+
+Full commands and the distinction between exact results, samples and the aborted run are in
+[the shape-survey record](../evidence/singleton_shape_survey_2026-08-27.md).

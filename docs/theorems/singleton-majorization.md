@@ -288,6 +288,95 @@ generic base `h`, `F_h` is not a polymatroid, consistently with the counterexamp
 remaining structural question is whether the Pascal multiplicities and power-of-two column
 capacities make it one for `h=G_r`.
 
+### A shape-preserving forest target (2026-08-27)
+
+There is a precise version of the proposed “children of similar shape” idea.  For an integer
+partition `a`, define its hinge, or coalescence, profile
+
+    E_a(t) = sum_i max(a_i-t,0),                    t=1,2,... .
+
+For equal-mass partitions, `a <=_w g` is equivalent to `E_a(t)<=E_g(t)` at every integer
+threshold.  The discrete derivative of this profile is the conjugate row-count profile
+`c_t(a)=#{i:a_i>=t}`.  Thus this is the whole majorization shape, not a new scalar score.
+
+In a legal first cut, one parent row of width `u` is either left intact or split as `u=x+y`
+between the mixed child and one pure child.  Put
+
+    j_(x,y)(t) = min(x,t)+min(y,t)-min(u,t).
+
+Direct cancellation gives the exact aggregate identity
+
+    sum_(children C) E_C(t) = E_a(t)-J_a(t),
+    J_a(t) = sum_(parent rows u=x+y) j_(x,y)(t).                 (G)
+
+At `t=1`, every genuinely split row contributes one and every intact row contributes zero, so
+`J_a(1)` is exactly the number of split parent rows.  More generally, the largest possible
+contribution of a row `u` at threshold `t` is `min(t,max(u-t,0))`.  Hence the parent itself imposes
+the sharp coordinatewise capacity
+
+    J_a(t) <= E_a(t)-E_a(2t).                                  (H)
+
+In particular, (H) at `t=1` is `J_a(1)<=#{i:a_i>=2}`.  The previously observed cap by the
+number of nonunit rows is therefore the first coordinate of a canonical hierarchy, not an
+exception for unit rows.
+
+Let `g=G_K`, `h=G_(K-1)`, and define the canonical top-layer removal profile
+
+    B_K(t) = E_g(t)-3E_h(t).
+
+It is nonnegative because the canonical first cut of `G_K` has three children equal to `h`, and
+(G) says that its cut profile is exactly `B_K`.  If `E_g(t)>0`, the literal same-shape target is
+
+    J_a^*(t) = (E_a(t)/E_g(t)) B_K(t),
+
+capped by (H) and rounded integrally.  At thresholds where `E_h(t)>0`, without the cap or rounding,
+substituting this value in (G) makes the average normalized child hinge coordinate equal to the
+parent's:
+
+    (sum_C E_C(t))/(3E_h(t)) = E_a(t)/E_g(t).
+
+The first coordinate has an especially simple form.  If `r` is the number of rows, put
+
+    theta(a) = (3^K-r)/(3^K-2^K).
+
+Since `B_K(1)=2^(K-1)`, same average shape asks for
+
+    J_a(1) = 2^(K-1) theta(a),
+
+up to floor/ceiling and the forced cap `#{i:a_i>=2}`.  Equivalently, view every row of width `u`
+as a binary tree with `u` leaves and `u-1` joins.  Then `theta` is the fraction of the
+`3^K-2^K` joins of the canonical forest retained by `a`, and the equation removes that same
+fraction of the `2^(K-1)` joins at the top recursive layer.
+
+The most literal **Shape-Preserving Cut** proposal would ask every full-mass `a<=_w G_K` for a
+legal first cut whose three children are each majorized by `G_(K-1)` and whose cut profile `J_a`
+simultaneously takes the floor or ceiling of
+
+    min((E_a(t)/E_g(t)) B_K(t), E_a(t)-E_a(2t))
+
+at every relevant threshold.  The statement is **false already at `K=3`**.  The 61st state in the
+exact descending census is
+
+    a=(8,5,5,5,1,1,1,1).
+
+Its coordinate targets include `J_a(1)=4` and `J_a(2)=6`.  It has legal children, for example
+
+    (4,3,1,1), (4,2,2,1), (4,3,1,1),
+
+but that cut has `J_a(1)=4`, `J_a(2)=7`, and exhaustive search finds no cut meeting all rounded
+targets simultaneously.  Thus the full hinge profile is the right intrinsic language, but its
+coordinates have genuine lattice coupling and cannot be normalized independently.
+
+The first-coordinate shadow remains a clean **Scalar Shape-Balance Conjecture**: require only
+
+    J_a(1) in floor/ceiling(min(2^(K-1) theta(a), #{i:a_i>=2})).
+
+This is still stronger than the Row-Coloring Lemma and is not proved.  An exact reconstruction
+survey finds no failure among all 1,206 full-mass states at `K=3` or all 5,997,038 at `K=4`.
+`tools/singleton_shape_survey.cpp` reproduces both censuses and the full-profile counterexample.
+The scalar rule is therefore a plausible coarse induction invariant, not by itself a certificate:
+the proof must still produce three individually `G_(K-1)`-majorized children.
+
 ### Global signed lifting and the no-holes target (2026-08-26)
 
 There is a cleaner global formulation that removes value blocks and forward choices entirely.

@@ -171,6 +171,17 @@ Pascal/dyadic columns.  This formulation and the convex-hull equality are proved
 [theorem note](theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26);
 only the no-lattice-holes/transfer step remains open.
 
+The 2026-08-27 forest-shape survey supplies a useful coarse invariant but not a replacement proof.
+For `E_a(t)=sum_i(a_i-t)_+`, every cut has an exact removal profile
+`sum_C E_C(t)=E_a(t)-J_a(t)` and the sharp capacity
+`J_a(t)<=E_a(t)-E_a(2t)`.  Its first coordinate says to split approximately the same fraction of
+the `2^(K-1)` top-layer joins as the fraction of all canonical joins retained by the parent, capped
+by the number of nonunit rows.  Direct reconstruction verifies this scalar rule on all 5,997,038
+`K=4` states.  Do not try to impose the analogous normalization independently at every threshold:
+`(8,5,5,5,1^4)@3` refutes that stronger rule.  Use the hinge profile to describe augmenting-path
+cuts and their obstructions, while keeping Pascal orthant saturation as the exact target; see the
+[shape survey](../evidence/singleton_shape_survey_2026-08-27.md).
+
 The complete full-mass census gives supporting geometry: all 5,997,038 states at `K=4` satisfy the
 Row-Coloring Lemma, and a balanced value-block rule with one-block lookahead succeeds on every one,
 plus ten million uniform `K=5` samples.  Treat that rule as diagnostic for the exchange geometry,
