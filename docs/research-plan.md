@@ -171,6 +171,14 @@ Pascal/dyadic columns.  This formulation and the convex-hull equality are proved
 [theorem note](theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26);
 only the no-lattice-holes/transfer step remains open.
 
+For a constructive attack, use the equivalent
+[padded pure-first formulation](theorems/singleton-majorization.md#padded-pure-first-allocation-2026-08-27):
+on `3^K` fixed labelled slots, place paired balanced supports for the two pure children so that the
+residual stays under `G_(K-1)`, then let Gale--Ryser construct the mixed child.  Fixed alternating
+intervals are too rigid already at `K=3` for `(8,7,4,1^8)`.  The live algorithmic target is an
+adaptive decreasing-capacity insertion with alternating-path reroutes; prove that every stopped
+insertion's opposite-orientation tight cut can be crossed using the Pascal multiplicities.
+
 The 2026-08-27 forest-shape survey supplies a useful coarse invariant but not a replacement proof.
 For `E_a(t)=sum_i(a_i-t)_+`, every cut has an exact removal profile
 `sum_C E_C(t)=E_a(t)-J_a(t)` and the sharp capacity

@@ -371,6 +371,77 @@ generic base `h`, `F_h` is not a polymatroid, consistently with the counterexamp
 remaining structural question is whether the Pascal multiplicities and power-of-two column
 capacities make it one for `h=G_r`.
 
+### Padded pure-first allocation (2026-08-27)
+
+Padding to `N=3^K` labelled row slots does give a cleaner exact target for a universal
+construction.  Put `h=G_(K-1)`, and list the conjugate column capacities of `h` as
+
+    h'=(c_1,...,c_s),          sum_j c_j=3^(K-1).
+
+Let `a=(a_i:i in E)` be a full-mass parent state on the fixed slot set `E`, including its zero
+rows.  A **pure-first allocation** consists of
+
+1. an orientation `E=A disjoint-union B`;
+2. for every `j`, supports `L_j subset A` and `R_j subset B` with
+   `|L_j|=|R_j|=c_j`; and
+3. pure degrees
+
+       p_i=#{j:i in L_j or i in R_j}
+
+   satisfying `p_i<=a_i`, such that the residual `m_i=a_i-p_i` is majorized by `h`.
+
+This is exactly equivalent to a legal first cut; it is not an additional conjecture.  Given the
+data above, the `L_j` and `R_j` are already incidence matrices for the two pure children.  Since
+`m<=_w h` and both have mass `3^(K-1)`, Gale--Ryser supplies a `0`-`1` incidence matrix with row
+degrees `m` and column degrees `(c_j)`, which is the mixed child.  Conversely, realize each child
+of any legal cut by such a matrix, pair equal-capacity left and right columns, and orient every row
+toward the pure child it uses; rows using no pure child may be oriented arbitrarily.  This recovers
+the pure-first data.
+
+Thus the proposed order of construction is valid: place the pure incidences first and leave the
+mixed child to an ordinary degree-sequence theorem.  Padding is useful because rows never appear
+or disappear, zero slots remain explicit vertices that can be oriented freely, and orientation
+and pure placement are the only coupled choices.  It does not by itself choose those supports.
+
+One tempting global choice is still too rigid.  Fix a linear alternating order of the `N` slots
+and require each doubled pure support `L_j union R_j` to be a consecutive interval of length
+`2c_j`; it is then automatically split evenly between `A` and `B`.  At `K=3`, however,
+
+    h=G_2=(4,3,1,1),       h'=(4,2,2,1),
+    a=(8,7,4,1^8) <=_w G_3=(8,7,4,4,1^4).
+
+This state does have a legal cut: assign row triples `(left,mixed,right)` as
+
+    8 -> (4,4,0),       7 -> (0,3,4),       4 -> (3,1,0),
+    two 1s -> (1,0,0),  five 1s -> (0,0,1), one 1 -> (0,1,0).
+
+The children are `(4,3,1,1)`, `(4,3,1,1)`, and `(4,1^5)`, all majorized by `h`.
+Nevertheless, the four interval lengths would be `8,4,4,2`.  In every pure-first allocation, the
+row of size eight must have `(p,m)=(4,4)`.  The row of size seven must have `(p,m)=(4,3)`: pure
+degree is at most four, while a second mixed degree four would violate the first two inequalities
+for `m<=_w h`.  The remaining mixed mass is two, and the size-four row can retain at most one of it.
+Consequently the pure coverage profile must be one of
+
+    (4,4,4,1^6)       or       (4,4,3,1^7).                    (E)
+
+Neither is the coverage profile of intervals of lengths `8,4,4,2`.  The first would require three
+points common to all four intervals, impossible because the shortest interval has length two.  In
+the second, the two degree-four points must be exactly the length-two interval.  Removing it leaves
+three intervals of lengths `8,4,4` with coverage `(3^3,1^7)`: their triple intersection has length
+three and there are no degree-two points.  The two length-four intervals must therefore extend a
+common three-point block on opposite sides.  The length-eight interval contains the block and at
+least one of those two extensions, creating a degree-two point, a contradiction.
+
+The useful algorithmic target is therefore an **adaptive balanced-support augmentation**.  Insert
+the paired pure columns in decreasing capacity, rerouting earlier incidences along alternating
+paths when a side lacks `c_j` usable rows; a row may change orientation only after its pure
+incidences have been rerouted.  Once all pairs are placed and the residual remains majorized by
+`h`, Gale--Ryser finishes the mixed child.  Choosing, say, the shortest lexicographically first
+augmenting path would make this a universal deterministic algorithm.  The still-unproved step is
+that an augmenting path always exists.  A failed augmentation exposes an opposite-orientation
+tight cut, so proving that the Pascal multiplicities always let that cut be crossed is the same
+separator-elimination problem isolated by the adjacent-fiber formulation above.
+
 ### A shape-preserving forest target (2026-08-27)
 
 There is a precise version of the proposed “children of similar shape” idea.  For an integer

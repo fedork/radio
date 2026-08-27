@@ -10519,6 +10519,35 @@ strong niceness, and `Q_3` already contains a claw.  The exact target is closure
 operator `T(G)=G disjoint-union (G join G)`.  Tool, command and literature links are in
 `evidence/singleton_strong_niceness_2026-08-27.md`.
 
+## 2026-08-27 -- padding gives an exact pure-first construction target
+
+Returning to the partition algorithm with every state padded to `3^K` labelled slots yields a
+useful exact reduction.  If `h'=(c_j)` is the conjugate of `G_(K-1)`, first orient the fixed row
+slots left or right and place, for every `j`, `c_j` pure incidences on each side.  If the resulting
+pure degree `p_i` does not exceed `a_i` and the residual `m=a-p` is majorized by `h`, then
+Gale--Ryser constructs the mixed child automatically.  Conversely every legal cut has exactly
+such a representation after realizing and pairing the pure child columns.  Thus “greedily assign
+the pure children, then prove the remainder is majorized” is the right order; the unresolved part
+is the balanced pure-support placement, not the mixed allocation.  Zero rows stay in the fixed
+ground set and require no special deletion rule.
+
+A first global implementation—put the slots in one alternating order and represent each doubled
+pure column by an even consecutive interval—fails analytically at `K=3`.  For
+`a=(8,7,4,1^8)<=_w G_3` and `G_2'=(4,2,2,1)`, the interval lengths are `8,4,4,2`.  Mixed
+majorization forces the pure coverage profile to be either `(4,4,4,1^6)` or
+`(4,4,3,1^7)`.  The first needs three points common to a length-two interval.  In the second,
+removing that interval would leave lengths `8,4,4` with profile `(3^3,1^7)`; the two length-four
+intervals must extend their common three-point block on opposite sides, while the length-eight
+interval necessarily covers one extension and creates a forbidden degree-two point.  So fixed
+interval geometry is too rigid even though padding itself is useful.
+
+The next precise target is an adaptive augmenting-path algorithm: add paired pure columns in
+decreasing capacity, reroute old pure incidences when necessary, and change a row's orientation
+only after evacuating its pure incidences.  A stopped augmentation exposes the familiar
+opposite-orientation tight separator.  The remaining proof must use the dyadic capacities and
+Pascal multiplicities to cross that cut; padding makes the construction and failure certificate
+cleaner but does not yet prove that augmentation always succeeds.
+
 The conjugate-layer view also isolates the assignment gap.  Each child layer of height `r` becomes
 a parent layer `(2^r,1^r)`: its incidences split evenly into left, mixed and right, and a parent row
 may take mixed plus one pure incidence in that layer.  Across layers the same row must keep one
