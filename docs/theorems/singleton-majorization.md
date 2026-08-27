@@ -331,6 +331,50 @@ So alternation satisfies the balanced parent prefixes but can fail an off-diagon
 For example, `A=(16,11,5,5)`, `B=(15,11,5,3,3)` satisfies every inequality (C), so this is a
 counterexample to the rule, not to the converse.
 
+### Complete `K<=4` census and a sharper forward conjecture (2026-08-26)
+
+The full-mass reduction makes a complete small census practical.  The provenance-built utility
+`tools/singleton_pair_coloring_census.cpp` enumerates every integer partition of `3^K` weakly
+majorized by `G_K`, normalizes colorings by the multiplicities of equal rows, and checks (C)
+directly.  There are 1,206 such states at `K=3` and 5,997,038 at `K=4`.  Every one has an
+unrestricted coloring satisfying (C).  This is an exhaustive finite verification, not an
+inductive proof.
+
+The stronger adjacent-pair proposal fails on 916 of the `K=4` states.  Its first full-mass
+counterexample is
+
+`(16,15,11,11,5,5,5,1^13)`.
+
+One legal coloring is
+
+`A=(16,11,5,5,1^4)`, `B=(15,11,5,1^9)`.
+
+Thus the tail unit rows must sometimes be distributed unevenly; keeping them in the argument is
+essential, and splitting every adjacent pair is genuinely too restrictive.
+
+The census suggests a more flexible **Block-Extension Conjecture**.  Write the distinct row
+values as `v_1>...>v_s`, with multiplicities `m_j`, and process these value blocks in descending
+order.  For each block choose, among the allocations that preserve all currently exposed
+inequalities (C) and permit at least one legal allocation of the next lower block, the allocation
+that minimizes the current A/B total-mass difference.  Fix complementation by putting a largest
+row in A and favor A on an exact tie.  This is a forward pass with one-block lookahead and no
+recoloring.  It succeeds on the complete `K<=4` census, on 10,000,000 uniformly sampled states
+from the exact 38,378,683,542,323-state full-mass `K=5` universe, and on a separate 100,000-state
+`K=6` dominance-transfer sample.
+
+Those higher-level samples are not proofs.  Simpler variants already fail: plain balanced blocks
+miss 22 `K=4` states and 12 of the ten million `K=5` samples; reserving enough final rows for both
+colors fixes all `K=4` cases but misses six of those `K=5` samples.  The first such `K=5` failure
+needs the width-6 choice to anticipate the following width-5 block.  The exact counts,
+counterexamples, commands and proposed two-block proof obligation are in
+[the census record](../../evidence/singleton_row_coloring_census_2026-08-26.md).
+
+Grouping equal rows here is only the normalization of row colorings by permutations of
+indistinguishable rows.  It does not establish that equality has a special theorem unavailable to
+nearby widths.  A proof still has to show, using the full Pascal/dyadic structure of `G`, that a
+one-block-extendable balanced choice always exists and preserves the same property at the next
+step.  That statement remains open.
+
 Even “put the next row on any side that keeps all inequalities currently valid” is not an
 exchange-free algorithm.  For `K=3`, the partial coloring
 

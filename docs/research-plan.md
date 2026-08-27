@@ -163,13 +163,18 @@ contains no number absent from `data/*.csv`.
 **Foundational singleton subproblem (corrected 2026-08-26).**  Weak majorization by `G_K` is
 proved necessary, but its converse is open.  The exact target is the Row-Coloring Lemma (C) in
 [the theorem note](theorems/singleton-majorization.md#the-exact-remaining-row-coloring-lemma).
-The best bottom-up route is to prove that the legal demand family `F_(G_r)` has the discrete-
-polymatroid augmentation property, equivalently to construct a global balanced row orientation of
-the doubled Pascal/dyadic columns.  Strict alternation, lower-load assignment, local safe-next
-assignment, fixed half-mixed reservation, two-class exchange, and even the broader class of all
-`2`-flat bases now have explicit counterexamples.  Do not spend more time on another memoryless
-coloring rule; an advance must exploit the full Pascal multiplicities via a global augmenting path,
-or prove niceness of the transcript graph `Q_K` by another method.
+One bottom-up route is to prove that the legal demand family `F_(G_r)` has the discrete-polymatroid
+augmentation property, equivalently to construct a global balanced row orientation of the doubled
+Pascal/dyadic columns.  A second, newly concrete target comes from the complete full-mass census:
+all 5,997,038 states at `K=4` satisfy the Row-Coloring Lemma, and a balanced value-block rule with
+one-block lookahead succeeds on every one, plus ten million uniform `K=5` samples.  Prove its
+two-block extension invariant, or use its exceptional-prefix geometry to prove augmentation; exact
+data and counterexamples are in
+[the census record](../evidence/singleton_row_coloring_census_2026-08-26.md).  Strict alternation,
+lower-load assignment, local safe-next assignment, fixed half-mixed reservation, two-class
+exchange, adjacent-pair orientation, and even the broader class of all `2`-flat bases have explicit
+counterexamples.  A new rule must exploit the full Pascal multiplicities; finite or sampled success
+must not be promoted to the open converse.
 
 **Delivered 2026-08-09.** The useful child-profile feature was not merely an ordering score. The
 [Vertex-Splitting Pullback Lemma](theorems/singleton-majorization.md#vertex-splitting-pullback-lemma-2026-08-09)

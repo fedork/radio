@@ -10383,3 +10383,46 @@ regression.  The full frozen-refuter regression also passed after the solver cha
 pass reports exactly the 481 and 973 majorized-terminal files as conditional (three and six
 genuinely nonembedded leaves respectively); all canonical and numbered files verify
 unconditionally.
+
+## 2026-08-26 -- complete `K=4` Row-Coloring census and block-extension conjecture
+
+The proposed brute-force route paid off, but did not close the theorem.  A new provenance-built
+utility enumerates every full-mass integer partition majorized by `G_K`, quotients colorings by
+equal-row permutations, and checks the exact Fixed-Color Hall inequalities (C).  The completion
+counter independently agrees with the enumerator.  All 1,206 states at `K=3` and all 5,997,038
+states at `K=4` have a coloring, giving a complete finite verification of the Row-Coloring Lemma
+through `K=4`.
+
+The adjacent-pair hypothesis is false on 916 `K=4` states.  Its first full-mass counterexample is
+`(16,15,11,11,5,5,5,1^13)`: every paired coloring distributes the tail units too evenly, while
+`(16,11,5,5,1^4)/(15,11,5,1^9)` satisfies (C).  This settles the earlier uncertainty about
+alternation: independently rephasing adjacent pairs is still insufficient, and the artificial unit
+rows must stay visible.
+
+Normalizing by equal-value multiplicities exposed a much sharper candidate.  Process value blocks
+in descending order; among current Hall-legal allocations that admit at least one allocation of the
+next lower block, choose the one minimizing the A/B total-mass difference.  This forward rule uses
+one-block lookahead and no recoloring.  It passes all 5,997,038 `K=4` states.  Plain block balancing
+fails on 22; final-row reservation repairs those `K=4` failures but fails on six of ten million
+uniform `K=5` samples.  One extracted failure is
+`(31,29,23,22,21,21,12,12,12,7,7,6,5^5,1^15)`: the width-6 row must anticipate the following
+width-5 block, whose balanced allocations otherwise fail off-diagonal Hall inequalities by one.
+
+Dynamic completion counts put the exact full-mass `K=5` universe at 38,378,683,542,323 states.
+On ten million independent uniform samples, plain blocks passed 9,999,988, row reservation passed
+9,999,994, and one-block lookahead passed all ten million.  A separate 100,000-state `K=6`
+dominance-transfer walk also found no lookahead failure.  These are stress tests, not proofs.
+
+The proof target is now the Block-Extension Conjecture: show that a one-block-extendable allocation
+always exists and that the most balanced such allocation preserves this property for the next
+block.  A discrete-convex/interval theorem for projections onto consecutive block counts would
+explain why the exact `K=4` search never needed longer backtracking.  The graph-recursion shortcut
+of proving the self-join nice separately is false: `(2,2,2)<=(2,2,1,1)` cannot be split into two
+subsequences each below `(2,1)`, so the middle component cannot be factored away.
+
+Measured cost: the complete `K=4` runs took 25--71 wall seconds depending on the number of rules
+instrumented, with negligible RSS.  One million transfer-generated `K=5` states took 91 seconds;
+one million uniform states took 10 seconds; ten million uniform states took 81--106 seconds; the
+100,000-state `K=6` transfer walk took 166 seconds.  Every retained headline above comes from a
+bounded provenance-built run.  Full commands, examples and statuses are in
+[the census record](../evidence/singleton_row_coloring_census_2026-08-26.md).

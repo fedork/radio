@@ -3,7 +3,9 @@
 **Read this first.** Where everything stands, and what will silently ruin your work if you
 don't know it. Last refreshed **2026-08-26**.  The central correction is that singleton
 majorization is proved only as a necessary condition: the former sufficiency proof used a false
-decomposition lemma.  Canonical/distinct-slot witness leaves remain unconditional, arbitrary
+decomposition lemma.  A new exact census verifies the missing Row-Coloring Lemma for all 5,997,038
+full-mass states at `K=4` and exposes a strong block-extension conjecture, but supplies no general
+proof.  Canonical/distinct-slot witness leaves remain unconditional, arbitrary
 `[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
 unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers
 through `k=8`, the exact `k=9,m=1..6` cells, and the published `m=5` theorem are unaffected.
@@ -18,6 +20,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | trap | why it matters |
 |---|---|
 | **Do not use arbitrary weak majorization by `G_k` as a positive singleton theorem.** | Necessity is proved; sufficiency is the open Row-Coloring Lemma.  The former Three-Way Decomposition Lemma is false already at `k=2`.  `[canonical U_k]` and `[embedded G_k]` leaves are unconditional because they delete edges from Aigner's explicit `G_k` strategy; `[majorized G_k]` leaves are conditional.  `tools/check_witness.py` reports the distinction. Fresh solver builds continue nonembedded majorized singletons through exact recursion and ignore positive dominance-trie hits for them, because historical caches do not record whether the old shortcut created a fact. Retain a checked unconditional tree for every positive claim. |
+| **Do not promote the finite singleton-coloring census or sampled block rule to a theorem.** | Exhaustion proves the Row-Coloring Lemma only through `K=4`.  Balanced value blocks with one-block lookahead also pass ten million uniform `K=5` samples, but `K=5` has 38,378,683,542,323 full-mass dominated states.  Adjacent-pair orientation already fails on 916 `K=4` states, and weaker block rules have sampled `K=5` counterexamples.  The general converse remains open; see [the census record](../evidence/singleton_row_coloring_census_2026-08-26.md). |
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
@@ -88,7 +91,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   These are asymptotic statements, not finite-cell evidence; see [literature.md](literature.md).
 - **Singleton necessity, two further theorems, plus the lift-box lemma** — Singleton Majorization
   Necessity, Unit-Group Elimination and Subgraph Monotonicity are proved; the singleton converse is
-  open.  So is the new geometric core of recursive Pareto lifting. The
+  open.  The Row-Coloring Lemma is now exhaustively verified through `K=4`, with a reproducible
+  block-coloring census and a sampled higher-level conjecture, but this does not change proof status.
+  So is the new geometric core of recursive Pareto lifting. The
   latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
   but was load-bearing and unwritten: it is
   what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
