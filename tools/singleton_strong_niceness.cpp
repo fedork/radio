@@ -1,7 +1,11 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
+#include <random>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -23,21 +27,113 @@
 
 namespace {
 
-// For k<=3 every coefficient counts a subset of the 27! labelled vertex
-// orders, so unsigned 128-bit arithmetic is exact.  The explicit command-line
-// bound below prevents this representation from being used at k=4.
-using WideInteger = unsigned __int128;
+struct WideInteger {
+    static constexpr std::uint32_t base = 1000000000;
+    std::vector<std::uint32_t> digits;
+
+    WideInteger(std::uint64_t value = 0) {
+        while (value) {
+            digits.push_back(static_cast<std::uint32_t>(value % base));
+            value /= base;
+        }
+    }
+
+    void normalize() {
+        while (!digits.empty() && digits.back() == 0) digits.pop_back();
+    }
+
+    WideInteger &operator+=(const WideInteger &other) {
+        const std::size_t size = std::max(digits.size(), other.digits.size());
+        digits.resize(size, 0);
+        std::uint64_t carry = 0;
+        for (std::size_t i = 0; i < size; ++i) {
+            const std::uint64_t sum = digits[i] + carry +
+                (i < other.digits.size() ? other.digits[i] : 0);
+            digits[i] = static_cast<std::uint32_t>(sum % base);
+            carry = sum / base;
+        }
+        if (carry) digits.push_back(static_cast<std::uint32_t>(carry));
+        return *this;
+    }
+
+    WideInteger &operator*=(std::uint32_t factor) {
+        std::uint64_t carry = 0;
+        for (std::uint32_t &digit : digits) {
+            const std::uint64_t product =
+                static_cast<std::uint64_t>(digit) * factor + carry;
+            digit = static_cast<std::uint32_t>(product % base);
+            carry = product / base;
+        }
+        while (carry) {
+            digits.push_back(static_cast<std::uint32_t>(carry % base));
+            carry /= base;
+        }
+        normalize();
+        return *this;
+    }
+
+    WideInteger &operator*=(const WideInteger &other) {
+        if (digits.empty() || other.digits.empty()) {
+            digits.clear();
+            return *this;
+        }
+        std::vector<std::uint32_t> result(digits.size() + other.digits.size(), 0);
+        for (std::size_t i = 0; i < digits.size(); ++i) {
+            std::uint64_t carry = 0;
+            for (std::size_t j = 0; j < other.digits.size(); ++j) {
+                const std::uint64_t product = result[i + j] + carry +
+                    static_cast<std::uint64_t>(digits[i]) * other.digits[j];
+                result[i + j] = static_cast<std::uint32_t>(product % base);
+                carry = product / base;
+            }
+            std::size_t position = i + other.digits.size();
+            while (carry) {
+                const std::uint64_t sum = result[position] + carry;
+                result[position] = static_cast<std::uint32_t>(sum % base);
+                carry = sum / base;
+                ++position;
+                if (position == result.size() && carry) result.push_back(0);
+            }
+        }
+        digits = std::move(result);
+        normalize();
+        return *this;
+    }
+
+    WideInteger &operator/=(std::uint32_t divisor) {
+        std::uint64_t remainder = 0;
+        for (std::size_t i = digits.size(); i-- > 0;) {
+            const std::uint64_t current = remainder * base + digits[i];
+            digits[i] = static_cast<std::uint32_t>(current / divisor);
+            remainder = current % divisor;
+        }
+        assert(remainder == 0);
+        normalize();
+        return *this;
+    }
+
+    friend bool operator==(const WideInteger &value, int scalar) {
+        return scalar == 0 && value.digits.empty();
+    }
+
+    friend bool operator<(const WideInteger &left, const WideInteger &right) {
+        if (left.digits.size() != right.digits.size())
+            return left.digits.size() < right.digits.size();
+        for (std::size_t i = left.digits.size(); i-- > 0;)
+            if (left.digits[i] != right.digits[i])
+                return left.digits[i] < right.digits[i];
+        return false;
+    }
+};
 using Sequence = std::vector<int>;
 
-std::string show_integer(WideInteger value) {
-    if (value == 0) return "0";
-    std::string result;
-    while (value > 0) {
-        result.push_back(static_cast<char>('0' + value % 10));
-        value /= 10;
-    }
-    std::reverse(result.begin(), result.end());
-    return result;
+std::string show_integer(const WideInteger &value) {
+    if (value.digits.empty()) return "0";
+    std::ostringstream out;
+    out << value.digits.back();
+    for (std::size_t i = value.digits.size() - 1; i-- > 0;)
+        out << std::setw(9) << std::setfill('0') << value.digits[i];
+    return out.str();
 }
 
 int power(int base, int exponent) {
@@ -320,8 +416,86 @@ bool dominates(const Sequence &upper, const Sequence &lower) {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc == 5 && std::string(argv[1]) == "--walk") {
+        const int k = std::stoi(argv[2]);
+        const int requested_steps = std::stoi(argv[3]);
+        const std::uint64_t seed = std::strtoull(argv[4], nullptr, 10);
+        if (k < 1 || k > 4 || requested_steps < 0) {
+            std::cerr << "walk level must be 1..4 and steps must be nonnegative\n";
+            return 2;
+        }
+        const int slots = power(3, k);
+        CoefficientCounter counter(k);
+        std::mt19937_64 random(seed);
+        Sequence current = singleton_base(k);
+        WideInteger current_coefficient = counter.count(k, current);
+        int completed = 0;
+        for (; completed < requested_steps; ++completed) {
+            Sequence padded = current;
+            padded.resize(slots, 0);
+            std::vector<Sequence> neighbors;
+            for (int donor = 0; donor < slots; ++donor)
+                for (int recipient = 0; recipient < slots; ++recipient) {
+                    if (donor == recipient ||
+                        padded[donor] < padded[recipient] + 2)
+                        continue;
+                    Sequence next = padded;
+                    --next[donor];
+                    ++next[recipient];
+                    next.erase(std::remove(next.begin(), next.end(), 0), next.end());
+                    std::sort(next.begin(), next.end(), std::greater<int>());
+                    if (std::find(neighbors.begin(), neighbors.end(), next) == neighbors.end())
+                        neighbors.push_back(std::move(next));
+                }
+            if (neighbors.empty()) break;
+            Sequence next = neighbors[random() % neighbors.size()];
+            WideInteger next_coefficient = counter.count(k, next);
+            if (next_coefficient < current_coefficient) {
+                std::cout << "TRANSFER_MONOTONICITY_FAIL k=" << k
+                          << " step=" << completed
+                          << " upper=" << show(current)
+                          << " upper_coefficient=" << show_integer(current_coefficient)
+                          << " lower=" << show(next)
+                          << " lower_coefficient=" << show_integer(next_coefficient) << '\n';
+                return 1;
+            }
+            current = std::move(next);
+            current_coefficient = std::move(next_coefficient);
+            if ((completed + 1) % 10 == 0)
+                std::cerr << "walked " << (completed + 1) << '/' << requested_steps << '\n';
+        }
+        std::cout << "TRANSFER_MONOTONICITY_WALK_PASS k=" << k
+                  << " requested_steps=" << requested_steps
+                  << " completed_steps=" << completed
+                  << " seed=" << seed
+                  << " final_state=" << show(current) << '\n';
+        for (int level = 1; level <= k; ++level)
+            std::cout << "NODES k=" << level
+                      << " value=" << counter.nodes_by_level[level] << '\n';
+        return 0;
+    }
+    if (argc >= 4 && std::string(argv[1]) == "--coefficient") {
+        const int k = std::stoi(argv[2]);
+        if (k < 0 || k > 4) {
+            std::cerr << "coefficient level must be between 0 and 4\n";
+            return 2;
+        }
+        Sequence profile;
+        for (int i = 3; i < argc; ++i) profile.push_back(std::stoi(argv[i]));
+        std::sort(profile.begin(), profile.end(), std::greater<int>());
+        CoefficientCounter counter(k);
+        const WideInteger coefficient = counter.count(k, profile);
+        std::cout << "COEFFICIENT k=" << k << " state=" << show(profile)
+                  << " value=" << show_integer(coefficient) << '\n';
+        for (int level = 1; level <= k; ++level)
+            std::cout << "NODES k=" << level
+                      << " value=" << counter.nodes_by_level[level] << '\n';
+        return coefficient == 0 ? 1 : 0;
+    }
     if (argc != 2) {
-        std::cerr << "usage: singleton_strong_niceness k\n";
+        std::cerr << "usage: singleton_strong_niceness k\n"
+                  << "       singleton_strong_niceness --walk k steps seed\n"
+                  << "       singleton_strong_niceness --coefficient k widths...\n";
         return 2;
     }
     const int k = std::stoi(argv[1]);
