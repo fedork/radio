@@ -493,6 +493,36 @@ proof obligation is to use the power-of-two capacities and binomial multipliciti
 symmetrize that cut and turn it into a violated parent rank inequality.  Ordinary
 bisubmodular exchange does not automatically do this after the absolute-value fold.
 
+There is a sharper local version of exactly that obligation.  For a fixed coloring `A/B`, put
+
+    r_(A,B)(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).
+
+The Fixed-Color Hall Lemma says that a labelled demand vector `x` is feasible for this coloring
+exactly when `x(S)<=r_(A,B)(S)` for every row set `S`.  Consider one Robin-Hood transfer
+
+    y=x-e_i+e_j,                 x_i>=x_j+2.
+
+The same coloring is feasible for both `x` and `y` exactly when no `x`-tight set contains `j` but
+not `i`.  Indeed, those and only those inequalities increase, and they increase by one.  Moreover,
+if `i,j` have the same color, such a tight set is impossible: replacing `j` by `i` preserves all
+three cardinalities in `r_(A,B)` but increases its demand by at least two, contradicting the
+feasibility of `x`.
+
+Thus only an opposite-color tight separator can obstruct a transfer.  This isolates the following
+particularly economical sufficient statement.
+
+> **Pascal Adjacent-Fiber Lemma (open).** If `x in M_h`, `h=G_(K-1)`, and
+> `y=x-e_i+e_j` is a Robin-Hood transfer, then some row coloring is feasible for both `x` and `y`.
+
+The coloring may depend on the chosen transfer; asking one coloring to support every outgoing
+transfer is stronger and is not needed.  The Adjacent-Fiber Lemma would prove (T), hence (F), by
+walking from a permutation of `G_K` through unit Robin-Hood transfers.  In tight-set language, its
+entire unproved content is: among the feasible colorings of `x`, one can eliminate every tight set
+that separates this particular opposite-color pair.  A plausible proof would choose a coloring
+maximizing the minimum separator slack and use bisubmodular uncrossing to recolor across a minimal
+tight separator.  What is still missing is the Pascal-specific recoloring step that either raises
+that slack or turns the separator into a violated parent-rank inequality.
+
 Simple global scalar optimization is not a substitute for (F).  Requiring at least
 `2^(K-1)` rows of each color and then minimizing the final A/B mass difference passes every
 full-mass state through `K=3`, but fails already at `K=4`.  The first failure in descending

@@ -8,7 +8,10 @@ full-mass states at `K=4`; an independent cut census also verifies the scalar eq
 coalescence rule on all of them, while refuting independent matching of the full hinge profile at
 `K=3`.  Exact coefficient recursion also shows that the transcript graph `Q_3` is strongly nice,
 a genuinely stronger finite statement, but closure under its special disjoint-union/join recursion
-is unproved.  These expose useful conjectural geometry but supply no general proof.
+is unproved.  The bottom-up route is now reduced further: a fixed coloring survives a unit transfer
+unless an opposite-color tight Hall set separates recipient from donor, so a Pascal-specific
+Adjacent-Fiber/strict-separator elimination lemma would finish the induction.  That lemma is still
+unproved.  These expose useful conjectural geometry but supply no general proof.
 Canonical/distinct-slot witness leaves remain unconditional, arbitrary
 `[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
 unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers

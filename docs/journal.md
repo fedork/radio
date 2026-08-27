@@ -10528,3 +10528,29 @@ the global coloring `A=(8,4,2,1)`, `B=(7,2,1,1,1)` passes.  Thus the remaining o
 row-orientation plus integral-flow theorem.  This is the layer form of Pascal orthant saturation,
 not a new solution; it explains why amount assignment can be delegated to flow once the global row
 signs are found.
+
+## 2026-08-27 -- adjacent-fiber reduction of the transfer proof
+
+The bottom-up transfer proposal has a still sharper exact obstruction.  For a fixed row coloring,
+write
+
+    r_(A,B)(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).
+
+If `x` is feasible and `y=x-e_i+e_j`, the same coloring remains feasible exactly when there is no
+`x`-tight set containing recipient `j` but not donor `i`.  When donor and recipient have the same
+color this is automatic: exchanging `j` for the at-least-two-larger `i` preserves the rank but
+would violate feasibility.  Hence the only obstruction is an opposite-color tight separator.
+
+This gives the Pascal Adjacent-Fiber Lemma: every feasible `x` and Robin-Hood neighbor `y` should
+have at least one common feasible coloring.  If true, it completes the converse by the standard
+unit-transfer generation of every partition dominated by `G_K`, followed by the Fixed-Color Hall
+Lemma and induction on `K`.  The coloring is allowed to depend on the selected transfer; the
+stronger demand for one coloring supporting all transfers is unnecessary.
+
+A direct proof attempt by maximizing the minimum separator slack reaches one precise missing
+step: uncrossing supplies a minimal opposite-color tight separator, but ordinary bisubmodular
+exchange does not show how to recolor across it while preserving all other Hall inequalities.  The
+needed move must use the dyadic capacities and Pascal multiplicities; generic bases have the same
+signed submodularity and explicit counterexamples.  Thus the reduction is complete, but the
+separator-elimination lemma remains open and no proof of singleton-majorization sufficiency is
+claimed.
