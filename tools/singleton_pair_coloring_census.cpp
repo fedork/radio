@@ -658,6 +658,214 @@ struct Census {
     }
 };
 
+// In the 3M-slot padded formulation, reserve the M lightest slots for rows that may use only the
+// mixed child, then alternate the remaining 2M slots between the two pure orientations.  The
+// reserved rows are necessarily zero or one.  If their total is c, contracting them from the
+// mixed child replaces H(t) by min(H(t), M-c).  This census tests that particular deterministic
+// orientation; it is stronger than the Row-Coloring Lemma and is only a diagnostic.
+struct PaddedThreeCensus {
+    int k;
+    Sequence parent;
+    Hall hall;
+    Sequence parent_prefix{0};
+    int total = 0;
+    int block_size = 0;
+    std::uint64_t states = 0;
+    std::vector<std::uint64_t> states_by_c;
+    std::vector<std::uint64_t> failures_by_c;
+    std::vector<std::uint64_t> failures_by_support;
+    Sequence first_failure;
+    int first_failure_c = -1;
+    int first_p = -1;
+    int first_q = -1;
+    int first_lhs = -1;
+    int first_rhs = -1;
+
+    explicit PaddedThreeCensus(int level)
+        : k(level), parent(singleton_base(level)), hall(singleton_base(level - 1)) {
+        for (int value : parent) {
+            total += value;
+            parent_prefix.push_back(total);
+        }
+        block_size = total / 3;
+        states_by_c.assign(block_size + 1, 0);
+        failures_by_c.assign(block_size + 1, 0);
+        failures_by_support.assign(total + 1, 0);
+    }
+
+    int parent_H(int count) const {
+        return parent_prefix[std::min(count, static_cast<int>(parent.size()))];
+    }
+
+    int value_at(const Sequence &state, int index) const {
+        return index < static_cast<int>(state.size()) ? state[index] : 0;
+    }
+
+    void inspect(const Sequence &state) {
+        ++states;
+        int c = 0;
+        for (int i = 2 * block_size; i < total; ++i) {
+            const int value = value_at(state, i);
+            if (value > 1) {
+                std::cerr << "PADDED_TAIL_NOT_UNIT k=" << k
+                          << " state=" << show(state) << '\n';
+                std::exit(1);
+            }
+            c += value;
+        }
+        ++states_by_c[c];
+
+        Sequence pa(1, 0);
+        Sequence pb(1, 0);
+        for (int i = 0; i < 2 * block_size; ++i) {
+            Sequence &prefix = (i % 2 == 0) ? pa : pb;
+            prefix.push_back(prefix.back() + value_at(state, i));
+        }
+
+        bool legal = true;
+        int bad_p = -1;
+        int bad_q = -1;
+        int bad_lhs = -1;
+        int bad_rhs = -1;
+        for (int p = 0; p <= block_size && legal; ++p) {
+            for (int q = 0; q <= block_size; ++q) {
+                const int mixed = std::min(hall.H(p + q), block_size - c);
+                const int lhs = pa[p] + pb[q];
+                const int rhs = hall.H(p) + hall.H(q) + mixed;
+                if (lhs > rhs) {
+                    legal = false;
+                    bad_p = p;
+                    bad_q = q;
+                    bad_lhs = lhs;
+                    bad_rhs = rhs;
+                    break;
+                }
+            }
+        }
+        if (legal) return;
+        ++failures_by_c[c];
+        ++failures_by_support[state.size()];
+        if (first_failure.empty()) {
+            first_failure = state;
+            first_failure_c = c;
+            first_p = bad_p;
+            first_q = bad_q;
+            first_lhs = bad_lhs;
+            first_rhs = bad_rhs;
+        }
+    }
+
+    void enumerate(int remaining, int maximum, Sequence &state) {
+        if (remaining == 0) {
+            inspect(state);
+            return;
+        }
+        const int used = total - remaining;
+        for (int value = std::min(maximum, remaining); value >= 1; --value) {
+            if (used + value > parent_H(static_cast<int>(state.size()) + 1)) continue;
+            state.push_back(value);
+            enumerate(remaining - value, value, state);
+            state.pop_back();
+        }
+    }
+
+    void run() {
+        Sequence state;
+        enumerate(total, parent.front(), state);
+        std::cout << "PADDED_THREE_CENSUS k=" << k << " states=" << states << '\n';
+        for (int c = 0; c <= block_size; ++c) {
+            if (states_by_c[c] == 0) continue;
+            std::cout << "TAIL_MASS c=" << c
+                      << " states=" << states_by_c[c]
+                      << " alternating_failures=" << failures_by_c[c] << '\n';
+        }
+        for (int support = 0; support <= total; ++support) {
+            if (failures_by_support[support] == 0) continue;
+            std::cout << "FAILURE_SUPPORT rows=" << support
+                      << " failures=" << failures_by_support[support] << '\n';
+        }
+        if (!first_failure.empty())
+            std::cout << "FIRST_PADDED_ALTERNATING_FAILURE state=" << show(first_failure)
+                      << " c=" << first_failure_c
+                      << " p=" << first_p << " q=" << first_q
+                      << " lhs=" << first_lhs << " rhs=" << first_rhs << '\n';
+    }
+};
+
+// For a state with at least 2M nonzero rows, put its M lightest padded slots in the mixed-only
+// block.  If that block has mass c, write E=M-c and
+//
+//   U_E(t)=min(H_k(t), E+t),
+//
+// the joint parent-majorization/support bound on the first t remaining rows.  Under strict
+// alternation, the Hall inequalities with q>=p follow from concavity.  For p>q it is enough that
+//
+//   floor((U_E(2q+1)+U_E(2p-1))/2)
+//       <= H(p)+H(q)+min(H(p+q),E).
+//
+// Each side is piecewise linear in integer E, with breakpoints only where one displayed min
+// changes branch.  Checking those breakpoints and their two neighbors is therefore exhaustive.
+void check_padded_prefix_arithmetic(int k) {
+    const Sequence child = singleton_base(k - 1);
+    const Hall hall(child);
+    int mass = 0;
+    for (int value : child) mass += value;
+    const int child_rows = static_cast<int>(child.size());
+    const auto parent_H = [&](int count) {
+        return hall.H(count) + hall.H((count + 1) / 2) + hall.H(count / 2);
+    };
+    const auto U = [&](int count, int excess_mass) {
+        return std::min(parent_H(count), excess_mass + count);
+    };
+
+    std::uint64_t pairs = 0;
+    std::uint64_t values = 0;
+    for (int p = 1; p <= child_rows; ++p) {
+        for (int q = 0; q < p; ++q) {
+            ++pairs;
+            const int total_rows = p + q;
+            const int first_index = 2 * q + 1;
+            const int second_index = 2 * p - 1;
+            const int switches[] = {
+                0,
+                mass - 1,
+                mass,
+                parent_H(first_index) - first_index,
+                parent_H(second_index) - second_index,
+                hall.H(total_rows),
+            };
+            std::vector<int> candidates;
+            for (int point : switches) {
+                for (int delta = -2; delta <= 2; ++delta) {
+                    const int excess_mass = point + delta;
+                    if (excess_mass < 0 || excess_mass > mass) continue;
+                    candidates.push_back(excess_mass);
+                }
+            }
+            std::sort(candidates.begin(), candidates.end());
+            candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+            for (int excess_mass : candidates) {
+                ++values;
+                const int lhs =
+                    (U(first_index, excess_mass) + U(second_index, excess_mass)) / 2;
+                const int rhs = hall.H(p) + hall.H(q) +
+                                std::min(hall.H(total_rows), excess_mass);
+                if (lhs > rhs) {
+                    std::cout << "PADDED_PREFIX_FAILURE k=" << k
+                              << " E=" << excess_mass
+                              << " p=" << p << " q=" << q
+                              << " lhs=" << lhs << " rhs=" << rhs << '\n';
+                    return;
+                }
+            }
+        }
+    }
+    std::cout << "PADDED_PREFIX_CHECK k=" << k
+              << " pairs=" << pairs
+              << " breakpoint_values=" << values
+              << " result=PASS\n";
+}
+
 void sample_transfer_states(int k, std::uint64_t sample_count, std::uint64_t seed) {
     const Sequence parent = singleton_base(k);
     const Hall hall(singleton_base(k - 1));
@@ -996,6 +1204,25 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--padded-prefix-check") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 8;
+        if (k < 1 || k > 12) {
+            std::cerr << "usage: singleton_pair_coloring_census --padded-prefix-check k\n";
+            return 2;
+        }
+        check_padded_prefix_arithmetic(k);
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--padded-three-census") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 4;
+        if (k < 1 || k > 4) {
+            std::cerr << "usage: singleton_pair_coloring_census --padded-three-census k\n";
+            return 2;
+        }
+        PaddedThreeCensus census(k);
+        census.run();
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--global-census") {
         const int k = argc > 2 ? std::atoi(argv[2]) : 4;
         if (k < 1 || k > 4) {

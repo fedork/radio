@@ -10548,6 +10548,37 @@ opposite-orientation tight separator.  The remaining proof must use the dyadic c
 Pascal multiplicities to cross that cut; padding makes the construction and failure certificate
 cleaner but does not yet prove that augmentation always succeeds.
 
+## 2026-08-27 -- canonical padded tail isolates a high-support alternation lemma
+
+The equal partition into `M=3^(K-1)` left-eligible, right-eligible and mixed-only slots has an exact
+three-variable Hall criterion.  Two exchange lemmas simplify it substantially.  A heavier
+mixed-only row can always swap with a lighter pure-eligible row without hurting Hall, so the
+mixed-only block may be taken to be the `M` smallest padded rows.  Those rows must be zeros and
+ones.  If their mass is `c`, minimizing over their Hall coordinate contracts the mixed prefix from
+`H(t)` to `min(H(t),M-c)`.
+
+When the parent has at least `2M` nonzero rows, parent majorization plus the mandatory unit in every
+unselected positive row gives the stronger prefix bound
+`U_E(t)=min(H_K(t),E+t)`, `E=M-c`.  Alternating the remaining `2M` rows makes all inequalities on
+the side receiving the smaller row of each pair follow from concavity.  Only
+
+    floor((U_E(2q+1)+U_E(2p-1))/2)
+      <= H(p)+H(q)+min(H(p+q),E),       p>q,
+
+remains.  This is now a one-dimensional Pascal-prefix statement, with no state or assignment
+variables.  It is unproved uniformly.
+
+The new `--padded-three-census` mode checks the construction directly.  The complete `K=3` census
+has 66 states with nonzero canonical-tail mass and no alternating failure; the complete `K=4`
+census has 11,309 and no failure.  All ordinary alternating failures have only 9 or 11 nonzero rows
+at `K=3`, and 16 through 21 at `K=4`, far below the `2M` thresholds 18 and 54.  The new
+`--padded-prefix-check` mode exhausts the integer breakpoints of the remaining scalar inequality;
+every `K=1..12` passes, with 2,098,176 `(p,q)` pairs and 20,201,473 breakpoint values at `K=12`.
+The final provenance build is `a895141b33ec5893167eb3e49a33dad0a11d2016ebd1e43ceeff2471907a67c3`;
+the complete censuses took 5.4 wall seconds together and all twelve prefix checks took 2.1 wall
+seconds on the recorded M4 Pro.  Full derivation and commands are in
+`evidence/singleton_padded_three_blocks_2026-08-27.md`.
+
 The conjugate-layer view also isolates the assignment gap.  Each child layer of height `r` becomes
 a parent layer `(2^r,1^r)`: its incidences split evenly into left, mixed and right, and a parent row
 may take mixed plus one pure incidence in that layer.  Across layers the same row must keep one

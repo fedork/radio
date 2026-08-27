@@ -179,6 +179,16 @@ intervals are too rigid already at `K=3` for `(8,7,4,1^8)`.  The live algorithmi
 adaptive decreasing-capacity insertion with alternating-path reroutes; prove that every stopped
 insertion's opposite-orientation tight cut can be crossed using the Pascal multiplicities.
 
+The equal-three-block view supplies a separate concrete subgoal.  Exchange always moves the
+mixed-only block to the `3^(K-1)` smallest padded rows, which are zeros and ones.  For parents with
+at least `2*3^(K-1)` nonzero rows, strict alternation of the remainder reduces every Hall inequality
+to the explicit Pascal prefix family (P4) in the
+[theorem note](theorems/singleton-majorization.md#equal-blocks-and-the-canonical-mixed-only-tail).
+The exact breakpoint checker passes all `K<=12`.  Prove (P4) from the conjugate capacities
+`2^(r-j)` with Pascal multiplicities; this would settle the entire high-support regime without
+exchange.  Do not mistake it for the full lemma: the complete `K=3,4` failures of ordinary
+alternation all occur below that support threshold, where the augmenting-path problem remains.
+
 The 2026-08-27 forest-shape survey supplies a useful coarse invariant but not a replacement proof.
 For `E_a(t)=sum_i(a_i-t)_+`, every cut has an exact removal profile
 `sum_C E_C(t)=E_a(t)-J_a(t)` and the sharp capacity

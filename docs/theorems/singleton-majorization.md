@@ -442,6 +442,51 @@ that an augmenting path always exists.  A failed augmentation exposes an opposit
 tight cut, so proving that the Pascal multiplicities always let that cut be crossed is the same
 separator-elimination problem isolated by the adjacent-fiber formulation above.
 
+#### Equal blocks and the canonical mixed-only tail
+
+The `3^K` padding also sharpens the row-partition version.  Put `M=3^(K-1)` and divide the padded
+slots into equal blocks `A,B,C`, where `A` rows may feed left and mixed, `B` rows may feed mixed and
+right, and `C` rows may feed only mixed.  If `A_p,B_q,C_r` denote the corresponding largest-row
+prefix sums, the integral Hall criterion is exactly
+
+    A_p+B_q+C_r <= H(p)+H(q)+H(p+q+r)                 (P1)
+
+for all `0<=p,q,r<=M`.  The conditions `mass(A)>=M` and `mass(B)>=M` are only the two complementary
+whole-block cases of (P1).
+
+There is no need to search over `C`.  In any feasible partition, swapping a heavier `C` row with a
+lighter `A` or `B` row preserves every Hall inequality: a set containing the heavier row gains
+pure capacity, while a set containing only the lighter row is certified by replacing it with the
+heavier row before the swap.  Hence `C` may always be taken to be the `M` smallest padded rows.
+They are necessarily zeros and ones.  If their mass is `c` and `E=M-c`, minimizing (P1) over its
+`r` coordinate gives the exact contracted condition
+
+    A_p+B_q <= H(p)+H(q)+min(H(p+q),E).               (P2)
+
+Thus the equal three-block formulation canonically chooses its mixed-only block and reduces back
+to a two-color problem with a tail-truncated mixed child.
+
+This reduction is especially clean when the parent has at least `2M` nonzero rows.  Its remaining
+`2M` rows have prefix bound
+
+    U_E(t)=min(H_K(t),E+t).                           (P3)
+
+The second term is the total-mass bound after charging one unit to every unselected positive row.
+It implies all balanced instances of (P2).  If the remaining rows are colored alternately by
+rank, pairwise averaging also proves every off-diagonal inequality on the side receiving the
+smaller row of each pair.  The other side would follow from the single arithmetic family
+
+    floor((U_E(2q+1)+U_E(2p-1))/2)
+      <= H(p)+H(q)+min(H(p+q),E),        p>q.         (P4)
+
+An exact breakpoint checker verifies (P4) for every integer `E` through `K=12`.  Complete state
+censuses find no padded-alternation failure with a nonzero canonical tail at `K=3,4`; all failures
+have far fewer than `2M` nonzero rows.  This is a proved reduction plus finite evidence, not a
+uniform proof of (P4).  A proof of (P4) from the dyadic/Pascal formula for `H` would settle the
+entire high-support regime by an explicit single pass.  The derivation, exchange proof, census
+counts and commands are in the
+[padded three-block record](../../evidence/singleton_padded_three_blocks_2026-08-27.md).
+
 ### A shape-preserving forest target (2026-08-27)
 
 There is a precise version of the proposed “children of similar shape” idea.  For an integer
