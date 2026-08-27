@@ -10554,3 +10554,20 @@ needed move must use the dyadic capacities and Pascal multiplicities; generic ba
 signed submodularity and explicit counterexamples.  Thus the reduction is complete, but the
 separator-elimination lemma remains open and no proof of singleton-majorization sufficiency is
 claimed.
+
+## 2026-08-27 -- why padded unsorted counting is support, not cardinality
+
+Padding every full-mass state to `N=3^K` labelled rows gives a clean exact count of the target
+lattice points: sum `N!/((N-length(lambda))! product_v multiplicity_v(lambda)!)` over the
+partitions `lambda` of `N` dominated by `G_K`.  It also gives a clean labelled recurrence for
+child decompositions.  These are not the same count, because the recombination map has nonuniform
+fibers.
+
+The obstruction is visible without computation at `K=1`.  The target has seven labelled states:
+six permutations of `(2,1,0)` and `(1,1,1)`.  Choosing placements for the left, mixed and right
+unit children, with the two pure placements distinct, gives 18 triples.  Each `(2,1,0)` has two
+preimages and `(1,1,1)` has six.  Thus counting all child triples measures the sum of coefficients,
+not the number of supported parent states.  Counting distinct outputs and proving that this count
+equals the target count would be a valid proof, but it is equivalent to proving that every target
+coefficient is nonzero—the Row-Coloring Lemma itself.  Padding removes permutation bookkeeping;
+it does not remove collisions or the existence problem.

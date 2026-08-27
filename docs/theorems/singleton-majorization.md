@@ -156,6 +156,26 @@ without invoking the open converse.  It verifies (SN) for `K=3` on all 1,206 pos
 types and all 463,886 comparable ordered pairs (4,740,395 recursive allocation nodes).  This is
 another finite theorem only, not an induction proof.
 
+Padding to `N=3^K` labelled rows removes permutation quotients but does not turn this recurrence
+into a cardinality proof.  Let `S_K` be the full-mass labelled vectors majorized by `G_K`.  Its
+cardinality has the exact partition sum
+
+    |S_K| = sum_(lambda partition N, lambda<=G_K)
+                N! / ((N-length(lambda))! product_(v>=1) multiplicity_v(lambda)!).       (COUNT)
+
+Let `D_K` instead be the triples of padded child vectors `(l,m,r)`, each majorized by `G_(K-1)`,
+with `l_i r_i=0`, and map a triple to `a=l+m+r`.  This map has image contained in `S_K`, but it is
+many-to-one with nonconstant fibers.  Already for `K=1`, `S_1` consists of the six labelled
+permutations of `(2,1,0)` and `(1,1,1)`, hence has size seven.  The three unit children have
+`3*3*2=18` legal labelled placements: every `(2,1,0)` output has two preimages, while `(1,1,1)`
+has six.
+
+Consequently, counting child triples computes a sum of decomposition coefficients, whereas the
+converse asks for the size of their support.  Proving that the number of *distinct* outputs equals
+`|S_K|` would indeed prove the Row-Coloring Lemma, because the image is already contained in
+`S_K`; however, determining that distinct-output count is exactly the assertion that every relevant
+coefficient is nonzero.  A uniform division by a fiber size is impossible even at `K=1`.
+
 There is no immediate closure theorem for the displayed graph recursion.  Strong niceness is
 closed under disjoint union, but not under graph join in general; moreover `Q_3` contains an induced
 claw, so the hereditary claw-free characterization does not apply.  The useful new proof target is
