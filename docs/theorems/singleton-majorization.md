@@ -156,6 +156,31 @@ without invoking the open converse.  It verifies (SN) for `K=3` on all 1,206 pos
 types and all 463,886 comparable ordered pairs (4,740,395 recursive allocation nodes).  This is
 another finite theorem only, not an induction proof.
 
+Labelling every coin by its unique transcript makes this recurrence genuinely bijective at the
+decorated level: restricting a parent coloring to the three first-symbol copies recovers its three
+child colorings uniquely, and compatible child colorings recombine uniquely.  It does not make the
+projection to the row-size vector injective.  In coefficient language a successful counting proof
+must therefore be coefficientwise.  The clean sufficient target for one Robin-Hood transfer is an
+injection
+
+    colorings of type a  -->  colorings of type a-e_i+e_j.                 (INJ)
+
+Trying to build (INJ) recursively identifies the same structural obstruction as the Hall proof.
+If the donor has more occurrences than the recipient in the mixed child, or in a pure child that
+the recipient may legally use, child-level strong niceness performs the transfer.  The unresolved
+case has donor and recipient on opposite pure sides, with no donor excess in the mixed child.  A
+two-color Kempe exchange need not work—the induced-claw example below already proves that—and an
+injective construction must route through a third color or a global augmenting chain.  That is
+strictly stronger than merely finding one feasible coloring for the target state, and its stopped
+augmenting paths would have to overcome the same opposite-color tight separators isolated by the
+Pascal Adjacent-Fiber Lemma.
+
+Exact arbitrary-precision probes at `K=4` have not refuted (INJ): the coefficient rises on the
+first canonical balancing transfer, and one exact ten-transfer walk is monotone.  A longer request
+hit its cap after those ten completed steps.  These are narrow finite probes, not evidence for all
+5,997,038 states or all dominance covers; commands and exact coefficients are in the
+[strong-niceness census record](../../evidence/singleton_strong_niceness_2026-08-27.md).
+
 Padding to `N=3^K` labelled rows removes permutation quotients but does not turn this recurrence
 into a cardinality proof.  Let `S_K` be the full-mass labelled vectors majorized by `G_K`.  Its
 cardinality has the exact partition sum

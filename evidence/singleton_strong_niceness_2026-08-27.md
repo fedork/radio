@@ -47,10 +47,57 @@ returned
     NODES k=3 value=4740395
 
 The same executable returns 1 and 2 supported partitions for `K=0,1`, 15 for `K=2`, and passes all
-94 comparable ordered pairs at `K=2`.  Since a coefficient is at most `27!`, the `K<=3` utility's
-unsigned 128-bit arithmetic is exact.
+94 comparable ordered pairs at `K=2`.  Since a coefficient is at most `27!`, that original
+executable's unsigned 128-bit arithmetic was exact.  The later `K=4` extension below replaces it
+with arbitrary-precision arithmetic.
 
 This is exhaustive finite evidence, not a proof for arbitrary `K`.
+
+## Exact arbitrary-precision `K=4` probes
+
+The utility now uses an exact nonnegative arbitrary-precision integer and has two bounded diagnostic
+modes: `--coefficient` evaluates one profile, and `--walk` follows randomly selected unit
+Robin-Hood transfers while checking coefficient monotonicity at every completed step.  The updated
+source was provenance-built at commit `8070827a65b427718f737cd1d24a185b4d050ada`:
+
+    CC=clang++ tools/build_radio.py -O3 -Wall -Wextra \
+        tools/singleton_strong_niceness.cpp -o /tmp/singleton_strong_niceness_big
+
+The build id was
+`560d11ce7ebab7866dd56ed43d243ce9f01fcba3f928990a5996bf19a17f4a12`.  Each retained local
+output passed `tools/check_provenance.py`.  The canonical profile and its first balancing neighbor
+gave
+
+    COEFFICIENT k=4 state=(16,15,11,11,5,5,5,5,1,1,1,1,1,1,1,1)
+      value=817133116390102794240
+    COEFFICIENT k=4 state=(15,15,12,11,5,5,5,5,1,1,1,1,1,1,1,1)
+      value=7354198047510925148160
+
+Thus this cover increases the coefficient by exactly nine.  Both capped commands completed in one
+five-second polling interval.  The exact walk
+
+    tools/capped_run.sh --seconds 60 --rss-gb 4 --label strong-g4-walk10-clean -- \
+      tools/run_with_provenance.py /tmp/singleton_strong_niceness_big \
+        --walk 4 10 8272026
+
+returned
+
+    TRANSFER_MONOTONICITY_WALK_PASS k=4 requested_steps=10 completed_steps=10
+      seed=8272026 final_state=(14,13,11,10,5,5,5,5,3,2,1,1,1,1,1,1,1,1)
+    NODES k=1 value=4
+    NODES k=2 value=248
+    NODES k=3 value=190835
+    NODES k=4 value=400927
+
+It also completed in one five-second polling interval.  Requesting 100 steps with the same seed is
+an abort, not a larger positive sample: it printed `walked 10/100`, then hit the 60-second cap after
+63 wall seconds at 1.45 GB peak RSS while evaluating the next coefficient.  No monotonicity failure
+was printed, but no eleventh comparison completed.
+
+These probes establish neither `K=4` strong niceness nor even a representative sample of its
+dominance covers.  Their purpose is narrower: the history-counting strengthening does not fail at
+the first canonical transfers, while exact coefficient evaluation becomes expensive almost
+immediately away from the canonical profile.
 
 ## Why ordinary closure results do not finish the induction
 

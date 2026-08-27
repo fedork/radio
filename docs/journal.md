@@ -10571,3 +10571,26 @@ not the number of supported parent states.  Counting distinct outputs and provin
 equals the target count would be a valid proof, but it is equivalent to proving that every target
 coefficient is nonzero—the Row-Coloring Lemma itself.  Padding removes permutation bookkeeping;
 it does not remove collisions or the existence problem.
+
+## 2026-08-27 -- history-labelled counting reaches the same opposite-pure obstruction
+
+Unique transcript labels make the recursive decomposition bijective at the level of proper
+colorings of `Q_K`, but the sufficient counting theorem is coefficientwise: inject colorings of
+type `a` into those of every Robin-Hood neighbor `a-e_i+e_j`.  Recursive case analysis works when
+the donor has an excess in the mixed child or in a pure child that the recipient may use.  It stops
+when donor and recipient occupy opposite pure sides and the mixed child has no donor excess.  The
+induced-claw example already rules out a two-color repair; an injection must use a third color or a
+global augmenting chain.  Such a construction must overcome the same opposite-color tight
+separators isolated by the Pascal Adjacent-Fiber Lemma.  Thus history counting remains viable but
+is strictly stronger than the support theorem and does not bypass its hard case.
+
+`tools/singleton_strong_niceness.cpp` now uses exact arbitrary-precision arithmetic and supports
+single-profile and random-transfer-walk diagnostics through `K=4`.  At provenance build
+`560d11ce7ebab7866dd56ed43d243ce9f01fcba3f928990a5996bf19a17f4a12`, the canonical `G_4`
+coefficient was `817133116390102794240`; its first balancing neighbor
+`(15,15,12,11,5,5,5,5,1^8)` had coefficient `7354198047510925148160`, exactly nine times larger.
+One seeded ten-transfer walk completed monotonically after 400,927 level-four allocation nodes.
+A 100-step request with the same seed completed no eleventh comparison and timed out after 63 wall
+seconds at 1.45 GB peak RSS; it is an abort, not a 100-step result.  The exact commands, final state,
+lower-level node counts and provenance are in
+`evidence/singleton_strong_niceness_2026-08-27.md`.

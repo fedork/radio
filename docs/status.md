@@ -8,7 +8,9 @@ full-mass states at `K=4`; an independent cut census also verifies the scalar eq
 coalescence rule on all of them, while refuting independent matching of the full hinge profile at
 `K=3`.  Exact coefficient recursion also shows that the transcript graph `Q_3` is strongly nice,
 a genuinely stronger finite statement, but closure under its special disjoint-union/join recursion
-is unproved.  The bottom-up route is now reduced further: a fixed coloring survives a unit transfer
+is unproved.  Exact arbitrary-precision `K=4` probes pass the first canonical transfer and one
+ten-transfer walk, but a longer request stalls at the next coefficient; this is diagnostic only.
+The bottom-up route is now reduced further: a fixed coloring survives a unit transfer
 unless an opposite-color tight Hall set separates recipient from donor, so a Pascal-specific
 Adjacent-Fiber/strict-separator elimination lemma would finish the induction.  That lemma is still
 unproved.  These expose useful conjectural geometry but supply no general proof.
