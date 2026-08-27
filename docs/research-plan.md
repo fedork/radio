@@ -182,6 +182,23 @@ by the number of nonunit rows.  Direct reconstruction verifies this scalar rule 
 cuts and their obstructions, while keeping Pascal orthant saturation as the exact target; see the
 [shape survey](../evidence/singleton_shape_survey_2026-08-27.md).
 
+A second global formulation is now worth pursuing in parallel with the signed Hall fold.  For the
+transcript graph `Q_K`, the monomial coefficient `c_K(lambda)` of its chromatic symmetric function
+counts semi-ordered legal decompositions of type `lambda`.  Exact recursive counting shows that
+`Q_3` is **strongly nice**: `c_K(mu)>=c_K(lambda)` whenever `mu<=lambda`, for all 1,206 supported
+types and 463,886 comparable pairs.  Strong niceness would imply the converse immediately.  The
+graph recursion is `Q_K=Q_(K-1) disjoint-union (Q_(K-1) join Q_(K-1))`; disjoint union preserves
+strong niceness but graph join does not in general, so the proof obligation is closure under this
+special combined operator, not an existing generic theorem.  See the
+[theorem formulation](theorems/singleton-majorization.md#a-stronger-chromatic-symmetric-function-target-2026-08-27)
+and [exact census](../evidence/singleton_strong_niceness_2026-08-27.md).
+
+The complete feasible split-count fiber is less promising as an induction variable.  At `K=3` it
+is always an integer interval, but continuous hinge and mixed-mass endpoint bounds miss parity and
+pure-side packing obstructions.  Computing all endpoints did not finish even a ten-state `K=4`
+sample in 60 CPU seconds.  Retain the endpoint examples as diagnostics; do not replace the no-holes
+target by an unproved interval assertion.
+
 The complete full-mass census gives supporting geometry: all 5,997,038 states at `K=4` satisfy the
 Row-Coloring Lemma, and a balanced value-block rule with one-block lookahead succeeds on every one,
 plus ten million uniform `K=5` samples.  Treat that rule as diagnostic for the exchange geometry,

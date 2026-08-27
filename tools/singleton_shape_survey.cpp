@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -7,6 +8,7 @@
 #include <random>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -75,6 +77,8 @@ struct LocalOption {
 };
 
 struct ShapeSplitSearch {
+    static constexpr int max_split_bits = 256;
+    using SplitMask = std::bitset<max_split_bits>;
     const Sequence &parent;
     Sequence child_base;
     Sequence child_prefix{0};
@@ -94,6 +98,7 @@ struct ShapeSplitSearch {
     std::vector<std::array<int, 3>> selected;
     std::vector<std::array<int, 3>> witness;
     std::unordered_set<std::string> memo;
+    std::unordered_map<std::string, SplitMask> all_memo;
     std::uint64_t nodes = 0;
 
     ShapeSplitSearch(const Sequence &state, int k, int target,
@@ -299,6 +304,79 @@ struct ShapeSplitSearch {
 
     bool run() { return dfs(0, 0); }
 
+    SplitMask finish_unit_suffix_all(int index) const {
+        SplitMask result;
+        const int units = static_cast<int>(parent.size()) - index;
+        int required = 0;
+        for (int child = 0; child < 3; ++child) {
+            const int deficit = child_mass - mass[child];
+            if (deficit < 0 || rows[child] + deficit < child_min_rows) return result;
+            required += deficit;
+        }
+        if (required == units) result.set(0);
+        return result;
+    }
+
+    SplitMask dfs_all(int index) {
+        ++nodes;
+        SplitMask result;
+        if (index == static_cast<int>(parent.size())) {
+            for (int child = 0; child < 3; ++child)
+                if (mass[child] != child_mass || rows[child] < child_min_rows)
+                    return result;
+            result.set(0);
+            return result;
+        }
+        if (parent[index] == 1) return finish_unit_suffix_all(index);
+
+        for (int child = 0; child < 3; ++child)
+            if (mass[child] > child_mass ||
+                mass[child] + suffix_mass[index] < child_mass)
+                return result;
+
+        const std::string key = memo_key(index, 0);
+        const auto old = all_memo.find(key);
+        if (old != all_memo.end()) return old->second;
+
+        auto choices = options_by_width[parent[index]];
+        std::stable_sort(choices.begin(), choices.end(), [&](const LocalOption &left,
+                                                             const LocalOption &right) {
+            auto score = [&](const LocalOption &option) {
+                int value = 0;
+                for (int child = 0; child < 3; ++child) {
+                    const int residual = child_mass - mass[child] - option.piece[child];
+                    value += residual * residual;
+                }
+                return value;
+            };
+            return score(left) < score(right);
+        });
+
+        for (const LocalOption &option : choices) {
+            bool legal = true;
+            for (int child = 0; child < 3; ++child) {
+                const int piece = option.piece[child];
+                if (!piece) continue;
+                ++frequency[child][piece];
+                mass[child] += piece;
+                ++rows[child];
+                if (mass[child] > child_mass || !child_majorized(child)) legal = false;
+            }
+            if (legal) result |= dfs_all(index + 1) << option.split;
+            for (int child = 0; child < 3; ++child) {
+                const int piece = option.piece[child];
+                if (!piece) continue;
+                --frequency[child][piece];
+                mass[child] -= piece;
+                --rows[child];
+            }
+        }
+        all_memo.emplace(key, result);
+        return result;
+    }
+
+    SplitMask all_feasible() { return dfs_all(0); }
+
     std::array<Sequence, 3> witness_children() const {
         std::array<Sequence, 3> result;
         for (const auto &pieces : witness)
@@ -414,10 +492,29 @@ struct Survey {
     Sequence failure_profile_upper;
     Sequence failure_profile_actual;
     bool full_profile;
+    bool interval_mode;
+    std::uint64_t interval_states = 0;
+    std::uint64_t minimum_equals_hinge = 0;
+    std::uint64_t maximum_equals_splittable = 0;
+    std::uint64_t maximum_equals_mixed_bound = 0;
+    std::uint64_t both_scalar_roundings_feasible = 0;
+    std::uint64_t scalar_touches_minimum = 0;
+    std::uint64_t scalar_touches_maximum = 0;
+    int largest_minimum_gap = 0;
+    int largest_maximum_gap = 0;
+    int largest_mixed_upper_gap = 0;
+    Sequence largest_minimum_gap_state;
+    Sequence largest_maximum_gap_state;
+    Sequence largest_mixed_upper_gap_state;
+    std::vector<int> largest_minimum_gap_interval;
+    std::vector<int> largest_maximum_gap_interval;
+    std::vector<int> largest_mixed_upper_gap_interval;
 
-    explicit Survey(int level, bool enforce_full_profile = false)
+    explicit Survey(int level, bool enforce_full_profile = false,
+                    bool survey_intervals = false)
         : k(level), base(singleton_base(level)), total(power(3, level)) {
         full_profile = enforce_full_profile;
+        interval_mode = survey_intervals;
         for (int value : base) prefix.push_back(prefix.back() + value);
     }
 
@@ -425,7 +522,101 @@ struct Survey {
         return prefix[std::min(count, static_cast<int>(base.size()))];
     }
 
+    int hinge_minimum_splits(const Sequence &state) const {
+        const Sequence child = singleton_base(k - 1);
+        int result = 0;
+        for (int threshold = 1; threshold <= state.front(); ++threshold) {
+            int required = 0;
+            for (int value : state) required += std::max(value - threshold, 0);
+            for (int value : child)
+                required -= 3 * std::max(value - threshold, 0);
+            if (required <= 0) continue;
+            Sequence capacities;
+            for (int value : state)
+                capacities.push_back(
+                    std::min(threshold, std::max(value - threshold, 0)));
+            std::sort(capacities.begin(), capacities.end(), std::greater<int>());
+            int supplied = 0;
+            int used = 0;
+            while (used < static_cast<int>(capacities.size()) && supplied < required)
+                supplied += capacities[used++];
+            if (supplied < required) return static_cast<int>(state.size()) + 1;
+            result = std::max(result, used);
+        }
+        return result;
+    }
+
+    bool inspect_interval(const Sequence &state) {
+        ++checked;
+        ++interval_states;
+        const int splittable = static_cast<int>(std::count_if(
+            state.begin(), state.end(), [](int value) { return value >= 2; }));
+        std::vector<int> feasible;
+        ShapeSplitSearch search(state, k, 0);
+        const auto mask = search.all_feasible();
+        for (int target = 0; target <= splittable; ++target)
+            if (mask.test(target)) feasible.push_back(target);
+        nodes += search.nodes;
+        max_nodes = std::max(max_nodes, search.nodes);
+        bool contiguous = !feasible.empty();
+        for (std::size_t i = 1; i < feasible.size(); ++i)
+            if (feasible[i] != feasible[i - 1] + 1) contiguous = false;
+        if (!contiguous) {
+            failure = state;
+            failure_feasible = feasible;
+            return false;
+        }
+
+        const int hinge_minimum = hinge_minimum_splits(state);
+        const int child_mass = power(3, k - 1);
+        const int child_width = power(2, k - 1);
+        int mandatory = 0;
+        int mandatory_mixed_mass = 0;
+        for (int value : state)
+            if (value > child_width) {
+                ++mandatory;
+                mandatory_mixed_mass += value - child_width;
+            }
+        const int mixed_upper = std::min(
+            splittable, mandatory + child_mass - mandatory_mixed_mass);
+        const int minimum_gap = feasible.front() - hinge_minimum;
+        const int maximum_gap = splittable - feasible.back();
+        const int mixed_upper_gap = mixed_upper - feasible.back();
+        minimum_equals_hinge += minimum_gap == 0;
+        maximum_equals_splittable += maximum_gap == 0;
+        maximum_equals_mixed_bound += feasible.back() == mixed_upper;
+        const auto scalar_targets = target_splits(state, k);
+        bool lower_target = std::binary_search(
+            feasible.begin(), feasible.end(), scalar_targets.front());
+        bool upper_target = std::binary_search(
+            feasible.begin(), feasible.end(), scalar_targets.back());
+        both_scalar_roundings_feasible += lower_target && upper_target;
+        scalar_touches_minimum +=
+            scalar_targets.front() <= feasible.front() &&
+            feasible.front() <= scalar_targets.back();
+        scalar_touches_maximum +=
+            scalar_targets.front() <= feasible.back() &&
+            feasible.back() <= scalar_targets.back();
+        if (minimum_gap > largest_minimum_gap) {
+            largest_minimum_gap = minimum_gap;
+            largest_minimum_gap_state = state;
+            largest_minimum_gap_interval = feasible;
+        }
+        if (maximum_gap > largest_maximum_gap) {
+            largest_maximum_gap = maximum_gap;
+            largest_maximum_gap_state = state;
+            largest_maximum_gap_interval = feasible;
+        }
+        if (mixed_upper_gap > largest_mixed_upper_gap) {
+            largest_mixed_upper_gap = mixed_upper_gap;
+            largest_mixed_upper_gap_state = state;
+            largest_mixed_upper_gap_interval = feasible;
+        }
+        return true;
+    }
+
     bool inspect(const Sequence &state) {
+        if (interval_mode) return inspect_interval(state);
         ++checked;
         const auto targets = target_splits(state, k);
         std::uint64_t state_nodes = 0;
@@ -498,6 +689,33 @@ struct Survey {
                   << " max_nodes=" << max_nodes;
         if (failure.empty()) {
             std::cout << " result=NO_FAILURE\n";
+            if (interval_mode) {
+                std::cout << "INTERVAL_SUMMARY states=" << interval_states
+                          << " minimum_equals_hinge=" << minimum_equals_hinge
+                          << " maximum_equals_splittable="
+                          << maximum_equals_splittable
+                          << " maximum_equals_mixed_bound="
+                          << maximum_equals_mixed_bound
+                          << " both_scalar_roundings_feasible="
+                          << both_scalar_roundings_feasible
+                          << " scalar_touches_minimum=" << scalar_touches_minimum
+                          << " scalar_touches_maximum=" << scalar_touches_maximum
+                          << " largest_minimum_gap=" << largest_minimum_gap
+                          << " minimum_gap_state=" << show(largest_minimum_gap_state)
+                          << " minimum_gap_interval=";
+                for (int value : largest_minimum_gap_interval) std::cout << value << ',';
+                std::cout << " largest_maximum_gap=" << largest_maximum_gap
+                          << " maximum_gap_state=" << show(largest_maximum_gap_state)
+                          << " maximum_gap_interval=";
+                for (int value : largest_maximum_gap_interval) std::cout << value << ',';
+                std::cout << " largest_mixed_upper_gap=" << largest_mixed_upper_gap
+                          << " mixed_upper_gap_state="
+                          << show(largest_mixed_upper_gap_state)
+                          << " mixed_upper_gap_interval=";
+                for (int value : largest_mixed_upper_gap_interval)
+                    std::cout << value << ',';
+                std::cout << '\n';
+            }
             return;
         }
         std::cout << " result=FAIL state=" << show(failure) << " targets=";
@@ -532,7 +750,10 @@ int main(int argc, char **argv) {
         std::cerr << "usage: singleton_shape_survey --census k\n"
                      "       singleton_shape_survey --uniform k samples [seed]\n"
                      "       singleton_shape_survey --profile-census k\n"
-                     "       singleton_shape_survey --profile-uniform k samples [seed]\n";
+                     "       singleton_shape_survey --profile-uniform k samples [seed]\n"
+                     "       singleton_shape_survey --interval-census k\n"
+                     "       singleton_shape_survey --interval-uniform k samples [seed]\n"
+                     "       singleton_shape_survey --state k row...\n";
         return 2;
     }
     const std::string mode = argv[1];
@@ -541,16 +762,46 @@ int main(int argc, char **argv) {
         std::cerr << "k must be in 1..5\n";
         return 2;
     }
-    const bool full_profile = mode == "--profile-census" ||
-                              mode == "--profile-uniform";
-    Survey survey(k, full_profile);
-    if (mode == "--census" || mode == "--profile-census") {
+    if (mode == "--state") {
         Sequence state;
-        survey.enumerate(survey.total, survey.base.front(), state);
-        survey.report(full_profile ? "profile-census" : "census");
+        for (int i = 3; i < argc; ++i) state.push_back(std::atoi(argv[i]));
+        std::sort(state.begin(), state.end(), std::greater<int>());
+        const int expected_mass = power(3, k);
+        int actual_mass = 0;
+        for (int value : state) actual_mass += value;
+        if (state.empty() || actual_mass != expected_mass) {
+            std::cerr << "state mass must be " << expected_mass << '\n';
+            return 2;
+        }
+        const int splittable = static_cast<int>(std::count_if(
+            state.begin(), state.end(), [](int value) { return value >= 2; }));
+        std::cout << "STATE_SPLITS k=" << k << " state=" << show(state)
+                  << " splittable=" << splittable << '\n';
+        for (int target = 0; target <= splittable; ++target) {
+            ShapeSplitSearch search(state, k, target);
+            if (!search.run()) continue;
+            const auto children = search.witness_children();
+            std::cout << "s=" << target << " L=" << show(children[0])
+                      << " M=" << show(children[1])
+                      << " R=" << show(children[2]) << '\n';
+        }
         return 0;
     }
-    if (mode == "--uniform" || mode == "--profile-uniform") {
+    const bool full_profile = mode == "--profile-census" ||
+                              mode == "--profile-uniform";
+    const bool intervals = mode == "--interval-census" ||
+                           mode == "--interval-uniform";
+    Survey survey(k, full_profile, intervals);
+    if (mode == "--census" || mode == "--profile-census" ||
+        mode == "--interval-census") {
+        Sequence state;
+        survey.enumerate(survey.total, survey.base.front(), state);
+        survey.report(full_profile ? "profile-census" :
+                      intervals ? "interval-census" : "census");
+        return 0;
+    }
+    if (mode == "--uniform" || mode == "--profile-uniform" ||
+        mode == "--interval-uniform") {
         const std::uint64_t samples = argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 10000;
         const std::uint64_t seed = argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 1;
         DominatedPartitionSampler sampler(survey.base);
@@ -558,7 +809,8 @@ int main(int argc, char **argv) {
         std::mt19937_64 random(seed);
         for (std::uint64_t i = 0; i < samples && survey.failure.empty(); ++i)
             survey.inspect(sampler.sample(random));
-        survey.report(full_profile ? "profile-uniform" : "uniform",
+        survey.report(full_profile ? "profile-uniform" :
+                      intervals ? "interval-uniform" : "uniform",
                       samples, universe, seed);
         return 0;
     }

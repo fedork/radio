@@ -10494,3 +10494,37 @@ invariant, not a proof; the exact general target remains Pascal orthant saturati
 
 Full commands and the distinction between exact results, samples and the aborted run are in
 [the shape-survey record](../evidence/singleton_shape_survey_2026-08-27.md).
+
+## 2026-08-27 -- split-count fibers, strong niceness, and the row-orientation reduction
+
+Enumerating all feasible split counts at `K=3` sharpened what the shape calculation can and cannot
+control.  Every one of the 1,206 fibers is an interval, but the hinge lower endpoint is exact for
+only 1,190 states and the elementary mixed-mass upper endpoint for 1,177.  The misses are genuine
+lattice effects: `(8,2^9,1)` needs a second split to repair parity; `(8,7,2^6)` permits only four
+splits because `8` and `7` consume seven of the mixed child's nine units; and
+`(8,6,5,3,2,1^3)` misses that upper bound because three pure remainders of width four cannot fit
+under two copies of `(4,3,1,1)`.  The all-fiber traversal visited 4,740,395 nodes.  A ten-state
+`K=4` request did not finish within 60 CPU seconds and is an abort, not evidence.  This makes the
+interval a useful diagnostic but a poor primary induction variable.  Reproducible output is in
+`evidence/singleton_shape_survey_2026-08-27.md`.
+
+The transcript-graph formulation produced a stronger global lead.  If
+`X_(Q_K)=sum c_K(lambda)m_lambda`, then `c_K(lambda)` counts semi-ordered legal decompositions.
+Exact recursion over the row triples `(w-x,x,0)/(0,w-x,x)` proves computationally that `Q_3` is
+strongly nice: all 1,206 supported types and 463,886 comparable pairs satisfy
+`c_K(mu)>=c_K(lambda)` for `mu<=lambda`.  The provenance-wrapped run took five wall seconds and
+4,740,395 allocation nodes.  Strong niceness would imply the open support theorem, but no generic
+closure result finishes the induction: a 2026 theorem covers disjoint union, graph join can destroy
+strong niceness, and `Q_3` already contains a claw.  The exact target is closure for the special
+operator `T(G)=G disjoint-union (G join G)`.  Tool, command and literature links are in
+`evidence/singleton_strong_niceness_2026-08-27.md`.
+
+The conjugate-layer view also isolates the assignment gap.  Each child layer of height `r` becomes
+a parent layer `(2^r,1^r)`: its incidences split evenly into left, mixed and right, and a parent row
+may take mixed plus one pure incidence in that layer.  Across layers the same row must keep one
+pure orientation.  Fixing odd rows left and even rows right is too rigid already for
+`(8,7,4,2,2,1^4)@3`: its alternating coloring violates Hall at `(p,q)=(5,1)` by `23>22`, whereas
+the global coloring `A=(8,4,2,1)`, `B=(7,2,1,1,1)` passes.  Thus the remaining object is exactly a
+row-orientation plus integral-flow theorem.  This is the layer form of Pascal orthant saturation,
+not a new solution; it explains why amount assignment can be delegated to flow once the global row
+signs are found.

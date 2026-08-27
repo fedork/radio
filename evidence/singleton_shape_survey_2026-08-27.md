@@ -100,6 +100,50 @@ The finalized diagnostic line is
 
     PROFILE threshold:lower-upper/first_feasible 1:4-4/4 2:6-6/7 3:8-8/8 4:7-7/7 5:3-3/3 6:2-2/2 7:1-1/1
 
+## Feasible split-count intervals
+
+The `--interval-census` mode computes every feasible number `s` of genuinely split rows in one
+memoized traversal.  With build id
+`a03d47456d5b6689d24dc9d9337c293415604e2be5a89c959dc65d1311230818`, the command
+
+    tools/run_with_provenance.py /tmp/singleton-shape-survey --interval-census 3
+
+returned no non-interval fiber among all 1,206 states.  It visited 4,740,395 recursive states.
+The exact endpoint comparison was:
+
+    minimum_equals_hinge=1190
+    maximum_equals_splittable=955
+    maximum_equals_mixed_bound=1177
+    both_scalar_roundings_feasible=1185
+
+Here the hinge lower bound is obtained by asking, at every threshold, how many largest row
+capacities are needed to supply `E_a(t)-3E_h(t)`.  The mixed upper bound notes that every row wider
+than the child width must split and must put at least its excess in the mixed child.
+
+The misses are small but structural.  For
+
+    a=(8,2,2,2,2,2,2,2,2,2,1)
+
+the hinge bound is one split but the feasible interval is `2..6`: after `8=4+4`, the three residual
+branch masses have a parity obstruction, and splitting one `2` repairs it.  At the other endpoint,
+
+    a=(8,7,2,2,2,2,2,2)
+
+only `s=4` is feasible although all eight rows can individually split.  The `8` and `7` already
+consume at least seven of the mixed child's nine units, leaving room for only two further split
+rows.  Finally,
+
+    a=(8,6,5,3,2,1,1,1)
+
+misses even that sharpened mixed bound by one: splitting all five nonunit rows forces mixed pieces
+`(4,2,1,1,1)`, while the pure remainders contain three `4`s, so one pure child violates the top-two
+cap `4+3=7`.
+
+Thus the split-count fiber happens to be an interval at `K=3`, but its endpoints already require
+integer packing information beyond the hinge inequalities.  A ten-state `K=4` interval sample was
+stopped after 60 CPU seconds without a verdict; computing an entire fiber is much harder than
+finding the scalar target and is not currently a promising induction route.
+
 ## Aborted higher-level attempt
 
 A direct `--uniform 5 1000 314159265` run was stopped by its 60-CPU-second

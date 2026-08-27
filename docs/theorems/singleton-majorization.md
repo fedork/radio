@@ -129,6 +129,44 @@ The graph has the exact recursion
 The three copies are the transcripts starting in `1`, `0`, and `2`: the `0` and `2` copies are
 completely joined, while the `1` copy has no edges to either.
 
+### A stronger chromatic-symmetric-function target (2026-08-27)
+
+Write the chromatic symmetric function as
+
+    X_(Q_K) = sum_lambda c_K(lambda) m_lambda.
+
+Stanley's monomial expansion says that `c_K(lambda)` counts semi-ordered stable partitions of
+`Q_K` of type `lambda`.  Thus the desired converse follows from the formally stronger inequalities
+
+    lambda >= mu  =>  c_K(lambda) <= c_K(mu).                    (SN)
+
+In current terminology, (SN) says that `Q_K` is **strongly nice**; strongly nice immediately
+implies nice, meaning that the stable-partition support is a dominance ideal.  This packages the
+existence problem globally: it asks for monotonicity of the number of decompositions, rather than
+selecting one decomposition by a local rule.
+
+The graph recursion gives an exact coefficient recurrence.  For a fixed labelled color of size
+`w`, its counts in the left/mixed/right copies must be
+
+    (w-x,x,0) or (0,w-x,x).
+
+After assigning every color, the three child coefficients multiply, and summing all assignments
+gives `c_K`.  The provenance-built `tools/singleton_strong_niceness.cpp` evaluates this recurrence
+without invoking the open converse.  It verifies (SN) for `K=3` on all 1,206 possible supported
+types and all 463,886 comparable ordered pairs (4,740,395 recursive allocation nodes).  This is
+another finite theorem only, not an induction proof.
+
+There is no immediate closure theorem for the displayed graph recursion.  Strong niceness is
+closed under disjoint union, but not under graph join in general; moreover `Q_3` contains an induced
+claw, so the hereditary claw-free characterization does not apply.  The useful new proof target is
+therefore the special operator
+
+    T(G) = G disjoint-union (G join G):
+
+prove directly that the particular sequence `Q_K=T(Q_(K-1))` preserves strong niceness, or at least
+preserves the dominance-ideal support.  The coefficient recurrence is a clean setting in which to
+try the same two-coordinate balancing transfer as in the Row-Coloring Lemma.
+
 ## Proven necessity
 
 For a graph `Q`, let `alpha_t(Q)` be the maximum number of vertices in an induced subgraph that is
@@ -502,17 +540,19 @@ solution by itself.
 
 The sequence
 
-`(16,15,11,11,5,5,5,3,3) <=_w G_4`
+`(8,7,4,2,2,1,1,1,1) <=_w G_3`
 
 colored by odd/even position has
 
-`A=(16,11,5,5,3)` and `B=(15,11,5,3)`.  At `(p,q)=(5,2)`,
+`A=(8,4,2,1,1)` and `B=(7,2,1,1)`.  At `(p,q)=(5,1)`,
 
-`A_5+B_2=66 > H_3(7)+H_3(5)+H_3(2)=26+24+15=65`.
+`A_5+B_1=23 > H_2(6)+H_2(5)+H_2(1)=9+9+4=22`.
 
-So alternation satisfies the balanced parent prefixes but can fail an off-diagonal Hall inequality.
-For example, `A=(16,11,5,5)`, `B=(15,11,5,3,3)` satisfies every inequality (C), so this is a
-counterexample to the rule, not to the converse.
+So alternation satisfies the balanced parent prefixes but can fail an off-diagonal Hall inequality
+already at `K=3`.  For example, `A=(8,4,2,1)`, `B=(7,2,1,1,1)` satisfies every inequality (C),
+so this is a counterexample to the rule, not to the converse.  In the conjugate-layer flow model,
+the corresponding working row orientations are `L,R,L,L,R,L,R,R,R`: the pure orientation must be
+chosen globally and need not alternate.
 
 ### Complete `K<=4` census and a sharper forward conjecture (2026-08-26)
 
