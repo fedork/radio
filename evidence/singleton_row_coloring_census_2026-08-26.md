@@ -116,6 +116,42 @@ A separate dominance-transfer walk tested 100,000 `K=6` states (seed
 `271828182`); plain block balancing and one-block lookahead both succeeded.  This
 sample is correlated and is only a targeted dominance-cover stress test.
 
+## A simpler global balance rule also fails
+
+A more natural global proposal is to ignore the order of construction: among all
+two-colorings having at least `2^(K-1)` rows of each color, minimize the final
+total-mass difference, and ask whether some optimum satisfies (C).  The row-count
+constraint is necessary at full mass and repairs the elementary `K=3` failure of
+unconstrained mass balancing.  The rule succeeds on all 1,206 full-mass `K=3`
+states.
+
+It nevertheless fails at `K=4`.  The new `--global-census` mode enumerates until
+the first failure:
+
+    tools/run_with_provenance.py /tmp/singleton-pair-census --global-census 4
+
+It checks 15,855 states and 564,421 normalized coloring nodes before returning
+
+    (16,15,9,9,9,5,5,5,1^8).
+
+The run took 0.32 wall seconds / 0.21 user CPU seconds on the recorded M4 Pro.
+There is a unique normalized split with the optimal mass difference one:
+
+    A=(16,15,5,1,1,1,1,1),
+    B=(9,9,9,5,5,1,1,1).
+
+It already violates the pure `(2,0)` inequality, since `16+15=31>2H_3(2)=30`.
+Legal splits first occur at mass difference three, for example
+
+    A=(16,9,5,5,1,1,1,1),
+    B=(15,9,9,5,1,1,1,1).
+
+The mode computes the optimum over every normalized coloring by subset dynamic
+programming, then exhausts the Hall-legal colorings at that optimum, so this is an
+exact rule counterexample rather than a greedy miss.  Thus a global proof cannot
+optimize only final mass and row count; it must retain the full signed prefix-rank
+profile.
+
 ## Proof target exposed by the census
 
 The finite data suggest the following **Block-Extension Conjecture**.  For
@@ -141,6 +177,14 @@ the self-join need not itself be nice.  Already for shape `g=(2,1)`, the partiti
 two subsequences each dominated by `(2,1)`.  The middle component is therefore not
 separable from the two pure components; that failed factorization is the original
 mixed-child difficulty in another form.
+
+The block rule is now best treated as diagnostic rather than as the primary proof
+target.  A cleaner exact formulation folds the integral signed Hall polyhedron by
+absolute value.  Its convex hull is the parent majorization polymatroid, so the
+Row-Coloring Lemma asks precisely whether the Pascal fold has no lattice holes.
+Equivalently, it is enough to route every unit Robin-Hood transfer by a global
+signed augmenting path.  The full derivation is in the
+[theorem note](../docs/theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26).
 
 No general proof follows from this census.  The Singleton Majorization converse and
 the Row-Coloring Lemma remain open.

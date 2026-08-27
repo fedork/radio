@@ -288,6 +288,100 @@ generic base `h`, `F_h` is not a polymatroid, consistently with the counterexamp
 remaining structural question is whether the Pascal multiplicities and power-of-two column
 capacities make it one for `h=G_r`.
 
+### Global signed lifting and the no-holes target (2026-08-26)
+
+There is a cleaner global formulation that removes value blocks and forward choices entirely.
+Fix a labelled row set `E` and, for disjoint `X,Y subset E`, define
+
+    f(X,Y) = H(|X union Y|) + H(|X|) + H(|Y|).
+
+Define the signed Hall polyhedron
+
+    P(f) = { z in R^E : z(X)-z(Y) <= f(X,Y) for every disjoint X,Y }.
+
+If `A={i:z_i>=0}` and `B={i:z_i<0}`, inequalities with rows carrying the wrong sign can be
+deleted from `X,Y`; this increases the left side and decreases the right side.  Therefore
+`z in P(f)` is equivalent to (C) for the coloring `A/B` and row demands `|z_i|`.
+
+The saturated prefix function `H` is nondecreasing and concave.  Hence `S -> H(|S|)` is
+submodular.  Under the bisubmodular meet, the positive and negative sets become their respective
+intersections; under the reduced union, each is contained in its ordinary union.  Submodularity
+and monotonicity therefore prove the required inequality separately for `H(|X|)` and `H(|Y|)`.
+For `H(|X union Y|)`, the supports of the meet and reduced union are contained in the ordinary
+intersection and union of the two supports, so the same argument applies.  Adding the three
+inequalities proves that `f` is bisubmodular.  Thus the integral signed feasible set
+
+    Z_h = P(f) intersection Z^E
+
+has the standard signed-exchange, or BS-convex, structure of an integral bisubmodular
+polyhedron.  See [Iwamasa 2023](https://arxiv.org/abs/2303.06320) for the exchange
+characterizations.  Bisubmodularity itself is not the missing proof: the generic bases above
+produce the same kind of `f` and still have uncolorable parent demands.
+
+Fold the signed set into the nonnegative orthant:
+
+    M_h = { |z| : z in Z_h }.
+
+Also put
+
+    R(S) = max_(X disjoint-union Y=S) f(X,Y)
+         = H(|S|)+H(ceil(|S|/2))+H(floor(|S|/2))
+         = H_K(|S|).
+
+The middle equality follows from concavity of `H`: the maximum splits `S` as evenly as
+possible.  Every `x in M_h` satisfies `x(S)<=R(S)`, by taking `X` and `Y` to be the positive
+and negative coordinates of its signed lift inside `S`.
+
+In fact the convex hull is already exact:
+
+    conv(M_h) = { x in R_+^E : x(S)<=R(S) for every S subset E }.                 (E)
+
+For the reverse inclusion, the vertices of the cardinality-based polymatroid on the right are
+coordinate permutations of `(G_K[1],...,G_K[t],0,...)`.  Each is in `M_h`: take the canonical
+decomposition of `G_K` and delete its rows after `t`.  This proves (E).
+
+Consequently the Row-Coloring Lemma is exactly the following **Pascal Orthant-Saturation
+Lemma**:
+
+    M_h = conv(M_h) intersection Z_+^E,              for h=G_(K-1).              (F)
+
+In words, folding the integral signed Hall polyhedron creates no lattice holes.  Generic `h`
+can create holes, as the explicit counterexamples above demonstrate.  The complete `K<=4`
+census says that the Pascal folds have no holes at those levels.
+
+A still more concrete sufficient statement is the following global transfer lemma.  If
+`x in M_h` and `x_i>=x_j+2`, then
+
+    x-e_i+e_j in M_h,                                                        (T)
+
+where the signed lift and its row coloring may change everywhere.  Starting from a permutation
+of `G_K`, repeated unit Robin-Hood transfers generate every full-mass integer vector majorized
+by `G_K`; (T) would therefore prove (F), and artificial unit rows handle smaller mass.
+
+This is the precise global form of the bottom-up coin-transfer proposal.  In the column model,
+remove one incidence from donor row `i` and seek an alternating row/column path that installs it
+at recipient `j`, possibly flipping several whole-row orientations.  If the path search stops,
+its reached rows and doubled/single columns give a Hall cut.  The remaining Pascal-specific
+proof obligation is to use the power-of-two capacities and binomial multiplicities in (D) to
+symmetrize that cut and turn it into a violated parent rank inequality.  Ordinary
+bisubmodular exchange does not automatically do this after the absolute-value fold.
+
+Simple global scalar optimization is not a substitute for (F).  Requiring at least
+`2^(K-1)` rows of each color and then minimizing the final A/B mass difference passes every
+full-mass state through `K=3`, but fails already at `K=4`.  The first failure in descending
+partition enumeration is
+
+    a=(16,15,9,9,9,5,5,5,1^8).
+
+Its unique normalized mass-optimal split has totals `41/40` and puts `16,15` together, so even
+the pure inequality `(p,q)=(2,0)` fails: `31>2H(2)=30`.  A legal split exists at totals `39/42`:
+
+    A=(16,9,5,5,1,1,1,1),
+    B=(15,9,9,5,1,1,1,1).
+
+Thus the global invariant must retain the full signed rank profile, not just total mass and row
+count.
+
 A tempting attempt is to reserve half of every mixed-column capacity for each color in advance.
 It is already too rigid at `h=G_2=(4,3,1,1)`, whose conjugate is `(4,2,2,1)`.  Splitting those
 capacities by ceiling/floor gives effective color bases

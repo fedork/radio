@@ -223,6 +223,146 @@ struct GeneralSearch {
     }
 };
 
+// A genuinely global candidate rule.  Ignore Hall feasibility at first and, among all
+// bipartitions having at least one full child-base worth of rows on each side, minimize the
+// final total-mass difference.  GlobalBalanceSearch asks whether at least one such optimum
+// satisfies (C).  This is stronger than the Row-Coloring Lemma and is therefore only an
+// experimental predicate, not a theorem.
+struct GlobalBalanceSearch {
+    const Hall &hall;
+    std::vector<GeneralSearch::Block> blocks;
+    int total_mass = 0;
+    int total_rows = 0;
+    int best_difference = std::numeric_limits<int>::max();
+    std::uint64_t nodes = 0;
+    Coloring solution;
+    Coloring unrestricted_optimum;
+
+    GlobalBalanceSearch(const Sequence &state, const Hall &h) : hall(h) {
+        total_rows = static_cast<int>(state.size());
+        for (int value : state) {
+            total_mass += value;
+            if (blocks.empty() || blocks.back().value != value)
+                blocks.push_back({value, 1});
+            else
+                ++blocks.back().count;
+        }
+
+        std::vector<std::vector<unsigned char>> possible(
+            total_rows + 1, std::vector<unsigned char>(total_mass + 1));
+        possible[0][0] = 1;
+        int used_rows = 0;
+        int used_mass = 0;
+        for (const auto [value, count] : blocks) {
+            auto next = possible;
+            for (auto &row : next) std::fill(row.begin(), row.end(), 0);
+            for (int rows = 0; rows <= used_rows; ++rows)
+                for (int mass = 0; mass <= used_mass; ++mass) {
+                    if (!possible[rows][mass]) continue;
+                    for (int to_a = 0; to_a <= count; ++to_a)
+                        next[rows + to_a][mass + to_a * value] = 1;
+                }
+            possible = std::move(next);
+            used_rows += count;
+            used_mass += count * value;
+        }
+
+        for (int rows = hall.child_rows;
+             rows <= total_rows - hall.child_rows; ++rows)
+            for (int mass = 0; mass <= total_mass; ++mass)
+                if (possible[rows][mass])
+                    best_difference = std::min(
+                        best_difference, std::abs(2 * mass - total_mass));
+    }
+
+    bool dfs(std::size_t block_index, Coloring &current,
+             int remaining_rows, int remaining_mass) {
+        ++nodes;
+        if (block_index == blocks.size()) {
+            if (static_cast<int>(current.a.size()) < hall.child_rows ||
+                static_cast<int>(current.b.size()) < hall.child_rows ||
+                std::abs(current.total_a - current.total_b) != best_difference)
+                return false;
+            solution = current;
+            return true;
+        }
+
+        if (static_cast<int>(current.a.size()) + remaining_rows < hall.child_rows ||
+            static_cast<int>(current.b.size()) + remaining_rows < hall.child_rows)
+            return false;
+        const int lowest_a = current.total_a;
+        const int highest_a = current.total_a + remaining_mass;
+        bool mass_reachable = false;
+        for (int target = 0; target <= total_mass; ++target)
+            if (std::abs(2 * target - total_mass) == best_difference &&
+                lowest_a <= target && target <= highest_a) {
+                mass_reachable = true;
+                break;
+            }
+        if (!mass_reachable) return false;
+
+        const auto [value, count] = blocks[block_index];
+        std::vector<int> choices;
+        for (int to_a = 0; to_a <= count; ++to_a) {
+            if (block_index == 0 && to_a * 2 < count) continue;
+            choices.push_back(to_a);
+        }
+        std::stable_sort(choices.begin(), choices.end(), [&](int lhs, int rhs) {
+            return std::abs(2 * (current.total_a + lhs * value) - total_mass) <
+                   std::abs(2 * (current.total_a + rhs * value) - total_mass);
+        });
+
+        for (int to_a : choices) {
+            const int to_b = count - to_a;
+            const int old_a = static_cast<int>(current.a.size());
+            const int old_b = static_cast<int>(current.b.size());
+            for (int i = 0; i < to_a; ++i) current.push_a(value);
+            for (int i = 0; i < to_b; ++i) current.push_b(value);
+            const bool legal = newest_inequalities_hold(hall, current, old_a, old_b);
+            if (legal && dfs(block_index + 1, current,
+                             remaining_rows - count,
+                             remaining_mass - count * value))
+                return true;
+            for (int i = 0; i < to_a; ++i) current.pop_a();
+            for (int i = 0; i < to_b; ++i) current.pop_b();
+        }
+        return false;
+    }
+
+    bool run() {
+        if (best_difference == std::numeric_limits<int>::max()) return false;
+        Coloring current;
+        return dfs(0, current, total_rows, total_mass);
+    }
+
+    bool find_unrestricted_optimum(std::size_t block_index, Coloring &current) {
+        if (block_index == blocks.size()) {
+            if (static_cast<int>(current.a.size()) < hall.child_rows ||
+                static_cast<int>(current.b.size()) < hall.child_rows ||
+                std::abs(current.total_a - current.total_b) != best_difference)
+                return false;
+            unrestricted_optimum = current;
+            return true;
+        }
+        const auto [value, count] = blocks[block_index];
+        for (int to_a = 0; to_a <= count; ++to_a) {
+            if (block_index == 0 && to_a * 2 < count) continue;
+            const int to_b = count - to_a;
+            for (int i = 0; i < to_a; ++i) current.push_a(value);
+            for (int i = 0; i < to_b; ++i) current.push_b(value);
+            if (find_unrestricted_optimum(block_index + 1, current)) return true;
+            for (int i = 0; i < to_a; ++i) current.pop_a();
+            for (int i = 0; i < to_b; ++i) current.pop_b();
+        }
+        return false;
+    }
+
+    bool find_unrestricted_optimum() {
+        Coloring current;
+        return find_unrestricted_optimum(0, current);
+    }
+};
+
 enum class BlockOrder { Balanced, MinA, MaxA };
 
 bool greedy_block_coloring(const Sequence &state, const Hall &hall,
@@ -768,9 +908,104 @@ void sample_uniform_states(int k, std::uint64_t sample_count, std::uint64_t seed
                   << " exact_B=" << show(first_reserve_solution.b) << '\n';
 }
 
+struct GlobalBalanceCensus {
+    int k;
+    Sequence parent;
+    Hall hall;
+    Sequence parent_prefix{0};
+    int total = 0;
+    std::uint64_t states = 0;
+    std::uint64_t nodes = 0;
+    Sequence first_failure;
+    int first_best_difference = 0;
+    Coloring first_unrestricted_optimum;
+    Coloring first_legal;
+
+    explicit GlobalBalanceCensus(int level)
+        : k(level), parent(singleton_base(level)),
+          hall(singleton_base(level - 1)) {
+        for (int value : parent) {
+            total += value;
+            parent_prefix.push_back(total);
+        }
+    }
+
+    int parent_H(int count) const {
+        return parent_prefix[std::min(count, static_cast<int>(parent.size()))];
+    }
+
+    void inspect(const Sequence &state) {
+        ++states;
+        GlobalBalanceSearch search(state, hall);
+        const bool ok = search.run();
+        nodes += search.nodes;
+        if (!ok && first_failure.empty()) {
+            first_failure = state;
+            first_best_difference = search.best_difference;
+            if (!search.find_unrestricted_optimum()) {
+                std::cerr << "NO_GLOBAL_BALANCE_OPTIMUM k=" << k
+                          << " state=" << show(state) << '\n';
+                std::exit(1);
+            }
+            first_unrestricted_optimum = search.unrestricted_optimum;
+            GeneralSearch exact(state, hall);
+            Coloring current;
+            if (!exact.dfs(0, current)) {
+                std::cerr << "ROW_COLORING_COUNTEREXAMPLE k=" << k
+                          << " state=" << show(state) << '\n';
+                std::exit(1);
+            }
+            first_legal = exact.solution;
+        }
+    }
+
+    void enumerate(int remaining, int maximum, Sequence &state) {
+        if (!first_failure.empty()) return;
+        if (remaining == 0) {
+            inspect(state);
+            return;
+        }
+        const int used = total - remaining;
+        for (int value = std::min(maximum, remaining); value >= 1; --value) {
+            if (used + value > parent_H(static_cast<int>(state.size()) + 1)) continue;
+            state.push_back(value);
+            enumerate(remaining - value, value, state);
+            state.pop_back();
+            if (!first_failure.empty()) return;
+        }
+    }
+
+    void run() {
+        Sequence state;
+        enumerate(total, parent.front(), state);
+        std::cout << "GLOBAL_BALANCE_CENSUS k=" << k
+                  << " states=" << states
+                  << " nodes=" << nodes;
+        if (first_failure.empty())
+            std::cout << " ok=" << states << '/' << states << '\n';
+        else
+            std::cout << " first_failure=" << show(first_failure)
+                      << " best_difference=" << first_best_difference
+                      << " optimum_A=" << show(first_unrestricted_optimum.a)
+                      << " optimum_B=" << show(first_unrestricted_optimum.b)
+                      << " legal_A=" << show(first_legal.a)
+                      << " legal_B=" << show(first_legal.b) << '\n';
+    }
+};
+
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--global-census") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 4;
+        if (k < 1 || k > 4) {
+            std::cerr << "usage: singleton_pair_coloring_census --global-census k\n";
+            return 2;
+        }
+        GlobalBalanceCensus census(k);
+        census.run();
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--uniform") {
         const int k = argc > 2 ? std::atoi(argv[2]) : 5;
         const std::uint64_t samples = argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 100000;

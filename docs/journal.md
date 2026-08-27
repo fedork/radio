@@ -10426,3 +10426,35 @@ one million uniform states took 10 seconds; ten million uniform states took 81--
 100,000-state `K=6` transfer walk took 166 seconds.  Every retained headline above comes from a
 bounded provenance-built run.  Full commands, examples and statuses are in
 [the census record](../evidence/singleton_row_coloring_census_2026-08-26.md).
+
+## 2026-08-26 -- global signed-lifting formulation; scalar balance refuted
+
+The block-extension rule is useful experimental evidence but is too procedural to be the natural
+proof target.  The Row-Coloring Lemma has a short exact global formulation.  For disjoint labelled
+row sets `X,Y`, the signed Hall rank
+
+    f(X,Y)=H(|X union Y|)+H(|X|)+H(|Y|)
+
+is bisubmodular.  Integer points `z` of its signed polyhedron encode a legal coloring through the
+signs of `z`, with row demands `|z|`.  If `M_h` is the set of such magnitude vectors, then
+`conv(M_h)` is exactly the parent majorization polymatroid: inclusion follows from the signed Hall
+inequality, and every polymatroid vertex is a permutation of an initial segment of `G_K`, hence is
+obtained by deleting rows from the canonical strategy.  The open converse is therefore precisely
+that the Pascal absolute-value fold has no lattice holes.  A sufficient local form says that every
+unit Robin-Hood transfer of magnitudes can be routed, allowing a global signed augmenting path and
+whole-row recolorings.  Generic bisubmodularity does not prove this; the recorded non-Pascal bases
+have holes.  The missing cut argument must use the full dyadic capacities and Pascal
+multiplicities.
+
+The simplest global scalar rule was tested and refuted.  Among colorings with the necessary
+`2^(K-1)` rows on each side, globally minimize final A/B mass difference.  It passes all 1,206
+`K=3` states but the new exact mode stops at the 15,855th enumerated `K=4` state,
+`(16,15,9,9,9,5,5,5,1^8)`.  Its unique normalized `41/40` split puts 16 and 15 together and fails
+the pure `(2,0)` Hall inequality by one.  A `39/42` split is legal.  An independent enumeration of
+the normalized eight/eight colorings confirmed the failure; the retained mode instead certifies it
+by exact subset dynamic programming followed by exhaustive Hall search at the optimal mass.
+
+Measured cost: the provenance-built exhaustive prefix visited 564,421 coloring nodes in 0.32 wall
+seconds / 0.21 user CPU seconds on the M4 Pro.  A preceding 100,000-state uniform `K=4` request
+found a different failure at sample 2,044 and stopped; the concurrently launched `K=5` sample was
+interrupted once the `K=4` refutation was established, and no solver process was left running.

@@ -163,18 +163,24 @@ contains no number absent from `data/*.csv`.
 **Foundational singleton subproblem (corrected 2026-08-26).**  Weak majorization by `G_K` is
 proved necessary, but its converse is open.  The exact target is the Row-Coloring Lemma (C) in
 [the theorem note](theorems/singleton-majorization.md#the-exact-remaining-row-coloring-lemma).
-One bottom-up route is to prove that the legal demand family `F_(G_r)` has the discrete-polymatroid
-augmentation property, equivalently to construct a global balanced row orientation of the doubled
-Pascal/dyadic columns.  A second, newly concrete target comes from the complete full-mass census:
-all 5,997,038 states at `K=4` satisfy the Row-Coloring Lemma, and a balanced value-block rule with
-one-block lookahead succeeds on every one, plus ten million uniform `K=5` samples.  Prove its
-two-block extension invariant, or use its exceptional-prefix geometry to prove augmentation; exact
-data and counterexamples are in
+The cleanest bottom-up target is the Pascal Orthant-Saturation Lemma: the magnitudes of the integer
+points in the signed Hall bisubmodular polyhedron should contain every lattice point of their convex
+hull, which is exactly the parent majorization polymatroid.  Equivalently, prove that every unit
+Robin-Hood transfer can be routed by a global signed augmenting path through the doubled
+Pascal/dyadic columns.  This formulation and the convex-hull equality are proved in the
+[theorem note](theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26);
+only the no-lattice-holes/transfer step remains open.
+
+The complete full-mass census gives supporting geometry: all 5,997,038 states at `K=4` satisfy the
+Row-Coloring Lemma, and a balanced value-block rule with one-block lookahead succeeds on every one,
+plus ten million uniform `K=5` samples.  Treat that rule as diagnostic for the exchange geometry,
+not as the primary theorem: even the simpler global rule that fixes the necessary row counts and
+then minimizes total-mass difference fails after 15,855 `K=4` states.  Exact data and counterexamples are in
 [the census record](../evidence/singleton_row_coloring_census_2026-08-26.md).  Strict alternation,
 lower-load assignment, local safe-next assignment, fixed half-mixed reservation, two-class
-exchange, adjacent-pair orientation, and even the broader class of all `2`-flat bases have explicit
-counterexamples.  A new rule must exploit the full Pascal multiplicities; finite or sampled success
-must not be promoted to the open converse.
+exchange, adjacent-pair orientation, global scalar balance, and even the broader class of all
+`2`-flat bases have explicit counterexamples.  A proof must exploit the full Pascal multiplicities;
+finite or sampled success must not be promoted to the open converse.
 
 **Delivered 2026-08-09.** The useful child-profile feature was not merely an ordering score. The
 [Vertex-Splitting Pullback Lemma](theorems/singleton-majorization.md#vertex-splitting-pullback-lemma-2026-08-09)
