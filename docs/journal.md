@@ -10936,3 +10936,38 @@ is blocked, uncross all `A`-heavy flip blockers and `B`-heavy swap blockers with
 and use the repeated columns in (TB3) to sum those certificates into a parent-prefix violation.
 The maximum-gain data identifies the correct global direction; it does not supply that uncrossing
 argument.
+
+## 2026-08-28 -- tight-set core eliminates the alternating blocker chain
+
+The previous entry's expected `B`-heavy swap-blocker family is unnecessary.  For a failed coloring,
+all dangerous `x`-tight sets are closed under union and intersection.  Let `C` and `U` be their
+intersection and union.  Any one-row common recoloring must move a `B` row `v in C` to `A`; a swap
+must return an `A` row `u notin U` to `B`.
+
+Provisionally flip `v` and intersect all sets on which that flip violates `x`; call the intersection
+`P_v`.  If `x_v>x_u`, swapping `u` and `v` is feasible for `x` exactly when `u in P_v`.  The only
+new point is decisive: a set `T` containing `u` but not `v` has post-swap rank equal to the old rank
+of `T-u+v`, while `x(T-u+v)=x(T)-x_u+x_v>x(T)`.  Old feasibility of the replacement set therefore
+rules out this formerly expected reverse blocker.  If `v in C` and `u notin U`, the same swap is
+also feasible for the transferred demand; unchanged tight dangerous sets are excluded by the
+core/hull memberships, and the two changed directions have at least one unit of replacement slack
+or the Tight Pascal-Band gain.  Thus no repeated recoloring or alternating cut descent is needed.
+
+The exact remaining statement is the **Core--Blocker Escape Lemma**: for some `v in C intersection
+B`, either its flip has no blocker, or `P_v-U` contains a smaller `A` row.  This is still open, but
+it is a strictly sharper global rule than positive crossing and has no arbitrary separator or
+preselected endpoint.  Uncrossing a dangerous tight set `S=X union Y` with a flip blocker
+`T=P union Q` gives the quantitative bound (CU): every Pascal column in the intersection of the
+target open band and blocker closed band charges `|X-P|+|Q-Y|` to a submodularity defect smaller
+than the blocker's full rank loss.  If the blocker band is contained in the target band, signed
+nesting follows immediately.  The unresolved case is to combine these overlap charges across all
+core rows and force one common blocker intersection beyond `U`, or a parent-prefix violation.
+
+`tools/singleton_pair_coloring_census.cpp --boundary-blockers` now prints `C`, `U`, and every move's
+blocker intersection/union.  The first genuine `K=4` no-flip state has one dangerous tight set.  For
+`v=11`, its 24 blockers share `{15_A,8_A,5_A,4_A,16_B,11_B}`, so the three smaller outside rows
+`8,5,4` all give successful swaps.  In the earlier closest-boundary counterexample, the 44 blockers
+for `v=11` share only `{15_A,8_A,16_B,11_B}` and select the nonlocal swap `8_A<->11_B` directly.
+Both exact labelled-mask runs completed below one wall second together.  The provenance build
+`322b29b4bb6d29da2a36f410b69dcdba0a5b8b6cb0026862d90a7d9cb5d39036`, commands and full outputs
+are summarized in `evidence/singleton_boundary_exchange_2026-08-28.md`.

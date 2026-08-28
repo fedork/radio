@@ -572,14 +572,89 @@ inequality bounds that mass by `2*3^(K-1)`, so cycling is impossible and the pro
 common coloring.  A zero recipient is easier: its padded zero row may be assigned the donor's color
 without affecting feasibility, and after the transfer the marked rows already share a color.
 
-The finite evidence is stronger than the open lemma.  Through `K=3` and in the first 5,000 `K=4`
-states, every maximum-`A`-mass crossing neighbor is successful for the transfer, every tie at the
-maximum is successful, and the smallest observed maximum gain is one.  Three further disjoint
-windows also have a successful maximum-gain crossing neighbor.  These observations identify the
-right acyclic potential, but do not prove that a positive feasible crossing move exists.  A proof
-should assume that every positive crossing flip/swap has an `A`- or `B`-heavy blocker, uncross those
-certificates with `S`, and use (TB3) to turn the resulting closed alternating region into a violated
-parent prefix inequality.
+The arbitrary choice of `S` can now be removed, and with it the apparent alternating blocker
+chain.  Let `D` be the family of all `x`-tight sets that contain `j` and omit `i`.  Since `r` is
+submodular and `x` is modular, tight sets are closed under union and intersection.  Therefore
+
+    C=intersection_(S in D) S,          U=union_(S in D) S
+
+are themselves dangerous tight sets.  In particular `j in C`, `i notin U`.  Every recoloring that
+works for the transfer in one flip or swap must move some `v in C intersection B` to `A`; in the
+swap case it must move some `u in A-U` back to `B`.  Otherwise at least one member of `D` gains no
+rank.
+
+For `v in C intersection B`, temporarily flip `v` to `A` and let
+
+    N_v={T : r_(A+v,B-v)(T)<x(T)}
+
+be its family of original-demand blockers.  Every member of `N_v` contains `v`.  If `N_v` is empty,
+the flip is feasible for both `x` and the transferred demand.  If `N_v` is nonempty, put
+
+    P_v=intersection_(T in N_v) T.
+
+There is an exact global swap rule:
+
+> **Core--Blocker Escape Lemma (open Pascal step).** For some `v in C intersection B`, either
+> `N_v` is empty, or `P_v intersection (A-U)` contains a row `u` with `x_u<x_v`.
+
+Indeed, in the second case swap `u` and `v`.  Sets containing `v` but not `u` are safe because
+`u in P_v`; sets containing both or neither are unchanged.  A set `T` containing `u` but not `v`
+cannot become infeasible.  Under the old coloring its post-swap rank is exactly the old rank of
+`T-u+v`, while
+
+    x(T-u+v)=x(T)-x_u+x_v > x(T).
+
+Old feasibility therefore gives the post-swap inequality with at least `x_v-x_u>=1` slack.  This
+simple replacement argument eliminates the supposed reverse, `B`-heavy blocker family.
+
+The same flip or swap is already feasible for the transferred demand, not merely a step in a
+monotone iteration.  For a swap, an old dangerous tight set contains `v` because `v in C` and omits
+`u` because `u notin U`, so (CG) gives it at least two units of new rank.  Any newly tight dangerous
+set containing `u` but not `v` has the replacement slack above; a set containing neither or both
+would have been an old member of `D`, contradicting `v in C` or `u notin U`; and a set containing
+`v` but not `u`, with new color counts `(p,q)`, gains
+`h_p-h_(q+1)>=h_(p+1)-h_q>=2`; if it were newly tight, the old coloring would be infeasible.  The
+flip case is the same argument without `u`.  Thus the Core--Blocker Escape Lemma implies
+Adjacent-Fiber in one recoloring.
+
+This is now the sharpest constructive target: compute the dangerous tight-set lattice, scan its
+`B`-core, and either take a feasible flip or intersect that flip's blockers and take a smaller
+outside-`A` row.  It uses no alternation, endpoint special case, exchange cycle, or arbitrary
+separator.  Its existence is still unproved.  The finite evidence for the earlier maximum-gain
+rule also supports this stronger statement: every observed successful one-flip/one-swap neighbor
+must cross every member of `D`, hence has exactly the core/hull membership above.
+
+Uncrossing now has a quantitative form that exposes the remaining Pascal work.  Let
+`S=X union Y in D` have counts `(p,q)`, and let a blocker `T=P union Q in N_v` have old counts
+`(a,b)`, slack `delta`, and flip loss `L=h_b-h_(a+1)>delta`.  If `Delta` is the submodularity
+defect of `r` on `S,T`, tightness of `S` gives
+
+    slack(S intersection T)+slack(S union T)=delta-Delta,
+
+so `Delta<=delta<L`.  For every child column whose capacity `c` lies in both bands
+
+    p<c<q,                         b<=c<=a,
+
+the `A`- and `B`-rank terms contribute exactly
+
+    |X minus P| + |Q minus Y|
+
+to `Delta`.  If `m` Pascal columns lie in the band intersection, then
+
+    m (|X minus P|+|Q minus Y|) <= Delta < L.                  (CU)
+
+In particular, when the entire blocker band lies in the target band, `m=L` and (CU) forces the
+signed nesting `X subset P`, `Q subset Y`.  The missing general argument must use the duplicated
+columns guaranteed by (TB3), across all `v in C intersection B`, to force one blocker's common
+intersection past `U` onto a smaller `A` row, or else sum the residual nonnested defects into a
+violated parent prefix inequality.  Only the `A`-heavy flip blockers remain; an alternating-cut
+descent is unnecessary.
+
+The finite evidence remains substantial.  Through `K=3` and in the first 5,000 `K=4` states,
+every maximum-`A`-mass crossing neighbor is successful for the transfer, every tie at the maximum
+is successful, and the smallest observed maximum gain is one.  Three further disjoint windows also
+have a successful maximum-gain crossing neighbor.  These observations do not prove the
+Core--Blocker Escape Lemma.
 
 Standard delta-matroid exchange does not supply that termination.  The fixed-absolute coloring
 family is not even a delta-matroid in general for Pascal `H`.  At `K=3`, take

@@ -977,6 +977,40 @@ void inspect_boundary_blockers(int k, int donor_value, int recipient_value,
         std::exit(2);
     }
 
+    const std::uint64_t masks = std::uint64_t{1} << n;
+    std::uint64_t dangerous_intersection = masks - 1;
+    std::uint64_t dangerous_union = 0;
+    int dangerous_tight_sets = 0;
+    for (std::uint64_t mask = 1; mask < masks; ++mask) {
+        if (((mask >> recipient) & 1U) == 0 || ((mask >> donor) & 1U) != 0) continue;
+        int demand = 0, count_a = 0, count_b = 0;
+        for (int row = 0; row < n; ++row) {
+            if (((mask >> row) & 1U) == 0) continue;
+            demand += values[row];
+            (old_a[row] ? count_a : count_b)++;
+        }
+        if (hall.capacity(count_a, count_b) != demand) continue;
+        ++dangerous_tight_sets;
+        dangerous_intersection &= mask;
+        dangerous_union |= mask;
+    }
+    if (dangerous_tight_sets == 0) {
+        std::cerr << "BOUNDARY_BLOCKERS found no dangerous tight set\n";
+        std::exit(1);
+    }
+
+    const auto print_rows = [&](std::uint64_t mask) {
+        std::cout << '{';
+        bool first = true;
+        for (int row = 0; row < n; ++row) {
+            if (((mask >> row) & 1U) == 0) continue;
+            if (!first) std::cout << ',';
+            first = false;
+            std::cout << values[row] << '@' << row << (old_a[row] ? 'A' : 'B');
+        }
+        std::cout << '}';
+    };
+
     std::vector<unsigned char> in_separator(n, 0);
     in_separator[recipient] = 1;
     int need_a = point.cut_p;
@@ -1012,6 +1046,11 @@ void inspect_boundary_blockers(int k, int donor_value, int recipient_value,
     print_band(target_band);
     std::cout << " A=" << show(point.coloring.a)
               << " B=" << show(point.coloring.b) << '\n';
+    std::cout << "DANGEROUS_LATTICE tight_sets=" << dangerous_tight_sets << " core=";
+    print_rows(dangerous_intersection);
+    std::cout << " hull=";
+    print_rows(dangerous_union);
+    std::cout << '\n';
 
     const auto inspect_move = [&](const char *kind, int u, int v,
                                   const std::vector<unsigned char> &new_a) {
@@ -1036,10 +1075,11 @@ void inspect_boundary_blockers(int k, int donor_value, int recipient_value,
         int violations = 0;
         bool all_blocker_bands_smaller = true;
         bool have_blocker_band = false;
+        std::uint64_t blocker_intersection = masks - 1;
+        std::uint64_t blocker_union = 0;
         std::tuple<int, int, int, int, int> largest_blocker_band{-1, -1, -1, -1, -1};
         int example_old_a = -1, example_old_b = -1, example_new_a = -1,
             example_new_b = -1, example_old_slack = -1, example_new_margin = -1;
-        const std::uint64_t masks = std::uint64_t{1} << n;
         for (std::uint64_t mask = 1; mask < masks; ++mask) {
             int demand = 0, oa = 0, ob = 0, na = 0, nb = 0;
             for (int row = 0; row < n; ++row) {
@@ -1052,6 +1092,8 @@ void inspect_boundary_blockers(int k, int donor_value, int recipient_value,
             minimum_x_margin = std::min(minimum_x_margin, new_margin);
             if (new_margin >= 0) continue;
             ++violations;
+            blocker_intersection &= mask;
+            blocker_union |= mask;
             const int old_slack = hall.capacity(oa, ob) - demand;
             if (old_slack < 0 || oa == na || ob == nb) {
                 std::cerr << "BOUNDARY_BLOCKERS inconsistent rank-loss blocker\n";
@@ -1088,6 +1130,10 @@ void inspect_boundary_blockers(int k, int donor_value, int recipient_value,
                       << ")->(" << example_new_a << ',' << example_new_b << ')'
                       << " old_slack=" << example_old_slack
                       << " new_margin=" << example_new_margin;
+            std::cout << " blocker_core=";
+            print_rows(blocker_intersection);
+            std::cout << " blocker_hull=";
+            print_rows(blocker_union);
         } else {
             Coloring normalized = candidate;
             bool recipient_in_a = new_a[recipient] != 0;

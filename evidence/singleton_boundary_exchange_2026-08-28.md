@@ -137,6 +137,47 @@ their orientation and strictly increases an integer mass bounded by the pure Hal
 the process cannot cycle.  The exact remaining claim is therefore the **Positive Pascal Crossing
 Lemma**: such a positive feasible crossing move always exists.  It is still open.
 
+## Tight-set core removes the reverse blocker
+
+The dangerous `x`-tight sets form a lattice.  Write `C` for their intersection and `U` for their
+union.  A one-flip/one-swap common coloring must move a `B` row `v in C` to `A`; a swap must move an
+`A` row `u notin U` back to `B`.  For each such `v`, flip it provisionally and intersect all row
+sets on which the flipped coloring violates the original demand.  Call that intersection `P_v`.
+
+There is no second, oppositely imbalanced blocker family for a **positive** swap.  If a set `T`
+contains `u` but not `v`, its rank after swapping colors equals the old rank of `T-u+v`.  Since
+`x_v>x_u`, old feasibility of `T-u+v` leaves at least `x_v-x_u` slack for `T` after the swap.
+Consequently the swap is feasible for `x` exactly when `u in P_v`.  If also `v in C` and
+`u notin U`, the same swap is feasible for the transferred demand.  This reduces the open proof to
+one global intersection statement: for some `v in C`, either its flip has no blocker, or `P_v-U`
+contains a smaller `A` row.
+
+`--boundary-blockers` now prints the dangerous lattice core/hull and the intersection/union of all
+blockers for every tested move.  In the first `K=4` no-flip case
+
+    x=(16,15,11,8,7,6,5,4,1^9),       transfer 8 -> 6,
+    A=(15,8,5,4,1^4),                  B=(16,11,7,6,1^5),
+
+there is one dangerous tight set, with
+
+    C=U={15_A,16_B,11_B,7_B,6_B}.
+
+Flipping `v=11` has 24 labelled blockers whose common intersection is
+
+    P_11={15_A,8_A,5_A,4_A,16_B,11_B}.
+
+Thus each of `u=8,5,4` lies in `P_11-U` and is smaller than 11; all three swaps are feasible and
+finish the transfer.  In the closest-boundary counterexample
+
+    x=(16,15,11,8,7,6,3^4,1^6),
+
+the same dangerous core occurs, but the common blocker intersection for `v=11` is
+
+    P_11={15_A,8_A,16_B,11_B}.
+
+It selects the nonlocal swap `8_A <-> 11_B` directly.  These are exact labelled-mask case checks,
+not a census proof of the intersection statement.
+
 The final build for the complete `K=3` and first-5,000 `K=4` maximum/tie/positive-gain checks is
 `fa329a545ac76dca7dda565267c854962707ed331e393d111ae9303346c3e46e`:
 
@@ -152,3 +193,14 @@ The final run took 56 wall seconds at 0.01 GB reported peak RSS.  The detailed b
 
     tools/run_with_provenance.py /tmp/singleton_boundary_positive_final \
         --boundary-blockers 3 3 1 13 3 2 2 2 2 2 2 2 2 2 2 2 1 1
+
+The lattice/blocker-core extension was built as
+`322b29b4bb6d29da2a36f410b69dcdba0a5b8b6cb0026862d90a7d9cb5d39036`.  Its two exact case commands
+are
+
+    CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+        tools/singleton_pair_coloring_census.cpp -o /tmp/singleton-core-work2
+    tools/run_with_provenance.py /tmp/singleton-core-work2 --boundary-blockers 4 8 6 4 \
+        16 15 11 8 7 6 5 4 1 1 1 1 1 1 1 1 1
+    tools/run_with_provenance.py /tmp/singleton-core-work2 --boundary-blockers 4 8 6 1 \
+        16 15 11 8 7 6 3 3 3 3 1 1 1 1 1 1

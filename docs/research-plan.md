@@ -202,20 +202,24 @@ rank from the Tight Pascal-Band Lemma compresses an ambient unit-exchange chain 
 or swap that makes the transfer margin positive.  The Boolean labels alone do not supply that
 exchange, and nested/laminar supports are false already at `K=3`.  The fixed-absolute coloring
 family itself is not a delta-matroid: `(3,2^11,1,1)@3` has an explicit symmetric-exchange failure.
-Use the exact boundary calculus instead.  A failed `B->A` flip is certified by an `A`-heavy cut;
-a failed crossing swap has one blocker family of each imbalance; and every successful local repair
-must cross the original `B`-heavy tight separator.  Strict descent of the dyadic band is false:
-`(3,2^11,1,1)@3` has a crossing-swap blocker with exactly the target band.  Prove the weaker and
-cleaner **Positive Pascal Crossing Lemma** instead: every failed material-row coloring has an
-original-state-feasible crossing flip or swap that strictly increases the recipient-opposite
-side's total mass.  Repeating such moves terminates because nonendpoint moves preserve the marked
-orientation and strictly increase a bounded integer mass, while an endpoint move gives a
-same-color certificate.  Complete `K=3` and the first 5,000 `K=4` states have minimum maximum
-crossing gain one, and every maximum-gain tie succeeds immediately; three further disjoint windows
-also have a successful maximum-gain neighbor.  The missing proof should uncross the blockers of
-*all* positive moves with the tight separator and use (TB3) to derive a violated parent prefix.
-Row-count slack and two closest-boundary prescriptions both have `K=4` counterexamples, so do not
-preselect the exchanged identities.  Exact formulas and counterexamples are in the
+Use the exact boundary calculus instead.  Strict descent of the dyadic band is false:
+`(3,2^11,1,1)@3` has a crossing-swap blocker with exactly the target band.  The dangerous tight
+sets form a lattice; write `C` for their intersection and `U` for their union.  For each opposite-
+color row `v in C`, provisionally flip it and intersect all sets that then violate the original
+demand.  Prove the **Core--Blocker Escape Lemma**: some flip is feasible, or one such blocker
+intersection contains a smaller returning row `u in A-U`.  The swap `u<->v` is then feasible for
+both the original and transferred demand.  Positivity supplies an important exact simplification:
+a set containing `u` but not `v` cannot block, because its post-swap rank is the old rank of
+`T-u+v`, whose old demand is larger.  Thus do not construct an alternating `A`-heavy/`B`-heavy cut
+chain; only the common intersection of the `A`-heavy flip blockers remains.  Uncross those blockers
+with `C` and `U`; equation (CU) in the theorem note measures every nonnested row by the number of
+Pascal columns shared by its blocker band and the dangerous open band.  Use (TB3) to force the
+intersection past `U` onto a smaller row, or sum the residual defects into a violated parent
+prefix.  Complete `K=3` and the first 5,000 `K=4` states have minimum maximum crossing gain one, and
+every maximum-gain tie succeeds immediately; three further disjoint windows also have a successful
+maximum-gain neighbor.  This is evidence, not the missing existence proof.  Row-count slack and two
+closest-boundary prescriptions both have `K=4` counterexamples, so do not preselect the exchanged
+identities.  Exact formulas and counterexamples are in the
 [boundary-exchange record](../evidence/singleton_boundary_exchange_2026-08-28.md).
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the
