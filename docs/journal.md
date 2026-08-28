@@ -10971,3 +10971,33 @@ for `v=11` share only `{15_A,8_A,16_B,11_B}` and select the nonlocal swap `8_A<-
 Both exact labelled-mask runs completed below one wall second together.  The provenance build
 `322b29b4bb6d29da2a36f410b69dcdba0a5b8b6cb0026862d90a7d9cb5d39036`, commands and full outputs
 are summarized in `evidence/singleton_boundary_exchange_2026-08-28.md`.
+
+## 2026-08-28 -- blocker cores are a monotone prefix staircase and survive a K=5 probe
+
+The Core--Blocker Escape target no longer requires arbitrary labelled intersections.  For fixed
+`v`, the `A` rows common to all flip blockers form an upper set by mass.  If every blocker contains
+`u` and a heavier `A` row `w` were omitted by some blocker, replacing `u` by `w` would make another
+blocker omitting `u`, a contradiction.  Therefore, if any smaller row outside the dangerous hull
+works, the largest such row works.  This rehabilitates a closest-smaller choice only *after* the
+crossing row `v` is selected globally from the dangerous core; the refuted rules selected `v` from
+one arbitrary separator.
+
+The upper sets are monotone in `v`.  For `x_v>=x_w`, any blocker for flipping `w` maps to one for
+flipping `v`, either unchanged when it already contains `v`, or by replacing `w` with `v`.  Its
+`A` part is unchanged, so `P_v intersection A` is contained in `P_w intersection A`.  Meanwhile
+`U intersection (A-{i})` is itself an upper set, and every strictly heavier `B` row above a member
+of the dangerous core is also in the core.  The missing lemma is therefore a one-dimensional
+staircase crossing: as `v` descends, the common blocker prefix grows and must cross the dangerous
+hull before the newly reached outside row becomes at least as large as `v`.  Candidate membership
+has the exact sorted-prefix test (ST2), so a contradiction proof can choose one violating `(a,b)`
+pair per failed step and combine it with (TB3)/(CU).
+
+A targeted falsification was worthwhile because all earlier local evidence stopped at `K=4`.
+The new `--fixed-positive-sample` mode generates majorized states by Robin--Hood walks, finds one
+exact coloring, walks on its feasible flip/swap graph to reach boundary colorings, and tests sampled
+opposite-color transfers.  On 5,000 `K=5` states it tested 624,395 pairs; 3,220 current colorings
+failed after their transfer, and every one had a positive common one-flip/one-swap neighbor.  This
+is deterministic for seed `20260828` but neither the states, colorings nor pairs are uniform.  It is
+a 50-wall-second falsification probe, not a theorem.  Build
+`13b14aa1a44b8bacfcecf1574726543f5cafdc6d60709909257dd31a432b122a` and the capped command are in
+`evidence/singleton_boundary_exchange_2026-08-28.md`.

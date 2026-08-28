@@ -624,6 +624,51 @@ separator.  Its existence is still unproved.  The finite evidence for the earlie
 rule also supports this stronger statement: every observed successful one-flip/one-swap neighbor
 must cross every member of `D`, hence has exactly the core/hull membership above.
 
+The intersections have a further order structure.  For fixed `v`, `P_v intersection A` is an
+upper set in row mass.  If `u in P_v`, `w in A`, and `x_w>=x_u`, then every blocker contains `w`:
+otherwise a blocker containing `u` but omitting `w` can replace `u` by `w`, preserving its color
+counts and not decreasing its demand, to produce a blocker omitting `u`.  This contradicts
+`u in P_v`.  Consequently, if *any* smaller row in `A-U` gives an escape for `v`, then so does the
+largest row in `A-U` whose mass is still strictly below `x_v`.  The closest-smaller row is therefore
+canonical **after** `v` has been selected from the global core; the failed closest-boundary rules
+selected `v` from one arbitrary separator instead.
+
+These upper sets are monotone as the scanned `B` row decreases.  If `v,w in B`, `x_v>=x_w`, and
+both flips are blocked, then
+
+    P_v intersection A subset P_w intersection A.                         (ST1)
+
+To see this, map a blocker of the flip of `w` to one for `v`.  If it already contains `v`, it is
+unchanged; otherwise replace `w` by `v`.  The post-flip color counts are the same and demand does
+not decrease, while the blocker has exactly the same `A` rows.  Thus every `A` row common to all
+`v`-blockers is common to all `w`-blockers.
+
+The dangerous lattice has compatible prefix geometry.  `U intersection (A-{i})` is an upper set:
+in a dangerous tight set, replacing an included ordinary `A` row by a heavier omitted one would
+either violate old feasibility or give another dangerous tight set.  Also, if `v in C intersection
+B`, every strictly heavier `B` row lies in `C` (equal rows may exchange their labelled roles).
+Hence, after sorting within colors, the Core--Blocker Escape Lemma is a one-dimensional staircase:
+the common `A`-prefix `P_v intersection A` grows monotonically as `v` descends through the
+dangerous `B`-core, and one must prove that it crosses the ordinary `A`-prefix `U intersection A`
+before its newly reached row becomes at least as large as `v`.  The marked donor is the one
+possible out-of-prefix row because it is excluded from every dangerous set.
+
+There is also an exact numerical test for one staircase step.  For the canonical candidate
+`u=u(v)`, sort
+
+    A(v,u)=(A-{u}) union {v},              B(v)=B-{v}.
+
+Then `u in P_v` exactly when
+
+    prefix_a(A(v,u)) + prefix_b(B(v))
+        <= H(a+b)+H(a)+H(b)                                      (ST2)
+
+for every `(a,b)`.  These are precisely the provisional-flip inequalities on sets omitting `u`;
+all sets containing `u` are safe after the positive swap by the replacement argument.  Thus the
+remaining Pascal theorem can be attacked entirely with sorted prefixes: if every staircase step
+fails (ST2), choose one violating pair per step and use (TB3)/(CU) to sum them into a parent-prefix
+violation.  Arbitrary labelled blocker sets no longer need to be tracked.
+
 Uncrossing now has a quantitative form that exposes the remaining Pascal work.  Let
 `S=X union Y in D` have counts `(p,q)`, and let a blocker `T=P union Q in N_v` have old counts
 `(a,b)`, slack `delta`, and flip loss `L=h_b-h_(a+1)>delta`.  If `Delta` is the submodularity

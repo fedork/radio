@@ -229,6 +229,26 @@ bool full_coloring_holds(const Hall &hall, const Coloring &coloring) {
     return newest_inequalities_hold(hall, coloring, 0, 0);
 }
 
+bool labelled_coloring_holds(const Hall &hall, const Sequence &values,
+                             const std::vector<unsigned char> &in_a,
+                             int donor = -1, int recipient = -1) {
+    Coloring coloring;
+    for (int row = 0; row < static_cast<int>(values.size()); ++row) {
+        int value = values[row];
+        if (row == donor) --value;
+        if (row == recipient) ++value;
+        if (in_a[row]) coloring.a.push_back(value);
+        else coloring.b.push_back(value);
+    }
+    std::sort(coloring.a.begin(), coloring.a.end(), std::greater<int>());
+    std::sort(coloring.b.begin(), coloring.b.end(), std::greater<int>());
+    coloring.pa.assign(1, 0);
+    coloring.pb.assign(1, 0);
+    for (int value : coloring.a) coloring.pa.push_back(coloring.pa.back() + value);
+    for (int value : coloring.b) coloring.pb.push_back(coloring.pb.back() + value);
+    return full_coloring_holds(hall, coloring);
+}
+
 bool remove_one(Sequence &values, int value) {
     const auto found = std::find(values.begin(), values.end(), value);
     if (found == values.end()) return false;
@@ -2767,6 +2787,157 @@ void sample_transfer_states(int k, std::uint64_t sample_count, std::uint64_t see
                   << " exact_B=" << show(first_reserve_solution.b) << '\n';
 }
 
+// Falsification probe for the Core--Blocker Escape target beyond the exhaustive K=4 range.
+// For one feasible labelled coloring, test random opposite-color Robin--Hood transfers.  Whenever
+// the current coloring fails after the transfer, exhaust every positive one-row flip and swap.
+// A missing common neighbor would refute both Positive Pascal Crossing and Core--Blocker Escape.
+void sample_fixed_positive_crossings(int k, std::uint64_t state_count,
+                                     std::uint64_t pairs_per_state, std::uint64_t seed) {
+    const Sequence parent = singleton_base(k);
+    const Hall hall(singleton_base(k - 1));
+    int total = 0;
+    for (int value : parent) total += value;
+    std::mt19937_64 random(seed);
+    Sequence padded(total, 0);
+    const auto reset = [&] {
+        std::fill(padded.begin(), padded.end(), 0);
+        std::copy(parent.begin(), parent.end(), padded.begin());
+    };
+    reset();
+    std::uint64_t walk_left = 0;
+    std::uint64_t pairs_tested = 0;
+    std::uint64_t failed_colorings = 0;
+    std::uint64_t positive_common = 0;
+
+    for (std::uint64_t sample = 0; sample < state_count; ++sample) {
+        if (walk_left == 0) {
+            reset();
+            walk_left = 1 + random() % static_cast<std::uint64_t>(2 * total);
+        }
+        Sequence state = padded;
+        while (!state.empty() && state.back() == 0) state.pop_back();
+        GeneralSearch exact(state, hall);
+        Coloring current;
+        if (!exact.dfs(0, current)) {
+            std::cerr << "FIXED_POSITIVE_INTERNAL_ERROR uncolorable sampled state\n";
+            std::exit(1);
+        }
+
+        Sequence values;
+        std::vector<unsigned char> base_a;
+        for (int value : exact.solution.a) {
+            values.push_back(value);
+            base_a.push_back(1);
+        }
+        for (int value : exact.solution.b) {
+            values.push_back(value);
+            base_a.push_back(0);
+        }
+        const int n = static_cast<int>(values.size());
+        // The first exact coloring is deliberately balanced and often lies well inside every
+        // transfer fiber.  Walk on the feasible-coloring graph to probe boundary colorings.
+        for (int step = 0; step < 16 * n; ++step) {
+            std::vector<unsigned char> candidate = base_a;
+            const int first = static_cast<int>(random() % n);
+            if ((random() & 1U) == 0) {
+                candidate[first] = !candidate[first];
+            } else {
+                const int second = static_cast<int>(random() % n);
+                if (first == second || candidate[first] == candidate[second]) continue;
+                candidate[first] = !candidate[first];
+                candidate[second] = !candidate[second];
+            }
+            if (labelled_coloring_holds(hall, values, candidate))
+                base_a = std::move(candidate);
+        }
+        std::vector<std::pair<int, int>> pairs;
+        for (int donor = 0; donor < n; ++donor)
+            for (int recipient = 0; recipient < n; ++recipient)
+                if (base_a[donor] != base_a[recipient] &&
+                    values[donor] >= values[recipient] + 2)
+                    pairs.emplace_back(donor, recipient);
+        std::shuffle(pairs.begin(), pairs.end(), random);
+        if (pairs.size() > pairs_per_state) pairs.resize(pairs_per_state);
+
+        for (const auto [raw_donor, raw_recipient] : pairs) {
+            std::vector<unsigned char> old_a = base_a;
+            if (!old_a[raw_donor])
+                for (unsigned char &side : old_a) side = !side;
+            const int donor = raw_donor;
+            const int recipient = raw_recipient;
+            if (!old_a[donor] || old_a[recipient]) std::exit(1);
+            ++pairs_tested;
+            if (labelled_coloring_holds(hall, values, old_a, donor, recipient)) continue;
+            ++failed_colorings;
+
+            bool repaired = false;
+            for (int v = 0; v < n && !repaired; ++v) {
+                if (old_a[v] || values[v] <= 0) continue;
+                std::vector<unsigned char> candidate = old_a;
+                candidate[v] = 1;
+                if (labelled_coloring_holds(hall, values, candidate) &&
+                    labelled_coloring_holds(hall, values, candidate, donor, recipient)) {
+                    repaired = true;
+                    break;
+                }
+                for (int u = 0; u < n && !repaired; ++u) {
+                    if (!old_a[u] || values[v] <= values[u]) continue;
+                    candidate = old_a;
+                    candidate[v] = 1;
+                    candidate[u] = 0;
+                    if (labelled_coloring_holds(hall, values, candidate) &&
+                        labelled_coloring_holds(
+                            hall, values, candidate, donor, recipient))
+                        repaired = true;
+                }
+            }
+            if (repaired) {
+                ++positive_common;
+                continue;
+            }
+
+            Coloring oriented;
+            for (int row = 0; row < n; ++row) {
+                if (old_a[row]) oriented.a.push_back(values[row]);
+                else oriented.b.push_back(values[row]);
+            }
+            std::sort(oriented.a.begin(), oriented.a.end(), std::greater<int>());
+            std::sort(oriented.b.begin(), oriented.b.end(), std::greater<int>());
+            std::cout << "FIXED_POSITIVE_COUNTEREXAMPLE k=" << k
+                      << " state=" << show(state)
+                      << " donor=" << values[donor]
+                      << " recipient=" << values[recipient]
+                      << " A=" << show(oriented.a)
+                      << " B=" << show(oriented.b) << '\n';
+            return;
+        }
+
+        std::vector<int> donors;
+        for (int row = 0; row < total; ++row)
+            if (padded[row] >= 2) donors.push_back(row);
+        bool moved = false;
+        for (int attempt = 0; attempt < 64 && !moved && !donors.empty(); ++attempt) {
+            const int donor = donors[random() % donors.size()];
+            const int recipient = static_cast<int>(random() % total);
+            if (donor == recipient || padded[donor] < padded[recipient] + 2) continue;
+            --padded[donor];
+            ++padded[recipient];
+            std::sort(padded.begin(), padded.end(), std::greater<int>());
+            moved = true;
+        }
+        if (!moved) walk_left = 0;
+        else --walk_left;
+    }
+
+    std::cout << "FIXED_POSITIVE_SAMPLE k=" << k
+              << " states=" << state_count
+              << " pairs_per_state=" << pairs_per_state
+              << " seed=" << seed
+              << " pairs_tested=" << pairs_tested
+              << " failed_colorings=" << failed_colorings
+              << " positive_common=" << positive_common << '\n';
+}
+
 struct DominatedPartitionSampler {
     Sequence parent_prefix{0};
     int total = 0;
@@ -3122,6 +3293,22 @@ int main(int argc, char **argv) {
         }
         GlobalBalanceCensus census(k);
         census.run();
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--fixed-positive-sample") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 5;
+        const std::uint64_t states =
+            argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 100;
+        const std::uint64_t pairs =
+            argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 32;
+        const std::uint64_t seed =
+            argc > 5 ? std::strtoull(argv[5], nullptr, 10) : 1;
+        if (k < 2 || k > 6 || states == 0 || pairs == 0) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --fixed-positive-sample k states pairs-per-state [seed]\n";
+            return 2;
+        }
+        sample_fixed_positive_crossings(k, states, pairs, seed);
         return 0;
     }
     if (argc >= 2 && std::string(argv[1]) == "--uniform") {

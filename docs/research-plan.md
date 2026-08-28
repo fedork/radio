@@ -212,14 +212,17 @@ both the original and transferred demand.  Positivity supplies an important exac
 a set containing `u` but not `v` cannot block, because its post-swap rank is the old rank of
 `T-u+v`, whose old demand is larger.  Thus do not construct an alternating `A`-heavy/`B`-heavy cut
 chain; only the common intersection of the `A`-heavy flip blockers remains.  Uncross those blockers
-with `C` and `U`; equation (CU) in the theorem note measures every nonnested row by the number of
-Pascal columns shared by its blocker band and the dangerous open band.  Use (TB3) to force the
-intersection past `U` onto a smaller row, or sum the residual defects into a violated parent
-prefix.  Complete `K=3` and the first 5,000 `K=4` states have minimum maximum crossing gain one, and
-every maximum-gain tie succeeds immediately; three further disjoint windows also have a successful
-maximum-gain neighbor.  This is evidence, not the missing existence proof.  Row-count slack and two
-closest-boundary prescriptions both have `K=4` counterexamples, so do not preselect the exchanged
-identities.  Exact formulas and counterexamples are in the
+with `C` and `U`.  First use the proved prefix staircase: `P_v intersection A` is an upper set and
+grows as `v` decreases, while `U intersection (A-{i})` is an upper set.  For each core `v`, test
+only the largest row outside `U` that is still smaller than `v`; condition (ST2) is the complete
+sorted-prefix test.  If every staircase step fails, choose one violating `(a,b)` pair per step.
+Equation (CU) measures every nonnested row by the number of Pascal columns shared by its blocker
+band and the dangerous open band.  Use (TB3) to show that these monotone witnesses cannot pass one
+another without forcing the blocker prefix past `U`, or sum their residual defects into a violated
+parent prefix.  Complete `K=3`, the first 5,000 `K=4` states and a targeted `K=5` boundary sample
+support the statement.  This is evidence, not the missing existence proof.  Row-count slack and
+two rules that preselect `v` from one separator have `K=4` counterexamples; closest-smaller `u` is
+canonical only after the global core scan.  Exact formulas and counterexamples are in the
 [boundary-exchange record](../evidence/singleton_boundary_exchange_2026-08-28.md).
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the

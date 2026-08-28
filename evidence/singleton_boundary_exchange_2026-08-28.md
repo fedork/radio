@@ -178,6 +178,37 @@ the same dangerous core occurs, but the common blocker intersection for `v=11` i
 It selects the nonlocal swap `8_A <-> 11_B` directly.  These are exact labelled-mask case checks,
 not a census proof of the intersection statement.
 
+## Prefix staircase and a K=5 falsification probe
+
+The blocker intersection has deterministic order structure.  For fixed `v`, its `A` part is an
+upper set by row mass: if every blocker contains `u`, then every `A` row at least as large as `u`
+also lies in every blocker.  Moreover these common upper sets grow as `v` decreases through `B`.
+Thus, for each `v` in the dangerous core, there is only one canonical swap candidate to test: the
+largest row outside the dangerous hull whose mass is still below `x_v`.  The theorem note proves
+these claims and reduces candidate feasibility to the sorted prefix inequalities (ST2).
+
+Because this strengthened local statement had previously only been tested through `K=4`, a new
+`--fixed-positive-sample` mode probes it without enumerating a state's whole coloring space.  It
+generates full-mass states by random Robin--Hood walks from `G_K`, constructs one exact feasible
+coloring, then takes 16 row-count-many random feasible flips/swaps to move that coloring toward the
+boundary.  For sampled opposite-color Robin--Hood pairs, it keeps only those for which the current
+coloring actually fails after the transfer and exhausts every positive one-row flip and swap.  A
+failure would refute both Positive Pascal Crossing and Core--Blocker Escape for that coloring.
+
+At `K=5`, 5,000 sampled states and up to 128 opposite-color pairs per state produced 624,395 tested
+pairs.  Exactly 3,220 current colorings failed their transfer, and all 3,220 had a positive common
+one-flip/one-swap neighbor.  The state walk, coloring walk and pair subsample are deterministic for
+the printed seed but are not uniform; this is a falsification probe, not a finite theorem.  The run
+completed in 50 wall seconds at 0.00 GB reported peak RSS.
+
+The build was `13b14aa1a44b8bacfcecf1574726543f5cafdc6d60709909257dd31a432b122a`:
+
+    CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+        tools/singleton_pair_coloring_census.cpp -o /tmp/singleton-fixed-positive2
+    tools/capped_run.sh --seconds 60 --rss-gb 1 --label fixed-positive-k5 -- \
+        tools/run_with_provenance.py /tmp/singleton-fixed-positive2 \
+        --fixed-positive-sample 5 5000 128 20260828
+
 The final build for the complete `K=3` and first-5,000 `K=4` maximum/tie/positive-gain checks is
 `fa329a545ac76dca7dda565267c854962707ed331e393d111ae9303346c3e46e`:
 
