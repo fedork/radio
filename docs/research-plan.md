@@ -219,6 +219,10 @@ by the number of nonunit rows.  Direct reconstruction verifies this scalar rule 
 `(8,5,5,5,1^4)@3` refutes that stronger rule.  Use the hinge profile to describe augmenting-path
 cuts and their obstructions, while keeping Pascal orthant saturation as the exact target; see the
 [shape survey](../evidence/singleton_shape_survey_2026-08-27.md).
+Likewise, do not require every row image to contain a piece whose width occurs in `G_(K-1)`:
+`(8,7,4,2,2,2,1,1)@3` forces mixed mass at least ten under that rule, although the branch mass is
+nine.  If atom widths remain useful, they need a weaker role, such as an aggregate resource or a
+condition only on genuinely split rows, not a row-by-row requirement covering intact rows.
 
 A second global formulation is now worth pursuing in parallel with the signed Hall fold.  For the
 transcript graph `Q_K`, the monomial coefficient `c_K(lambda)` of its chromatic symmetric function

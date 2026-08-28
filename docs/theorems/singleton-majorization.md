@@ -590,6 +590,25 @@ survey finds no failure among all 1,206 full-mass states at `K=3` or all 5,997,0
 The scalar rule is therefore a plausible coarse induction invariant, not by itself a certificate:
 the proof must still produce three individually `G_(K-1)`-majorized children.
 
+A tempting local strengthening is already false.  Call a positive piece an **atom-sized piece**
+when its width occurs as a row width of `G_(K-1)`, and require every parent row's one- or
+two-piece image under the first cut to contain one.  At `K=3`,
+
+    a=(8,7,4,2,2,2,1,1) <=_w G_3=(8,7,4,3,2,1,1,1)
+
+is a counterexample.  The child atom widths are `{4,3,1}`.  The rows `8` and `7` must contribute
+at least `4` and `3` respectively to the mixed child, while each of the three rows of width `2`
+must split as `1+1` and contribute another one.  These five rows force mixed mass at least ten,
+greater than its required mass nine.  The state nevertheless has an ordinary legal cut:
+
+    8 -> (4,4,0),  7 -> (0,3,4),  4 -> (3,1,0),  2 -> (1,1,0),
+    2 -> (0,0,2),  2 -> (0,0,2),  1 -> (1,0,0),  1 -> (0,0,1),
+
+whose children are `(4,3,1,1)`, `(4,3,1,1)`, and `(4,2,2,1)`.  This repair leaves two
+non-atom-sized rows intact; demanding that the atom-sized piece be the larger one is therefore
+false as well.  This does not refute the weaker condition imposed only on genuinely split rows.
+The exact atom-restricted modes of `tools/singleton_shape_survey.cpp` reproduce the obstruction.
+
 ### Global signed lifting and the no-holes target (2026-08-26)
 
 There is a cleaner global formulation that removes value blocks and forward choices entirely.

@@ -35,7 +35,9 @@
 //
 // This is an exact finite survey of the rule, not a proof of it.  Every accepted
 // split is reconstructed directly and all three child partitions are checked
-// against G_(k-1).
+// against G_(k-1).  The atom modes additionally require every parent row's one-
+// or two-piece image to contain a positive piece whose width occurs in G_(k-1),
+// optionally requiring the largest piece to have such a width.
 
 namespace {
 
@@ -76,6 +78,12 @@ struct LocalOption {
     int split = 0;
 };
 
+enum class AtomConstraint {
+    none,
+    either_piece,
+    larger_piece,
+};
+
 struct ShapeSplitSearch {
     static constexpr int max_split_bits = 256;
     using SplitMask = std::bitset<max_split_bits>;
@@ -87,6 +95,7 @@ struct ShapeSplitSearch {
     int child_max_width;
     int target_splits;
     bool enforce_full_profile;
+    AtomConstraint atom_constraint;
     Sequence cut_lower;
     Sequence cut_upper;
     Sequence cut_used;
@@ -102,12 +111,13 @@ struct ShapeSplitSearch {
     std::uint64_t nodes = 0;
 
     ShapeSplitSearch(const Sequence &state, int k, int target,
-                     bool full_profile = false)
+                     bool full_profile = false,
+                     AtomConstraint atoms = AtomConstraint::none)
         : parent(state), child_base(singleton_base(k - 1)),
           child_mass(power(3, k - 1)),
           child_min_rows(power(2, k - 1)),
           child_max_width(child_base.front()), target_splits(target),
-          enforce_full_profile(full_profile),
+          enforce_full_profile(full_profile), atom_constraint(atoms),
           cut_lower(state.empty() ? 1 : state.front() + 1, 0),
           cut_upper(state.empty() ? 1 : state.front() + 1,
                     std::numeric_limits<int>::max()),
@@ -119,6 +129,9 @@ struct ShapeSplitSearch {
         for (int i = static_cast<int>(parent.size()) - 1; i >= 0; --i)
             suffix_mass[i] = suffix_mass[i + 1] + parent[i];
         for (auto &f : frequency) f.assign(child_max_width + 1, 0);
+
+        std::vector<bool> is_atom(child_max_width + 1, false);
+        for (int value : child_base) is_atom[value] = true;
 
         if (enforce_full_profile) {
             const Sequence parent_base = singleton_base(k);
@@ -153,6 +166,16 @@ struct ShapeSplitSearch {
                          std::array<int, 3>{width - x, x, 0},
                          std::array<int, 3>{0, width - x, x}}) {
                     if (*std::max_element(pieces.begin(), pieces.end()) > child_max_width)
+                        continue;
+                    const int largest = *std::max_element(pieces.begin(), pieces.end());
+                    const bool has_atom = std::any_of(
+                        pieces.begin(), pieces.end(), [&](int piece) {
+                            return piece > 0 && is_atom[piece];
+                        });
+                    if (atom_constraint == AtomConstraint::either_piece && !has_atom)
+                        continue;
+                    if (atom_constraint == AtomConstraint::larger_piece &&
+                        !is_atom[largest])
                         continue;
                     if (std::any_of(choices.begin(), choices.end(), [&](const LocalOption &old) {
                             return old.piece == pieces;
@@ -493,6 +516,7 @@ struct Survey {
     Sequence failure_profile_actual;
     bool full_profile;
     bool interval_mode;
+    AtomConstraint atom_constraint;
     std::uint64_t interval_states = 0;
     std::uint64_t minimum_equals_hinge = 0;
     std::uint64_t maximum_equals_splittable = 0;
@@ -511,10 +535,12 @@ struct Survey {
     std::vector<int> largest_mixed_upper_gap_interval;
 
     explicit Survey(int level, bool enforce_full_profile = false,
-                    bool survey_intervals = false)
+                    bool survey_intervals = false,
+                    AtomConstraint atoms = AtomConstraint::none)
         : k(level), base(singleton_base(level)), total(power(3, level)) {
         full_profile = enforce_full_profile;
         interval_mode = survey_intervals;
+        atom_constraint = atoms;
         for (int value : base) prefix.push_back(prefix.back() + value);
     }
 
@@ -616,6 +642,16 @@ struct Survey {
     }
 
     bool inspect(const Sequence &state) {
+        if (atom_constraint != AtomConstraint::none) {
+            ++checked;
+            ShapeSplitSearch search(state, k, 0, false, atom_constraint);
+            const auto feasible = search.all_feasible();
+            nodes += search.nodes;
+            max_nodes = std::max(max_nodes, search.nodes);
+            if (feasible.any()) return true;
+            failure = state;
+            return false;
+        }
         if (interval_mode) return inspect_interval(state);
         ++checked;
         const auto targets = target_splits(state, k);
@@ -718,7 +754,12 @@ struct Survey {
             }
             return;
         }
-        std::cout << " result=FAIL state=" << show(failure) << " targets=";
+        std::cout << " result=FAIL state=" << show(failure);
+        if (atom_constraint != AtomConstraint::none) {
+            std::cout << '\n';
+            return;
+        }
+        std::cout << " targets=";
         for (int value : failure_targets) std::cout << value << ',';
         std::cout << " feasible=";
         for (int value : failure_feasible) std::cout << value << ',';
@@ -753,6 +794,10 @@ int main(int argc, char **argv) {
                      "       singleton_shape_survey --profile-uniform k samples [seed]\n"
                      "       singleton_shape_survey --interval-census k\n"
                      "       singleton_shape_survey --interval-uniform k samples [seed]\n"
+                     "       singleton_shape_survey --atom-census k\n"
+                     "       singleton_shape_survey --atom-uniform k samples [seed]\n"
+                     "       singleton_shape_survey --larger-atom-census k\n"
+                     "       singleton_shape_survey --larger-atom-uniform k samples [seed]\n"
                      "       singleton_shape_survey --state k row...\n";
         return 2;
     }
@@ -791,17 +836,28 @@ int main(int argc, char **argv) {
                               mode == "--profile-uniform";
     const bool intervals = mode == "--interval-census" ||
                            mode == "--interval-uniform";
-    Survey survey(k, full_profile, intervals);
+    const bool atom_either = mode == "--atom-census" ||
+                             mode == "--atom-uniform";
+    const bool atom_larger = mode == "--larger-atom-census" ||
+                             mode == "--larger-atom-uniform";
+    const AtomConstraint atoms = atom_either ? AtomConstraint::either_piece :
+                                 atom_larger ? AtomConstraint::larger_piece :
+                                               AtomConstraint::none;
+    Survey survey(k, full_profile, intervals, atoms);
     if (mode == "--census" || mode == "--profile-census" ||
-        mode == "--interval-census") {
+        mode == "--interval-census" || mode == "--atom-census" ||
+        mode == "--larger-atom-census") {
         Sequence state;
         survey.enumerate(survey.total, survey.base.front(), state);
         survey.report(full_profile ? "profile-census" :
-                      intervals ? "interval-census" : "census");
+                      intervals ? "interval-census" :
+                      atom_either ? "atom-census" :
+                      atom_larger ? "larger-atom-census" : "census");
         return 0;
     }
     if (mode == "--uniform" || mode == "--profile-uniform" ||
-        mode == "--interval-uniform") {
+        mode == "--interval-uniform" || mode == "--atom-uniform" ||
+        mode == "--larger-atom-uniform") {
         const std::uint64_t samples = argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 10000;
         const std::uint64_t seed = argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 1;
         DominatedPartitionSampler sampler(survey.base);
@@ -810,7 +866,9 @@ int main(int argc, char **argv) {
         for (std::uint64_t i = 0; i < samples && survey.failure.empty(); ++i)
             survey.inspect(sampler.sample(random));
         survey.report(full_profile ? "profile-uniform" :
-                      intervals ? "interval-uniform" : "uniform",
+                      intervals ? "interval-uniform" :
+                      atom_either ? "atom-uniform" :
+                      atom_larger ? "larger-atom-uniform" : "uniform",
                       samples, universe, seed);
         return 0;
     }

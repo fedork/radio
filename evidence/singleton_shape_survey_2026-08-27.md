@@ -150,3 +150,38 @@ A direct `--uniform 5 1000 314159265` run was stopped by its 60-CPU-second
 limit before producing even a batch verdict.  It is an abort and supplies no
 `K=5` evidence.  Direct assignment enumeration is the wrong high-level method;
 the fixed-color Hall projection used by the row-coloring census is much faster.
+
+## Per-row atom-sized pieces fail at K=3 (2026-08-28)
+
+The `--atom-census` mode requires every parent row's image to contain a positive piece whose
+width occurs in `G_(K-1)`.  An intact row is represented by its positive piece and a zero piece;
+zero is not an atom width.  The stronger `--larger-atom-census` mode requires the largest piece
+to have a canonical child-row width.  With build id
+`2140914d270dd46b4698a9a8bf352df8bf28f57d2f9945915d67fed56e96acfe`, the commands
+
+    tools/run_with_provenance.py /tmp/singleton-atom-survey --atom-census 3
+    tools/run_with_provenance.py /tmp/singleton-atom-survey --larger-atom-census 3
+
+both stop at the fourth descending state:
+
+    SHAPE_SURVEY mode=atom-census k=3 checked=4 nodes=33 max_nodes=10 result=FAIL state=(8,7,4,2,2,2,1,1)
+    SHAPE_SURVEY mode=larger-atom-census k=3 checked=4 nodes=31 max_nodes=9 result=FAIL state=(8,7,4,2,2,2,1,1)
+
+This failure has a direct proof, independent of the search.  The state is majorized by
+`G_3=(8,7,4,3,2,1,1,1)`.  The widths occurring in `G_2` are `{4,3,1}`.  The child width cap forces
+`8=4+4`; the atom rule and the cap make the mixed contribution from `7` at least three; and each
+of the three width-two rows must be `1+1`.  Every genuine split has one mixed piece, so those rows
+alone force mixed mass at least `4+3+1+1+1=10`, exceeding the branch mass `3^2=9`.
+
+The unrestricted state command returns the ordinary legal children
+
+    L=(4,3,1,1) M=(4,3,1,1) R=(4,2,2,1).
+
+One row-level realization is
+
+    8 -> (4,4,0),  7 -> (0,3,4),  4 -> (3,1,0),  2 -> (1,1,0),
+    2 -> (0,0,2),  2 -> (0,0,2),  1 -> (1,0,0),  1 -> (0,0,1).
+
+This witness uses the freedom to leave two noncanonical width-two rows intact.  The counterexample
+does not address a restriction applying only to genuinely split rows, but it
+rules out the proposed condition on every row and, a fortiori, its larger-piece version.

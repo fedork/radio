@@ -10754,3 +10754,20 @@ probes at `K=5` (`26->24`, `26->23`) and `K=6` (`57->55`) agree with the formula
 `f18ca95eb7b7cd6df8d25df3d35594490dc9392193df3c98c8e5d976dc76dc88`.  These probes are checks,
 not premises of the proof.  Full details and reproduction metadata are in
 `evidence/singleton_adjacent_fiber_census_2026-08-27.md`.
+
+## 2026-08-28 -- a per-row canonical-atom cut rule fails at K=3
+
+The proposed strengthening required every row's one- or two-piece first-cut image to contain a
+positive piece whose width occurs in `G_(K-1)`, possibly requiring the larger piece.  Exact
+restricted reconstruction refutes even the weaker version at the fourth `K=3` state,
+`(8,7,4,2,2,2,1,1)`.  The state is majorized by `G_3`.  Since the `G_2` widths are `{4,3,1}`,
+the rows 8 and 7 force at least 4 and 3 mixed units, while all three width-two rows must split as
+`1+1`; the mixed lower bound is therefore 10, above its mass 9.
+
+An unrestricted cut exists and has children `(4,3,1,1)`, `(4,3,1,1)`, `(4,2,2,1)`.  It repairs
+the obstruction by leaving two width-two rows intact.  Hence atom widths cannot be imposed as a
+row-by-row condition covering intact rows; an aggregate atom budget or a restriction only on
+genuinely split rows is not refuted by this example.  `tools/singleton_shape_survey.cpp` now has
+`--atom-{census,uniform}` and `--larger-atom-{census,uniform}` modes; final provenance build
+`2140914d270dd46b4698a9a8bf352df8bf28f57d2f9945915d67fed56e96acfe`.  The direct proof and
+reproduction lines are in `evidence/singleton_shape_survey_2026-08-27.md`.
