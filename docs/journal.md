@@ -10863,3 +10863,38 @@ took under two wall seconds; the exact 10,000-state `K=4` prefix took about two 
 Definitions, reproduction commands and the distinction between exact windows and a complete level
 are in
 `evidence/singleton_coloring_landscape_2026-08-28.md`.
+
+## 2026-08-28 -- exact boundary calculus refutes delta exchange and isolates an alternating-cut proof
+
+The fixed-absolute-value caveat is substantive, not merely missing bookkeeping.  For a fixed
+feasible coloring, flipping `v:B->A` changes the Hall rank of a containing set with old counts
+`(p,q)` by exactly `h_(p+1)-h_q`.  Swapping `u in A` and `v in B` gives that change on sets
+containing only `v`, the symmetric change `h_(q+1)-h_p` on sets containing only `u`, and zero on
+sets containing both or neither.  Hence a failed flip has an oppositely imbalanced blocker, while
+a failed swap has one blocker family of each imbalance.
+
+For a `B`-heavy tight transfer separator `S=X union Y`, every successful one-flip repair must move
+some row of `Y` to `A`, and every successful one-swap repair must exchange a row of `Y` with a row
+of `A-X`; otherwise the Hall rank of `S` cannot rise while its transferred demand rises by one.
+The Tight Pascal-Band Lemma makes every such crossing move gain at least two on `S`.  The remaining
+proof is therefore exact: follow an `A`-heavy blocker of a failed crossing move, then the next
+`B`-heavy blocker, and prove strict descent of the dyadic band before this alternating cut chain
+can repeat.  The repeated Pascal rank supplies the departure capacity; termination is still open.
+
+A new labelled-mask mode gives a small counterexample to using standard delta-matroid theory.
+For `(3,2^11,1,1)@3`, feasible `A`-sets `{0,1,2,3}` and `{1,2,3,4,5}` fail symmetric exchange at
+row 0.  The permitted flip leaves only three `A` rows and full-set capacity 26 below mass 27; the
+two permitted swaps leave the opposite side at mass 19 above pure capacity 18.  Thus expanding a
+jump-system coordinate into Boolean elements does not justify restricting every block to be
+all-in or all-out.  An initial unoptimized Python pair check was killed after about 35 CPU seconds;
+the provenance-built C++ mode returns the exact witness immediately.
+
+The same diagnostic rejects two tempting ways to select the crossing row.  At `K=3`, the 325
+above-floor failed colorings all flip and the 23 floor failures all swap.  In the first 5,000
+`K=4` states, 516 above-floor failures also need a swap.  Trying the marked-recipient/closest-lower
+swap and the largest-outside/closest-higher swap together still misses 170 failed colorings.  The
+first miss is repaired, up to global side complementation, by swapping the marked donor itself
+with a larger opposite-side row.  The final 5,000-state run took 55 wall seconds at 0.01 GB peak
+RSS.  The exact identities, build and commands are in
+`evidence/singleton_boundary_exchange_2026-08-28.md`.  Do not add another endpoint or closest-value
+special case: the live target is existence over the whole crossing cut.

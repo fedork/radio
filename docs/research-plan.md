@@ -200,7 +200,15 @@ polyhedron is integral bisubmodular and therefore has support-one-or-two delta e
 fixed-absolute-value slice does not automatically inherit them.  Prove that the repeated internal
 rank from the Tight Pascal-Band Lemma compresses an ambient unit-exchange chain to a boundary flip
 or swap that makes the transfer margin positive.  The Boolean labels alone do not supply that
-exchange, and nested/laminar supports are false already at `K=3`.
+exchange, and nested/laminar supports are false already at `K=3`.  The fixed-absolute coloring
+family itself is not a delta-matroid: `(3,2^11,1,1)@3` has an explicit symmetric-exchange failure.
+Use the exact boundary calculus instead.  A failed `B->A` flip is certified by an `A`-heavy cut;
+a failed crossing swap has one blocker family of each imbalance; and every successful local repair
+must cross the original `B`-heavy tight separator.  The remaining proof is therefore termination
+of this alternating cut chain by strict descent of its dyadic band.  Row-count slack and two
+closest-boundary prescriptions both have `K=4` counterexamples, so do not preselect the exchanged
+identities.  Exact formulas and counterexamples are in the
+[boundary-exchange record](../evidence/singleton_boundary_exchange_2026-08-28.md).
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the
 [Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md); local landscape

@@ -619,12 +619,87 @@ struct LandscapeSummary {
     int first_stuck_one = -1;
     int first_stuck_two = -1;
     int first_stuck_swap = -1;
+    int first_no_direct_flip_above_floor = -1;
+    int canonical_crossing_swap_failures = 0;
+    int first_canonical_crossing_swap_failure = -1;
+    int failed_recipient_side_at_floor = 0;
+    int failed_recipient_side_above_floor = 0;
+    int no_direct_flip_above_floor = 0;
+    int no_direct_swap_at_floor = 0;
     std::vector<int> minimum_success_distances;
     int maximum_minimum_success_distance = -1;
     int maximum_distance_point = -1;
 };
 
-LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points) {
+bool canonical_crossing_swap_succeeds(const LandscapePoint &point, const Hall &hall,
+                                      int donor_value, int recipient_value) {
+    if (point.margin >= 1 || point.recipient_in_a || point.cut_p < 0 || point.cut_q < 1)
+        return true;
+    if (recipient_value == 0) return true;  // This diagnostic only classifies material rows.
+
+    Sequence outside_a = point.coloring.a;
+    Sequence inside_b = point.coloring.b;
+    if (!remove_one(outside_a, donor_value) ||
+        (recipient_value > 0 && !remove_one(inside_b, recipient_value)))
+        return false;
+    if (point.cut_p > static_cast<int>(outside_a.size()) ||
+        point.cut_q - 1 > static_cast<int>(inside_b.size()))
+        return false;
+
+    // The separator witness uses the top p unmarked A rows.  Swap the marked recipient
+    // itself with the closest smaller non-donor row just outside that prefix.
+    outside_a.erase(outside_a.begin(), outside_a.begin() + point.cut_p);
+    for (int u : outside_a) {
+        if (u >= recipient_value) continue;
+        Coloring candidate = point.coloring;
+        if (!remove_one(candidate.a, u) ||
+            !remove_one(candidate.b, recipient_value))
+            return false;
+        candidate.a.push_back(recipient_value);
+        candidate.b.push_back(u);
+        std::sort(candidate.a.begin(), candidate.a.end(), std::greater<int>());
+        std::sort(candidate.b.begin(), candidate.b.end(), std::greater<int>());
+        if (!full_coloring_holds(hall, candidate)) continue;
+        if (transferred_coloring_holds(hall, candidate, donor_value,
+                                      recipient_value, true))
+            return true;
+        break;  // Values are descending, so this was the closest smaller boundary row.
+    }
+
+    // The other crossing direction keeps the marked recipient in B: exchange the largest
+    // outside A row with the least unmarked-or-marked Y row above it.
+    if (outside_a.empty()) return false;
+    const int u = outside_a.front();
+    inside_b.resize(point.cut_q - 1);
+    inside_b.push_back(recipient_value);
+    std::sort(inside_b.begin(), inside_b.end(), std::greater<int>());
+    for (auto it = inside_b.rbegin(); it != inside_b.rend(); ++it) {
+        const int v = *it;
+        if (v <= u) continue;
+        Coloring candidate = point.coloring;
+        if (!remove_one(candidate.a, u) || !remove_one(candidate.b, v)) return false;
+        candidate.a.push_back(v);
+        candidate.b.push_back(u);
+        std::sort(candidate.a.begin(), candidate.a.end(), std::greater<int>());
+        std::sort(candidate.b.begin(), candidate.b.end(), std::greater<int>());
+        if (!full_coloring_holds(hall, candidate)) return false;
+        if (v == recipient_value &&
+            transferred_coloring_holds(hall, candidate, donor_value,
+                                       recipient_value, true))
+            return true;
+        if ((v != recipient_value ||
+             std::count(candidate.b.begin(), candidate.b.end(), recipient_value) > 0) &&
+            transferred_coloring_holds(hall, candidate, donor_value,
+                                       recipient_value, false))
+            return true;
+        return false;  // This is the unique closest-above value block.
+    }
+    return false;
+}
+
+LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points,
+                                     const Hall &hall, int donor_value,
+                                     int recipient_value) {
     LandscapeSummary summary;
     for (std::size_t i = 0; i < points.size(); ++i) {
         if (points[i].margin >= 1) continue;
@@ -680,6 +755,23 @@ LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points) 
         summary.no_direct_success_two += !reaches_two;
         summary.no_direct_success_swap += !reaches_swap;
         summary.no_direct_success_one_or_swap += !reaches_one && !reaches_swap;
+        const bool canonical_swap = reaches_one || canonical_crossing_swap_succeeds(
+            points[i], hall, donor_value, recipient_value);
+        if (!canonical_swap) {
+            ++summary.canonical_crossing_swap_failures;
+            if (summary.first_canonical_crossing_swap_failure < 0)
+                summary.first_canonical_crossing_swap_failure = static_cast<int>(i);
+        }
+        const int recipient_side_rows = static_cast<int>(points[i].coloring.b.size());
+        if (recipient_side_rows == hall.child_rows) {
+            ++summary.failed_recipient_side_at_floor;
+            summary.no_direct_swap_at_floor += !reaches_swap;
+        } else {
+            ++summary.failed_recipient_side_above_floor;
+            summary.no_direct_flip_above_floor += !reaches_one;
+            if (!reaches_one && summary.first_no_direct_flip_above_floor < 0)
+                summary.first_no_direct_flip_above_floor = static_cast<int>(i);
+        }
         summary.minimum_success_distances.push_back(minimum_success_distance);
         if (minimum_success_distance > summary.maximum_minimum_success_distance) {
             summary.maximum_minimum_success_distance = minimum_success_distance;
@@ -698,7 +790,8 @@ void inspect_adjacent_fiber_landscape(int k, int donor, int recipient, Sequence 
         enumerate_landscape(state, child, hall, donor, recipient);
     const std::vector<LandscapePoint> points =
         collapse_unlabelled_landscape(raw, signature_source.blocks);
-    const LandscapeSummary summary = summarize_landscape(points);
+    const LandscapeSummary summary = summarize_landscape(
+        points, hall, donor, recipient);
 
     std::cout << "ADJACENT_FIBER_LANDSCAPE k=" << k
               << " state=" << show(state)
@@ -712,7 +805,14 @@ void inspect_adjacent_fiber_landscape(int k, int donor, int recipient, Sequence 
               << " stuck_swap=" << summary.stuck_swap
               << " no_direct_success_d1=" << summary.no_direct_success_one
               << " no_direct_success_d2=" << summary.no_direct_success_two
-              << " no_direct_success_swap=" << summary.no_direct_success_swap << '\n';
+              << " no_direct_success_swap=" << summary.no_direct_success_swap
+              << " failed_recipient_floor=" << summary.failed_recipient_side_at_floor
+              << " failed_recipient_above_floor="
+              << summary.failed_recipient_side_above_floor
+              << " no_direct_flip_above_floor=" << summary.no_direct_flip_above_floor
+              << " no_direct_swap_at_floor=" << summary.no_direct_swap_at_floor
+              << " canonical_crossing_swap_failures="
+              << summary.canonical_crossing_swap_failures << '\n';
     for (std::size_t i = 0; i < points.size(); ++i) {
         const auto &[levels, columns, width, p, q] = points[i].band;
         std::cout << "LANDSCAPE_POINT index=" << i
@@ -726,6 +826,63 @@ void inspect_adjacent_fiber_landscape(int k, int donor, int recipient, Sequence 
                   << " A=" << show(points[i].coloring.a)
                   << " B=" << show(points[i].coloring.b) << '\n';
     }
+}
+
+// Test whether the labelled feasible-coloring family of one fixed state satisfies Bouchet's
+// symmetric-exchange axiom.  This is deliberately a case inspector rather than a census: its
+// 2^n mask table is useful for small theoretical examples, but is not the representation used by
+// the full partition census above.
+void inspect_boundary_delta_case(int k, Sequence state) {
+    std::sort(state.begin(), state.end(), std::greater<int>());
+    const int n = static_cast<int>(state.size());
+    if (n > 24) {
+        std::cerr << "BOUNDARY_DELTA_CASE supports at most 24 labelled rows\n";
+        std::exit(2);
+    }
+    const Hall hall(singleton_base(k - 1));
+    const std::uint64_t mask_count = std::uint64_t{1} << n;
+    std::vector<unsigned char> feasible(mask_count, 0);
+    std::vector<std::uint64_t> family;
+    for (std::uint64_t mask = 0; mask < mask_count; ++mask) {
+        Coloring coloring;
+        for (int row = 0; row < n; ++row) {
+            if ((mask >> row) & 1U)
+                coloring.push_a(state[row]);
+            else
+                coloring.push_b(state[row]);
+        }
+        if (full_coloring_holds(hall, coloring)) {
+            feasible[mask] = 1;
+            family.push_back(mask);
+        }
+    }
+
+    for (std::uint64_t x : family) {
+        for (std::uint64_t y : family) {
+            std::uint64_t difference = x ^ y;
+            for (int e = 0; e < n; ++e) {
+                if (((difference >> e) & 1U) == 0) continue;
+                bool exchanged = feasible[x ^ (std::uint64_t{1} << e)] != 0;
+                for (int f = 0; !exchanged && f < n; ++f) {
+                    if (f == e || ((difference >> f) & 1U) == 0) continue;
+                    exchanged = feasible[x ^ (std::uint64_t{1} << e) ^
+                                           (std::uint64_t{1} << f)] != 0;
+                }
+                if (!exchanged) {
+                    std::cout << "BOUNDARY_DELTA_CASE k=" << k
+                              << " state=" << show(state)
+                              << " feasible_colorings=" << family.size()
+                              << " delta=NO x=" << x << " y=" << y
+                              << " e=" << e << '\n';
+                    return;
+                }
+            }
+        }
+    }
+    std::cout << "BOUNDARY_DELTA_CASE k=" << k
+              << " state=" << show(state)
+              << " feasible_colorings=" << family.size()
+              << " delta=YES\n";
 }
 
 struct LandscapeCensus {
@@ -748,6 +905,11 @@ struct LandscapeCensus {
     std::uint64_t no_direct_success_two = 0;
     std::uint64_t no_direct_success_swap = 0;
     std::uint64_t no_direct_success_one_or_swap = 0;
+    std::uint64_t failed_recipient_side_at_floor = 0;
+    std::uint64_t failed_recipient_side_above_floor = 0;
+    std::uint64_t no_direct_flip_above_floor = 0;
+    std::uint64_t no_direct_swap_at_floor = 0;
+    std::uint64_t canonical_crossing_swap_failures = 0;
     std::map<int, std::uint64_t> success_distance_counts;
     int maximum_success_distance = -1;
     Sequence maximum_distance_state;
@@ -766,6 +928,14 @@ struct LandscapeCensus {
     int first_stuck_donor = -1;
     int first_stuck_recipient = -1;
     LandscapePoint first_stuck_point;
+    Sequence first_no_direct_flip_above_floor_state;
+    int first_no_direct_flip_above_floor_donor = -1;
+    int first_no_direct_flip_above_floor_recipient = -1;
+    LandscapePoint first_no_direct_flip_above_floor_point;
+    Sequence first_canonical_crossing_swap_failure_state;
+    int first_canonical_crossing_swap_failure_donor = -1;
+    int first_canonical_crossing_swap_failure_recipient = -1;
+    LandscapePoint first_canonical_crossing_swap_failure_point;
 
     LandscapeCensus(int level, std::uint64_t limit, std::uint64_t skip = 0)
         : k(level), parent(singleton_base(level)), child(singleton_base(level - 1)),
@@ -787,7 +957,8 @@ struct LandscapeCensus {
         AdjacentFiberSearch signature_source(state, hall, donor, recipient, false);
         const std::vector<LandscapePoint> collapsed =
             collapse_unlabelled_landscape(points, signature_source.blocks);
-        const LandscapeSummary summary = summarize_landscape(collapsed);
+        const LandscapeSummary summary = summarize_landscape(
+            collapsed, hall, donor, recipient);
         feasible_colorings += collapsed.size();
         failed_colorings += summary.failed;
         stuck_one += summary.stuck_one;
@@ -796,6 +967,12 @@ struct LandscapeCensus {
         no_direct_success_two += summary.no_direct_success_two;
         no_direct_success_swap += summary.no_direct_success_swap;
         no_direct_success_one_or_swap += summary.no_direct_success_one_or_swap;
+        failed_recipient_side_at_floor += summary.failed_recipient_side_at_floor;
+        failed_recipient_side_above_floor += summary.failed_recipient_side_above_floor;
+        no_direct_flip_above_floor += summary.no_direct_flip_above_floor;
+        no_direct_swap_at_floor += summary.no_direct_swap_at_floor;
+        canonical_crossing_swap_failures +=
+            summary.canonical_crossing_swap_failures;
         for (int distance : summary.minimum_success_distances)
             ++success_distance_counts[distance];
         if (summary.maximum_minimum_success_distance > maximum_success_distance) {
@@ -822,6 +999,22 @@ struct LandscapeCensus {
             first_stuck_donor = donor;
             first_stuck_recipient = recipient;
             first_stuck_point = collapsed[summary.first_stuck_two];
+        }
+        if (summary.first_no_direct_flip_above_floor >= 0 &&
+            first_no_direct_flip_above_floor_state.empty()) {
+            first_no_direct_flip_above_floor_state = state;
+            first_no_direct_flip_above_floor_donor = donor;
+            first_no_direct_flip_above_floor_recipient = recipient;
+            first_no_direct_flip_above_floor_point =
+                collapsed[summary.first_no_direct_flip_above_floor];
+        }
+        if (summary.first_canonical_crossing_swap_failure >= 0 &&
+            first_canonical_crossing_swap_failure_state.empty()) {
+            first_canonical_crossing_swap_failure_state = state;
+            first_canonical_crossing_swap_failure_donor = donor;
+            first_canonical_crossing_swap_failure_recipient = recipient;
+            first_canonical_crossing_swap_failure_point =
+                collapsed[summary.first_canonical_crossing_swap_failure];
         }
     }
 
@@ -876,7 +1069,14 @@ struct LandscapeCensus {
                   << " no_direct_success_d2=" << no_direct_success_two
                   << " no_direct_success_swap=" << no_direct_success_swap
                   << " no_direct_success_one_or_swap="
-                  << no_direct_success_one_or_swap << '\n';
+                  << no_direct_success_one_or_swap
+                  << " failed_recipient_floor=" << failed_recipient_side_at_floor
+                  << " failed_recipient_above_floor="
+                  << failed_recipient_side_above_floor
+                  << " no_direct_flip_above_floor=" << no_direct_flip_above_floor
+                  << " no_direct_swap_at_floor=" << no_direct_swap_at_floor
+                  << " canonical_crossing_swap_failures="
+                  << canonical_crossing_swap_failures << '\n';
         for (const auto &[distance, count] : success_distance_counts)
             std::cout << "LANDSCAPE_SUCCESS_DISTANCE distance=" << distance
                       << " failed_colorings=" << count << '\n';
@@ -922,6 +1122,24 @@ struct LandscapeCensus {
                       << " A=" << show(first_stuck_point.coloring.a)
                       << " B=" << show(first_stuck_point.coloring.b) << '\n';
         }
+        if (!first_no_direct_flip_above_floor_state.empty())
+            std::cout << "LANDSCAPE_ABOVE_FLOOR_NO_FLIP state="
+                      << show(first_no_direct_flip_above_floor_state)
+                      << " donor=" << first_no_direct_flip_above_floor_donor
+                      << " recipient=" << first_no_direct_flip_above_floor_recipient
+                      << " A=" << show(first_no_direct_flip_above_floor_point.coloring.a)
+                      << " B=" << show(first_no_direct_flip_above_floor_point.coloring.b)
+                      << '\n';
+        if (!first_canonical_crossing_swap_failure_state.empty())
+            std::cout << "LANDSCAPE_CANONICAL_CROSSING_SWAP_FAILURE state="
+                      << show(first_canonical_crossing_swap_failure_state)
+                      << " donor=" << first_canonical_crossing_swap_failure_donor
+                      << " recipient=" << first_canonical_crossing_swap_failure_recipient
+                      << " A="
+                      << show(first_canonical_crossing_swap_failure_point.coloring.a)
+                      << " B="
+                      << show(first_canonical_crossing_swap_failure_point.coloring.b)
+                      << '\n';
     }
 };
 
@@ -2400,6 +2618,19 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--boundary-delta-case") {
+        if (argc < 4) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --boundary-delta-case k value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        Sequence state;
+        for (int i = 3; i < argc; ++i) state.push_back(std::atoi(argv[i]));
+        if (k < 1) return 2;
+        inspect_boundary_delta_case(k, std::move(state));
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-landscape-census") {
         const int k = argc > 2 ? std::atoi(argv[2]) : 3;
         const std::uint64_t state_limit =

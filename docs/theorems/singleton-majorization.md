@@ -497,6 +497,78 @@ swap, chosen so that the transfer margin becomes positive.  The Tight Pascal-Ban
 the repeated internal rank needed for that compression; proving that it prevents the chain from
 ending in the interior is the unresolved step.
 
+#### Exact boundary-exchange calculus (2026-08-28)
+
+The local flip-or-swap target can be stated without any incidence choices.  Fix a feasible
+coloring `A/B`, put
+
+    r(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|),
+    slack(S)=r(S)-x(S),
+
+and write `h_s=H(s)-H(s-1)`, padded by zero.  If a row `v in B` is flipped to `A`, then for a set
+`S` containing `v`, with old color counts `(p,q)`,
+
+    r_new(S)-r(S)=h_(p+1)-h_q.                              (FX)
+
+Sets not containing `v` are unchanged.  Hence the flip is feasible for `x` exactly when
+
+    slack(S) >= h_q-h_(p+1)                                (FC)
+
+for every `S` containing `v`.  In particular, every failed `B->A` flip has an `A`-heavy blocker:
+the right side can be positive only across a drop of `h` with `q<=p`.
+
+For a swap `u in A`, `v in B`, sets containing both or neither row are unchanged.  Sets containing
+`v` but not `u` obey (FC), while sets containing `u` but not `v` require
+
+    slack(S) >= h_p-h_(q+1).                                (SC)
+
+Thus the two possible blocker families have opposite color imbalance.  In the Boolean-column
+model, the right sides of (FC) and (SC) count exactly the child columns whose capacities lie in
+the corresponding closed interval between the two color counts.
+
+Now let `S=X union Y` be a tight separator for a transfer from `i in A-X` to `j in Y subset B`.
+The Tight Pascal-Band Lemma gives `q>=p+2` and
+
+    h_(p+1)-h_q >= 2+h_(p+q)-h_(p+q+1) >= 2.                (CG)
+
+Any successful one-flip repair must therefore flip a row of `Y` from `B` to `A`.  Any successful
+one-swap repair must exchange a row of `Y` with a row of `A-X`.  Indeed, every other flip or swap
+leaves `r(S)` unchanged or decreases it, whereas the transferred demand on `S` is `x(S)+1`.
+Conversely, every such crossing move gains the amount in (CG) on this particular cut.  The only
+remaining issue is that it may expose an oppositely imbalanced blocker elsewhere.
+
+This reduces the proposed proof to a precise alternating-cut statement: starting from a
+`B`-heavy tight transfer cut, choose a crossing flip or swap; if it is blocked, follow its
+`A`-heavy certificate, then its next `B`-heavy certificate, and prove that the dyadic band strictly
+decreases before a cut can repeat.  The Pascal repeated-rank inequality (TB3) supplies at least two
+columns on the departing band.  What is not yet proved is that one of those copies forces strict
+descent rather than allowing the alternating certificate chain to return on a different row set.
+
+Standard delta-matroid exchange does not supply that termination.  The fixed-absolute coloring
+family is not even a delta-matroid in general for Pascal `H`.  At `K=3`, take
+
+    x=(3,2^11,1,1),
+
+index the width-three row by `0` and the first width-two rows by `1,2,...`, and let the `A`-sets be
+
+    P={0,1,2,3},             Q={1,2,3,4,5}.
+
+Both colorings are feasible.  For `e=0 in P triangle Q`, symmetric exchange permits only the flip
+`P triangle {0}` or the two swaps `P triangle {0,4}` and `P triangle {0,5}`.  The flip leaves only
+three `A` rows, so the full-set capacity is 26 below mass 27.  Either swap leaves the other side
+with mass 19, above its pure capacity `2H(10)=18`.  All three candidates are infeasible.  The
+expanded-coordinate theorem for jump systems remains valid; restricting each expanded block to
+be all-in or all-out is the step that destroys symmetric exchange.
+
+The exact diagnostic also rejects simpler ways of preselecting the crossing rows.  Through `K=3`,
+all 325 failed colorings whose recipient side is above its `2^(K-1)` row floor have a one-row
+repair, while the 23 failures at the floor need a swap.  In the first 5,000 `K=4` states, however,
+516 above-floor failures also need a swap.  Two natural closest-boundary swap prescriptions still
+miss 170 failed colorings in that window.  Therefore the live statement is existence of *some*
+crossing move, selected from the whole cut, not a fixed endpoint or closest-value rule.  The exact
+counterexamples and reproduction commands are in the
+[boundary-exchange record](../../evidence/singleton_boundary_exchange_2026-08-28.md).
+
 Fix a number of labelled parent rows.  Let `F_h` be the set of integer demand vectors that admit a
 legal allocation to left, mixed and right columns of capacities `h'`: a row uses a column at most
 once and may use `{left,mixed}` or `{mixed,right}`, but not both pure sides.  The maximum demand
