@@ -188,7 +188,7 @@ shows that every actual dangerous separator `(p,q)` saturates every dyadic child
 
 Thus every obstruction crosses a repeated internal Boolean rank; this is now a theorem, not only
 the pattern seen in the 889 cases.  A fixed-color tight cut cannot be crossed while preserving row
-orientations--that would contradict the Fixed-Color Hall Lemma.  The corrected target optimizes
+orientations--that would contradict the Fixed-Color Hall Lemma.  This stronger local route optimizes
 over feasible colorings of the original state and uses a global color-exchange augmenting chain to
 raise the separating margin.  After quotienting equal-row identities and global side
 complementation, every failed coloring in the exact `K<=3` landscape and the first 10,000 `K=4`
@@ -202,11 +202,11 @@ rank from the Tight Pascal-Band Lemma compresses an ambient unit-exchange chain 
 or swap that makes the transfer margin positive.  The Boolean labels alone do not supply that
 exchange, and nested/laminar supports are false already at `K=3`.  The fixed-absolute coloring
 family itself is not a delta-matroid: `(3,2^11,1,1)@3` has an explicit symmetric-exchange failure.
-Use the exact boundary calculus instead.  Strict descent of the dyadic band is false:
+Use the exact boundary calculus only as an optional stronger route.  Strict descent of the dyadic band is false:
 `(3,2^11,1,1)@3` has a crossing-swap blocker with exactly the target band.  The dangerous tight
 sets form a lattice; write `C` for their intersection and `U` for their union.  For each opposite-
 color row `v in C`, provisionally flip it and intersect all sets that then violate the original
-demand.  Prove the **Core--Blocker Escape Lemma**: some flip is feasible, or one such blocker
+demand.  The **Core--Blocker Escape Lemma** conjectures that some flip is feasible, or one such blocker
 intersection contains a smaller returning row `u in A-U`.  The swap `u<->v` is then feasible for
 both the original and transferred demand.  Positivity supplies an important exact simplification:
 a set containing `u` but not `v` cannot block, because its post-swap rank is the old rank of
@@ -224,6 +224,40 @@ support the statement.  This is evidence, not the missing existence proof.  Row-
 two rules that preselect `v` from one separator have `K=4` counterexamples; closest-smaller `u` is
 canonical only after the global core scan.  Exact formulas and counterexamples are in the
 [boundary-exchange record](../evidence/singleton_boundary_exchange_2026-08-28.md).
+
+Do not treat that staircase as the unique remaining proof obligation.  The quantifiers strengthen
+at each step: the exact Row-Coloring/no-holes statement permits an arbitrary construction for each
+state; global transfer closure permits an arbitrary new coloring at the next state; Adjacent-Fiber
+requires a common coloring; Core--Blocker Escape requires a nearby common coloring from every
+failed one.  No reverse implication to either local statement is proved.
+
+Return first to the equivalent **Balanced Pascal Realization Lemma** in the
+[theorem note](theorems/singleton-majorization.md#an-equivalent-balanced-column-realization).
+For `c=G_(K-1)'`, Gale--Ryser supplies a `0`--`1` matrix with row degrees `x` and paired column
+degrees `(2c_t,c_t)`.  Choose the realization so that all degree-`2c_t` neighborhoods admit one
+common bisection into `c_t+c_t`.  Pairing opposite sides inside each doubled column turns them into
+prescribed-size matchings; the exact task is to choose degree-preserving switches and pairings so
+their union is bipartite.  This puts the Pascal multiplicities into the construction from the
+start and allows a global change of realization.  A useful next lemma must either eliminate an odd
+cycle by switching among identical Pascal columns or turn a switch-minimal odd obstruction into a
+violated parent prefix.  Unlike Core--Blocker Escape, this would prove an equivalent statement,
+not a local strengthening.
+
+The first switch normalization is now proved.  Minimize the sum of squared doubled-column
+imbalances over all realizations and row colorings.  Two doubled columns of the same capacity then
+have imbalances differing by at most one; otherwise an opposite-color `2x2` incidence switch
+strictly improves the objective.  Across capacities `c,e`, their defects differ by at most
+`max(1,|c-e|)`, so every capacity class has one defect sign.  If a doubled column of degree `2c`
+has positive defect `d`, every
+single column of degree `c` has all of its `B` rows nested inside that doubled column and contains
+at least `d` `A` rows; reverse the colors for negative defect.  Work next at the level of the `K`
+power-of-two capacity classes, not individual failed colorings.  Whole-row optimality adds (BR3):
+the signed sum of incident defects is at most half the doubled incidence degree on an `A` row and
+at least its negative on a `B` row; summing gives `2 sum delta^2<=sum c`.  Combine these row bounds
+and forced nestings with
+multiplicities `binomial(K-1,j)` and try to derive either a cross-capacity improving switch or a
+violated parent prefix.  This is the smallest current obstruction on an equivalent global route.
+
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the
 [Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md); local landscape

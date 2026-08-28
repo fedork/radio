@@ -10897,7 +10897,7 @@ first miss is repaired, up to global side complementation, by swapping the marke
 with a larger opposite-side row.  The final 5,000-state run took 55 wall seconds at 0.01 GB peak
 RSS.  The exact identities, build and commands are in
 `evidence/singleton_boundary_exchange_2026-08-28.md`.  Do not add another endpoint or closest-value
-special case: the live target is existence over the whole crossing cut.
+special case: within the local-repair route, existence must range over the whole crossing cut.
 
 ## 2026-08-28 -- same-band blockers refute descent; positive crossing gives a monotone target
 
@@ -10953,7 +10953,7 @@ also feasible for the transferred demand; unchanged tight dangerous sets are exc
 core/hull memberships, and the two changed directions have at least one unit of replacement slack
 or the Tight Pascal-Band gain.  Thus no repeated recoloring or alternating cut descent is needed.
 
-The exact remaining statement is the **Core--Blocker Escape Lemma**: for some `v in C intersection
+The resulting strong local statement is the **Core--Blocker Escape Lemma**: for some `v in C intersection
 B`, either its flip has no blocker, or `P_v-U` contains a smaller `A` row.  This is still open, but
 it is a strictly sharper global rule than positive crossing and has no arbitrary separator or
 preselected endpoint.  Uncrossing a dangerous tight set `S=X union Y` with a flip blocker
@@ -10986,7 +10986,7 @@ The upper sets are monotone in `v`.  For `x_v>=x_w`, any blocker for flipping `w
 flipping `v`, either unchanged when it already contains `v`, or by replacing `w` with `v`.  Its
 `A` part is unchanged, so `P_v intersection A` is contained in `P_w intersection A`.  Meanwhile
 `U intersection (A-{i})` is itself an upper set, and every strictly heavier `B` row above a member
-of the dangerous core is also in the core.  The missing lemma is therefore a one-dimensional
+of the dangerous core is also in the core.  The open local strengthening is therefore a one-dimensional
 staircase crossing: as `v` descends, the common blocker prefix grows and must cross the dangerous
 hull before the newly reached outside row becomes at least as large as `v`.  Candidate membership
 has the exact sorted-prefix test (ST2), so a contradiction proof can choose one violating `(a,b)`
@@ -11001,3 +11001,48 @@ is deterministic for seed `20260828` but neither the states, colorings nor pairs
 a 50-wall-second falsification probe, not a theorem.  Build
 `13b14aa1a44b8bacfcecf1574726543f5cafdc6d60709909257dd31a432b122a` and the capped command are in
 `evidence/singleton_boundary_exchange_2026-08-28.md`.
+
+## 2026-08-28 -- correction: the prefix staircase is a stronger route, not the remaining lemma
+
+The proof search had silently strengthened its quantifiers.  The Row-Coloring Lemma is equivalent
+to Pascal orthant saturation and, as a universal full-mass statement, to closure under unit
+Robin--Hood transfers with an arbitrarily rebuilt coloring.  Adjacent-Fiber additionally requires
+one coloring common to the two transfer endpoints.  Positive Crossing requires a monotone local
+move from every failed coloring, and Core--Blocker Escape requires an immediately common
+one-flip/one-swap neighbor.  The blocker-core and prefix-staircase deductions are correct
+conditional results, but proving them is not known to be necessary for Row-Coloring.  Calling Core
+Escape the sole remaining target was therefore an overstatement and risked another loop through
+increasingly strong coloring rules.
+
+The main global target is now recorded in an equivalent column form.  Write `c=G_(K-1)'`.
+Gale--Ryser realizes every full-mass `x<=_w G_K` by a `0`--`1` matrix whose columns have degrees
+`2c_t` and `c_t`.  A legal first cut is exactly a choice of such a realization plus one row
+bipartition that gives `c_t` rows of each color in every doubled column.  Pairing opposite colors
+inside each doubled column makes its incidences a matching; all doubled columns must have a
+bipartite union, while the single columns are unrestricted.  This Balanced Pascal Realization
+Lemma is exactly Row-Coloring, not a strengthening.  It also makes the intended role of repeated
+Pascal targets precise: degree-preserving switches may change the entire incidence realization
+and pairing, instead of repairing a prescribed coloring.
+
+The decisive reason for the correction is logical, not computational: the stronger quantifiers
+had never been derived from the exact statement.  A bounded scratch search over small generic
+bases did not find a separation, but that unretained diagnostic supplies neither a reverse
+implication nor evidence for the Pascal theorem.
+
+The balanced-column form also yields a proved global normalization.  Minimize the sum of squared
+color imbalances over all doubled columns, allowing both the incidence realization and row
+coloring to vary.  If two doubled columns of the same degree `2c` have defects differing by at
+least two, the larger-defect column has an `A` row absent from the other and the smaller-defect
+column has a `B` row absent from the first.  The resulting `2x2` incidence switch preserves all
+margins and strictly lowers the square sum.  Hence one capacity class has only two consecutive
+defect values and cannot contain both signs.  The same count across capacities `c,e` bounds the
+defect difference by `max(1,|c-e|)`.  If a doubled column has positive defect `d`, switching it
+against any single
+column of degree `c` shows that every `B` row of the single column must already lie in the doubled
+column; consequently the single column has at least `d` `A` rows.  Negative defect gives the
+color-reversed nesting.  Flipping a whole row in the same global optimum shows that an `A` row's
+incident defect sum is at most half its doubled-column degree, with the color-reversed lower bound
+for a `B` row.  Summing gives `2 sum delta^2<=sum c`.  This reduces a putative counterexample to
+coupled defects across the power-of-two capacity levels.  The missing step is to use their
+binomial multiplicities to force a
+cross-capacity switch or a violated parent prefix.

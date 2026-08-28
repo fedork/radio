@@ -617,10 +617,13 @@ would have been an old member of `D`, contradicting `v in C` or `u notin U`; and
 flip case is the same argument without `u`.  Thus the Core--Blocker Escape Lemma implies
 Adjacent-Fiber in one recoloring.
 
-This is now the sharpest constructive target: compute the dangerous tight-set lattice, scan its
+This is a sharp **local strengthening**: compute the dangerous tight-set lattice, scan its
 `B`-core, and either take a feasible flip or intersect that flip's blockers and take a smaller
 outside-`A` row.  It uses no alternation, endpoint special case, exchange cycle, or arbitrary
-separator.  Its existence is still unproved.  The finite evidence for the earlier maximum-gain
+separator.  Its existence is still unproved, and it is not the sole remaining obligation for the
+Row-Coloring Lemma: it asks every failed coloring for an immediately adjacent common coloring,
+whereas the exact global statement may recolor and rebuild the incidence realization arbitrarily.
+The finite evidence for the earlier maximum-gain
 rule also supports this stronger statement: every observed successful one-flip/one-swap neighbor
 must cross every member of `D`, hence has exactly the core/hull membership above.
 
@@ -664,12 +667,12 @@ Then `u in P_v` exactly when
         <= H(a+b)+H(a)+H(b)                                      (ST2)
 
 for every `(a,b)`.  These are precisely the provisional-flip inequalities on sets omitting `u`;
-all sets containing `u` are safe after the positive swap by the replacement argument.  Thus the
-remaining Pascal theorem can be attacked entirely with sorted prefixes: if every staircase step
+all sets containing `u` are safe after the positive swap by the replacement argument.  Thus this
+strong local conjecture can be attacked entirely with sorted prefixes: if every staircase step
 fails (ST2), choose one violating pair per step and use (TB3)/(CU) to sum them into a parent-prefix
 violation.  Arbitrary labelled blocker sets no longer need to be tracked.
 
-Uncrossing now has a quantitative form that exposes the remaining Pascal work.  Let
+Uncrossing now has a quantitative form that exposes the remaining work on that route.  Let
 `S=X union Y in D` have counts `(p,q)`, and let a blocker `T=P union Q in N_v` have old counts
 `(a,b)`, slack `delta`, and flip loss `L=h_b-h_(a+1)>delta`.  If `Delta` is the submodularity
 defect of `r` on `S,T`, tightness of `S` gives
@@ -1052,7 +1055,111 @@ In words, folding the integral signed Hall polyhedron creates no lattice holes. 
 can create holes, as the explicit counterexamples above demonstrate.  The complete `K<=4`
 census says that the Pascal folds have no holes at those levels.
 
-A still more concrete sufficient statement is the following global transfer lemma.  If
+### An equivalent balanced-column realization
+
+There is a second exact formulation in which the Pascal structure is present before any coloring
+is chosen.  Let `c=h'` be the conjugate child partition.  Pascal identity (D) says that the
+conjugate parent capacities consist, for every `c_t`, of one **doubled column** of degree `2c_t`
+and one **single column** of degree `c_t`.  For a full-mass demand `x`, Gale--Ryser gives
+
+    x <=_w G_K
+
+if and only if there is a `0`--`1` row/column incidence matrix with row degrees `x` and exactly
+those doubled and single column degrees.
+
+The Row-Coloring Lemma is equivalent to asking for such a matrix together with a coloring of its
+rows `A/B` for which every doubled column is perfectly balanced:
+
+    |N(D_t) intersection A|=|N(D_t) intersection B|=c_t.          (BR)
+
+Indeed, merge the left and right copies of child column `t` in any legal decomposition.  A row
+cannot use both pure children, so the merged column is still `0`--`1`; full mass makes its degree
+`2c_t`, the mixed column has degree `c_t`, and the row orientation gives (BR).  Conversely, split
+each doubled column according to the two row colors and retain each single column as the mixed
+copy.  Every resulting child column has degree `c_t`, and a row uses only its chosen pure side and
+the mixed side, so this is a legal decomposition.
+
+Equivalently, pair the `c_t` rows of one color in a doubled column with its `c_t` rows of the other
+color.  The doubled columns become matchings of prescribed sizes whose union is bipartite; the
+single columns are unrestricted subsets of the same prescribed sizes.  Thus the exact global
+problem is:
+
+> **Balanced Pascal Realization Lemma (open, equivalent form).** Every full-mass row-degree
+> sequence majorized by `G_K` has a realization by the doubled/single Pascal columns in which the
+> doubled-column neighborhoods admit the common exact bisection (BR).
+
+This formulation does not assume that a previously selected coloring can be repaired locally.
+It is therefore an exact restatement of the Row-Coloring Lemma, unlike the stronger local targets
+below.  A possible constructive proof would start with an arbitrary Gale--Ryser realization and
+use degree-preserving switches, while choosing the pairings inside identical doubled columns, to
+remove odd cycles from the union of the paired matchings.  What is missing is a Pascal-specific
+global switching argument; merely repairing one failed coloring is not logically necessary.
+
+The global switching space has an immediate normalization that the fixed-color route obscures.
+Among all incidence realizations with the prescribed margins and all row colorings, minimize
+
+    Phi=sum_(doubled D_t) delta_t^2,
+    delta_t=|N(D_t) intersection A|-c_t.
+
+For two doubled columns `D,E` of the same capacity `2c`, minimality gives
+
+    |delta_D-delta_E|<=1.                                      (BR1)
+
+Indeed, if `delta_D>=delta_E+2`, then `D` contains more `A` rows than `E`, while `E` contains
+more `B` rows than `D`.  Choose `u in A intersection (D-E)` and
+`v in B intersection (E-D)`, and interchange the two incidences.  This preserves every row and
+column degree, changes the two imbalances to `delta_D-1,delta_E+1`, and strictly decreases `Phi`.
+The reverse inequality is symmetric.
+
+The same argument across capacities gives the useful Lipschitz bound
+
+    |delta_D-delta_E|<=max(1,|c_D-c_E|).                         (BR1')
+
+For if, say, `delta_D-delta_E` exceeds both terms on the right, then
+`c_D+delta_D>c_E+delta_E` and `c_E-delta_E>c_D-delta_D`; the same opposite-color interchange
+exists and lowers `Phi`.  In particular, (BR1) means that one capacity class cannot contain both
+a positive and a negative defect: it has one sign, with zero possibly present at the boundary.
+
+There is also an exact doubled/single nesting consequence.  Let `D` have capacity `2c` and let
+`S` be any single column of the matching degree `c`.  If `delta_D=d>0`, then
+
+    N(S) intersection B subset N(D) intersection B,
+    |N(S) intersection A|>=d.                                  (BR2)
+
+The first inclusion fails exactly when there are
+`u in A intersection (D-S)` and `v in B intersection (S-D)`; the same incidence interchange
+reduces `d` and hence `Phi`.  Such a row `u` always exists because `D` contains `c+d>c=|S|`
+rows of color `A`.  The cardinality bound follows from the inclusion.  For `d<0`, the color-reversed
+statement holds: `N(S) intersection A subset N(D) intersection A` and
+`|N(S) intersection B|>=-d`.
+
+Finally, minimality under flipping one whole row couples the capacity classes.  If `p_u` is the
+number of doubled columns containing row `u`, then
+
+    2 sum_(D contains u) delta_D <= p_u,       u in A,
+    2 sum_(D contains u) delta_D >= -p_u,      u in B.           (BR3)
+
+For an `A` row, a flip changes each incident term from `delta_D^2` to
+`(delta_D-1)^2`; for a `B` row it changes it to `(delta_D+1)^2`.  Nonnegativity of those two
+changes is exactly (BR3).  Summing the first inequality over `A` rows and the second over `B` rows
+also gives the coarse global bound
+
+    2 sum_D delta_D^2 <= sum_D c_D.                             (BR4)
+
+Thus defects of one sign cannot simply accumulate independently across the Pascal levels; every
+row meeting them must receive compensating zero or opposite-sign incidences as prescribed by
+(BR3).
+
+Thus a switch-minimal counterexample cannot have unrelated defects in the many identical Pascal
+columns.  At each power-of-two capacity, all doubled-column imbalances take at most two consecutive
+values of one sign, capacity levels obey (BR1'), every nonzero value forces nesting against every
+single column at that capacity, and rows obey (BR3).  The
+remaining exact task on this route is to combine those per-capacity defects using the binomial
+multiplicities and show that either another switch exists or their aggregate violates a parent
+prefix inequality.  Unlike the Core--Blocker staircase, (BR1)--(BR2) were obtained by optimizing
+globally over realizations and colorings and therefore do not strengthen the desired conclusion.
+
+An equivalent transfer form of the same universal full-mass claim is the following.  If
 `x in M_h` and `x_i>=x_j+2`, then
 
     x-e_i+e_j in M_h,                                                        (T)
@@ -1060,6 +1167,12 @@ A still more concrete sufficient statement is the following global transfer lemm
 where the signed lift and its row coloring may change everywhere.  Starting from a permutation
 of `G_K`, repeated unit Robin-Hood transfers generate every full-mass integer vector majorized
 by `G_K`; (T) would therefore prove (F), and artificial unit rows handle smaller mass.
+
+As universal full-mass statements, (T) and (F) are equivalent: (F) immediately puts the more
+balanced neighbor back in `M_h`, while (T) reaches every dominated vector from `G_K`.  The next
+statement is different.  Requiring the two endpoints of every transfer to share one feasible
+coloring is a genuine strengthening of (T); no implication from global transfer closure to that
+common-fiber property has been proved.
 
 This is the precise global form of the bottom-up coin-transfer proposal.  In the column model,
 remove one incidence from donor row `i` and seek an alternating row/column path that installs it
