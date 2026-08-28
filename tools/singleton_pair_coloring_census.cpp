@@ -223,6 +223,194 @@ struct GeneralSearch {
     }
 };
 
+bool full_coloring_holds(const Hall &hall, const Coloring &coloring) {
+    return newest_inequalities_hold(hall, coloring, 0, 0);
+}
+
+bool remove_one(Sequence &values, int value) {
+    const auto found = std::find(values.begin(), values.end(), value);
+    if (found == values.end()) return false;
+    values.erase(found);
+    return true;
+}
+
+// For a fixed labelled Robin--Hood transfer, compute the minimum x-slack among row sets that
+// contain the recipient but not the donor.  The donor is normalized to color A.  All unmarked
+// zero rows can be omitted: adding one increases a row count without increasing demand, so it
+// cannot decrease Hall slack.  A zero recipient remains explicit through recipient_count=1.
+int separator_margin(const Hall &hall, const Coloring &coloring,
+                     int donor_value, int recipient_value, bool recipient_in_a) {
+    Sequence pool_a = coloring.a;
+    Sequence pool_b = coloring.b;
+    if (!remove_one(pool_a, donor_value)) {
+        std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR missing donor\n";
+        std::exit(1);
+    }
+    if (recipient_value > 0) {
+        Sequence &recipient_pool = recipient_in_a ? pool_a : pool_b;
+        if (!remove_one(recipient_pool, recipient_value)) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR missing recipient\n";
+            std::exit(1);
+        }
+    }
+
+    Sequence prefix_a(1, 0);
+    Sequence prefix_b(1, 0);
+    for (int value : pool_a) prefix_a.push_back(prefix_a.back() + value);
+    for (int value : pool_b) prefix_b.push_back(prefix_b.back() + value);
+
+    const int include_a = recipient_in_a ? 1 : 0;
+    const int include_b = recipient_in_a ? 0 : 1;
+    const int include_mass_a = recipient_in_a ? recipient_value : 0;
+    const int include_mass_b = recipient_in_a ? 0 : recipient_value;
+    int margin = std::numeric_limits<int>::max();
+    for (int p = include_a; p <= include_a + static_cast<int>(pool_a.size()); ++p) {
+        const int demand_a = include_mass_a + prefix_a[p - include_a];
+        for (int q = include_b; q <= include_b + static_cast<int>(pool_b.size()); ++q) {
+            const int demand_b = include_mass_b + prefix_b[q - include_b];
+            margin = std::min(margin, hall.capacity(p, q) - demand_a - demand_b);
+        }
+    }
+    return margin;
+}
+
+bool transferred_coloring_holds(const Hall &hall, const Coloring &coloring,
+                                int donor_value, int recipient_value,
+                                bool recipient_in_a) {
+    Sequence a = coloring.a;
+    Sequence b = coloring.b;
+    if (!remove_one(a, donor_value)) {
+        std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR missing transferred donor\n";
+        std::exit(1);
+    }
+    if (donor_value > 1) a.push_back(donor_value - 1);
+    Sequence &recipient_side = recipient_in_a ? a : b;
+    if (recipient_value > 0 && !remove_one(recipient_side, recipient_value)) {
+        std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR missing transferred recipient\n";
+        std::exit(1);
+    }
+    recipient_side.push_back(recipient_value + 1);
+    std::sort(a.begin(), a.end(), std::greater<int>());
+    std::sort(b.begin(), b.end(), std::greater<int>());
+
+    Coloring transferred;
+    for (int value : a) transferred.push_a(value);
+    for (int value : b) transferred.push_b(value);
+    return full_coloring_holds(hall, transferred);
+}
+
+// Enumerate every coloring up to permutations of unmarked equal rows.  Complementation is
+// normalized by forcing the labelled donor into A; the labelled recipient may use either side.
+// With stop_at_one=true the search is still an exact test of the Adjacent-Fiber Lemma, but it
+// stops once a common coloring (separator margin >=1) is found instead of maximizing larger
+// margins that are irrelevant to the lemma.
+struct AdjacentFiberSearch {
+    const Hall &hall;
+    std::vector<GeneralSearch::Block> blocks;
+    int donor_value;
+    int recipient_value;
+    bool stop_at_one;
+    int recipient_mode;
+    std::uint64_t nodes = 0;
+    std::uint64_t complete_colorings = 0;
+    int best_margin = std::numeric_limits<int>::min();
+    int best_same_margin = std::numeric_limits<int>::min();
+    int best_opposite_margin = std::numeric_limits<int>::min();
+    Coloring best_coloring;
+    bool best_recipient_in_a = false;
+
+    AdjacentFiberSearch(const Sequence &state, const Hall &h, int donor, int recipient,
+                        bool stop, int mode = -1)
+        : hall(h), donor_value(donor), recipient_value(recipient), stop_at_one(stop),
+          recipient_mode(mode) {
+        for (int value : state) {
+            if (blocks.empty() || blocks.back().value != value)
+                blocks.push_back({value, 1});
+            else
+                ++blocks.back().count;
+        }
+    }
+
+    bool finish(Coloring &current, bool recipient_in_a) {
+        ++complete_colorings;
+        const int margin = separator_margin(
+            hall, current, donor_value, recipient_value, recipient_in_a);
+        const bool transferred_legal = transferred_coloring_holds(
+            hall, current, donor_value, recipient_value, recipient_in_a);
+        if ((margin >= 1) != transferred_legal) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR margin mismatch"
+                      << " donor=" << donor_value
+                      << " recipient=" << recipient_value
+                      << " margin=" << margin << '\n';
+            std::exit(1);
+        }
+        if (margin > best_margin) {
+            best_margin = margin;
+            best_coloring = current;
+            best_recipient_in_a = recipient_in_a;
+        }
+        int &oriented_best = recipient_in_a ? best_same_margin : best_opposite_margin;
+        oriented_best = std::max(oriented_best, margin);
+        return stop_at_one && margin >= 1;
+    }
+
+    bool dfs(std::size_t block_index, Coloring &current, int recipient_color) {
+        ++nodes;
+        if (block_index == blocks.size()) {
+            if (recipient_color < 0) {
+                // The recipient is one of the padded zero rows, which was not present in blocks.
+                if (recipient_mode != 0 && finish(current, true)) return true;
+                return recipient_mode != 1 && finish(current, false);
+            }
+            return finish(current, recipient_color == 1);
+        }
+
+        const auto [value, count] = blocks[block_index];
+        const bool has_donor = value == donor_value;
+        const bool has_recipient = value == recipient_value;
+        const int ordinary_count = count - static_cast<int>(has_donor) -
+                                   static_cast<int>(has_recipient);
+        if (ordinary_count < 0 || (has_donor && has_recipient)) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR bad marked block\n";
+            std::exit(1);
+        }
+
+        const int first_recipient_choice = has_recipient && recipient_mode == 0 ? 1 : 0;
+        const int recipient_choice_end = has_recipient && recipient_mode == 1 ? 1 :
+                                         (has_recipient ? 2 : 1);
+        for (int recipient_choice = first_recipient_choice;
+             recipient_choice < recipient_choice_end; ++recipient_choice) {
+            // Try putting donor and recipient together first; it often certifies the transfer
+            // immediately, but both choices are searched when necessary.
+            const bool marked_recipient_in_a = has_recipient && recipient_choice == 0;
+            for (int ordinary_to_a = 0; ordinary_to_a <= ordinary_count; ++ordinary_to_a) {
+                const int to_a = ordinary_to_a + static_cast<int>(has_donor) +
+                                 static_cast<int>(marked_recipient_in_a);
+                const int to_b = ordinary_count - ordinary_to_a +
+                                 static_cast<int>(has_recipient &&
+                                                  !marked_recipient_in_a);
+                const int old_a = static_cast<int>(current.a.size());
+                const int old_b = static_cast<int>(current.b.size());
+                for (int i = 0; i < to_a; ++i) current.push_a(value);
+                for (int i = 0; i < to_b; ++i) current.push_b(value);
+                const bool legal = newest_inequalities_hold(hall, current, old_a, old_b);
+                const int next_recipient_color = has_recipient
+                    ? static_cast<int>(marked_recipient_in_a)
+                    : recipient_color;
+                if (legal && dfs(block_index + 1, current, next_recipient_color)) return true;
+                for (int i = 0; i < to_a; ++i) current.pop_a();
+                for (int i = 0; i < to_b; ++i) current.pop_b();
+            }
+        }
+        return false;
+    }
+
+    void run() {
+        Coloring current;
+        dfs(0, current, -1);
+    }
+};
+
 // A genuinely global candidate rule.  Ignore Hall feasibility at first and, among all
 // bipartitions having at least one full child-base worth of rows on each side, minimize the
 // final total-mass difference.  GlobalBalanceSearch asks whether at least one such optimum
@@ -655,6 +843,260 @@ struct Census {
                   << " nodes=" << max_general_search_nodes
                   << " A=" << show(worst_general_solution.a)
                   << " B=" << show(worst_general_solution.b) << '\n';
+    }
+};
+
+struct AdjacentFiberCensus {
+    int k;
+    Sequence parent;
+    Hall hall;
+    Sequence parent_prefix{0};
+    int total = 0;
+    std::uint64_t state_limit = 0;
+    bool exact_margins = false;
+    std::uint64_t states = 0;
+    std::uint64_t transfers = 0;
+    std::uint64_t common = 0;
+    std::uint64_t common_with_same_color = 0;
+    std::uint64_t nodes = 0;
+    std::uint64_t complete_colorings = 0;
+    int minimum_best_margin = std::numeric_limits<int>::max();
+    int maximum_best_margin = std::numeric_limits<int>::min();
+    std::vector<std::uint64_t> margin_counts;
+    Sequence worst_state;
+    int worst_donor = -1;
+    int worst_recipient = -1;
+    Coloring worst_coloring;
+    bool worst_recipient_in_a = false;
+    Sequence first_failure;
+    int first_failure_donor = -1;
+    int first_failure_recipient = -1;
+    int first_failure_margin = 0;
+    Sequence first_same_color_failure;
+    int first_same_color_donor = -1;
+    int first_same_color_recipient = -1;
+    int first_same_color_margin = 0;
+    Coloring first_same_color_opposite_certificate;
+
+    AdjacentFiberCensus(int level, std::uint64_t limit, bool exact)
+        : k(level), parent(singleton_base(level)), hall(singleton_base(level - 1)),
+          state_limit(limit), exact_margins(exact) {
+        for (int value : parent) {
+            total += value;
+            parent_prefix.push_back(total);
+        }
+        margin_counts.assign(2 * total + 3, 0);
+    }
+
+    int parent_H(int count) const {
+        return parent_prefix[std::min(count, static_cast<int>(parent.size()))];
+    }
+
+    Sequence transferred_state(const Sequence &state, int donor, int recipient) const {
+        Sequence result = state;
+        if (!remove_one(result, donor)) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR state donor\n";
+            std::exit(1);
+        }
+        result.push_back(donor - 1);
+        if (recipient > 0) {
+            if (!remove_one(result, recipient)) {
+                std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR state recipient\n";
+                std::exit(1);
+            }
+        }
+        result.push_back(recipient + 1);
+        std::sort(result.begin(), result.end(), std::greater<int>());
+        return result;
+    }
+
+    void verify_transferred_state(const Sequence &state, int donor, int recipient) const {
+        const Sequence result = transferred_state(state, donor, recipient);
+        int prefix = 0;
+        int mass = 0;
+        for (std::size_t i = 0; i < result.size(); ++i) {
+            prefix += result[i];
+            mass += result[i];
+            if (prefix > parent_H(static_cast<int>(i) + 1)) {
+                std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR transferred majorization\n";
+                std::exit(1);
+            }
+        }
+        if (mass != total) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR transferred mass\n";
+            std::exit(1);
+        }
+    }
+
+    void inspect_transfer(const Sequence &state, int donor, int recipient) {
+        ++transfers;
+        verify_transferred_state(state, donor, recipient);
+        int best_margin = std::numeric_limits<int>::min();
+        int best_same_margin = std::numeric_limits<int>::min();
+        Coloring best_coloring;
+        bool best_recipient_in_a = false;
+        if (exact_margins) {
+            AdjacentFiberSearch search(state, hall, donor, recipient, false);
+            search.run();
+            nodes += search.nodes;
+            complete_colorings += search.complete_colorings;
+            best_margin = search.best_margin;
+            best_same_margin = search.best_same_margin;
+            best_coloring = search.best_coloring;
+            best_recipient_in_a = search.best_recipient_in_a;
+        } else {
+            AdjacentFiberSearch same(state, hall, donor, recipient, true, 1);
+            same.run();
+            nodes += same.nodes;
+            complete_colorings += same.complete_colorings;
+            best_same_margin = same.best_margin;
+            if (same.best_margin >= 1) {
+                best_margin = same.best_margin;
+                best_coloring = same.best_coloring;
+                best_recipient_in_a = true;
+            } else {
+                // Same-color failure is rare.  Exhaust the opposite-color fiber so that the
+                // census measures its true best separator margin, rather than only existence.
+                AdjacentFiberSearch opposite(state, hall, donor, recipient, false, 0);
+                opposite.run();
+                nodes += opposite.nodes;
+                complete_colorings += opposite.complete_colorings;
+                if (same.best_margin >= opposite.best_margin) {
+                    best_margin = same.best_margin;
+                    best_coloring = same.best_coloring;
+                    best_recipient_in_a = true;
+                } else {
+                    best_margin = opposite.best_margin;
+                    best_coloring = opposite.best_coloring;
+                    best_recipient_in_a = false;
+                }
+            }
+        }
+        if (best_margin == std::numeric_limits<int>::min()) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR no feasible coloring"
+                      << " k=" << k << " state=" << show(state) << '\n';
+            std::exit(1);
+        }
+
+        const int recorded_margin = exact_margins
+            ? best_margin
+            : std::min(best_margin, 2);
+        if (recorded_margin < -total || recorded_margin > total + 1) {
+            std::cerr << "ADJACENT_FIBER_INTERNAL_ERROR margin range\n";
+            std::exit(1);
+        }
+        ++margin_counts[recorded_margin + total];
+        maximum_best_margin = std::max(maximum_best_margin, recorded_margin);
+        if (recorded_margin < minimum_best_margin) {
+            minimum_best_margin = recorded_margin;
+            worst_state = state;
+            worst_donor = donor;
+            worst_recipient = recipient;
+            worst_coloring = best_coloring;
+            worst_recipient_in_a = best_recipient_in_a;
+        }
+        if (best_same_margin >= 1) {
+            ++common_with_same_color;
+        } else if (first_same_color_failure.empty()) {
+            first_same_color_failure = state;
+            first_same_color_donor = donor;
+            first_same_color_recipient = recipient;
+            first_same_color_margin = best_same_margin;
+            if (best_margin >= 1 && !best_recipient_in_a)
+                first_same_color_opposite_certificate = best_coloring;
+        }
+        if (best_margin >= 1) {
+            ++common;
+        } else if (first_failure.empty()) {
+            first_failure = state;
+            first_failure_donor = donor;
+            first_failure_recipient = recipient;
+            first_failure_margin = best_margin;
+        }
+    }
+
+    void inspect(const Sequence &state) {
+        ++states;
+        std::vector<int> values;
+        for (int value : state)
+            if (values.empty() || values.back() != value) values.push_back(value);
+        for (int donor : values) {
+            if (donor < 2) continue;
+            for (int recipient : values) {
+                if (donor >= recipient + 2)
+                    inspect_transfer(state, donor, recipient);
+            }
+            if (static_cast<int>(state.size()) < total)
+                inspect_transfer(state, donor, 0);
+        }
+    }
+
+    bool limit_reached() const {
+        return state_limit != 0 && states >= state_limit;
+    }
+
+    void enumerate(int remaining, int maximum, Sequence &state) {
+        if (limit_reached()) return;
+        if (remaining == 0) {
+            inspect(state);
+            return;
+        }
+        const int used = total - remaining;
+        for (int value = std::min(maximum, remaining); value >= 1; --value) {
+            if (used + value > parent_H(static_cast<int>(state.size()) + 1)) continue;
+            state.push_back(value);
+            enumerate(remaining - value, value, state);
+            state.pop_back();
+            if (limit_reached()) return;
+        }
+    }
+
+    void run() {
+        Sequence state;
+        enumerate(total, parent.front(), state);
+        std::cout << "ADJACENT_FIBER_CENSUS k=" << k
+                  << " mode=" << (exact_margins ? "exact-margin" : "existence")
+                  << " complete=" << (state_limit == 0 ? "YES" : "NO")
+                  << " states=" << states
+                  << " transfers=" << transfers
+                  << " common=" << common
+                  << " same_color_certificates=" << common_with_same_color
+                  << " nodes=" << nodes
+                  << " complete_colorings=" << complete_colorings << '\n';
+        if (transfers == 0) return;
+        std::cout << "MARGIN_RANGE min=" << minimum_best_margin
+                  << " max=" << maximum_best_margin
+                  << " capped=" << (exact_margins ? "NO" : "YES") << '\n';
+        for (int margin = -total; margin <= total + 1; ++margin) {
+            const std::uint64_t count = margin_counts[margin + total];
+            if (count == 0) continue;
+            std::cout << "MARGIN margin=" << margin << " transfers=" << count << '\n';
+        }
+        std::cout << "WORST_ADJACENT_FIBER state=" << show(worst_state)
+                  << " donor=" << worst_donor
+                  << " recipient=" << worst_recipient
+                  << " margin=" << minimum_best_margin
+                  << " A=" << show(worst_coloring.a)
+                  << " B=" << show(worst_coloring.b)
+                  << " recipient_color=" << (worst_recipient_in_a ? 'A' : 'B') << '\n';
+        if (!first_failure.empty())
+            std::cout << "ADJACENT_FIBER_COUNTEREXAMPLE state=" << show(first_failure)
+                      << " donor=" << first_failure_donor
+                      << " recipient=" << first_failure_recipient
+                      << " best_margin=" << first_failure_margin << '\n';
+        if (!first_same_color_failure.empty())
+        {
+            std::cout << "SAME_COLOR_COUNTEREXAMPLE state=" << show(first_same_color_failure)
+                      << " donor=" << first_same_color_donor
+                      << " recipient=" << first_same_color_recipient
+                      << " best_same_margin=";
+            if (first_same_color_margin == std::numeric_limits<int>::min())
+                std::cout << "NO_FEASIBLE_SAME_COLORING";
+            else
+                std::cout << first_same_color_margin;
+            std::cout << " opposite_A=" << show(first_same_color_opposite_certificate.a)
+                      << " opposite_B=" << show(first_same_color_opposite_certificate.b) << '\n';
+        }
     }
 };
 
@@ -1324,6 +1766,20 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-census") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 3;
+        const std::uint64_t state_limit =
+            argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 0;
+        const bool exact_margins = argc > 4 && std::string(argv[4]) == "exact";
+        if (k < 1 || k > 4 || (argc > 4 && !exact_margins)) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --adjacent-fiber-census k [state-limit] [exact]\n";
+            return 2;
+        }
+        AdjacentFiberCensus census(k, state_limit, exact_margins);
+        census.run();
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--padded-alternation-counterexample") {
         check_padded_alternation_counterexample();
         return 0;

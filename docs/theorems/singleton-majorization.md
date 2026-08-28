@@ -698,6 +698,28 @@ maximizing the minimum separator slack and use bisubmodular uncrossing to recolo
 tight separator.  What is still missing is the Pascal-specific recoloring step that either raises
 that slack or turns the separator into a violated parent-rank inequality.
 
+An exact census now verifies this common-coloring statement for every full-mass state and every
+normalized donor-value/recipient-value transfer through `K=4`: all 141,690,676 `K=4` transfer
+types pass.  For `K<=3`, exhaustive maximization gives best separator margin at least two.  At
+`K=4` every transfer also has a certificate of margin at least two.  Transfers without a
+same-color certificate have their opposite-color fiber exhaustively maximized; ordinary
+same-color successes stop at their first certificate, so maxima above two are not claimed.  This
+is strong finite evidence, not the missing recoloring proof.
+
+The tempting stronger claim that donor and recipient can always share a color is false at `K=4`.
+For
+
+    x=(16,15,11,9,7,5,5,5,1^8),       donor=11, recipient=9,
+
+no feasible coloring puts the two marked rows together, while the opposite-color assignment
+
+    A=(15,11,5,5,1^4),       B=(16,9,7,5,1^4)
+
+is feasible before and after the transfer.  Thus a proof really must eliminate opposite-color
+tight separators rather than normalize them away.  Counts, exact search method, commands and
+provenance are in the
+[Adjacent-Fiber census record](../../evidence/singleton_adjacent_fiber_census_2026-08-27.md).
+
 Simple global scalar optimization is not a substitute for (F).  Requiring at least
 `2^(K-1)` rows of each color and then minimizing the final A/B mass difference passes every
 full-mass state through `K=3`, but fails already at `K=4`.  The first failure in descending

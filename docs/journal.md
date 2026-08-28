@@ -10682,3 +10682,31 @@ lower-support `K=4` states.  If
 global interval-discrepancy or augmenting-path statement; merely balancing the current prefix total
 cannot control all `D_p-D_q` simultaneously.  Do not spend further effort trying to prove (PA)
 from the Pascal formula.
+
+## 2026-08-27 -- global Adjacent-Fiber census passes through K=4
+
+The global transfer target survives a substantially stronger finite test.  A new exact mode marks
+a donor and recipient row, enumerates all feasible colorings up to permutations of unmarked equal
+rows, and computes the least Hall slack over sets containing the recipient but not the donor.  It
+also independently applies the transfer and checks that margin at least one is equivalent to Hall
+feasibility of the transferred coloring.
+
+Exact maximization at `K=1,2,3` covers respectively 1, 33 and 8,916 normalized transfer types; all
+pass, and the best separator margin is always at least two.  The complete `K=4` existence census
+covers all 5,997,038 full-mass states and 141,690,676 distinct state/donor-value/recipient-value
+transfers.  Every transfer has a common coloring with separator margin at least two.  The run
+visited 1,173,872,133 search nodes and completed in 353 wall seconds at reported peak RSS below
+0.01 GB under a 1,800-second/4-GB cap.
+
+The more tempting same-color statement is false.  Exactly 889 `K=4` transfer types require the
+opposite-color search.  The first is
+`(16,15,11,9,7,5,5,5,1^8)` with donor 11 and recipient 9: no feasible coloring puts those marked
+rows together, while `A=(15,11,5,5,1^4)`, `B=(16,9,7,5,1^4)` works before and after the transfer.
+Thus the opposite-color tight-separator case isolated by the proof reduction is already necessary
+at `K=4`; it cannot be normalized away.
+
+The final provenance build is
+`b3809eae9bc918025b7c01ac262fed43372ae50f78c581bfe20514bce5f63ece`.  All four raw outputs pass
+`tools/check_provenance.py`.  Full definitions, exact/capped distinctions and reproduction commands
+are in `evidence/singleton_adjacent_fiber_census_2026-08-27.md`.  This is exhaustive finite evidence,
+not a proof of the Pascal Adjacent-Fiber Lemma for arbitrary `K`.

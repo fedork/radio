@@ -171,6 +171,17 @@ Pascal/dyadic columns.  This formulation and the convex-hull equality are proved
 [theorem note](theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26);
 only the no-lattice-holes/transfer step remains open.
 
+The exact Adjacent-Fiber census now passes every one of 141,690,676 normalized transfers from all
+5,997,038 full-mass `K=4` states.  For `K<=3`, the globally optimal separator margin is always at
+least two, and every `K=4` transfer has a certificate of margin at least two.  Use this as evidence
+for the transfer target, not as a theorem.  The same-color
+strengthening is already false for 889 `K=4` transfer types, so the proof must handle a genuinely
+opposite-color tight separator.  The next useful theoretical step is to characterize the minimal
+separator exposed after maximizing its slack and show that Pascal-identical columns cross it; do
+not spend another census on a rule that fixes donor and recipient to one side.  Exact method and
+the first obstruction are in the
+[Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md).
+
 For a constructive attack, use the equivalent
 [padded pure-first formulation](theorems/singleton-majorization.md#padded-pure-first-allocation-2026-08-27):
 on `3^K` fixed labelled slots, place paired balanced supports for the two pure children so that the
