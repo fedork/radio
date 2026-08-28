@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <functional>
 #include <iostream>
+#include <map>
 #include <random>
 #include <limits>
 #include <string>
@@ -238,8 +239,18 @@ bool remove_one(Sequence &values, int value) {
 // contain the recipient but not the donor.  The donor is normalized to color A.  All unmarked
 // zero rows can be omitted: adding one increases a row count without increasing demand, so it
 // cannot decrease Hall slack.  A zero recipient remains explicit through recipient_count=1.
-int separator_margin(const Hall &hall, const Coloring &coloring,
-                     int donor_value, int recipient_value, bool recipient_in_a) {
+struct SeparatorWitness {
+    int margin = std::numeric_limits<int>::max();
+    int p = -1;
+    int q = -1;
+    int demand = 0;
+    int capacity = 0;
+    int minimizers = 0;
+};
+
+SeparatorWitness separator_witness(const Hall &hall, const Coloring &coloring,
+                                   int donor_value, int recipient_value,
+                                   bool recipient_in_a) {
     Sequence pool_a = coloring.a;
     Sequence pool_b = coloring.b;
     if (!remove_one(pool_a, donor_value)) {
@@ -263,15 +274,28 @@ int separator_margin(const Hall &hall, const Coloring &coloring,
     const int include_b = recipient_in_a ? 0 : 1;
     const int include_mass_a = recipient_in_a ? recipient_value : 0;
     const int include_mass_b = recipient_in_a ? 0 : recipient_value;
-    int margin = std::numeric_limits<int>::max();
+    SeparatorWitness witness;
     for (int p = include_a; p <= include_a + static_cast<int>(pool_a.size()); ++p) {
         const int demand_a = include_mass_a + prefix_a[p - include_a];
         for (int q = include_b; q <= include_b + static_cast<int>(pool_b.size()); ++q) {
             const int demand_b = include_mass_b + prefix_b[q - include_b];
-            margin = std::min(margin, hall.capacity(p, q) - demand_a - demand_b);
+            const int demand = demand_a + demand_b;
+            const int capacity = hall.capacity(p, q);
+            const int margin = capacity - demand;
+            if (margin < witness.margin) {
+                witness = {margin, p, q, demand, capacity, 1};
+            } else if (margin == witness.margin) {
+                ++witness.minimizers;
+            }
         }
     }
-    return margin;
+    return witness;
+}
+
+int separator_margin(const Hall &hall, const Coloring &coloring,
+                     int donor_value, int recipient_value, bool recipient_in_a) {
+    return separator_witness(
+        hall, coloring, donor_value, recipient_value, recipient_in_a).margin;
 }
 
 bool transferred_coloring_holds(const Hall &hall, const Coloring &coloring,
@@ -410,6 +434,65 @@ struct AdjacentFiberSearch {
         dfs(0, current, -1);
     }
 };
+
+void inspect_adjacent_fiber_case(int k, int donor, int recipient, Sequence state) {
+    const Sequence parent = singleton_base(k);
+    const Hall hall(singleton_base(k - 1));
+    std::sort(state.begin(), state.end(), std::greater<int>());
+    int total = 0;
+    int parent_total = 0;
+    int prefix = 0;
+    int parent_prefix = 0;
+    bool majorized = true;
+    for (int value : parent) parent_total += value;
+    for (std::size_t i = 0; i < state.size(); ++i) {
+        total += state[i];
+        prefix += state[i];
+        if (i < parent.size()) parent_prefix += parent[i];
+        if (prefix > (i < parent.size() ? parent_prefix : parent_total)) majorized = false;
+    }
+    if (total != parent_total || !majorized || donor < recipient + 2) {
+        std::cerr << "usage error: case must be full-mass, majorized, and a Robin--Hood pair\n";
+        std::exit(2);
+    }
+
+    AdjacentFiberSearch same(state, hall, donor, recipient, false, 1);
+    same.run();
+    AdjacentFiberSearch opposite(state, hall, donor, recipient, false, 0);
+    opposite.run();
+    std::cout << "ADJACENT_FIBER_CASE k=" << k
+              << " state=" << show(state)
+              << " donor=" << donor
+              << " recipient=" << recipient << '\n';
+    std::cout << "CASE_SAME best_margin=";
+    if (same.best_margin == std::numeric_limits<int>::min())
+        std::cout << "NO_FEASIBLE_COLORING";
+    else
+        std::cout << same.best_margin;
+    std::cout << " nodes=" << same.nodes
+              << " complete_colorings=" << same.complete_colorings;
+    if (same.best_margin != std::numeric_limits<int>::min())
+        std::cout << " A=" << show(same.best_coloring.a)
+                  << " B=" << show(same.best_coloring.b);
+    std::cout << '\n';
+    std::cout << "CASE_OPPOSITE best_margin=";
+    if (opposite.best_margin == std::numeric_limits<int>::min())
+        std::cout << "NO_FEASIBLE_COLORING";
+    else
+        std::cout << opposite.best_margin;
+    std::cout << " nodes=" << opposite.nodes
+              << " complete_colorings=" << opposite.complete_colorings;
+    if (opposite.best_margin != std::numeric_limits<int>::min()) {
+        const SeparatorWitness witness = separator_witness(
+            hall, opposite.best_coloring, donor, recipient, false);
+        std::cout << " cut_p=" << witness.p
+                  << " cut_q=" << witness.q
+                  << " minimizing_cuts=" << witness.minimizers
+                  << " A=" << show(opposite.best_coloring.a)
+                  << " B=" << show(opposite.best_coloring.b);
+    }
+    std::cout << '\n';
+}
 
 // A genuinely global candidate rule.  Ignore Hall feasibility at first and, among all
 // bipartitions having at least one full child-base worth of rows on each side, minimize the
@@ -877,6 +960,13 @@ struct AdjacentFiberCensus {
     int first_same_color_recipient = -1;
     int first_same_color_margin = 0;
     Coloring first_same_color_opposite_certificate;
+    std::uint64_t hard_transfers = 0;
+    std::uint64_t hard_no_feasible_same = 0;
+    std::map<int, std::uint64_t> hard_same_margin_counts;
+    std::map<int, std::uint64_t> hard_opposite_margin_counts;
+    std::map<std::pair<int, int>, std::uint64_t> hard_value_pair_counts;
+    std::map<std::pair<int, int>, std::uint64_t> hard_cut_counts;
+    std::map<int, std::uint64_t> hard_cut_multiplicity_counts;
 
     AdjacentFiberCensus(int level, std::uint64_t limit, bool exact)
         : k(level), parent(singleton_base(level)), hall(singleton_base(level - 1)),
@@ -997,13 +1087,41 @@ struct AdjacentFiberCensus {
         }
         if (best_same_margin >= 1) {
             ++common_with_same_color;
-        } else if (first_same_color_failure.empty()) {
-            first_same_color_failure = state;
-            first_same_color_donor = donor;
-            first_same_color_recipient = recipient;
-            first_same_color_margin = best_same_margin;
-            if (best_margin >= 1 && !best_recipient_in_a)
-                first_same_color_opposite_certificate = best_coloring;
+        } else {
+            ++hard_transfers;
+            if (best_same_margin == std::numeric_limits<int>::min())
+                ++hard_no_feasible_same;
+            ++hard_same_margin_counts[best_same_margin];
+            ++hard_opposite_margin_counts[best_margin];
+            ++hard_value_pair_counts[{donor, recipient}];
+            const SeparatorWitness witness = separator_witness(
+                hall, best_coloring, donor, recipient, best_recipient_in_a);
+            ++hard_cut_counts[{witness.p, witness.q}];
+            ++hard_cut_multiplicity_counts[witness.minimizers];
+            std::cout << "HARD_ADJACENT_FIBER state=" << show(state)
+                      << " donor=" << donor
+                      << " recipient=" << recipient
+                      << " best_same_margin=";
+            if (best_same_margin == std::numeric_limits<int>::min())
+                std::cout << "NO_FEASIBLE_SAME_COLORING";
+            else
+                std::cout << best_same_margin;
+            std::cout << " opposite_margin=" << best_margin
+                      << " cut_p=" << witness.p
+                      << " cut_q=" << witness.q
+                      << " cut_demand=" << witness.demand
+                      << " cut_capacity=" << witness.capacity
+                      << " minimizing_cuts=" << witness.minimizers
+                      << " A=" << show(best_coloring.a)
+                      << " B=" << show(best_coloring.b) << '\n';
+            if (first_same_color_failure.empty()) {
+                first_same_color_failure = state;
+                first_same_color_donor = donor;
+                first_same_color_recipient = recipient;
+                first_same_color_margin = best_same_margin;
+                if (best_margin >= 1 && !best_recipient_in_a)
+                    first_same_color_opposite_certificate = best_coloring;
+            }
         }
         if (best_margin >= 1) {
             ++common;
@@ -1096,6 +1214,32 @@ struct AdjacentFiberCensus {
                 std::cout << first_same_color_margin;
             std::cout << " opposite_A=" << show(first_same_color_opposite_certificate.a)
                       << " opposite_B=" << show(first_same_color_opposite_certificate.b) << '\n';
+        }
+        if (hard_transfers != 0) {
+            std::cout << "HARD_SUMMARY transfers=" << hard_transfers
+                      << " no_feasible_same=" << hard_no_feasible_same << '\n';
+            for (const auto &[margin, count] : hard_same_margin_counts) {
+                std::cout << "HARD_SAME_MARGIN margin=";
+                if (margin == std::numeric_limits<int>::min())
+                    std::cout << "NO_FEASIBLE_SAME_COLORING";
+                else
+                    std::cout << margin;
+                std::cout << " transfers=" << count << '\n';
+            }
+            for (const auto &[margin, count] : hard_opposite_margin_counts)
+                std::cout << "HARD_OPPOSITE_MARGIN margin=" << margin
+                          << " transfers=" << count << '\n';
+            for (const auto &[values, count] : hard_value_pair_counts)
+                std::cout << "HARD_VALUE_PAIR donor=" << values.first
+                          << " recipient=" << values.second
+                          << " transfers=" << count << '\n';
+            for (const auto &[cut, count] : hard_cut_counts)
+                std::cout << "HARD_CUT p=" << cut.first
+                          << " q=" << cut.second
+                          << " certificates=" << count << '\n';
+            for (const auto &[multiplicity, count] : hard_cut_multiplicity_counts)
+                std::cout << "HARD_CUT_MULTIPLICITY minimizing_cuts=" << multiplicity
+                          << " certificates=" << count << '\n';
         }
     }
 };
@@ -1766,6 +1910,21 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-case") {
+        if (argc < 6) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --adjacent-fiber-case k donor recipient value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int donor = std::atoi(argv[3]);
+        const int recipient = std::atoi(argv[4]);
+        Sequence state;
+        for (int i = 5; i < argc; ++i) state.push_back(std::atoi(argv[i]));
+        if (k < 1) return 2;
+        inspect_adjacent_fiber_case(k, donor, recipient, std::move(state));
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-census") {
         const int k = argc > 2 ? std::atoi(argv[2]) : 3;
         const std::uint64_t state_limit =

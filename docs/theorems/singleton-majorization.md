@@ -720,6 +720,38 @@ tight separators rather than normalize them away.  Counts, exact search method, 
 provenance are in the
 [Adjacent-Fiber census record](../../evidence/singleton_adjacent_fiber_census_2026-08-27.md).
 
+The 889 exceptional `K=4` transfers are one family, not unrelated pathologies: they are exactly
+the states `(16,15,11,9,lambda)` with donor 11, recipient 9 and a majorized tail of mass 30.  The
+first four rows alone make a same-color assignment impossible.  Rows 16 and 15 must be opposite by
+the pure `(2,0)` inequality; if 11 and 9 were together, the four rows would have color counts
+`(3,1)` and demand 51 against capacity 49.  The exact opposite-color optimum is two in every case;
+the selected optimal certificate always has unique minimizing cardinalities `(1,2)`.
+
+This obstruction and its repair persist uniformly.  Put `U=2^(K-1)`, `M=3^(K-1)` and
+`d=2U-K-1`.  For every `K>=4` and
+
+    2U-2K+1 <= r <= 2U-K-3,
+
+the full-mass state `(2U,2U-1,d,r,1^T)` is majorized by `G_K`, but no feasible coloring puts the
+marked `d,r` rows together.  There are `K-3` choices of `r`.  A common crossing coloring has
+`2U-1,d` on one side and `2U,r` on the other.  Its nonunit left/mixed/right allocations are
+
+    2U-1 -> (U, U-1, 0),       d -> (U-1, U-K, 0),
+    2U   -> (0, U, U),         r -> (0, r-U+1, U-1),
+
+with unit rows filling each child to mass `M`.  The mixed child fits under the canonical prefix
+`(U,U-1,U-K,U-K)`.  After one transfer, replace its last two displayed contributions by
+`U-K-1,r-U+2`; they still fit under the identical pair `U-K,U-K`.  Indeed the same construction
+supports every intermediate transfer, and its separator margin is exactly `d-r`.
+
+This proves one genuine Pascal separator crossing with no cyclic reassignment: an identical pair
+at the first obstructing Pascal plateau absorbs the unit.  It also suggests a sharper remaining
+lemma.  Starting from a minimal opposite-color tight separator, descend through the dyadic/Pascal
+capacity blocks until reaching the first plateau with an unused identical target, reroute the unit
+inside that plateau, and propagate the displacement back along the block chain.  A proof must show
+that failure at every plateau sums to a violated parent prefix.  The explicit family proves the
+local reroute, but the global termination/violation alternative is still open.
+
 Simple global scalar optimization is not a substitute for (F).  Requiring at least
 `2^(K-1)` rows of each color and then minimizing the final A/B mass difference passes every
 full-mass state through `K=3`, but fails already at `K=4`.  The first failure in descending

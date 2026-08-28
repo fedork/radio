@@ -10710,3 +10710,47 @@ The final provenance build is
 `tools/check_provenance.py`.  Full definitions, exact/capped distinctions and reproduction commands
 are in `evidence/singleton_adjacent_fiber_census_2026-08-27.md`.  This is exhaustive finite evidence,
 not a proof of the Pascal Adjacent-Fiber Lemma for arbitrary `K`.
+
+## 2026-08-27 -- hard transfer fibers collapse to one Pascal crossing family
+
+A diagnostic rerun exhaustively maximized and recorded all 889 `K=4` transfers lacking a
+same-color certificate.  They are exactly the states `(16,15,11,9,lambda)`, with donor 11,
+recipient 9 and a majorized tail partition of mass 30.  Conversely all 889 admissible tails occur.
+Every same-color fiber is empty; every exact opposite-color optimum is two; and every selected
+optimum has the unique minimizing cut `(p,q)=(1,2)`, demand 40 and capacity 42.  The complete rerun
+used 1,173,872,133 nodes and 358 wall seconds under the 1,800-second/4-GB cap.  Provenance build:
+`fdb42be9f6e301adb279582600397400fbee9a6648dd24a0de5b3355b620e415`.
+
+The classification has a two-line explanation.  The rows 16 and 15 must be opposite because their
+sum exceeds the pure two-row capacity 30.  If marked rows 11 and 9 were together, one of 16 and 15
+would join them, producing a `(3,1)` demand of 51 against capacity 49.  Thus the hard search did
+not expose 889 different global phenomena; it exposed one four-row obstruction with arbitrary
+admissible tail.
+
+The obstruction persists and its crossing repair can be proved for all levels.  Put
+`U=2^(K-1)`, `M=3^(K-1)`, `d=2U-K-1`.  For each of the `K-3` integers
+`2U-2K+1<=r<=2U-K-3`, the full-mass state `(2U,2U-1,d,r,1^T)` is majorized by `G_K`, but the same
+two Hall inequalities forbid coloring `d,r` together.  Color `2U-1,d` against `2U,r` and allocate
+
+    2U-1 -> (U,U-1,0),       d -> (U-1,U-K,0),
+    2U   -> (0,U,U),         r -> (0,r-U+1,U-1).
+
+Unit rows fill all three children to mass `M`.  Their nonunit prefixes lie under
+`(U,U-1,U-K,U-K)`.  After transferring one unit, replace the two mixed contributions
+`U-K,r-U+1` by `U-K-1,r-U+2`; both still fit beneath the identical pair.  The same argument handles
+all intermediate transfers, and the `(1,2)` cut proves that its exact margin is `d-r`.
+
+This is the first uniform, non-search Pascal separator crossing and directly realizes the proposed
+“multiple identical targets” mechanism without a cyclic reassignment.  It does not finish the
+Adjacent-Fiber Lemma.  The remaining global obligation is now sharper: show that a minimal
+opposite-color tight separator can be followed down the dyadic/Pascal blocks until an identical
+target pair performs this local reroute, or else combine the blocking plateaus into a violated
+parent prefix.  Ordinary jump-system exchange only chooses some donor for an augmentation; after
+the absolute-value fold it does not force the specified donor, so the standard bisubmodular
+theorems do not supply this termination step.
+
+The diagnostic source also gained a provenance-checkable single-case mode.  Exact all-unit-tail
+probes at `K=5` (`26->24`, `26->23`) and `K=6` (`57->55`) agree with the formula; build
+`f18ca95eb7b7cd6df8d25df3d35594490dc9392193df3c98c8e5d976dc76dc88`.  These probes are checks,
+not premises of the proof.  Full details and reproduction metadata are in
+`evidence/singleton_adjacent_fiber_census_2026-08-27.md`.

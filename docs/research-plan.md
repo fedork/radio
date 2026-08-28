@@ -177,9 +177,14 @@ least two, and every `K=4` transfer has a certificate of margin at least two.  U
 for the transfer target, not as a theorem.  The same-color
 strengthening is already false for 889 `K=4` transfer types, so the proof must handle a genuinely
 opposite-color tight separator.  The next useful theoretical step is to characterize the minimal
-separator exposed after maximizing its slack and show that Pascal-identical columns cross it; do
-not spend another census on a rule that fixes donor and recipient to one side.  Exact method and
-the first obstruction are in the
+separator exposed after maximizing its slack and show that Pascal-identical columns cross it.  The
+889 cases are now exactly one four-row family, and its `K-3`-member continuation at every `K>=4`
+has an explicit common crossing allocation: two mixed contributions move toward one another under
+the identical pair `U-K,U-K`, with exact separator margin equal to their original gap.  Generalize
+this proved local reroute into a block-descending augmenting path; the missing termination argument
+must turn failure at every Pascal plateau into a violated parent prefix.  Do not spend another
+census on a rule that fixes donor and recipient to one side.  Exact method, classification and the
+uniform construction are in the
 [Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md).
 
 For a constructive attack, use the equivalent

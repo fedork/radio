@@ -72,6 +72,91 @@ leave the same-color fiber before finding a certificate.  This rules out the sho
 choose a feasible coloring that keeps donor and recipient together”; genuine opposite-color
 separator elimination is already necessary at `K=4`.
 
+The diagnostic rerun classifies all 889, not merely the first one.  Every hard transfer has
+
+    x=(16,15,11,9,lambda),       donor=11, recipient=9,
+
+where `lambda` is a partition of 30 and the displayed full sequence is majorized by `G_4`.
+Conversely every such tail occurs.  Equivalently its tail prefixes obey
+
+    lambda_1+...+lambda_t <= (7,12,17,22,23,24,...,30)_t.
+
+There are exactly 889 such tails in the same partition enumeration used by the full census.  In
+all 889 cases the same-color fiber is empty, the exact opposite-color optimum is two, and the
+chosen optimum has a unique minimizing separator with `(p,q)=(1,2)`, demand 40 and capacity 42.
+The same-color obstruction already follows from the first four rows.  Rows 16 and 15 must have
+opposite colors because `16+15>2H(2)=30`.  If 11 and 9 had the same color, one of 16 and 15 would
+join them and the other would be alone, but the resulting `(3,1)` set has demand 51 and capacity
+
+    H(4)+H(3)+H(1)=22+19+8=49.
+
+Thus the exact computation exposes a single local obstruction family rather than 889 unrelated
+exceptions.
+
+## A proved obstruction-and-crossing family at every level
+
+The local pattern is not confined to `K=4`.  Put
+
+    U=2^(K-1),       M=3^(K-1),       d=2U-K-1,
+
+so the first four rows of `G_(K-1)` are `(U,U-1,U-K,U-K)`.  For every `K>=4` and
+
+    2U-2K+1 <= r <= 2U-K-3,
+
+consider the full-mass state
+
+    x=(2U,2U-1,d,r,1^T),
+    T=3M-(2U+(2U-1)+d+r),
+
+with transfer `d -> r`.  The interval contains exactly `K-3` integers.  The state is majorized by
+`G_K`: its first three prefixes equal the canonical ones, its fourth is no larger, and thereafter
+each added unit is covered by a remaining positive canonical row until the canonical mass
+saturates.
+
+No feasible coloring puts `d` and `r` together.  The top two rows must be opposite because
+
+    2U+(2U-1) > 2H(2)=4U-2.
+
+If `d,r` shared a color, the four top rows would have color counts `(3,1)`, while
+
+    2U+(2U-1)+d+r > H(4)+H(3)+H(1)=8U-3K-2
+
+is exactly the lower bound `r>2U-2K` above.
+
+Nevertheless one crossing coloring works before and after the transfer.  Color `2U-1,d` as `A`
+and `2U,r` as `B`.  Write `s=r-U+1`.  Allocate the four nonunit rows to left, mixed and right as
+
+    2U-1 -> (U, U-1, 0),
+    d    -> (U-1, U-K, 0),
+    2U   -> (0, U, U),
+    r    -> (0, s, U-1).
+
+Use `M-(2U-1)` unit rows in the left child, `M-2U+K-r` in the mixed child, and
+`M-(2U-1)` in the right child.  These counts are nonnegative and sum to `T`.  The three children
+have mass `M` and shapes
+
+    left  = (U,U-1,1,...,1),
+    mixed = (U,U-1,U-K,s,1,...,1),
+    right = (U,U-1,1,...,1).
+
+They are majorized by `G_(K-1)`: the displayed nonunit prefixes fit its first four rows, every
+remaining canonical row is at least one, and all three children have mass `M`.  After the transfer,
+keep the coloring and every allocation except replace the mixed contributions `U-K,s` by
+`U-K-1,s+1`.  Since `s<=U-K-2`, those two entries still fit under the identical pair
+`U-K,U-K`.  This proves a common coloring uniformly, with no search and no cyclic reassignment.
+
+More strongly, the same construction works for every intermediate transfer of at most `d-r`
+units: the two mixed contributions move toward one another underneath the identical pair.  Hence
+the separating margin is at least `d-r`; the set consisting of the largest unmarked `A` row and
+the largest two `B` rows has slack exactly
+
+    H(1)+H(2)+H(3)-((2U-1)+2U+r)=d-r.
+
+So the margin is exactly the donor-recipient gap.  This is a concrete Pascal augmenting step: the
+two identical `U-K` targets absorb the transfer.  What remains open is proving that every minimal
+opposite-color separator at an arbitrary Pascal level can be reduced to such a duplicated-block
+reroute.
+
 The complete `K=4` run visited 1,173,872,133 search nodes and 141,770,271 complete feasible
 colorings.  It completed in 353 wall seconds with reported peak RSS below 0.01 GB under
 `tools/capped_run.sh`.  It found no Adjacent-Fiber counterexample.
@@ -96,3 +181,12 @@ The provenance build is
 All four raw outputs pass `tools/check_provenance.py`.  The `K<=3` runs took less than one wall
 second together on the recorded M4 Pro.  The complete `K=4` wrapper exited zero rather than by its
 time or memory cap.
+
+The hard-family diagnostic build is
+`fdb42be9f6e301adb279582600397400fbee9a6648dd24a0de5b3355b620e415`.  Its complete `K=4`
+rerun took 358 wall seconds, printed all 889 hard records plus the aggregate classification above,
+and again visited 1,173,872,133 nodes.  The later single-case mode was built as
+`f18ca95eb7b7cd6df8d25df3d35594490dc9392193df3c98c8e5d976dc76dc88`; exact probes of the
+all-unit-tail family at `K=5` for `26->24` and `26->23`, and at `K=6` for `57->55`, agree with
+the proved formula.  Every retained local output passes `tools/check_provenance.py`.  These probes
+are checks of the algebraic construction, not evidence needed for its proof.
