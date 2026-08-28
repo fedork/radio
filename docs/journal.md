@@ -10771,3 +10771,37 @@ genuinely split rows is not refuted by this example.  `tools/singleton_shape_sur
 `--atom-{census,uniform}` and `--larger-atom-{census,uniform}` modes; final provenance build
 `2140914d270dd46b4698a9a8bf352df8bf28f57d2f9945915d67fed56e96acfe`.  The direct proof and
 reproduction lines are in `evidence/singleton_shape_survey_2026-08-27.md`.
+
+## 2026-08-28 -- Pascal-first tight bands isolate the remaining transfer step
+
+Writing the conjugate of `G_r` as Boolean-lattice columns makes the recursive structure exact:
+one column `T subset [r]` has capacity `c(T)=2^(r-|T|)`, and adjoining the first-test coordinate
+replaces it by a doubled pure column of capacity `2c(T)` and a mixed column of capacity `c(T)`.
+For a full-mass parent, Gale--Ryser saturates all these columns.  A legal first cut is therefore
+equivalent to one sign per row that bisects every doubled column; the only missing condition is
+global row-sign coherence.
+
+This viewpoint gives a general Tight Pascal-Band Lemma.  If a feasible coloring has an
+opposite-color tight Hall separator with `p` left-color and `q` right-color rows, then equality of
+the total Hall bound forces equality separately in every left, mixed and right child column.  If a
+Robin--Hood donor lies just outside the left part and the recipient lies inside the right part,
+the row-degree bounds imply
+
+    #{T:p<c(T)<q} >= 2 + #{T:c(T)=p+q}.
+
+Thus every genuine transfer obstruction crosses a repeated internal Pascal rank (for `r>=2`).
+This proves globally the duplicated-target phenomenon previously proved only for the 889 explicit
+`K=4` hard fibers.  It does not yet prove that an alternating path can use the duplicated rank.
+
+The exact remaining target is a Dyadic Plateau-Descent Lemma: switches at a crossed repeated rank
+either finish the transfer or expose a tight separator with a strictly narrower crossed band.
+Iteration would terminate because the tight-band inequality forbids an empty final band.  Boolean
+labels alone do not give the required shadow closure; it must follow from the actual stopped
+alternating paths.  A nested/laminar substitute is false already for
+`(8,7,4,1^8)<=_w G_3`: its forced doubled-support sizes `8,4,4,2` and pure coverage profiles
+`(4,4,4,1^6)` or `(4,4,3,1^7)` admit no laminar realization.  Crossing supports are essential.
+
+This pass also corrected a transcription error in two research notes:
+`G_3=(8,7,4,4,1,1,1,1)`, not `(8,7,4,3,2,1,1,1)`.  The canonical-atom counterexample remains
+valid, because `(8,7,4,2,2,2,1,1)` is majorized by the corrected sequence and its contradiction
+uses only the `G_2` child widths.

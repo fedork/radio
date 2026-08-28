@@ -168,7 +168,7 @@ both stop at the fourth descending state:
     SHAPE_SURVEY mode=larger-atom-census k=3 checked=4 nodes=31 max_nodes=9 result=FAIL state=(8,7,4,2,2,2,1,1)
 
 This failure has a direct proof, independent of the search.  The state is majorized by
-`G_3=(8,7,4,3,2,1,1,1)`.  The widths occurring in `G_2` are `{4,3,1}`.  The child width cap forces
+`G_3=(8,7,4,4,1,1,1,1)`.  The widths occurring in `G_2` are `{4,3,1}`.  The child width cap forces
 `8=4+4`; the atom rule and the cap make the mixed contribution from `7` at least three; and each
 of the three width-two rows must be `1+1`.  Every genuine split has one mixed piece, so those rows
 alone force mixed mass at least `4+3+1+1+1=10`, exceeding the branch mass `3^2=9`.

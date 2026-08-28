@@ -181,10 +181,18 @@ separator exposed after maximizing its slack and show that Pascal-identical colu
 889 cases are now exactly one four-row family, and its `K-3`-member continuation at every `K>=4`
 has an explicit common crossing allocation: two mixed contributions move toward one another under
 the identical pair `U-K,U-K`, with exact separator margin equal to their original gap.  Generalize
-this proved local reroute into a block-descending augmenting path; the missing termination argument
-must turn failure at every Pascal plateau into a violated parent prefix.  Do not spend another
-census on a rule that fixes donor and recipient to one side.  Exact method, classification and the
-uniform construction are in the
+this proved local reroute into a block-descending augmenting path.  The new Tight Pascal-Band Lemma
+shows that every actual dangerous separator `(p,q)` saturates every dyadic child column and obeys
+
+`#{T:p<c(T)<q} >= 2 + #{T:c(T)=p+q}`.
+
+Thus every obstruction crosses a repeated internal Boolean rank; this is now a theorem, not only
+the pattern seen in the 889 cases.  The next proof obligation is the Dyadic Plateau-Descent Lemma:
+alternating switches at such a rank either route the transfer or expose a separator with a strictly
+smaller crossed band.  Derive the required shadow closure from the actual alternating paths--the
+Boolean labels alone do not supply it, and nested/laminar supports are false already at `K=3`.
+Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
+classification and the uniform construction are in the
 [Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md).
 
 For a constructive attack, use the equivalent

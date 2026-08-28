@@ -344,6 +344,107 @@ Thus every child column has power-of-two capacity, with multiplicities given by 
 triangle.  This gives a precise way to formulate the proposed “many identical transfer targets”
 idea.
 
+#### Pascal-first Boolean columns and a tight-band lemma (2026-08-28)
+
+The multiplicities in (D) can be given canonical labels instead of being treated as anonymous
+copies.  Index the columns of `(G_r)'` by the Boolean lattice `2^[r]`, with
+
+    c(T)=2^(r-|T|),                 T subset [r].
+
+There are `binomial(r,j)` sets of rank `j`, so this is exactly the conjugate partition above.
+After adjoining a new first-test coordinate `*`, every child column `T subset [r]` gives the two
+parent columns
+
+    T                 of capacity 2c(T),
+    T union {*}       of capacity  c(T).
+
+The first is the doubled pure column and the second is the mixed column.  Thus Pascal's identity
+is built into the first split: parent columns omitting `*` divide into equal left/right halves,
+while columns containing `*` become the mixed child.
+
+For a full-mass demand vector `a<=_w G_(r+1)`, Gale--Ryser gives a saturated simple incidence
+matrix from rows to these parent columns.  A legal first cut is equivalent to choosing such a
+matrix together with one sign for every row so that, in every doubled column `T`, at most `c(T)`
+incident rows have either sign.  Saturation then makes the split exactly `c(T)+c(T)`; the single
+column `T union {*}` supplies the mixed incidence.  Conversely, combine the paired pure columns
+of any legal cut and retain its mixed columns.  This proves the Boolean-column formulation without
+using the open converse.  The unresolved content is the **row coherence**: one sign must serve all
+doubled-column incidences of a row.
+
+This formulation exposes more structure in a tight Hall separator.  Put `h=G_r`, let `H` be its
+saturated prefix function, and fix a coherent allocation for a feasible coloring `A/B`.  Suppose
+`X subset A`, `Y subset B` is tight, and write
+
+    p=|X|,       q=|Y|,       t=p+q,
+    a(X union Y)=H(p)+H(q)+H(t).                              (TB1)
+
+> **Tight Pascal-Band Lemma.** In every child column `T` of capacity `c=c(T)`, the tight set uses
+> exactly `min(p,c)` left incidences, `min(t,c)` mixed incidences, and `min(q,c)` right
+> incidences.  Consequently every row of `X` has degree at least `h_p+h_t`, every row of `Y` has
+> degree at least `h_q+h_t`, every row of `A-X` has degree at most `h_(p+1)+h_(t+1)`, and every
+> row of `B-Y` has degree at most `h_(q+1)+h_(t+1)`.
+
+Indeed, each displayed per-column count is an upper bound.  Their sum over all columns is the
+right side of (TB1), so equality of the total forces equality in every column separately.  If
+`c>=p`, all `p` rows of `X` therefore use the left column; if `c<=p`, that column is filled by
+`X` and is unavailable outside it.  The number of child columns with `c>=s` is `h_s`, with
+`h_s=0` beyond the padded length of `h`.  Applying
+the same argument to the mixed and right columns gives all four degree bounds.
+
+Now consider a Robin--Hood transfer from a donor `i in A-X` to a recipient `j in Y`, with
+`a_i>=a_j+2`.  The bounds imply
+
+    h_(p+1)-h_q >= 2 + h_t-h_(t+1).                           (TB2)
+
+For the Pascal columns this has the exact interpretation
+
+    #{T : p<c(T)<q} >= 2 + #{T : c(T)=t}.                    (TB3)
+
+Thus a dangerous opposite-color tight separator necessarily has `q>=p+2` and crosses at least
+two child columns in the open count interval `(p,q)`.  For `r>=2`, that band contains an internal
+power-of-two capacity with repeated binomial multiplicity; the only multiplicity-one capacities
+are the two extreme Boolean ranks, and they cannot supply (TB3) by themselves.  The symmetric
+statement holds when the donor is in `B-Y` and the recipient in `X`.
+
+This is the first general reason that duplicated Pascal targets must occur at every genuine
+transfer obstruction.  It is stronger than the generic observation that an opposite-color tight
+set is the only obstruction: the set saturates the whole dyadic hierarchy term by term, and the
+donor-recipient gap forces a nontrivial repeated rank between its two color counts.
+
+The Boolean labels do **not** finish the proof by themselves.  Static Hall capacity has already
+summed over all equal columns, so an arbitrary stopped search need not be closed under Boolean
+shadows.  Nor can one demand nested or laminar doubled supports.  At `K=3`, the legal state
+`(8,7,4,1^8)` forces combined pure-degree profile `(4,4,4,1^6)` or `(4,4,3,1^7)` for doubled
+support sizes `8,4,4,2`.  A laminar family cannot realize the first profile because its size-two
+member contains at most two points common to all four supports.  For the second, the two
+degree-four points force the size-two support into both size-four supports; laminarity makes those
+equal, giving at least four points of degree at least three instead of three.  Crossing supports
+are already essential at this smallest nontrivial level.
+
+The sharpened Pascal-first target is therefore a **Dyadic Plateau-Descent Lemma**.  Begin with the
+min-cut/tight set exposed by a failed fixed-color transfer.  Choose a repeated Boolean rank in the
+band `(p,q)` guaranteed by (TB3), and run incidence switches through the paired pure and mixed
+columns of that rank.  The desired dichotomy is:
+
+1. the switches complete the transfer while preserving every row's orientation; or
+2. all copies at that rank are blocked, and their blocking rows expose another tight separator
+   whose crossed dyadic band is strictly smaller.
+
+At the incidence level a basic orientation-crossing reroute has a concrete three-vacancy form.
+Remove the donor's incidence from a left pure column, move an `A`-row incidence from a mixed column
+into that left vacancy, move a `B`-row incidence from a right pure column into the mixed vacancy,
+and place the recipient into the right vacancy.  The two bridge-row degrees and all final column
+sums are preserved.  A longer augmenting path repeats these row/column switches, possibly across
+several equal columns and dyadic ranks.  Tightness explains exactly why the short path can be blocked;
+the descent lemma must show that complete blockage propagates to a strictly narrower band rather
+than ending in place.
+
+Iterating the second outcome would terminate, while (TB3) says that a final dangerous band cannot
+be empty.  Proving the dichotomy is now the precise missing step.  In Boolean-lattice language it
+amounts to showing that a family of blocked switches has enough shadow closure for Pascal's
+rank-matching inequalities to apply.  That closure must be derived from the alternating-path
+rules; it cannot be assumed merely because the equal columns have been labelled by subsets.
+
 Fix a number of labelled parent rows.  Let `F_h` be the set of integer demand vectors that admit a
 legal allocation to left, mixed and right columns of capacities `h'`: a row uses a column at most
 once and may use `{left,mixed}` or `{mixed,right}`, but not both pure sides.  The maximum demand
@@ -594,7 +695,7 @@ A tempting local strengthening is already false.  Call a positive piece an **ato
 when its width occurs as a row width of `G_(K-1)`, and require every parent row's one- or
 two-piece image under the first cut to contain one.  At `K=3`,
 
-    a=(8,7,4,2,2,2,1,1) <=_w G_3=(8,7,4,3,2,1,1,1)
+    a=(8,7,4,2,2,2,1,1) <=_w G_3=(8,7,4,4,1,1,1,1)
 
 is a counterexample.  The child atom widths are `{4,3,1}`.  The rows `8` and `7` must contribute
 at least `4` and `3` respectively to the mixed child, while each of the three rows of width `2`
