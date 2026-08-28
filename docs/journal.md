@@ -11037,12 +11037,27 @@ column has a `B` row absent from the first.  The resulting `2x2` incidence switc
 margins and strictly lowers the square sum.  Hence one capacity class has only two consecutive
 defect values and cannot contain both signs.  The same count across capacities `c,e` bounds the
 defect difference by `max(1,|c-e|)`.  If a doubled column has positive defect `d`, switching it
-against any single
-column of degree `c` shows that every `B` row of the single column must already lie in the doubled
+against any single column of degree `c` shows that every `B` row of the single column must already lie in the doubled
 column; consequently the single column has at least `d` `A` rows.  Negative defect gives the
 color-reversed nesting.  Flipping a whole row in the same global optimum shows that an `A` row's
 incident defect sum is at most half its doubled-column degree, with the color-reversed lower bound
 for a `B` row.  Summing gives `2 sum delta^2<=sum c`.  This reduces a putative counterexample to
 coupled defects across the power-of-two capacity levels.  The missing step is to use their
-binomial multiplicities to force a
-cross-capacity switch or a violated parent prefix.
+binomial multiplicities to force a cross-capacity switch or a violated parent prefix.
+
+The doubled/single labels themselves should also be optimized.  At parent rank `ell`, there are
+`binomial(K,ell)` columns of the identical degree `2^(K-ell)`.  Pascal identity requires only
+`binomial(K-1,ell)` of them to be designated doubled and exactly balanced; the remaining
+`binomial(K-1,ell-1)` may be unrestricted single columns.  This gives the equivalent Binomial
+Balanced-Columns formulation.  In a minimum-square realization, the doubled labels therefore sit
+on the columns closest to half-and-half inside each degree pool: otherwise exchanging a doubled
+label with an unrestricted label of the same actual degree lowers the objective without changing
+one incidence.  Hence, if a rank misses its balance quota, every unrestricted column in that pool
+is unbalanced too.  This is the exact global use of the multiple identical Pascal targets that was
+lost when the local proof fixed a coloring and its child labels first.
+
+The boundary ranks do not obstruct this program.  Full mass forces at least `2^K` positive rows.
+Connect the unique degree-`2^K` column to the largest `2^K` residual degrees using the Ryser
+reduction, then color half of that neighborhood on each side; the remaining margins stay
+realizable.  The top quota is therefore exact, while the degree-one rank has quota zero.  Any
+rank-lexicographically first failure must be one of the internal Pascal levels.

@@ -244,7 +244,10 @@ violated parent prefix.  Unlike Core--Blocker Escape, this would prove an equiva
 not a local strengthening.
 
 The first switch normalization is now proved.  Minimize the sum of squared doubled-column
-imbalances over all realizations and row colorings.  Two doubled columns of the same capacity then
+imbalances over all realizations, row colorings, and doubled/single labels.  At parent rank `ell`,
+there are `binomial(K,ell)` identical columns and only `binomial(K-1,ell)` need balance; the other
+`binomial(K-1,ell-1)` may be declared single.  Therefore the selected doubled columns are exactly
+those closest to half-and-half in their degree pool (BR0).  Two doubled columns of the same capacity then
 have imbalances differing by at most one; otherwise an opposite-color `2x2` incidence switch
 strictly improves the objective.  Across capacities `c,e`, their defects differ by at most
 `max(1,|c-e|)`, so every capacity class has one defect sign.  If a doubled column of degree `2c`
@@ -257,6 +260,10 @@ at least its negative on a `B` row; summing gives `2 sum delta^2<=sum c`.  Combi
 and forced nestings with
 multiplicities `binomial(K-1,j)` and try to derive either a cross-capacity improving switch or a
 violated parent prefix.  This is the smallest current obstruction on an equivalent global route.
+The unique top-degree column can always be balanced by the Ryser reduction on the `2^K` largest
+rows, while the degree-one rank has quota zero.  A rank-lexicographic contradiction may therefore
+start with the first deficient internal rank `1<=ell<=K-1` and assume every larger-degree quota is
+already exact.
 
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the

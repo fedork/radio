@@ -1088,6 +1088,35 @@ problem is:
 > sequence majorized by `G_K` has a realization by the doubled/single Pascal columns in which the
 > doubled-column neighborhoods admit the common exact bisection (BR).
 
+The binomial quotas make this still more symmetric.  Index the conjugate parent columns by their
+rank `ell`.  There are
+
+    n_ell=binomial(K,ell)
+
+columns of the identical degree `2^(K-ell)`.  Pascal identity splits this pool into
+
+    b_ell=binomial(K-1,ell)       balanced doubled columns,
+    s_ell=binomial(K-1,ell-1)    unrestricted single columns.    (BQ)
+
+Here an out-of-range binomial coefficient is zero.  Thus the doubled/single labels are not fixed
+inside a degree pool.  The exact requirement is merely that at least `b_ell` of its `n_ell`
+columns contain half `A` rows and half `B` rows.  Choosing those columns as doubled and the other
+`s_ell` as single recovers (BR), and every (BR) realization clearly has these quotas.  This is an
+equivalent **Binomial Balanced-Columns** form of the lemma.  It displays the Pascal structure as a
+rank-by-rank allowance: all columns at `ell=0` must balance, while the allowed unbalanced count
+grows from `binomial(K-1,ell-1)` and reaches the sole degree-one column at `ell=K`.
+
+The top quota is never the obstruction.  A full-mass `x<=_w G_K` has at least `2^K` positive
+rows; otherwise its whole mass would occur before the positive support of `G_K` ends, violating a
+prefix inequality.  Apply the bipartite Havel--Hakimi (Ryser) reduction to the unique largest
+parent column, whose degree is `2^K`: connect it to the `2^K` largest residual row degrees, subtract
+one there, and the remaining row/column margins are still realizable.  Color exactly half of those
+`2^K` rows `A` and half `B`, then color all other rows arbitrarily.  This gives a realization in
+which the unique `ell=0` column is balanced.  Since `ell=K` has balance quota zero, a first failure
+in a rank-lexicographically optimized realization must lie at an internal rank
+
+    1<=ell<=K-1.                                                (BQ0)
+
 This formulation does not assume that a previously selected coloring can be repaired locally.
 It is therefore an exact restatement of the Row-Coloring Lemma, unlike the stronger local targets
 below.  A possible constructive proof would start with an arbitrary Gale--Ryser realization and
@@ -1100,6 +1129,17 @@ Among all incidence realizations with the prescribed margins and all row colorin
 
     Phi=sum_(doubled D_t) delta_t^2,
     delta_t=|N(D_t) intersection A|-c_t.
+
+Also minimize over which columns receive the doubled labels in each equal-degree pool.  Hence a
+selected doubled column `D(c)` and an unselected single column `S(2c)` of the same actual degree
+`2c` obey
+
+    |delta_D| <= ||N(S(2c)) intersection A|-c|.                  (BR0)
+
+Otherwise exchanging their type labels preserves the entire incidence matrix and all margins but
+strictly lowers `Phi`.  In particular, if a rank pool supplies fewer than its quota of balanced
+columns, every unselected column in that pool is also unbalanced; the doubled labels already mark
+the columns closest to half-and-half.
 
 For two doubled columns `D,E` of the same capacity `2c`, minimality gives
 

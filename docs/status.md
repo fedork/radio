@@ -74,7 +74,12 @@ An exact global reformulation now puts Pascal first: Gale--Ryser realizes every 
 degree sequence using one column of degree `2c` and one of degree `c` for each child conjugate
 capacity `c`; the task is to choose the realization so all doubled-column neighborhoods have one
 common exact row bisection.  This Balanced Pascal Realization Lemma is equivalent to Row-Coloring
-and avoids committing to a local repair path.  A first global switch lemma now compresses any
+and avoids committing to a local repair path.  Equivalently, among the `binomial(K,ell)` parent
+columns of degree `2^(K-ell)`, only `binomial(K-1,ell)` must balance; the other
+`binomial(K-1,ell-1)` are mixed, and these labels may be chosen after the incidence realization.
+The unique top-degree column can always be balanced by Ryser reduction, and the bottom degree-one
+rank has no balance requirement, so any first quota obstruction is internal.
+A first global switch lemma now compresses any
 minimum-square obstruction: doubled columns of one capacity have imbalances differing by at most
 one and therefore one common sign; cross-capacity defects satisfy a Lipschitz bound, and a nonzero
 imbalance forces color nesting against every single column of the matching
