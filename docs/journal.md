@@ -10548,7 +10548,7 @@ opposite-orientation tight separator.  The remaining proof must use the dyadic c
 Pascal multiplicities to cross that cut; padding makes the construction and failure certificate
 cleaner but does not yet prove that augmentation always succeeds.
 
-## 2026-08-27 -- canonical padded tail isolates a high-support alternation lemma
+## 2026-08-27 -- canonical padded tail isolates a high-support alternation inequality
 
 The equal partition into `M=3^(K-1)` left-eligible, right-eligible and mixed-only slots has an exact
 three-variable Hall criterion.  Two exchange lemmas simplify it substantially.  A heavier
@@ -10565,8 +10565,9 @@ the side receiving the smaller row of each pair follow from concavity.  Only
     floor((U_E(2q+1)+U_E(2p-1))/2)
       <= H(p)+H(q)+min(H(p+q),E),       p>q,
 
-remains.  This is now a one-dimensional Pascal-prefix statement, with no state or assignment
-variables.  It is unproved uniformly.
+remains.  This is a one-dimensional Pascal-prefix statement, with no state or assignment
+variables.  It was initially a proof target, but the exact `K=19` construction recorded below
+refutes it.
 
 The new `--padded-three-census` mode checks the construction directly.  The complete `K=3` census
 has 66 states with nonzero canonical-tail mass and no alternating failure; the complete `K=4`
@@ -10577,7 +10578,8 @@ every `K=1..12` passes, with 2,098,176 `(p,q)` pairs and 20,201,473 breakpoint v
 The final provenance build is `a895141b33ec5893167eb3e49a33dad0a11d2016ebd1e43ceeff2471907a67c3`;
 the complete censuses took 5.4 wall seconds together and all twelve prefix checks took 2.1 wall
 seconds on the recorded M4 Pro.  Full derivation and commands are in
-`evidence/singleton_padded_three_blocks_2026-08-27.md`.
+`evidence/singleton_padded_three_blocks_2026-08-27.md`.  These finite passes do not survive
+extrapolation to `K=19`.
 
 The conjugate-layer view also isolates the assignment gap.  Each child layer of height `r` becomes
 a parent layer `(2^r,1^r)`: its incidences split evenly into left, mixed and right, and a parent row
@@ -10654,3 +10656,29 @@ A 100-step request with the same seed completed no eleventh comparison and timed
 seconds at 1.45 GB peak RSS; it is an abort, not a 100-step result.  The exact commands, final state,
 lower-level node counts and provenance are in
 `evidence/singleton_strong_niceness_2026-08-27.md`.
+
+## 2026-08-27 -- high-support strict alternation retracted at K=19
+
+The apparent one-dimensional endgame from the canonical padded tail is false.  The arithmetic
+inequality (PA), despite passing every exact breakpoint check through `K=12`, fails at `K=19` with
+`M=E=3^18`, `p=513`, and `q=256` by 2,431.  More importantly, this is not slack introduced by the
+upper envelope `U_E`: a compressed exact construction realizes the bad prefixes as a sorted,
+full-mass state majorized by `G_19` with exactly `2M` nonzero rows.  Strict alternation gives
+`A_513+B_256=276,817,774` against Hall capacity 276,815,343.
+
+The new `--padded-alternation-counterexample` mode checks the compressed state's ordering, mass,
+every nontrivial majorization prefix, and the failing Hall cut.  Provenance build
+`44c17992e86ea10573820f143cc58fb8d3519edc5d6130e4d9659586725be8f7`; the build-and-run command
+took 2.6 wall seconds on the recorded M4 Pro and the verification itself took under 0.1 second.
+This retracts only the strict-alternation/high-support claim, not the Row-Coloring Lemma or the
+exact canonical-tail exchange and Hall contraction.
+
+Allowing each adjacent pair to choose its orientation gives a cleaner exact high-support
+subproblem.  It cannot prove the full lemma because adjacent-pair orientation already fails on 916
+lower-support `K=4` states.  If
+`d_i` is the difference in pair `i`, `epsilon_i` records its orientation, and
+`D_n=sum_(i<=n) epsilon_i d_i`, then
+`A_p+B_q=(P(2p)+P(2q)+D_p-D_q)/2`.  Within that regime the missing theorem is consequently a
+global interval-discrepancy or augmenting-path statement; merely balancing the current prefix total
+cannot control all `D_p-D_q` simultaneously.  Do not spend further effort trying to prove (PA)
+from the Pascal formula.

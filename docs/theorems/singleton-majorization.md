@@ -479,12 +479,26 @@ smaller row of each pair.  The other side would follow from the single arithmeti
     floor((U_E(2q+1)+U_E(2p-1))/2)
       <= H(p)+H(q)+min(H(p+q),E),        p>q.         (P4)
 
-An exact breakpoint checker verifies (P4) for every integer `E` through `K=12`.  Complete state
-censuses find no padded-alternation failure with a nonzero canonical tail at `K=3,4`; all failures
-have far fewer than `2M` nonzero rows.  This is a proved reduction plus finite evidence, not a
-uniform proof of (P4).  A proof of (P4) from the dyadic/Pascal formula for `H` would settle the
-entire high-support regime by an explicit single pass.  The derivation, exchange proof, census
-counts and commands are in the
+An exact breakpoint checker verifies (P4) for every integer `E` through `K=12`, but (P4) is false.
+At `K=19`, `E=M=3^18`, `p=513`, and `q=256`, its left side exceeds its right side by 2,431.
+This is not only a failure of the envelope `U_E`: a compressed construction realizes the relevant
+prefixes as an actual sorted, full-mass parent majorized by `G_19`, with exactly `2M` positive
+rows.  Strict alternation therefore does not settle even the high-support regime.
+
+The canonical-tail exchange and contraction (P1)--(P3) remain exact.  A useful high-support
+subproblem keeps adjacent pairs but chooses their orientations globally.  (This cannot be a proof
+for all states: adjacent-pair orientation already fails on 916 lower-support `K=4` states.)  Write
+pair `i` as `x_i>=y_i`, put `d_i=x_i-y_i`, choose `epsilon_i in {+1,-1}` according to which color
+receives `x_i`, and define `D_n=sum_(i<=n) epsilon_i d_i`.  If `P` is the parent prefix function,
+then
+
+    A_p+B_q = (P(2p)+P(2q)+D_p-D_q)/2.
+
+Thus all contracted Hall inequalities become simultaneous interval bounds on the signed walk
+increments `D_p-D_q`.  This formulation explains why balancing only the current total is not the
+right invariant: the constraints are on every interval, not just prefixes from zero.  It is still
+an existence problem, not a proof, and solving it would cover only the regime where paired rows
+are justified.  The derivation, retraction, exact counterexample and commands are in the
 [padded three-block record](../../evidence/singleton_padded_three_blocks_2026-08-27.md).
 
 ### A shape-preserving forest target (2026-08-27)

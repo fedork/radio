@@ -78,13 +78,13 @@ arithmetic statement is therefore
     floor((U_E(2q+1)+U_E(2p-1))/2)
       <= H(p)+H(q)+min(H(p+q),E),                  p>q.       (PA)
 
-Proving (PA) uniformly for the Pascal/dyadic prefix functions would prove an explicit no-exchange
-partition algorithm for every parent having at least `2*3^(K-1)` nonzero rows.  It does not address
-the lower-support regime, which contains all known strict-alternation counterexamples.
+(PA) is a sufficient condition for this explicit no-exchange partition algorithm.  The finite
+checks below first suggested that it might hold uniformly, but the exact `K=19` construction below
+refutes it even in the high-support regime.
 
 ## Exact checks
 
-`tools/singleton_pair_coloring_census.cpp` now has two relevant modes.  Build and run with
+`tools/singleton_pair_coloring_census.cpp` now has three relevant modes.  Build and run with
 
     CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
         tools/singleton_pair_coloring_census.cpp -o /tmp/singleton-pair-census-padded
@@ -92,6 +92,8 @@ the lower-support regime, which contains all known strict-alternation counterexa
         --padded-three-census 4
     tools/run_with_provenance.py /tmp/singleton-pair-census-padded \
         --padded-prefix-check 12
+    tools/run_with_provenance.py /tmp/singleton-pair-census-padded \
+        --padded-alternation-counterexample
 
 The complete state census gives:
 
@@ -111,8 +113,42 @@ It only needs `p,q<=|h|`: if either count is larger, its pure prefix has saturat
 mixed prefix has saturated at `E`, and the support bound `E+p+q` proves (U) immediately.
 Every level `K=1..12` passes.  At `K=12` it checks 2,098,176 pairs and 20,201,473 breakpoint values.
 
-The final source build was
+That finite pattern eventually breaks.  At `K=19`, put `M=E=3^18=387,420,489` and define
+`U(t)=min(H_19(t),M+t)`.  There is a sorted state with `2M` positive rows whose compressed form is
+
+* rows `1..513`: the corresponding `G_19` rows;
+* 294 rows of value 261,964, followed by 218 rows of value 261,963;
+* rows `1026..1281`: the corresponding `G_19` rows;
+* row 1282: 81,226;
+* 774,839,696 trailing unit rows, followed by the padding zeros.
+
+Its total mass is `3M`, and every prefix is at most the corresponding prefix of `G_19`.  The tool
+checks sortedness, total mass and all nontrivial majorization prefixes directly from this compressed
+description.  Under strict alternation, however, the contracted Hall inequality at `p=513,q=256`
+is
+
+    A_513+B_256 = 276,817,774
+      > 276,815,343 = H(513)+H(256)+H(769).
+
+The excess is 2,431.  Hence both (PA) and the proposed high-support strict-alternation algorithm are
+false.  This does **not** refute the Row-Coloring Lemma; it says that these same rows need a different,
+globally chosen orientation if the lemma is true.
+
+For adjacent pairs `(x_i,y_i)`, let `d_i=x_i-y_i`, choose a sign `epsilon_i` according to which
+color gets `x_i`, and put `D_n=sum_(i<=n) epsilon_i d_i`.  Then exactly
+
+    A_p+B_q = (P(2p)+P(2q)+D_p-D_q)/2.
+
+The adaptive-pair problem is therefore a signed-walk feasibility problem with simultaneous bounds
+on every interval `D_p-D_q`.  This is a cleaner target for the high-support subproblem, but not a
+candidate for the full lemma: arbitrary adjacent-pair orientation already fails on 916
+lower-support `K=4` states.  No general feasibility proof is known even in the high-support regime.
+
+The finite-check source build was
 `a895141b33ec5893167eb3e49a33dad0a11d2016ebd1e43ceeff2471907a67c3`.  The provenance-wrapped
 complete `K=3,4` censuses took 5.4 wall seconds together; the twelve arithmetic checks took
-2.1 wall seconds together on the recorded M4 Pro.  These finite checks support (PA) but do not
-prove it for arbitrary `K`.
+2.1 wall seconds together on the recorded M4 Pro.  The final counterexample build was
+`44c17992e86ea10573820f143cc58fb8d3519edc5d6130e4d9659586725be8f7`; its provenance-wrapped
+construction and verification took less than 0.1 wall second after a 2.6-second build-and-run
+command on the same machine.  The `K<=12` checks are retained as a warning about extrapolating a
+large finite range, not as evidence for (PA).

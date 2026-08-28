@@ -866,6 +866,126 @@ void check_padded_prefix_arithmetic(int k) {
               << " result=PASS\n";
 }
 
+// A compressed, exactly checked K=19 counterexample to strict alternation in the high-support
+// padded regime.  It does not refute the Row-Coloring Lemma: only the deterministic choice that
+// gives the larger member of every adjacent pair to A.
+void check_padded_alternation_counterexample() {
+    constexpr int k = 19;
+    constexpr int child_level = k - 1;
+    constexpr std::int64_t mass = 387420489;  // 3^18
+    constexpr std::int64_t support = 2 * mass;
+    constexpr int p = 513;
+    constexpr int q = 256;
+    constexpr int first_index = 2 * q + 1;
+    constexpr int second_index = 2 * p - 1;
+
+    const Sequence child = singleton_base(child_level);
+    const Hall hall(child);
+    const auto parent_H = [&](int count) -> std::int64_t {
+        return static_cast<std::int64_t>(hall.H(count)) +
+               hall.H((count + 1) / 2) + hall.H(count / 2);
+    };
+    const auto U = [&](int count) -> std::int64_t {
+        return std::min(parent_H(count), mass + count);
+    };
+
+    int switch_index = 0;
+    const int parent_rows = 2 * static_cast<int>(child.size());
+    for (int i = 1; i <= parent_rows; ++i) {
+        if (parent_H(i) >= mass + i) {
+            switch_index = i;
+            break;
+        }
+    }
+    if (switch_index <= second_index) {
+        std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR bad switch\n";
+        std::exit(1);
+    }
+
+    const std::int64_t segment_mass = U(second_index) - U(first_index);
+    const int pair_count = (second_index - first_index) / 2;
+    if (segment_mass % 2 != 0) {
+        std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR odd segment\n";
+        std::exit(1);
+    }
+    const std::int64_t pair_mass = segment_mass / 2;
+    const std::int64_t low_value = pair_mass / pair_count;
+    const int high_pairs = static_cast<int>(pair_mass - low_value * pair_count);
+    if (pair_count <= 0 || high_pairs < 0 || high_pairs > pair_count) {
+        std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR bad smoothing\n";
+        std::exit(1);
+    }
+
+    std::vector<std::int64_t> head;
+    head.reserve(switch_index);
+    for (int i = 1; i <= switch_index; ++i) {
+        if (i <= first_index || i > second_index) {
+            head.push_back(U(i) - U(i - 1));
+            continue;
+        }
+        const int offset = i - first_index - 1;
+        head.push_back(low_value + (offset < 2 * high_pairs ? 1 : 0));
+    }
+
+    std::int64_t prefix = 0;
+    for (int i = 1; i <= switch_index; ++i) {
+        if (i > 1 && head[i - 2] < head[i - 1]) {
+            std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR unsorted\n";
+            std::exit(1);
+        }
+        prefix += head[i - 1];
+        if (prefix > parent_H(i)) {
+            std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR majorization i=" << i << '\n';
+            std::exit(1);
+        }
+    }
+    if (head.empty() || head.back() < 1) {
+        std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR nonpositive head\n";
+        std::exit(1);
+    }
+    for (int i = switch_index + 1; i <= parent_rows; ++i) {
+        if (mass + i > parent_H(i)) {
+            std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR tail majorization i=" << i << '\n';
+            std::exit(1);
+        }
+    }
+    const std::int64_t total = prefix + support - switch_index;
+    if (prefix != mass + switch_index || total != 3 * mass) {
+        std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR mass\n";
+        std::exit(1);
+    }
+
+    std::int64_t a_prefix = 0;
+    std::int64_t b_prefix = 0;
+    for (int i = 1; i <= second_index; ++i) {
+        if (i % 2 == 1 && (i + 1) / 2 <= p) a_prefix += head[i - 1];
+        if (i % 2 == 0 && i / 2 <= q) b_prefix += head[i - 1];
+    }
+    const std::int64_t lhs = a_prefix + b_prefix;
+    const std::int64_t rhs = static_cast<std::int64_t>(hall.H(p)) + hall.H(q) +
+                             hall.H(p + q);
+    if (lhs <= rhs) {
+        std::cerr << "PADDED_ALTERNATION_INTERNAL_ERROR no Hall failure\n";
+        std::exit(1);
+    }
+
+    std::cout << "PADDED_ALTERNATION_COUNTEREXAMPLE k=" << k
+              << " child_mass=" << mass
+              << " support=" << support
+              << " switch=" << switch_index
+              << " p=" << p << " q=" << q
+              << " lhs=" << lhs << " rhs=" << rhs
+              << " excess=" << lhs - rhs << '\n';
+    std::cout << "COMPRESSED_HEAD canonical_rows=1.." << first_index
+              << " high_value=" << low_value + 1
+              << " high_count=" << 2 * high_pairs
+              << " low_value=" << low_value
+              << " low_count=" << 2 * (pair_count - high_pairs)
+              << " canonical_rows=" << second_index + 1 << ".." << switch_index - 1
+              << " adjusted_row=" << head.back()
+              << " trailing_ones=" << support - switch_index << '\n';
+}
+
 void sample_transfer_states(int k, std::uint64_t sample_count, std::uint64_t seed) {
     const Sequence parent = singleton_base(k);
     const Hall hall(singleton_base(k - 1));
@@ -1204,6 +1324,10 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--padded-alternation-counterexample") {
+        check_padded_alternation_counterexample();
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--padded-prefix-check") {
         const int k = argc > 2 ? std::atoi(argv[2]) : 8;
         if (k < 1 || k > 12) {

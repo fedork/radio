@@ -184,10 +184,14 @@ mixed-only block to the `3^(K-1)` smallest padded rows, which are zeros and ones
 at least `2*3^(K-1)` nonzero rows, strict alternation of the remainder reduces every Hall inequality
 to the explicit Pascal prefix family (P4) in the
 [theorem note](theorems/singleton-majorization.md#equal-blocks-and-the-canonical-mixed-only-tail).
-The exact breakpoint checker passes all `K<=12`.  Prove (P4) from the conjugate capacities
-`2^(r-j)` with Pascal multiplicities; this would settle the entire high-support regime without
-exchange.  Do not mistake it for the full lemma: the complete `K=3,4` failures of ordinary
-alternation all occur below that support threshold, where the augmenting-path problem remains.
+The exact breakpoint checker passes all `K<=12`, but (P4) is false at `K=19`; a full-mass
+majorized state realizes the failure, so this is not merely looseness in the prefix bound.  Do not
+try to prove (P4) or extrapolate its finite range.  Retain the exact canonical-tail contraction,
+then seek an adaptive orientation.  For adjacent pairs, orienting pair differences gives a signed
+prefix walk `D_n`; Hall becomes a family of interval bounds on `D_p-D_q`.  Prove those bounds by an
+augmenting-path/separator argument, or attack the equivalent bottom-up Pascal Adjacent-Fiber Lemma,
+where an opposite-color tight separator is the only obstruction to preserving a coloring under one
+unit Robin-Hood transfer.  Do not substitute another fixed block heuristic for either exact target.
 
 The 2026-08-27 forest-shape survey supplies a useful coarse invariant but not a replacement proof.
 For `E_a(t)=sum_i(a_i-t)_+`, every cut has an exact removal profile
