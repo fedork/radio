@@ -421,29 +421,81 @@ degree-four points force the size-two support into both size-four supports; lami
 equal, giving at least four points of degree at least three instead of three.  Crossing supports
 are already essential at this smallest nontrivial level.
 
-The sharpened Pascal-first target is therefore a **Dyadic Plateau-Descent Lemma**.  Begin with the
-min-cut/tight set exposed by a failed fixed-color transfer.  Choose a repeated Boolean rank in the
-band `(p,q)` guaranteed by (TB3), and run incidence switches through the paired pure and mixed
-columns of that rank.  The desired dichotomy is:
+A fixed-color tight separator cannot be defeated by incidence switches that preserve every row's
+orientation: the Fixed-Color Hall Lemma says exactly that the transferred demand is infeasible in
+that fiber.  Thus an earlier formulation of the proposed plateau descent--complete the transfer
+while preserving all signs--was internally impossible.  The residual search has to move among
+**feasible colorings of the original state**, rerouting pure incidences while one or more whole
+rows change sign, until it finds a coloring with separating margin at least one.
 
-1. the switches complete the transfer while preserving every row's orientation; or
-2. all copies at that rank are blocked, and their blocking rows expose another tight separator
-   whose crossed dyadic band is strictly smaller.
+Equal rows should not be marked prematurely.  A transfer between two values of a partition may
+choose any donor and recipient rows having those values.  In particular, if some donor-valued and
+recipient-valued rows share a color, choosing that pair gives separator margin at least their
+value gap: replacing the recipient by the donor preserves all three Hall cardinalities.  Only a
+coloring that segregates the two value classes can be dangerous.
 
-At the incidence level a basic orientation-crossing reroute has a concrete three-vacancy form.
-Remove the donor's incidence from a left pure column, move an `A`-row incidence from a mixed column
-into that left vacancy, move a `B`-row incidence from a right pure column into the mixed vacancy,
-and place the recipient into the right vacancy.  The two bridge-row degrees and all final column
-sums are preserved.  A longer augmenting path repeats these row/column switches, possibly across
-several equal columns and dyadic ranks.  Tightness explains exactly why the short path can be blocked;
-the descent lemma must show that complete blockage propagates to a strictly narrower band rather
-than ending in place.
+The corrected Pascal-first target is a **global color-exchange augmentation lemma**.  Among all
+feasible colorings of the original state, maximize the minimum donor-recipient separating margin;
+among equal optima, choose a minimum tight dyadic band.  If the margin is zero, (TB3) supplies a
+repeated internal Pascal rank crossing that band.  The desired exchange must reroute the pure
+incidences of a globally chosen set of rows through the duplicated columns and either raise the
+margin to one or produce another feasible coloring with a strictly smaller minimizing band.
 
-Iterating the second outcome would terminate, while (TB3) says that a final dangerous band cannot
-be empty.  Proving the dichotomy is now the precise missing step.  In Boolean-lattice language it
-amounts to showing that a family of blocked switches has enough shadow closure for Pascal's
-rank-matching inequalities to apply.  That closure must be derived from the alternating-path
-rules; it cannot be assumed merely because the equal columns have been labelled by subsets.
+The finite data suggests that the required global choice may nevertheless have a very small final
+support, once all irrelevant labels are removed.  The correct quotient identifies equal donor and
+recipient rows and also exchanges the two pure sides globally.  In that quotient, an exact census
+finds no failed coloring at `K=1,2`.  At `K=3`, 348 feasible colorings fail their selected transfer;
+325 have a successful coloring at row distance one and the remaining 23 at distance two.  The
+first genuine one-row failure is
+
+    a=(8,6,5,3,2,1,1,1),       transfer 5 -> 2,
+    A=(5,3,1,1),                B=(8,6,2,1).
+
+An exact prefix census of 10,000 `K=4` states contains 94,936 failed normalized colorings: 74,090
+reach success at distance one and 20,846 at distance two.  None needs more.  More specifically,
+every failed coloring in all checked landscapes reaches success by one row flip or one
+opposite-color swap.  This motivates the stronger **Two-Row Color-Exchange Lemma**: every
+failed feasible coloring has another feasible coloring, successful for the transfer, obtained by
+one flip or one swap (up to equal-row identity and global color complementation).  It would finish
+the Adjacent-Fiber step immediately.  The result is exhaustive only through `K=3`; the `K=4`
+prefix is finite evidence, not a proof.  A proof still has to derive the exchange from the
+duplicated rank forced by (TB3), rather than merely counting its capacity.  Exact definitions,
+counts and reproduction commands are in the
+[coloring-landscape record](../../evidence/singleton_coloring_landscape_2026-08-28.md).
+
+Three further disjoint 1,000-state windows after 1,000,000, 3,000,000 and 5,000,000 enumerated
+states give the same result.  Across all four `K=4` windows, every one of 377,873 failed colorings
+has a one-flip or one-swap repair.  This broadens the finite evidence but does not change its
+logical status: only 13,000 of the 5,997,038 `K=4` states were included in this landscape census.
+
+There is a close but incomplete connection to standard bisubmodular exchange.  Define, on disjoint
+row sets,
+
+    rho(X,Y)=H(|X|)+H(|Y|)+H(|X|+|Y|).
+
+Because `H` is nondecreasing and concave, each of the three cardinality terms is bisubmodular, so
+`rho` is an integral bisubmodular function.  If a coloring is encoded by
+`z_i=a_i` on `A` and `z_i=-a_i` on `B`, its Hall inequalities are exactly
+
+    z(X)-z(Y) <= rho(X,Y)             for all disjoint X,Y.
+
+Thus all integral signed demand vectors form the BS-convex set of integer points of the
+bisubmodular polyhedron `P(rho)`.  Its abstract delta-exchange directions have support at most two;
+see [Iwamasa, Theorem 3](https://arxiv.org/abs/2303.06320).  This is the correct structural analogue
+of the observed one-flip-or-one-swap rule.
+
+It is not yet a proof.  The feasible colorings of a fixed state are the boundary slice
+
+    P(rho) intersection {z: |z_i|=a_i for every i}.
+
+Flipping row `i` changes `z_i` by `2a_i`, whereas bisubmodular delta exchange only guarantees unit
+moves of support one or two through intermediate points with smaller absolute coordinates.  An
+intersection with the fixed-absolute-value slice need not inherit the exchange axiom.  The precise
+remaining theorem is therefore a **Pascal fixed-absolute exchange lemma**: for the Pascal `H`, the
+unit exchange chain can be compressed to a boundary move consisting of one row flip or one row
+swap, chosen so that the transfer margin becomes positive.  The Tight Pascal-Band Lemma supplies
+the repeated internal rank needed for that compression; proving that it prevents the chain from
+ending in the interior is the unresolved step.
 
 Fix a number of labelled parent rows.  Let `F_h` be the set of integer demand vectors that admit a
 legal allocation to left, mixed and right columns of capacities `h'`: a row uses a column at most

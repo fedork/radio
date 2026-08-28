@@ -187,13 +187,25 @@ shows that every actual dangerous separator `(p,q)` saturates every dyadic child
 `#{T:p<c(T)<q} >= 2 + #{T:c(T)=p+q}`.
 
 Thus every obstruction crosses a repeated internal Boolean rank; this is now a theorem, not only
-the pattern seen in the 889 cases.  The next proof obligation is the Dyadic Plateau-Descent Lemma:
-alternating switches at such a rank either route the transfer or expose a separator with a strictly
-smaller crossed band.  Derive the required shadow closure from the actual alternating paths--the
-Boolean labels alone do not supply it, and nested/laminar supports are false already at `K=3`.
+the pattern seen in the 889 cases.  A fixed-color tight cut cannot be crossed while preserving row
+orientations--that would contradict the Fixed-Color Hall Lemma.  The corrected target optimizes
+over feasible colorings of the original state and uses a global color-exchange augmenting chain to
+raise the separating margin.  After quotienting equal-row identities and global side
+complementation, every failed coloring in the exact `K<=3` landscape and the first 10,000 `K=4`
+states has a successful coloring within two row changes.  Three disjoint 1,000-state windows after
+1M, 3M and 5M enumerated states give the same result.  This motivates the Two-Row
+Color-Exchange Lemma; more precisely, every observed repair is one row flip or one opposite-color
+swap.  Encode a coloring as the fixed-absolute signed vector `z_i=+/-a_i`.  The ambient Hall
+polyhedron is integral bisubmodular and therefore has support-one-or-two delta exchanges, but its
+fixed-absolute-value slice does not automatically inherit them.  Prove that the repeated internal
+rank from the Tight Pascal-Band Lemma compresses an ambient unit-exchange chain to a boundary flip
+or swap that makes the transfer margin positive.  The Boolean labels alone do not supply that
+exchange, and nested/laminar supports are false already at `K=3`.
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the
-[Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md).
+[Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md); local landscape
+definitions and counterexamples are in the
+[coloring-landscape record](../evidence/singleton_coloring_landscape_2026-08-28.md).
 
 For a constructive attack, use the equivalent
 [padded pure-first formulation](theorems/singleton-majorization.md#padded-pure-first-allocation-2026-08-27):

@@ -10793,11 +10793,10 @@ Thus every genuine transfer obstruction crosses a repeated internal Pascal rank 
 This proves globally the duplicated-target phenomenon previously proved only for the 889 explicit
 `K=4` hard fibers.  It does not yet prove that an alternating path can use the duplicated rank.
 
-The exact remaining target is a Dyadic Plateau-Descent Lemma: switches at a crossed repeated rank
-either finish the transfer or expose a tight separator with a strictly narrower crossed band.
-Iteration would terminate because the tight-band inequality forbids an empty final band.  Boolean
-labels alone do not give the required shadow closure; it must follow from the actual stopped
-alternating paths.  A nested/laminar substitute is false already for
+The initial next target was phrased as a Dyadic Plateau-Descent Lemma inside one coloring.  The
+later landscape analysis below corrects that formulation: a tight Fixed-Color Hall cut makes an
+orientation-preserving completion impossible.  What survives is the need to use the repeated rank
+while changing whole row colors.  A nested/laminar substitute is false already for
 `(8,7,4,1^8)<=_w G_3`: its forced doubled-support sizes `8,4,4,2` and pure coverage profiles
 `(4,4,4,1^6)` or `(4,4,3,1^7)` admit no laminar realization.  Crossing supports are essential.
 
@@ -10805,3 +10804,62 @@ This pass also corrected a transcription error in two research notes:
 `G_3=(8,7,4,4,1,1,1,1)`, not `(8,7,4,3,2,1,1,1)`.  The canonical-atom counterexample remains
 valid, because `(8,7,4,2,2,2,1,1)` is majorized by the corrected sequence and its contradiction
 uses only the `G_2` child widths.
+
+## 2026-08-28 -- fixed-color plateau descent corrected; two-row target survives
+
+The first proposed Dyadic Plateau-Descent statement was internally impossible.  If a feasible
+coloring has a zero-margin donor/recipient separator, the Fixed-Color Hall Lemma says precisely
+that the transferred demand is infeasible with those row orientations.  No incidence switches
+preserving every sign can complete it.  The proof must instead move among feasible colorings of
+the original state, rerouting incidences while whole rows change orientation.
+
+The corrected diagnostic enumerates this coloring landscape.  A transfer between partition values
+may choose any equal donor/recipient row, and the two pure sides are globally interchangeable, so
+the final quotient identifies both equal-row choices and global `A/B` complementation.  It measures
+the minimum row-color distance in that quotient.
+
+The exhaustive `K<=3` result initially looked like 11,296 failed *marked* colorings, including 92
+one-row local maxima.  That was the wrong quotient: the first apparent two-row repair merely
+exchanged the marked recipient with an identical unit row.  Quotienting equal rows but not global
+complementation still manufactured apparent distance-four and distance-five `K=4` obstructions.
+Those too were artifacts: a donor value occurring on both sides lets the globally complementary
+marking choose the better donor identity.
+
+After the full quotient, `K=1,2` have no failed feasible colorings.  At `K=3` there are 237,617
+feasible normalized colorings across 8,916 transfer types; 348 fail, of which 325 have a successful
+coloring at row distance one and 23 first succeed at distance two.  In the first 10,000 `K=4`
+states--282,690 transfer types and 46,600,920 feasible normalized colorings--94,936 fail; 74,090
+reach success at distance one and the remaining 20,846 at distance two.  The first genuine
+distance-two case is
+
+    x=(16,15,11,11,5,5,5,4,2,1^7),       transfer 4->2,
+    A=(15,11,5,4,1^4),                    B=(16,11,5,5,2,1^3).
+
+This supports the Two-Row Color-Exchange Lemma: every failed feasible coloring has a successful
+one obtained by one row flip or one opposite-color swap in the correct quotient.  Proving it would
+finish the Adjacent-Fiber step.  The result is exhaustive only through `K=3`; the `K=4` run is an
+exact initial prefix, not a full level.
+
+The move shape is not accidental.  Encoding a coloring by `z_i=+/-x_i` turns the Fixed-Color Hall
+system into the integer points of the integral bisubmodular polyhedron with rank
+`rho(X,Y)=H(|X|)+H(|Y|)+H(|X|+|Y|)`.  Standard delta exchange there uses directions of support at
+most two.  It does not finish the proof because a row flip changes a coordinate by `2x_i`: the
+colorings form the nonconvex fixed-absolute slice `|z_i|=x_i`, which does not automatically inherit
+ambient unit exchange.  The theoretical task is now to use the repeated rank guaranteed by the
+Tight Pascal-Band Lemma to compress such a unit-exchange chain to a boundary flip or swap while
+making the transfer margin positive.
+
+The first 10,000-state `K=4` segment is head-heavy, so three disjoint 1,000-state windows were also
+enumerated after skipping 1,000,000, 3,000,000 and 5,000,000 states.  Across the four windows there
+are 369,300 transfers, 261,315,748 feasible normalized colorings and 377,873 failures.  Exactly
+352,471 failures have a distance-one repair and 25,402 need a swap; none needs anything else.  The
+last two windows have only distance-one failures.  The four runs were concurrent, the longest took
+under five wall minutes, and every process stayed below 50 MB RSS.  This rules out an obvious
+enumeration-order artifact, but it still covers only 13,000 of 5,997,038 `K=4` states.
+
+The final provenance build is
+`559585c2f01d0c51942cdf27a6013160df14c3d8ee0d160c4746a7bfa618a638`.  The exact `K<=3` census
+took under two wall seconds; the exact 10,000-state `K=4` prefix took about two wall minutes.
+Definitions, reproduction commands and the distinction between exact windows and a complete level
+are in
+`evidence/singleton_coloring_landscape_2026-08-28.md`.

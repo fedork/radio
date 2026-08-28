@@ -154,8 +154,13 @@ the largest two `B` rows has slack exactly
 
 So the margin is exactly the donor-recipient gap.  This is a concrete Pascal augmenting step: the
 two identical `U-K` targets absorb the transfer.  What remains open is proving that every minimal
-opposite-color separator at an arbitrary Pascal level can be reduced to such a duplicated-block
-reroute.
+opposite-color separator at an arbitrary Pascal level can be eliminated by changing to a suitable
+feasible coloring.  A fixed-color tight separator cannot itself be crossed while preserving row
+orientations--that is exactly what the Fixed-Color Hall Lemma forbids.  The later
+[coloring-landscape analysis](singleton_coloring_landscape_2026-08-28.md), after quotienting equal
+rows and global side complementation, instead supports a Two-Row Color-Exchange Lemma through all
+`K<=3` cases and four disjoint `K=4` windows totaling 13,000 states.  That stronger local statement
+remains unproved.
 
 The complete `K=4` run visited 1,173,872,133 search nodes and 141,770,271 complete feasible
 colorings.  It completed in 353 wall seconds with reported peak RSS below 0.01 GB under

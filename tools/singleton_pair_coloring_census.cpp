@@ -7,6 +7,7 @@
 #include <random>
 #include <limits>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -342,6 +343,7 @@ struct AdjacentFiberSearch {
     int best_opposite_margin = std::numeric_limits<int>::min();
     Coloring best_coloring;
     bool best_recipient_in_a = false;
+    std::function<void(const Coloring &, bool, int)> observer;
 
     AdjacentFiberSearch(const Sequence &state, const Hall &h, int donor, int recipient,
                         bool stop, int mode = -1)
@@ -368,6 +370,7 @@ struct AdjacentFiberSearch {
                       << " margin=" << margin << '\n';
             std::exit(1);
         }
+        if (observer) observer(current, recipient_in_a, margin);
         if (margin > best_margin) {
             best_margin = margin;
             best_coloring = current;
@@ -432,6 +435,493 @@ struct AdjacentFiberSearch {
     void run() {
         Coloring current;
         dfs(0, current, -1);
+    }
+};
+
+// Diagnostic landscape for the corrected plateau-descent proposal.  A fixed-color tight cut
+// proves that an orientation-preserving reroute cannot work.  The relevant finite state space is
+// therefore the feasible colorings of the original state.  Two normalized colorings have row
+// distance d when d rows must change color, minimized over equal-row matchings and global A/B
+// complementation.
+// This mode asks whether every failed coloring has a distance-one or distance-two neighbor that
+// either raises the separating margin or narrows a minimum tight Pascal band.
+struct LandscapePoint {
+    Coloring coloring;
+    bool recipient_in_a = false;
+    int margin = 0;
+    std::vector<int> signature;
+    std::vector<int> opposite_signature;
+    std::tuple<int, int, int, int, int> band;
+    int cut_p = -1;
+    int cut_q = -1;
+};
+
+std::vector<int> coloring_signature(const Coloring &coloring,
+                                    const std::vector<GeneralSearch::Block> &blocks,
+                                    int donor_value, int recipient_value,
+                                    bool recipient_in_a) {
+    std::vector<int> signature;
+    for (const auto &[value, count] : blocks) {
+        (void)count;
+        int to_a = static_cast<int>(
+            std::count(coloring.a.begin(), coloring.a.end(), value));
+        if (value == donor_value) --to_a;
+        if (value == recipient_value && recipient_in_a) --to_a;
+        signature.push_back(to_a);
+    }
+    signature.push_back(recipient_in_a ? 1 : 0);
+    return signature;
+}
+
+std::vector<int> unlabelled_coloring_signature(
+        const Coloring &coloring, const std::vector<GeneralSearch::Block> &blocks) {
+    std::vector<int> signature;
+    for (const auto &[value, count] : blocks) {
+        (void)count;
+        signature.push_back(static_cast<int>(
+            std::count(coloring.a.begin(), coloring.a.end(), value)));
+    }
+    return signature;
+}
+
+int signature_distance(const std::vector<int> &lhs, const std::vector<int> &rhs) {
+    int distance = 0;
+    for (std::size_t i = 0; i < lhs.size(); ++i)
+        distance += std::abs(lhs[i] - rhs[i]);
+    return distance;
+}
+
+int coloring_distance(const LandscapePoint &lhs, const LandscapePoint &rhs) {
+    return std::min(signature_distance(lhs.signature, rhs.signature),
+                    signature_distance(lhs.signature, rhs.opposite_signature));
+}
+
+std::tuple<int, int, int, int, int> band_key(int p, int q, const Sequence &child) {
+    int levels = 0;
+    int columns = 0;
+    int previous = -1;
+    for (int column = 1; column <= child.front(); ++column) {
+        const int capacity = static_cast<int>(
+            std::count_if(child.begin(), child.end(),
+                          [&](int value) { return value >= column; }));
+        if (p < capacity && capacity < q) {
+            ++columns;
+            if (capacity != previous) {
+                ++levels;
+                previous = capacity;
+            }
+        }
+    }
+    return {levels, columns, q - p, p, q};
+}
+
+LandscapePoint make_landscape_point(const Hall &hall, const Sequence &child,
+                                    const std::vector<GeneralSearch::Block> &blocks,
+                                    const Coloring &coloring, int donor_value,
+                                    int recipient_value, bool recipient_in_a, int margin) {
+    LandscapePoint point;
+    point.coloring = coloring;
+    point.recipient_in_a = recipient_in_a;
+    point.margin = margin;
+    point.signature = coloring_signature(
+        coloring, blocks, donor_value, recipient_value, recipient_in_a);
+    if (margin >= 1) {
+        point.band = {-1, -1, -1, -1, -1};
+        return point;
+    }
+
+    Sequence pool_a = coloring.a;
+    Sequence pool_b = coloring.b;
+    if (!remove_one(pool_a, donor_value)) std::exit(1);
+    if (recipient_value > 0) {
+        Sequence &recipient_pool = recipient_in_a ? pool_a : pool_b;
+        if (!remove_one(recipient_pool, recipient_value)) std::exit(1);
+    }
+    Sequence prefix_a(1, 0), prefix_b(1, 0);
+    for (int value : pool_a) prefix_a.push_back(prefix_a.back() + value);
+    for (int value : pool_b) prefix_b.push_back(prefix_b.back() + value);
+    const int include_a = recipient_in_a ? 1 : 0;
+    const int include_b = recipient_in_a ? 0 : 1;
+    const int include_mass_a = recipient_in_a ? recipient_value : 0;
+    const int include_mass_b = recipient_in_a ? 0 : recipient_value;
+    point.band = {std::numeric_limits<int>::max(), std::numeric_limits<int>::max(),
+                  std::numeric_limits<int>::max(), -1, -1};
+    for (int p = include_a; p <= include_a + static_cast<int>(pool_a.size()); ++p) {
+        const int demand_a = include_mass_a + prefix_a[p - include_a];
+        for (int q = include_b; q <= include_b + static_cast<int>(pool_b.size()); ++q) {
+            const int demand = demand_a + include_mass_b + prefix_b[q - include_b];
+            if (hall.capacity(p, q) - demand != margin) continue;
+            const auto candidate = band_key(p, q, child);
+            if (candidate < point.band) {
+                point.band = candidate;
+                point.cut_p = p;
+                point.cut_q = q;
+            }
+        }
+    }
+    return point;
+}
+
+bool landscape_improves(const LandscapePoint &from, const LandscapePoint &to) {
+    return to.margin > from.margin || (to.margin == from.margin && to.band < from.band);
+}
+
+std::vector<LandscapePoint> enumerate_landscape(const Sequence &state, const Sequence &child,
+                                                const Hall &hall, int donor, int recipient) {
+    AdjacentFiberSearch search(state, hall, donor, recipient, false);
+    std::vector<LandscapePoint> points;
+    search.observer = [&](const Coloring &coloring, bool recipient_in_a, int margin) {
+        points.push_back(make_landscape_point(
+            hall, child, search.blocks, coloring, donor, recipient, recipient_in_a, margin));
+    };
+    search.run();
+    return points;
+}
+
+// A Robin--Hood move between partition values does not distinguish equal donor or recipient
+// rows, and the pure sides are globally interchangeable.  Collapse marked-row realizations that
+// induce the same unordered pair of value multisets, retaining the best donor/recipient identities
+// and orientation.  This quotient is the landscape relevant to majorization.
+std::vector<LandscapePoint> collapse_unlabelled_landscape(
+        const std::vector<LandscapePoint> &raw,
+        const std::vector<GeneralSearch::Block> &blocks) {
+    std::map<std::vector<int>, LandscapePoint> best;
+    for (LandscapePoint point : raw) {
+        const std::vector<int> signature =
+            unlabelled_coloring_signature(point.coloring, blocks);
+        std::vector<int> opposite;
+        for (std::size_t i = 0; i < blocks.size(); ++i)
+            opposite.push_back(blocks[i].count - signature[i]);
+        const std::vector<int> key = std::min(signature, opposite);
+        point.signature = signature;
+        point.opposite_signature = opposite;
+        const auto found = best.find(key);
+        if (found == best.end() || landscape_improves(found->second, point))
+            best[key] = std::move(point);
+    }
+    std::vector<LandscapePoint> result;
+    for (auto &[signature, point] : best) {
+        (void)signature;
+        result.push_back(std::move(point));
+    }
+    return result;
+}
+
+struct LandscapeSummary {
+    int failed = 0;
+    int stuck_one = 0;
+    int stuck_two = 0;
+    int stuck_swap = 0;
+    int no_direct_success_one = 0;
+    int no_direct_success_two = 0;
+    int no_direct_success_swap = 0;
+    int no_direct_success_one_or_swap = 0;
+    int first_stuck_one = -1;
+    int first_stuck_two = -1;
+    int first_stuck_swap = -1;
+    std::vector<int> minimum_success_distances;
+    int maximum_minimum_success_distance = -1;
+    int maximum_distance_point = -1;
+};
+
+LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points) {
+    LandscapeSummary summary;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        if (points[i].margin >= 1) continue;
+        ++summary.failed;
+        bool improves_one = false;
+        bool improves_two = false;
+        bool improves_swap = false;
+        bool reaches_one = false;
+        bool reaches_two = false;
+        bool reaches_swap = false;
+        int minimum_success_distance = std::numeric_limits<int>::max();
+        for (std::size_t j = 0; j < points.size(); ++j) {
+            const int distance = coloring_distance(points[i], points[j]);
+            if (points[j].margin >= 1)
+                minimum_success_distance = std::min(minimum_success_distance, distance);
+            if (distance <= 1) {
+                improves_one = improves_one || landscape_improves(points[i], points[j]);
+                reaches_one = reaches_one || points[j].margin >= 1;
+            }
+            if (distance <= 2) {
+                improves_two = improves_two || landscape_improves(points[i], points[j]);
+                reaches_two = reaches_two || points[j].margin >= 1;
+            }
+            int rows_i = 0;
+            int rows_j = 0;
+            int opposite_rows_j = 0;
+            for (int count : points[i].signature) rows_i += count;
+            for (int count : points[j].signature) rows_j += count;
+            for (int count : points[j].opposite_signature) opposite_rows_j += count;
+            const bool is_swap =
+                (signature_distance(points[i].signature, points[j].signature) == 2 &&
+                 rows_i == rows_j) ||
+                (signature_distance(points[i].signature, points[j].opposite_signature) == 2 &&
+                 rows_i == opposite_rows_j);
+            if (is_swap) {
+                improves_swap = improves_swap || landscape_improves(points[i], points[j]);
+                reaches_swap = reaches_swap || points[j].margin >= 1;
+            }
+        }
+        if (!improves_one) {
+            ++summary.stuck_one;
+            if (summary.first_stuck_one < 0) summary.first_stuck_one = static_cast<int>(i);
+        }
+        if (!improves_two) {
+            ++summary.stuck_two;
+            if (summary.first_stuck_two < 0) summary.first_stuck_two = static_cast<int>(i);
+        }
+        if (!improves_swap) {
+            ++summary.stuck_swap;
+            if (summary.first_stuck_swap < 0) summary.first_stuck_swap = static_cast<int>(i);
+        }
+        summary.no_direct_success_one += !reaches_one;
+        summary.no_direct_success_two += !reaches_two;
+        summary.no_direct_success_swap += !reaches_swap;
+        summary.no_direct_success_one_or_swap += !reaches_one && !reaches_swap;
+        summary.minimum_success_distances.push_back(minimum_success_distance);
+        if (minimum_success_distance > summary.maximum_minimum_success_distance) {
+            summary.maximum_minimum_success_distance = minimum_success_distance;
+            summary.maximum_distance_point = static_cast<int>(i);
+        }
+    }
+    return summary;
+}
+
+void inspect_adjacent_fiber_landscape(int k, int donor, int recipient, Sequence state) {
+    const Sequence child = singleton_base(k - 1);
+    const Hall hall(child);
+    std::sort(state.begin(), state.end(), std::greater<int>());
+    AdjacentFiberSearch signature_source(state, hall, donor, recipient, false);
+    const std::vector<LandscapePoint> raw =
+        enumerate_landscape(state, child, hall, donor, recipient);
+    const std::vector<LandscapePoint> points =
+        collapse_unlabelled_landscape(raw, signature_source.blocks);
+    const LandscapeSummary summary = summarize_landscape(points);
+
+    std::cout << "ADJACENT_FIBER_LANDSCAPE k=" << k
+              << " state=" << show(state)
+              << " donor=" << donor
+              << " recipient=" << recipient
+              << " feasible_markings=" << raw.size()
+              << " feasible_colorings=" << points.size()
+              << " failed_colorings=" << summary.failed
+              << " stuck_d1=" << summary.stuck_one
+              << " stuck_d2=" << summary.stuck_two
+              << " stuck_swap=" << summary.stuck_swap
+              << " no_direct_success_d1=" << summary.no_direct_success_one
+              << " no_direct_success_d2=" << summary.no_direct_success_two
+              << " no_direct_success_swap=" << summary.no_direct_success_swap << '\n';
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        const auto &[levels, columns, width, p, q] = points[i].band;
+        std::cout << "LANDSCAPE_POINT index=" << i
+                  << " margin=" << points[i].margin
+                  << " recipient_color=" << (points[i].recipient_in_a ? 'A' : 'B')
+                  << " band_levels=" << levels
+                  << " band_columns=" << columns
+                  << " band_width=" << width
+                  << " cut_p=" << p
+                  << " cut_q=" << q
+                  << " A=" << show(points[i].coloring.a)
+                  << " B=" << show(points[i].coloring.b) << '\n';
+    }
+}
+
+struct LandscapeCensus {
+    int k;
+    Sequence parent;
+    Sequence child;
+    Hall hall;
+    Sequence parent_prefix{0};
+    int total = 0;
+    std::uint64_t state_limit = 0;
+    std::uint64_t state_skip = 0;
+    std::uint64_t states_seen = 0;
+    std::uint64_t states = 0;
+    std::uint64_t transfers = 0;
+    std::uint64_t feasible_colorings = 0;
+    std::uint64_t failed_colorings = 0;
+    std::uint64_t stuck_one = 0;
+    std::uint64_t stuck_two = 0;
+    std::uint64_t stuck_swap = 0;
+    std::uint64_t no_direct_success_two = 0;
+    std::uint64_t no_direct_success_swap = 0;
+    std::uint64_t no_direct_success_one_or_swap = 0;
+    std::map<int, std::uint64_t> success_distance_counts;
+    int maximum_success_distance = -1;
+    Sequence maximum_distance_state;
+    int maximum_distance_donor = -1;
+    int maximum_distance_recipient = -1;
+    LandscapePoint maximum_distance_point;
+    Sequence first_stuck_one_state;
+    int first_stuck_one_donor = -1;
+    int first_stuck_one_recipient = -1;
+    LandscapePoint first_stuck_one_point;
+    Sequence first_stuck_swap_state;
+    int first_stuck_swap_donor = -1;
+    int first_stuck_swap_recipient = -1;
+    LandscapePoint first_stuck_swap_point;
+    Sequence first_stuck_state;
+    int first_stuck_donor = -1;
+    int first_stuck_recipient = -1;
+    LandscapePoint first_stuck_point;
+
+    LandscapeCensus(int level, std::uint64_t limit, std::uint64_t skip = 0)
+        : k(level), parent(singleton_base(level)), child(singleton_base(level - 1)),
+          hall(child), state_limit(limit), state_skip(skip) {
+        for (int value : parent) {
+            total += value;
+            parent_prefix.push_back(total);
+        }
+    }
+
+    int parent_H(int count) const {
+        return parent_prefix[std::min(count, static_cast<int>(parent.size()))];
+    }
+
+    void inspect_transfer(const Sequence &state, int donor, int recipient) {
+        ++transfers;
+        const std::vector<LandscapePoint> points =
+            enumerate_landscape(state, child, hall, donor, recipient);
+        AdjacentFiberSearch signature_source(state, hall, donor, recipient, false);
+        const std::vector<LandscapePoint> collapsed =
+            collapse_unlabelled_landscape(points, signature_source.blocks);
+        const LandscapeSummary summary = summarize_landscape(collapsed);
+        feasible_colorings += collapsed.size();
+        failed_colorings += summary.failed;
+        stuck_one += summary.stuck_one;
+        stuck_two += summary.stuck_two;
+        stuck_swap += summary.stuck_swap;
+        no_direct_success_two += summary.no_direct_success_two;
+        no_direct_success_swap += summary.no_direct_success_swap;
+        no_direct_success_one_or_swap += summary.no_direct_success_one_or_swap;
+        for (int distance : summary.minimum_success_distances)
+            ++success_distance_counts[distance];
+        if (summary.maximum_minimum_success_distance > maximum_success_distance) {
+            maximum_success_distance = summary.maximum_minimum_success_distance;
+            maximum_distance_state = state;
+            maximum_distance_donor = donor;
+            maximum_distance_recipient = recipient;
+            maximum_distance_point = collapsed[summary.maximum_distance_point];
+        }
+        if (summary.first_stuck_one >= 0 && first_stuck_one_state.empty()) {
+            first_stuck_one_state = state;
+            first_stuck_one_donor = donor;
+            first_stuck_one_recipient = recipient;
+            first_stuck_one_point = collapsed[summary.first_stuck_one];
+        }
+        if (summary.first_stuck_swap >= 0 && first_stuck_swap_state.empty()) {
+            first_stuck_swap_state = state;
+            first_stuck_swap_donor = donor;
+            first_stuck_swap_recipient = recipient;
+            first_stuck_swap_point = collapsed[summary.first_stuck_swap];
+        }
+        if (summary.first_stuck_two >= 0 && first_stuck_state.empty()) {
+            first_stuck_state = state;
+            first_stuck_donor = donor;
+            first_stuck_recipient = recipient;
+            first_stuck_point = collapsed[summary.first_stuck_two];
+        }
+    }
+
+    void inspect(const Sequence &state) {
+        ++states;
+        std::vector<int> values;
+        for (int value : state)
+            if (values.empty() || values.back() != value) values.push_back(value);
+        for (int donor : values) {
+            if (donor < 2) continue;
+            for (int recipient : values)
+                if (donor >= recipient + 2) inspect_transfer(state, donor, recipient);
+            if (static_cast<int>(state.size()) < total) inspect_transfer(state, donor, 0);
+        }
+    }
+
+    bool limit_reached() const {
+        return state_limit != 0 && states >= state_limit;
+    }
+
+    void enumerate(int remaining, int maximum, Sequence &state) {
+        if (limit_reached()) return;
+        if (remaining == 0) {
+            ++states_seen;
+            if (states_seen <= state_skip) return;
+            inspect(state);
+            return;
+        }
+        const int used = total - remaining;
+        for (int value = std::min(maximum, remaining); value >= 1; --value) {
+            if (used + value > parent_H(static_cast<int>(state.size()) + 1)) continue;
+            state.push_back(value);
+            enumerate(remaining - value, value, state);
+            state.pop_back();
+            if (limit_reached()) return;
+        }
+    }
+
+    void run() {
+        Sequence state;
+        enumerate(total, parent.front(), state);
+        std::cout << "ADJACENT_FIBER_LANDSCAPE_CENSUS k=" << k
+                  << " complete=" << (state_limit == 0 && state_skip == 0 ? "YES" : "NO")
+                  << " skipped_states=" << state_skip
+                  << " states=" << states
+                  << " transfers=" << transfers
+                  << " feasible_colorings=" << feasible_colorings
+                  << " failed_colorings=" << failed_colorings
+                  << " stuck_d1=" << stuck_one
+                  << " stuck_d2=" << stuck_two
+                  << " stuck_swap=" << stuck_swap
+                  << " no_direct_success_d2=" << no_direct_success_two
+                  << " no_direct_success_swap=" << no_direct_success_swap
+                  << " no_direct_success_one_or_swap="
+                  << no_direct_success_one_or_swap << '\n';
+        for (const auto &[distance, count] : success_distance_counts)
+            std::cout << "LANDSCAPE_SUCCESS_DISTANCE distance=" << distance
+                      << " failed_colorings=" << count << '\n';
+        if (!maximum_distance_state.empty())
+            std::cout << "LANDSCAPE_MAX_DISTANCE distance=" << maximum_success_distance
+                      << " state=" << show(maximum_distance_state)
+                      << " donor=" << maximum_distance_donor
+                      << " recipient=" << maximum_distance_recipient
+                      << " A=" << show(maximum_distance_point.coloring.a)
+                      << " B=" << show(maximum_distance_point.coloring.b) << '\n';
+        if (!first_stuck_one_state.empty()) {
+            const auto &[levels, columns, width, p, q] = first_stuck_one_point.band;
+            std::cout << "LANDSCAPE_D1_COUNTEREXAMPLE state=" << show(first_stuck_one_state)
+                      << " donor=" << first_stuck_one_donor
+                      << " recipient=" << first_stuck_one_recipient
+                      << " margin=" << first_stuck_one_point.margin
+                      << " band_levels=" << levels
+                      << " band_columns=" << columns
+                      << " band_width=" << width
+                      << " cut_p=" << p
+                      << " cut_q=" << q
+                      << " A=" << show(first_stuck_one_point.coloring.a)
+                      << " B=" << show(first_stuck_one_point.coloring.b) << '\n';
+        }
+        if (!first_stuck_swap_state.empty())
+            std::cout << "LANDSCAPE_SWAP_COUNTEREXAMPLE state="
+                      << show(first_stuck_swap_state)
+                      << " donor=" << first_stuck_swap_donor
+                      << " recipient=" << first_stuck_swap_recipient
+                      << " A=" << show(first_stuck_swap_point.coloring.a)
+                      << " B=" << show(first_stuck_swap_point.coloring.b) << '\n';
+        if (!first_stuck_state.empty()) {
+            const auto &[levels, columns, width, p, q] = first_stuck_point.band;
+            std::cout << "LANDSCAPE_D2_COUNTEREXAMPLE state=" << show(first_stuck_state)
+                      << " donor=" << first_stuck_donor
+                      << " recipient=" << first_stuck_recipient
+                      << " margin=" << first_stuck_point.margin
+                      << " band_levels=" << levels
+                      << " band_columns=" << columns
+                      << " band_width=" << width
+                      << " cut_p=" << p
+                      << " cut_q=" << q
+                      << " A=" << show(first_stuck_point.coloring.a)
+                      << " B=" << show(first_stuck_point.coloring.b) << '\n';
+        }
     }
 };
 
@@ -1910,6 +2400,36 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-landscape-census") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 3;
+        const std::uint64_t state_limit =
+            argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 0;
+        const std::uint64_t state_skip =
+            argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 0;
+        if (k < 1 || k > 4 || (state_limit == 0 && state_skip != 0)) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --adjacent-fiber-landscape-census k [state-limit [state-skip]]\n";
+            return 2;
+        }
+        LandscapeCensus census(k, state_limit, state_skip);
+        census.run();
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-landscape") {
+        if (argc < 6) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --adjacent-fiber-landscape k donor recipient value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int donor = std::atoi(argv[3]);
+        const int recipient = std::atoi(argv[4]);
+        Sequence state;
+        for (int i = 5; i < argc; ++i) state.push_back(std::atoi(argv[i]));
+        if (k < 1) return 2;
+        inspect_adjacent_fiber_landscape(k, donor, recipient, std::move(state));
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--adjacent-fiber-case") {
         if (argc < 6) {
             std::cerr << "usage: singleton_pair_coloring_census"
