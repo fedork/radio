@@ -622,6 +622,13 @@ struct LandscapeSummary {
     int first_no_direct_flip_above_floor = -1;
     int canonical_crossing_swap_failures = 0;
     int first_canonical_crossing_swap_failure = -1;
+    int maximum_mass_gain_failures = 0;
+    int first_maximum_mass_gain_failure = -1;
+    int maximum_mass_gain_bad_ties = 0;
+    int first_maximum_mass_gain_bad_tie = -1;
+    int nonpositive_maximum_mass_gain = 0;
+    int first_nonpositive_maximum_mass_gain = -1;
+    int minimum_maximum_mass_gain = std::numeric_limits<int>::max();
     int failed_recipient_side_at_floor = 0;
     int failed_recipient_side_above_floor = 0;
     int no_direct_flip_above_floor = 0;
@@ -710,6 +717,50 @@ LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points,
         bool reaches_one = false;
         bool reaches_two = false;
         bool reaches_swap = false;
+        int maximum_mass_gain = std::numeric_limits<int>::min();
+        bool maximum_mass_gain_reaches_success = false;
+        bool maximum_mass_gain_has_failure = false;
+        int mass_i = 0;
+        int total_mass = 0;
+        for (int value : points[i].coloring.a) mass_i += value;
+        total_mass = mass_i;
+        for (int value : points[i].coloring.b) total_mass += value;
+        Sequence separator_b = points[i].coloring.b;
+        Sequence outside_a = points[i].coloring.a;
+        if (recipient_value > 0 && !remove_one(separator_b, recipient_value)) std::exit(1);
+        if (!remove_one(outside_a, donor_value)) std::exit(1);
+        if (points[i].cut_q > 0) {
+            separator_b.resize(points[i].cut_q - 1);
+            if (recipient_value > 0) separator_b.push_back(recipient_value);
+        } else {
+            separator_b.clear();
+        }
+        if (points[i].cut_p > static_cast<int>(outside_a.size())) std::exit(1);
+        outside_a.erase(outside_a.begin(), outside_a.begin() + points[i].cut_p);
+        outside_a.push_back(donor_value);
+        const auto crossing_move = [&](const Sequence &candidate_a) {
+            std::map<int, int> difference;
+            for (int value : candidate_a) ++difference[value];
+            for (int value : points[i].coloring.a) --difference[value];
+            int added = -1, removed = -1, additions = 0, removals = 0;
+            for (const auto &[value, count] : difference) {
+                if (count == 1) {
+                    added = value;
+                    ++additions;
+                } else if (count == -1) {
+                    removed = value;
+                    ++removals;
+                } else if (count != 0) {
+                    return false;
+                }
+            }
+            if (additions != 1 ||
+                std::find(separator_b.begin(), separator_b.end(), added) == separator_b.end())
+                return false;
+            if (removals == 0) return true;
+            return removals == 1 &&
+                   std::find(outside_a.begin(), outside_a.end(), removed) != outside_a.end();
+        };
         int minimum_success_distance = std::numeric_limits<int>::max();
         for (std::size_t j = 0; j < points.size(); ++j) {
             const int distance = coloring_distance(points[i], points[j]);
@@ -738,6 +789,33 @@ LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points,
                 improves_swap = improves_swap || landscape_improves(points[i], points[j]);
                 reaches_swap = reaches_swap || points[j].margin >= 1;
             }
+
+            int mass_j = 0;
+            for (int value : points[j].coloring.a) mass_j += value;
+            const int direct_distance =
+                signature_distance(points[i].signature, points[j].signature);
+            const int opposite_distance =
+                signature_distance(points[i].signature, points[j].opposite_signature);
+            const auto consider_gain = [&](const Sequence &candidate_a,
+                                           int candidate_distance, int candidate_rows,
+                                           int candidate_mass) {
+                const bool one_flip = candidate_distance == 1;
+                const bool one_swap = candidate_distance == 2 && rows_i == candidate_rows;
+                if ((!one_flip && !one_swap) || !crossing_move(candidate_a)) return;
+                const int gain = candidate_mass - mass_i;
+                if (gain > maximum_mass_gain) {
+                    maximum_mass_gain = gain;
+                    maximum_mass_gain_reaches_success = points[j].margin >= 1;
+                    maximum_mass_gain_has_failure = points[j].margin < 1;
+                } else if (gain == maximum_mass_gain && points[j].margin >= 1) {
+                    maximum_mass_gain_reaches_success = true;
+                } else if (gain == maximum_mass_gain) {
+                    maximum_mass_gain_has_failure = true;
+                }
+            };
+            consider_gain(points[j].coloring.a, direct_distance, rows_j, mass_j);
+            consider_gain(points[j].coloring.b, opposite_distance, opposite_rows_j,
+                          total_mass - mass_j);
         }
         if (!improves_one) {
             ++summary.stuck_one;
@@ -761,6 +839,25 @@ LandscapeSummary summarize_landscape(const std::vector<LandscapePoint> &points,
             ++summary.canonical_crossing_swap_failures;
             if (summary.first_canonical_crossing_swap_failure < 0)
                 summary.first_canonical_crossing_swap_failure = static_cast<int>(i);
+        }
+        if (recipient_value > 0 && !maximum_mass_gain_reaches_success) {
+            ++summary.maximum_mass_gain_failures;
+            if (summary.first_maximum_mass_gain_failure < 0)
+                summary.first_maximum_mass_gain_failure = static_cast<int>(i);
+        }
+        if (recipient_value > 0 && maximum_mass_gain_has_failure) {
+            ++summary.maximum_mass_gain_bad_ties;
+            if (summary.first_maximum_mass_gain_bad_tie < 0)
+                summary.first_maximum_mass_gain_bad_tie = static_cast<int>(i);
+        }
+        if (recipient_value > 0) {
+            summary.minimum_maximum_mass_gain =
+                std::min(summary.minimum_maximum_mass_gain, maximum_mass_gain);
+            if (maximum_mass_gain <= 0) {
+                ++summary.nonpositive_maximum_mass_gain;
+                if (summary.first_nonpositive_maximum_mass_gain < 0)
+                    summary.first_nonpositive_maximum_mass_gain = static_cast<int>(i);
+            }
         }
         const int recipient_side_rows = static_cast<int>(points[i].coloring.b.size());
         if (recipient_side_rows == hall.child_rows) {
@@ -825,6 +922,209 @@ void inspect_adjacent_fiber_landscape(int k, int donor, int recipient, Sequence 
                   << " cut_q=" << q
                   << " A=" << show(points[i].coloring.a)
                   << " B=" << show(points[i].coloring.b) << '\n';
+    }
+}
+
+// Inspect the exact obstruction created by every recoloring that crosses one selected minimum
+// separator.  This is a labelled case mode: it is meant to test the proposed Pascal-band descent,
+// not to contribute to the large censuses.  A rank-loss blocker with old color counts (a,b) loses
+// exactly the Ferrers columns whose heights lie between the two counts.  We encode that closed
+// height interval [lo,hi] as band_key(lo-1,hi+1).
+void inspect_boundary_blockers(int k, int donor_value, int recipient_value,
+                               int point_index, Sequence state) {
+    std::sort(state.begin(), state.end(), std::greater<int>());
+    const Sequence child = singleton_base(k - 1);
+    const Hall hall(child);
+    AdjacentFiberSearch signature_source(state, hall, donor_value, recipient_value, false);
+    const std::vector<LandscapePoint> raw =
+        enumerate_landscape(state, child, hall, donor_value, recipient_value);
+    const std::vector<LandscapePoint> points =
+        collapse_unlabelled_landscape(raw, signature_source.blocks);
+    if (point_index < 0 || point_index >= static_cast<int>(points.size())) {
+        std::cerr << "BOUNDARY_BLOCKERS point index out of range\n";
+        std::exit(2);
+    }
+    const LandscapePoint &point = points[point_index];
+    if (point.margin >= 1 || point.cut_p < 0 || point.cut_q < 0) {
+        std::cerr << "BOUNDARY_BLOCKERS requires a failed landscape point\n";
+        std::exit(2);
+    }
+
+    Sequence values;
+    std::vector<unsigned char> old_a;
+    for (int value : point.coloring.a) {
+        values.push_back(value);
+        old_a.push_back(1);
+    }
+    for (int value : point.coloring.b) {
+        values.push_back(value);
+        old_a.push_back(0);
+    }
+    const int n = static_cast<int>(values.size());
+    if (n > 24) {
+        std::cerr << "BOUNDARY_BLOCKERS supports at most 24 material rows\n";
+        std::exit(2);
+    }
+    int donor = -1, recipient = -1;
+    for (int row = 0; row < n; ++row) {
+        if (donor < 0 && old_a[row] && values[row] == donor_value) donor = row;
+        if (recipient < 0 && static_cast<bool>(old_a[row]) == point.recipient_in_a &&
+            values[row] == recipient_value)
+            recipient = row;
+    }
+    if (donor < 0 || recipient < 0) {
+        std::cerr << "BOUNDARY_BLOCKERS could not label donor/recipient\n";
+        std::exit(2);
+    }
+
+    std::vector<unsigned char> in_separator(n, 0);
+    in_separator[recipient] = 1;
+    int need_a = point.cut_p;
+    int need_b = point.cut_q - (point.recipient_in_a ? 0 : 1);
+    if (point.recipient_in_a) --need_a;
+    for (int row = 0; row < n && need_a > 0; ++row) {
+        if (row != donor && old_a[row] && row != recipient) {
+            in_separator[row] = 1;
+            --need_a;
+        }
+    }
+    for (int row = 0; row < n && need_b > 0; ++row) {
+        if (!old_a[row] && row != recipient) {
+            in_separator[row] = 1;
+            --need_b;
+        }
+    }
+    if (need_a != 0 || need_b != 0) {
+        std::cerr << "BOUNDARY_BLOCKERS could not reconstruct separator\n";
+        std::exit(2);
+    }
+
+    const auto target_band = band_key(point.cut_p, point.cut_q, child);
+    const auto print_band = [](const std::tuple<int, int, int, int, int> &band) {
+        const auto &[levels, columns, width, p, q] = band;
+        std::cout << "levels=" << levels << ",columns=" << columns
+                  << ",width=" << width << ",p=" << p << ",q=" << q;
+    };
+    std::cout << "BOUNDARY_BLOCKERS k=" << k << " state=" << show(state)
+              << " donor=" << donor_value << " recipient=" << recipient_value
+              << " point=" << point_index << " cut=(" << point.cut_p << ','
+              << point.cut_q << ") target_band=";
+    print_band(target_band);
+    std::cout << " A=" << show(point.coloring.a)
+              << " B=" << show(point.coloring.b) << '\n';
+
+    const auto inspect_move = [&](const char *kind, int u, int v,
+                                  const std::vector<unsigned char> &new_a) {
+        Coloring candidate;
+        for (int row = 0; row < n; ++row) {
+            if (new_a[row]) candidate.push_a(values[row]);
+            else candidate.push_b(values[row]);
+        }
+        std::sort(candidate.a.begin(), candidate.a.end(), std::greater<int>());
+        std::sort(candidate.b.begin(), candidate.b.end(), std::greater<int>());
+
+        int target_old_a = 0, target_old_b = 0, target_new_a = 0, target_new_b = 0;
+        for (int row = 0; row < n; ++row) {
+            if (!in_separator[row]) continue;
+            (old_a[row] ? target_old_a : target_old_b)++;
+            (new_a[row] ? target_new_a : target_new_b)++;
+        }
+        const int target_gain = hall.capacity(target_new_a, target_new_b) -
+                                hall.capacity(target_old_a, target_old_b);
+
+        int minimum_x_margin = 0;
+        int violations = 0;
+        bool all_blocker_bands_smaller = true;
+        bool have_blocker_band = false;
+        std::tuple<int, int, int, int, int> largest_blocker_band{-1, -1, -1, -1, -1};
+        int example_old_a = -1, example_old_b = -1, example_new_a = -1,
+            example_new_b = -1, example_old_slack = -1, example_new_margin = -1;
+        const std::uint64_t masks = std::uint64_t{1} << n;
+        for (std::uint64_t mask = 1; mask < masks; ++mask) {
+            int demand = 0, oa = 0, ob = 0, na = 0, nb = 0;
+            for (int row = 0; row < n; ++row) {
+                if (((mask >> row) & 1U) == 0) continue;
+                demand += values[row];
+                (old_a[row] ? oa : ob)++;
+                (new_a[row] ? na : nb)++;
+            }
+            const int new_margin = hall.capacity(na, nb) - demand;
+            minimum_x_margin = std::min(minimum_x_margin, new_margin);
+            if (new_margin >= 0) continue;
+            ++violations;
+            const int old_slack = hall.capacity(oa, ob) - demand;
+            if (old_slack < 0 || oa == na || ob == nb) {
+                std::cerr << "BOUNDARY_BLOCKERS inconsistent rank-loss blocker\n";
+                std::exit(1);
+            }
+            const int lo = std::min(oa, ob);
+            const int hi = std::max(oa, ob);
+            const auto blocker_band = band_key(lo - 1, hi + 1, child);
+            all_blocker_bands_smaller &= blocker_band < target_band;
+            if (!have_blocker_band || largest_blocker_band < blocker_band) {
+                have_blocker_band = true;
+                largest_blocker_band = blocker_band;
+                example_old_a = oa;
+                example_old_b = ob;
+                example_new_a = na;
+                example_new_b = nb;
+                example_old_slack = old_slack;
+                example_new_margin = new_margin;
+            }
+        }
+
+        std::cout << "CROSSING_MOVE kind=" << kind;
+        if (u >= 0) std::cout << " u=" << values[u] << "@" << u;
+        std::cout << " v=" << values[v] << "@" << v
+                  << " target_gain=" << target_gain
+                  << " x_margin=" << minimum_x_margin;
+        if (violations > 0) {
+            std::cout << " blockers=" << violations
+                      << " all_blocker_bands_smaller="
+                      << (all_blocker_bands_smaller ? "YES" : "NO")
+                      << " largest_blocker_band=";
+            print_band(largest_blocker_band);
+            std::cout << " example_counts=(" << example_old_a << ',' << example_old_b
+                      << ")->(" << example_new_a << ',' << example_new_b << ')'
+                      << " old_slack=" << example_old_slack
+                      << " new_margin=" << example_new_margin;
+        } else {
+            Coloring normalized = candidate;
+            bool recipient_in_a = new_a[recipient] != 0;
+            if (!new_a[donor]) {
+                std::swap(normalized.a, normalized.b);
+                recipient_in_a = !recipient_in_a;
+            }
+            const SeparatorWitness next = separator_witness(
+                hall, normalized, donor_value, recipient_value, recipient_in_a);
+            std::cout << " next_margin=" << next.margin;
+            if (next.margin < 1) {
+                const auto next_band = band_key(next.p, next.q, child);
+                std::cout << " next_cut=(" << next.p << ',' << next.q << ")"
+                          << " next_band=";
+                print_band(next_band);
+                std::cout << " next_band_smaller=" << (next_band < target_band ? "YES" : "NO");
+            } else {
+                std::cout << " transfer=SUCCESS";
+            }
+        }
+        std::cout << '\n';
+    };
+
+    // The relevant crossing directions move a B-row inside the B-heavy separator to A, either
+    // alone or while moving an A-row outside the separator back to B.
+    for (int v = 0; v < n; ++v) {
+        if (old_a[v] || !in_separator[v]) continue;
+        std::vector<unsigned char> flipped = old_a;
+        flipped[v] = 1;
+        inspect_move("flip", -1, v, flipped);
+        for (int u = 0; u < n; ++u) {
+            if (!old_a[u] || in_separator[u]) continue;
+            std::vector<unsigned char> swapped = old_a;
+            swapped[u] = 0;
+            swapped[v] = 1;
+            inspect_move("swap", u, v, swapped);
+        }
     }
 }
 
@@ -910,6 +1210,10 @@ struct LandscapeCensus {
     std::uint64_t no_direct_flip_above_floor = 0;
     std::uint64_t no_direct_swap_at_floor = 0;
     std::uint64_t canonical_crossing_swap_failures = 0;
+    std::uint64_t maximum_mass_gain_failures = 0;
+    std::uint64_t maximum_mass_gain_bad_ties = 0;
+    std::uint64_t nonpositive_maximum_mass_gain = 0;
+    int minimum_maximum_mass_gain = std::numeric_limits<int>::max();
     std::map<int, std::uint64_t> success_distance_counts;
     int maximum_success_distance = -1;
     Sequence maximum_distance_state;
@@ -936,6 +1240,10 @@ struct LandscapeCensus {
     int first_canonical_crossing_swap_failure_donor = -1;
     int first_canonical_crossing_swap_failure_recipient = -1;
     LandscapePoint first_canonical_crossing_swap_failure_point;
+    Sequence first_maximum_mass_gain_failure_state;
+    int first_maximum_mass_gain_failure_donor = -1;
+    int first_maximum_mass_gain_failure_recipient = -1;
+    LandscapePoint first_maximum_mass_gain_failure_point;
 
     LandscapeCensus(int level, std::uint64_t limit, std::uint64_t skip = 0)
         : k(level), parent(singleton_base(level)), child(singleton_base(level - 1)),
@@ -973,6 +1281,11 @@ struct LandscapeCensus {
         no_direct_swap_at_floor += summary.no_direct_swap_at_floor;
         canonical_crossing_swap_failures +=
             summary.canonical_crossing_swap_failures;
+        maximum_mass_gain_failures += summary.maximum_mass_gain_failures;
+        maximum_mass_gain_bad_ties += summary.maximum_mass_gain_bad_ties;
+        nonpositive_maximum_mass_gain += summary.nonpositive_maximum_mass_gain;
+        minimum_maximum_mass_gain =
+            std::min(minimum_maximum_mass_gain, summary.minimum_maximum_mass_gain);
         for (int distance : summary.minimum_success_distances)
             ++success_distance_counts[distance];
         if (summary.maximum_minimum_success_distance > maximum_success_distance) {
@@ -1015,6 +1328,14 @@ struct LandscapeCensus {
             first_canonical_crossing_swap_failure_recipient = recipient;
             first_canonical_crossing_swap_failure_point =
                 collapsed[summary.first_canonical_crossing_swap_failure];
+        }
+        if (summary.first_maximum_mass_gain_failure >= 0 &&
+            first_maximum_mass_gain_failure_state.empty()) {
+            first_maximum_mass_gain_failure_state = state;
+            first_maximum_mass_gain_failure_donor = donor;
+            first_maximum_mass_gain_failure_recipient = recipient;
+            first_maximum_mass_gain_failure_point =
+                collapsed[summary.first_maximum_mass_gain_failure];
         }
     }
 
@@ -1076,7 +1397,17 @@ struct LandscapeCensus {
                   << " no_direct_flip_above_floor=" << no_direct_flip_above_floor
                   << " no_direct_swap_at_floor=" << no_direct_swap_at_floor
                   << " canonical_crossing_swap_failures="
-                  << canonical_crossing_swap_failures << '\n';
+                  << canonical_crossing_swap_failures
+                  << " maximum_mass_gain_failures="
+                  << maximum_mass_gain_failures
+                  << " maximum_mass_gain_bad_ties="
+                  << maximum_mass_gain_bad_ties
+                  << " nonpositive_maximum_mass_gain="
+                  << nonpositive_maximum_mass_gain
+                  << " minimum_maximum_mass_gain="
+                  << (minimum_maximum_mass_gain == std::numeric_limits<int>::max()
+                          ? -1 : minimum_maximum_mass_gain)
+                  << '\n';
         for (const auto &[distance, count] : success_distance_counts)
             std::cout << "LANDSCAPE_SUCCESS_DISTANCE distance=" << distance
                       << " failed_colorings=" << count << '\n';
@@ -1139,6 +1470,14 @@ struct LandscapeCensus {
                       << show(first_canonical_crossing_swap_failure_point.coloring.a)
                       << " B="
                       << show(first_canonical_crossing_swap_failure_point.coloring.b)
+                      << '\n';
+        if (!first_maximum_mass_gain_failure_state.empty())
+            std::cout << "LANDSCAPE_MAXIMUM_MASS_GAIN_FAILURE state="
+                      << show(first_maximum_mass_gain_failure_state)
+                      << " donor=" << first_maximum_mass_gain_failure_donor
+                      << " recipient=" << first_maximum_mass_gain_failure_recipient
+                      << " A=" << show(first_maximum_mass_gain_failure_point.coloring.a)
+                      << " B=" << show(first_maximum_mass_gain_failure_point.coloring.b)
                       << '\n';
     }
 };
@@ -2618,6 +2957,22 @@ struct GlobalBalanceCensus {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--boundary-blockers") {
+        if (argc < 7) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --boundary-blockers k donor recipient point-index value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int donor = std::atoi(argv[3]);
+        const int recipient = std::atoi(argv[4]);
+        const int point_index = std::atoi(argv[5]);
+        Sequence state;
+        for (int i = 6; i < argc; ++i) state.push_back(std::atoi(argv[i]));
+        if (k < 1) return 2;
+        inspect_boundary_blockers(k, donor, recipient, point_index, std::move(state));
+        return 0;
+    }
     if (argc >= 2 && std::string(argv[1]) == "--boundary-delta-case") {
         if (argc < 4) {
             std::cerr << "usage: singleton_pair_coloring_census"

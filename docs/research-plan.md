@@ -204,10 +204,18 @@ exchange, and nested/laminar supports are false already at `K=3`.  The fixed-abs
 family itself is not a delta-matroid: `(3,2^11,1,1)@3` has an explicit symmetric-exchange failure.
 Use the exact boundary calculus instead.  A failed `B->A` flip is certified by an `A`-heavy cut;
 a failed crossing swap has one blocker family of each imbalance; and every successful local repair
-must cross the original `B`-heavy tight separator.  The remaining proof is therefore termination
-of this alternating cut chain by strict descent of its dyadic band.  Row-count slack and two
-closest-boundary prescriptions both have `K=4` counterexamples, so do not preselect the exchanged
-identities.  Exact formulas and counterexamples are in the
+must cross the original `B`-heavy tight separator.  Strict descent of the dyadic band is false:
+`(3,2^11,1,1)@3` has a crossing-swap blocker with exactly the target band.  Prove the weaker and
+cleaner **Positive Pascal Crossing Lemma** instead: every failed material-row coloring has an
+original-state-feasible crossing flip or swap that strictly increases the recipient-opposite
+side's total mass.  Repeating such moves terminates because nonendpoint moves preserve the marked
+orientation and strictly increase a bounded integer mass, while an endpoint move gives a
+same-color certificate.  Complete `K=3` and the first 5,000 `K=4` states have minimum maximum
+crossing gain one, and every maximum-gain tie succeeds immediately; three further disjoint windows
+also have a successful maximum-gain neighbor.  The missing proof should uncross the blockers of
+*all* positive moves with the tight separator and use (TB3) to derive a violated parent prefix.
+Row-count slack and two closest-boundary prescriptions both have `K=4` counterexamples, so do not
+preselect the exchanged identities.  Exact formulas and counterexamples are in the
 [boundary-exchange record](../evidence/singleton_boundary_exchange_2026-08-28.md).
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the

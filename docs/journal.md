@@ -10898,3 +10898,41 @@ with a larger opposite-side row.  The final 5,000-state run took 55 wall seconds
 RSS.  The exact identities, build and commands are in
 `evidence/singleton_boundary_exchange_2026-08-28.md`.  Do not add another endpoint or closest-value
 special case: the live target is existence over the whole crossing cut.
+
+## 2026-08-28 -- same-band blockers refute descent; positive crossing gives a monotone target
+
+The proposed strict Pascal-band descent is false even in the existing `K=3` boundary example.  For
+`x=(3,2^11,1,1)`, transfer `3->1`, and coloring `A=(3,2,2,2)`,
+`B=(2^8,1,1)`, the selected dangerous cut has counts `(0,10)`.  Swapping the marked width-three
+donor with a selected width-two row is blocked at old/new counts `(1,9)->(0,10)`.  The blocker's
+closed rank-loss band is exactly the original target band: three levels, four columns, width ten.
+Thus an alternating proof cannot use the dyadic band alone as a strictly decreasing potential.
+The exact `--boundary-blockers` mode now enumerates every crossing flip/swap for a selected failed
+coloring and distinguishes original-state infeasibility from a new transferred-state separator.
+
+A much simpler potential survived the finite tests.  Orient donor in `A` and recipient in `B`.
+Across a dangerous cut `X union Y`, call a feasible flip of a positive row in `Y`, or a feasible
+swap `v in Y`, `u in A-X` with `x_v>x_u`, a positive crossing.  It strictly increases total
+`A`-mass.  If it moves either marked endpoint, donor and recipient share a color and the transfer
+is finished.  Otherwise the endpoint orientation is unchanged; repeat if another separator
+remains.  Since each nonterminal step strictly increases an integer mass bounded by the pure Hall
+inequality, this process cannot cycle.  A padded zero recipient is assigned the donor's color for
+free.  Consequently the open Positive Pascal Crossing Lemma--existence of one such move at every
+material-row failure--would prove Adjacent-Fiber without one-step success or band descent.
+
+The quotient landscape census tests the stronger rule that every maximum-mass-gain crossing
+neighbor succeeds immediately.  The complete `K=3` census has 348 failed colorings and the first
+5,000 `K=4` states have 45,504; neither has a failed maximizing choice or a bad tie, and the minimum
+maximum gain is one.  Earlier-build disjoint windows found no missing successful maximum among
+78,487 failures after skip 1,000,000, 41,842 after skip 3,000,000, and 18,137 after skip 5,000,000.
+The latter two used 200 states each.  A 1,000-state attempt at skip 3,000,000 timed out after 184
+wall seconds and is an abort, not evidence; its 200-state replacement completed in 96 seconds.
+The 1M and 5M completed runs took 121 and 76 seconds.  The final complete-`K=3`/first-5,000 build is
+`fa329a545ac76dca7dda565267c854962707ed331e393d111ae9303346c3e46e`; its `K=4` run took 56
+wall seconds at 0.01 GB peak RSS.
+
+The theorem remains open.  The exact remaining proof should suppose every positive crossing move
+is blocked, uncross all `A`-heavy flip blockers and `B`-heavy swap blockers with the dangerous cut,
+and use the repeated columns in (TB3) to sum those certificates into a parent-prefix violation.
+The maximum-gain data identifies the correct global direction; it does not supply that uncrossing
+argument.

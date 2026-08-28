@@ -74,7 +74,7 @@ cut must flip, or some such row must swap with an `A` row outside it.
 
 ## Reproduction
 
-The final provenance build is
+The boundary/delta build was
 `cb48a5d92eccb9f3cbdf76b30c1b0cd2a31ad7cdb6126bbfebea6144512db25f`:
 
     CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
@@ -89,3 +89,66 @@ The final provenance build is
 
 The `K=3` run is exhaustive.  The `K=4` run is an exact initial window, not a complete level.  It
 completed in 55 wall seconds at 0.01 GB reported peak RSS.
+
+## Strict band descent is false; positive mass gives an acyclic target
+
+The exact blocker mode `--boundary-blockers` distinguishes two failures of a crossing move: the
+new coloring may violate an original-demand Hall inequality, or it may remain feasible for the
+original state while exposing another tight separator for the transferred state.  For a rank-loss
+blocker with old color counts `(a,b)`, the lost columns have heights in the closed interval between
+`a` and `b`; the mode compares that interval with the open Pascal band of the target separator.
+
+The delta-matroid counterexample above also refutes strict band descent.  Use transfer `3->1` and
+
+    A=(3,2,2,2),       B=(2^8,1,1).
+
+Its selected target cut is `(p,q)=(0,10)`.  Swapping the width-three donor with a selected
+width-two row is infeasible, and its blocker changes counts `(1,9)->(0,10)`.  The blocker band and
+target band are both
+
+    levels=3, columns=4, width=10, p=0, q=10.
+
+So an arbitrary alternating blocker chain has no strictly decreasing band potential.  In the same
+case, flipping any selected width-two row is feasible and immediately supports the transfer.
+
+This suggested testing a global but much simpler rule.  Among all feasible crossing flips and
+swaps across the selected separator, maximize the increase in the total mass of the side receiving
+the selected `B` row.  For material recipients, the exact quotient census found:
+
+| window | failed colorings | no successful maximum | failed tied maximum |
+|---|---:|---:|---:|
+| complete `K=3` | 348 | 0 | 0 |
+| first 5,000 `K=4` states | 45,504 | 0 | 0 |
+| 1,000 states after skip 1,000,000 | 78,487 | 0 | not measured |
+| 200 states after skip 3,000,000 | 41,842 | 0 | not measured |
+| 200 states after skip 5,000,000 | 18,137 | 0 | not measured |
+
+In the complete `K=3` run and first `K=4` window, every maximizing crossing neighbor succeeds,
+not merely one choice among ties, and the minimum maximum mass gain is `1`.  Across all displayed
+windows, all 183,970 failed colorings have a successful maximum-gain crossing neighbor.  The late
+windows are exact on their stated ranges, not a complete `K=4` census.  A 1,000-state run at skip
+3,000,000 timed out after 184 wall seconds and is an abort, not evidence; the completed 200-state
+replacement took 96 seconds.
+
+The weaker positive-gain statement is enough for a proof.  Repeatedly take any original-state
+feasible crossing move that strictly increases the receiving side's mass.  A move of either marked
+endpoint finishes by putting donor and recipient together.  Every other nonterminal move preserves
+their orientation and strictly increases an integer mass bounded by the pure Hall inequality, so
+the process cannot cycle.  The exact remaining claim is therefore the **Positive Pascal Crossing
+Lemma**: such a positive feasible crossing move always exists.  It is still open.
+
+The final build for the complete `K=3` and first-5,000 `K=4` maximum/tie/positive-gain checks is
+`fa329a545ac76dca7dda565267c854962707ed331e393d111ae9303346c3e46e`:
+
+    CC=clang++ tools/build_radio.py -O3 -std=c++20 -Wall -Wextra -pedantic \
+        tools/singleton_pair_coloring_census.cpp -o /tmp/singleton_boundary_positive_final
+    tools/run_with_provenance.py /tmp/singleton_boundary_positive_final \
+        --adjacent-fiber-landscape-census 3 0
+    tools/capped_run.sh --seconds 180 --rss-gb 1 --label boundary-positive-k4 -- \
+        tools/run_with_provenance.py /tmp/singleton_boundary_positive_final \
+        --adjacent-fiber-landscape-census 4 5000 0
+
+The final run took 56 wall seconds at 0.01 GB reported peak RSS.  The detailed blocker command is
+
+    tools/run_with_provenance.py /tmp/singleton_boundary_positive_final \
+        --boundary-blockers 3 3 1 13 3 2 2 2 2 2 2 2 2 2 2 2 1 1

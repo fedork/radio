@@ -537,12 +537,49 @@ leaves `r(S)` unchanged or decreases it, whereas the transferred demand on `S` i
 Conversely, every such crossing move gains the amount in (CG) on this particular cut.  The only
 remaining issue is that it may expose an oppositely imbalanced blocker elsewhere.
 
-This reduces the proposed proof to a precise alternating-cut statement: starting from a
-`B`-heavy tight transfer cut, choose a crossing flip or swap; if it is blocked, follow its
-`A`-heavy certificate, then its next `B`-heavy certificate, and prove that the dyadic band strictly
-decreases before a cut can repeat.  The Pascal repeated-rank inequality (TB3) supplies at least two
-columns on the departing band.  What is not yet proved is that one of those copies forces strict
-descent rather than allowing the alternating certificate chain to return on a different row set.
+Plain dyadic-band descent is false.  At `K=3`, for
+
+    x=(3,2^11,1,1),       transfer 3 -> 1,
+    A=(3,2,2,2),          B=(2^8,1,1),
+
+the selected tight separator has counts `(0,10)`.  Swapping the width-three donor with a selected
+width-two row is blocked by a set whose old/new counts are `(1,9)->(0,10)`; its closed Pascal
+rank-loss band is exactly the original open target band, not a smaller one.  Swapping equal
+width-two rows can also reproduce the same value coloring and the same separator.  Thus a proof
+cannot follow an arbitrary blocker and use the band alone as a decreasing potential.  A crossing
+flip of a width-two row succeeds in this example, so the failure points instead toward a global
+choice over the whole cut.
+
+There is a simpler monotone target.  Orient the failed coloring so that the donor is in `A` and
+the recipient in `B`, and select a tight transfer separator `S=X union Y`.  Call a crossing move
+**positive** when it is feasible for the original demand and either
+
+1. flips a positive-width row `v in Y` from `B` to `A`; or
+2. swaps `v in Y` with `u in A-X` and has `x_v>x_u`.
+
+Equivalently, the move strictly increases the total mass colored `A`.  The remaining local claim
+can be stated as follows.
+
+> **Positive Pascal Crossing Lemma (open).** Every failed material-row coloring has a tight
+> transfer separator across which some positive crossing flip or swap is feasible.
+
+This lemma alone proves the Adjacent-Fiber Lemma; the crossing move need not solve the transfer
+immediately.  If it moves the recipient or the donor (but not both, since the donor is at least two
+larger), the two marked rows acquire the same color and the same-color argument finishes.  Otherwise
+their orientation stays `A/B`.  If the new coloring still fails, repeat from one of its tight
+separators.  Each nonterminal step strictly increases the integer `A`-mass, while the pure Hall
+inequality bounds that mass by `2*3^(K-1)`, so cycling is impossible and the process terminates at a
+common coloring.  A zero recipient is easier: its padded zero row may be assigned the donor's color
+without affecting feasibility, and after the transfer the marked rows already share a color.
+
+The finite evidence is stronger than the open lemma.  Through `K=3` and in the first 5,000 `K=4`
+states, every maximum-`A`-mass crossing neighbor is successful for the transfer, every tie at the
+maximum is successful, and the smallest observed maximum gain is one.  Three further disjoint
+windows also have a successful maximum-gain crossing neighbor.  These observations identify the
+right acyclic potential, but do not prove that a positive feasible crossing move exists.  A proof
+should assume that every positive crossing flip/swap has an `A`- or `B`-heavy blocker, uncross those
+certificates with `S`, and use (TB3) to turn the resulting closed alternating region into a violated
+parent prefix inequality.
 
 Standard delta-matroid exchange does not supply that termination.  The fixed-absolute coloring
 family is not even a delta-matroid in general for Pascal `H`.  At `K=3`, take
