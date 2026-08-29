@@ -5,8 +5,8 @@ Aigner and Li--Wu--Triesch, our state `Sb(n:m)` is the complete bipartite graph 
 their search number `c(K_{m,n})` is the minimum number of adaptive ternary tests.  Thus their
 largest `n` with `c(K_{m,n}) <= k` is exactly our `n(k,m)`.
 
-The eleven sources below and the scoped Aigner book scan were read directly, not inferred from
-abstracts or secondary citations. Bibliographic links point to the version of record; local
+The sources below and the scoped Aigner book scan were read directly, not inferred from
+secondary citations. Bibliographic links point to the version of record when available; local
 download paths are deliberately not committed.
 
 ## Primary sources read
@@ -48,6 +48,36 @@ directly checked details are in [aigner-1988-scan.md](aigner-1988-scan.md).
   exact `m=3` result. This independently cross-checks the corresponding Aigner 1986 claims.
 - Proposition 3.25 is only a necessary majorization condition. Its stated open converse is a
   useful guard against overstating what this older source proves.
+
+### Stanley 1998
+
+R. P. Stanley, “Graph colorings and related symmetric functions: ideas and applications,”
+*Discrete Mathematics* 193 (1998), 267–286.
+[DOI 10.1016/S0012-365X(98)00146-0](https://doi.org/10.1016/S0012-365X(98)00146-0).
+
+- Defines a graph to be **nice** when its stable-partition types form a dominance ideal.  Since
+  stable sets in an incomparability graph are poset chains, the full-mass Singleton Majorization
+  Converse is exactly niceness of the transcript graph `Q_K`.
+- Records Griggs's Boolean-lattice dominance conjecture in this language.  This is the right
+  adjacent literature for the singleton question: majorization of chain sizes is a recognized
+  global existence problem, not a consequence of Greene--Kleitman prefix extremality.
+- Proposition 1.6 proves that a graph and all of its induced subgraphs are nice exactly when the
+  graph is claw-free.  It does not apply here: `Q_3` contains an induced claw, even though the
+  exact census proves that this particular graph is nice and strongly nice.
+
+### Shahriari 2008 (conference survey)
+
+S. Shahriari, “Normalized Matching Posets and Chain Partitions,” Polish Combinatorial Conference,
+Będlewo (2008).
+[Survey slides](https://2pcc.tcs.uj.edu.pl/archive/2pcc-Shariar-Shariari.pdf).
+
+- States the generalized Griggs conjectural template: a finite normalized-matching poset should
+  admit a chain partition of every size partition dominated by its nested-chain-decomposition
+  partition.
+- The transcript poset `P_K=V^K` is now proved locally to be normalized matching and to have nested
+  chain shape `G_K`.  Therefore the full-mass singleton converse is exactly the `P_K` instance of
+  this template.  The survey supplies terminology and context, not a theorem resolving this
+  special family.
 
 ### Andreae 1989
 

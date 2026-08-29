@@ -1394,20 +1394,135 @@ rows have total 15 greater than `sum(v)=13`.  The flexible coloring
 `A=(5,5)`, `B=(8,5)` does satisfy (C).  Hence the mixed capacity must be assigned adaptively; its
 identical targets cannot be permanently pre-colored.
 
-### Equivalent prescribed-chain problem
+### The Pascal rank poset and the Griggs-dominance connection (2026-08-29)
 
-There is also a useful poset formulation.  Let `V` be the three-element poset with
-`1<0`, `1<2`, and `0` incomparable with `2`, and let `P_K` be its `K`-fold lexicographic power.
-Then `Q_K` is the incomparability graph of `P_K`: two words are incomparable precisely when their
-first differing symbols are `0` and `2`.  Stable color classes of `Q_K` are therefore chains of
-`P_K`, and `G_K` is its Greene--Kleitman chain shape.
+The poset formulation identifies the problem more sharply than the Greene--Kleitman prefix
+calculation alone.  Let `V` be the three-element poset with `1<0`, `1<2`, and `0` incomparable
+with `2`, and let `P_K` be its `K`-fold lexicographic power.  Then `Q_K` is the incomparability
+graph of `P_K`: two words are incomparable precisely when their first differing symbols are `0`
+and `2`.  Stable color classes of `Q_K` are therefore chains of `P_K`.
 
-For full mass, the converse says exactly that every partition dominated by this
-Greene--Kleitman shape occurs as the list of lengths of a chain partition of `P_K`; for smaller
-mass, take an induced subposet.  General Greene--Kleitman theory supplies the extremal prefix
-numbers, which is another proof of necessity, but it does not supply all dominated chain-partition
-types.  Thus this is a useful connection and a possible source of an augmenting-chain proof, not a
-solution by itself.
+Replace a symbol `1` by the bit zero and either outer symbol `0,2` by the bit one.  If the resulting
+binary word represents the integer `r`, then the rank of the transcript is exactly
+
+    rho(w)=r,                         0<=r<2^K.                 (PR1)
+
+Indeed,
+
+    P_K = P_(K-1) ordinal-sum (P_(K-1) parallel-union P_(K-1)):  (PR2)
+
+the first-symbol-`1` copy occupies the lower half of the ranks, and the two outer copies occupy the
+upper half.  Every `1` bit of `r` may independently be labelled by the outer symbol `0` or `2`,
+whereas every zero bit is forced to be the symbol `1`.  Hence the rank number is
+
+    R_K(r)=2^popcount(r).                                      (PR3)
+
+This is the Pascal structure in rank order, before sorting any row or column profile.
+
+The adjacent-rank graph is equally explicit.  Write the binary expansion of `r` as
+
+    u 0 1^m,
+
+so `r+1` is `u 1 0^m`, and put `c=popcount(u)`.  The cover graph between these ranks is the
+disjoint union of `2^c` copies of
+
+    K_(2^m,2).                                                  (PR4)
+
+The component records the outer labels on the one-bits of `u`; after the carry, the new one-bit
+has two outer labels and the `m` reset bits have none.  Formula (PR4) proves the normalized
+matching inequality: if a lower-rank subset meets `d` components, it has at most `d 2^m` elements
+and its upper neighborhood has exactly `2d` elements.  Thus `P_K` is a normalized-matching poset.
+
+It also has a nested chain decomposition.  Inductively index the child chains `C_i` so that `C_i`
+meets local rank `r` exactly when `i<=R_(K-1)(r)`.  In the two upper copies give the copies of
+`C_i` global labels `2i-1,2i`.  For every global label `j<=2^(K-1)`, concatenate lower chain
+`C_j` with the upper chain carrying label `j`; labels above `2^(K-1)` consist only of their upper
+chain.  The resulting chain `D_j` meets a lower rank exactly when `j<=R_(K-1)(r)` and the
+corresponding upper rank exactly when `j<=2R_(K-1)(r)`.  Its rank support is therefore contained
+in that of every earlier chain, proving nesting.
+
+The sorted multiset of rank numbers is
+
+    2^ell repeated binomial(K,ell) times,       0<=ell<=K.
+
+Its conjugate is `G_K`, because equivalently
+
+    (G_K)' = (2^(K-j) repeated binomial(K,j) times, 0<=j<=K).
+
+Consequently the nested-chain partition of `P_K` has shape `G_K`, not merely the same extremal
+prefix sums.
+
+For full mass, the Singleton Majorization Converse is therefore exactly the following special
+case of the generalized Griggs dominance assertion:
+
+> Every integer partition dominated by the nested-chain partition of the normalized-matching
+> poset `P_K` occurs as the list of lengths of another chain partition of `P_K`.
+
+Shahriari states this dominance assertion for arbitrary finite normalized-matching posets in his
+[2008 chain-partition survey](https://2pcc.tcs.uj.edu.pl/archive/2pcc-Shariar-Shariari.pdf), while
+Stanley's `nice`-graph language gives the equivalent incomparability-graph statement.  The broad
+assertion is a conjectural template, not a theorem that can be imported here; even the Boolean-
+lattice specialization is the long-standing Griggs dominance conjecture, still treated as such in
+[Li--Qiu--Yang--Zhang (2024)](https://arxiv.org/abs/2408.13127) and in the current
+[nice-graph literature](https://arxiv.org/abs/2608.16613).  Our `P_K` is a much
+more rigid, recursively series-parallel family, so this connection neither proves nor refutes the
+singleton converse.  It does explain why Greene--Kleitman extremality alone stops at necessity.
+
+#### The exact carry-compatible incidence target
+
+The poset ranks separate the already-solved margin problem from the missing integral lift.  Given
+a proposed chain-size partition `a`, make a zero--one matrix `M` whose rows are proposed chains and
+whose columns are the ordered ranks `0,...,2^K-1`; put `M_(i,r)=1` when chain `i` is to use one
+element of rank `r`.  Its margins must be
+
+    row sums a_i,                 column sums R_K(r).            (PR5)
+
+Since the conjugate of the sorted column-sum sequence is `G_K`, Gale--Ryser says that a matrix
+with margins (PR5) exists exactly when `a<=_w G_K`.  Thus weak majorization solves the abstract
+rank-incidence problem completely.
+
+Call such a matrix **carry-compatible** if the one-entries in every rank can be bijected with the
+actual elements of that rank so that the elements assigned to each matrix row form a chain of
+`P_K`.  The full-mass converse is equivalent to:
+
+> **Carry-Compatible Gale--Ryser Lemma (open).** For every `a<=_w G_K` of mass `3^K`, at least one
+> matrix with margins (PR5) is carry-compatible.
+
+This is not an extra conjecture: a chain partition gives such a matrix by recording ranks, and a
+carry-compatible matrix lifts back to the chain partition.
+
+The compatibility recursion is precisely Pascal deletion/contraction.  The lower-half columns
+form one `P_(K-1)` instance.  In the upper half, one row orientation must be used at every upper
+rank occupied by that row, because the first outer symbol must remain `0` or remain `2`.  Every
+upper column of size `2R_(K-1)(r)` must therefore be bisected by one common row coloring; after the
+bisection its two halves are independent `P_(K-1)` instances.  All lower elements lie below all
+upper elements, so the lifted lower and upper pieces in one row concatenate automatically.  This
+is exactly the Balanced Pascal Realization Lemma in rank order.
+
+One must choose the matrix jointly with the lift.  It is false that every Gale--Ryser matrix with
+the correct margins is carry-compatible.  At `K=4`, use five rows `u,v,a,b,c`.  Give the four
+upper-rank columns the neighborhoods
+
+    rank 8:   {u,v},
+    rank 9:   {u,v,a,b},
+    rank 10:  {u,v,b,c},
+    rank 12:  {u,v,c,a},                                    (PR6)
+
+and give every incidence in every other rank a fresh row.  These columns have the required sizes
+`2,4,4,4`; altogether the row-degree partition is
+
+    (4,4,2,2,2,1^67) <=_w G_4.
+
+Any lift would have to bisect all four neighborhoods by the first outer symbol.  The first
+equation makes `u,v` opposite.  The next three then require successively `a,b` opposite, `b,c`
+opposite, and `c,a` opposite, an impossible odd cycle.  Nevertheless the row-degree partition
+itself is solvable: split one length-16 chain of the canonical `G_4` decomposition into chains of
+sizes `4,4,2,2,2,1,1`, and split every other canonical chain into singletons.  Thus (PR6) refutes
+only arbitrary-matrix lifting, not the converse.
+
+The remaining freedom is now exact: construct **some** rank-incidence realization whose dyadic
+carry hyperedges have the recursive common bisections.  Counting margins, sorting ranks, or lifting
+a canonical Gale--Ryser realization without switches all discard that choice.
 
 ### Why strict alternation is insufficient
 

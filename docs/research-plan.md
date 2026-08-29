@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-26.
+entries. Last revised 2026-08-29.
 
 ## High-level goals
 
@@ -163,11 +163,23 @@ contains no number absent from `data/*.csv`.
 **Foundational singleton subproblem (corrected 2026-08-26).**  Weak majorization by `G_K` is
 proved necessary, but its converse is open.  The exact target is the Row-Coloring Lemma (C) in
 [the theorem note](theorems/singleton-majorization.md#the-exact-remaining-row-coloring-lemma).
-The cleanest bottom-up target is the Pascal Orthant-Saturation Lemma: the magnitudes of the integer
-points in the signed Hall bisubmodular polyhedron should contain every lattice point of their convex
-hull, which is exactly the parent majorization polymatroid.  Equivalently, prove that every unit
-Robin-Hood transfer can be routed by a global signed augmenting path through the doubled
-Pascal/dyadic columns.  This formulation and the convex-hull equality are proved in the
+The cleanest global target now has an ordered-rank form.  The transcript poset `P_K` has rank
+numbers `R_K(r)=2^popcount(r)`, is normalized matching, and has a nested chain decomposition of
+shape `G_K`.  Gale--Ryser says `a<=_w G_K` is exactly the condition for a zero--one matrix with row
+sums `a` and column sums `R_K(r)`.  Prove that one such matrix can be chosen **carry-compatible**:
+its rank incidences lift to actual `P_K` chains through the complete-bipartite binary-carry
+components.  This Carry-Compatible Gale--Ryser Lemma is equivalent to the Balanced Pascal
+Realization and Row-Coloring lemmas, and places Pascal rank order at the start of the construction.
+Do not try to lift an arbitrary margin realization: (PR6) gives a solvable `K=4` row-degree state
+and a correct-margin matrix whose four upper columns force an impossible odd cycle of row
+bisections.  The exact proof must choose or switch the incidence matrix jointly with its lift; see
+the [Pascal-rank-poset formulation](theorems/singleton-majorization.md#the-pascal-rank-poset-and-the-griggs-dominance-connection-2026-08-29).
+
+Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
+the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
+exactly the parent majorization polymatroid.  One constructive form asks that every unit
+Robin-Hood transfer be routed by a global signed augmenting path through the doubled Pascal/dyadic
+columns.  This formulation and the convex-hull equality are proved in the
 [theorem note](theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26);
 only the no-lattice-holes/transfer step remains open.
 

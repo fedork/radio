@@ -11090,3 +11090,41 @@ degrees, adjacent deletion/contraction quotas, their arbitrary pairings, the tig
 and (BR0)--(BR4) to show that a positive minimum defect forces a violated parent prefix.  This is
 an equivalent Pascal-specific goal; merely summing rank multiplicities still repeats the
 convex-hull argument.
+
+## 2026-08-29 -- singleton converse is a Pascal Griggs-dominance instance
+
+The poset formulation now identifies exactly what the Pascal structure is doing.  Let `P_K` be the
+`K`-fold lexicographic power of the three-element `V` poset `1<0,1<2`.  Replacing `1` by binary zero
+and `0,2` by binary one gives the rank: level `r` has `2^popcount(r)` elements.  Across a binary
+carry `u 0 1^m -> u 1 0^m`, the adjacent cover graph is a disjoint union of
+`2^popcount(u)` copies of `K_(2^m,2)`, which proves normalized matching directly.
+
+The recursive decomposition `P_K=P_(K-1) ordinal-sum (P_(K-1) parallel-union P_(K-1))` also gives
+a nested chain decomposition.  Label the two upper copies of child chain `i` by `2i-1,2i`, and
+concatenate lower chain `j` to the upper chain labelled `j`.  Global chain `j` then meets exactly
+the ranks whose rank number is at least `j`.  Since the sorted rank-number multiset is `2^ell`
+with multiplicity `binomial(K,ell)`, its conjugate is `G_K`.  Thus the full-mass Singleton
+Majorization Converse is precisely the `P_K` instance of generalized Griggs chain-partition
+dominance, or equivalently Stanley niceness of `Q_K`.  Shahriari's 2008 survey states the general
+conjectural template; Stanley 1998 supplies the nice-graph language.  Neither source proves this
+special family, and the Boolean-lattice dominance specialization remains current open context.
+
+This exposes an exact global lift.  A target chain partition determines a zero--one rank-incidence
+matrix with row sums `a_i` and ordered column sums `R_K(r)=2^popcount(r)`.  Gale--Ryser constructs
+some such matrix exactly when `a<=_w G_K`; majorization therefore solves all margins.  The missing
+condition is that the incidences can be bijected with actual rank elements so each row is a chain.
+Recursively, the lower-half columns lift to one child, while all upper columns need one common row
+bisection into the two outer orientations and then two child lifts.  This Carry-Compatible
+Gale--Ryser Lemma is exactly the Balanced Pascal Realization Lemma in ordered-rank form.
+
+An arbitrary correct-margin matrix cannot be lifted.  At `K=4`, take upper-rank neighborhoods
+`{u,v}`, `{u,v,a,b}`, `{u,v,b,c}`, `{u,v,c,a}` at ranks `8,9,10,12`, and put every other rank
+incidence on a fresh row.  The row-degree state is `(4,4,2,2,2,1^67)<=_w G_4`.  Any first-coordinate
+bisection makes `u,v` opposite and then forces `a,b`, `b,c`, and `c,a` opposite, an odd-cycle
+contradiction.  This does not refute the singleton state: split one canonical length-16 chain into
+`4,4,2,2,2,1,1` and all remaining canonical chains into units.  It proves that the incidence
+realization must be selected or switched jointly with the Pascal lift; sorting rank sizes and then
+lifting a convenient Gale--Ryser matrix is another false shortcut.
+
+No long-running process or new census was used for this result; the derivations and parity
+counterexample are symbolic.  The repository baseline checks were green before the edit.
