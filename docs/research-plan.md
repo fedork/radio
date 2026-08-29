@@ -203,6 +203,17 @@ forms, and `K=4` probes are in the
 [cut-and-splice section](theorems/singleton-majorization.md#a-low-level-cut-and-splice-normal-form-2026-08-29)
 and [survey](../evidence/singleton_cut_splice_survey_2026-08-29.md).
 
+Do not require two normalized children to be identical.  The complete `K=3` recombination census
+finds 16 counterexamples, led by `(8,3^6,1)`.  The exact nearby target is the **Adjacent-Children
+Split Conjecture**: every parent has a valid split in which some two child types are equal or differ
+by one Robin--Hood transfer.  This covers all 1,206 `K=3` targets; so does the stronger-looking
+condition that all three child types form a dominance chain.  Before attempting a general proof,
+test the adjacent-pair statement on selected and then systematic `K=4` parents.  If it survives,
+try to derive it from the same Pascal duplicated-rank mechanism as Adjacent-Fiber, using the child
+partial-matching formulation rather than labelled row enumeration.  The counterexample proof,
+the 16-state exception family, and the exact finite salvage are in the
+[identical-child census](../evidence/singleton_identical_children_census_2026-08-29.md).
+
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
 exactly the parent majorization polymatroid.  One constructive form asks that every unit

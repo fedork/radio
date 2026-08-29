@@ -1688,6 +1688,46 @@ majorized targets have exact covers; among 100 seeded Robin--Hood-walk targets, 
 15 hit a 20,000-node cap, with no exhaustive failure.  This is exploratory evidence only and does
 not establish the conjecture at `K=4`.
 
+### Why two identical children are not always available (2026-08-29)
+
+A natural stronger decomposition would require at least two of the three sorted child sequences
+to be identical.  This holds for every full-mass target through `K=2`, but it is false at `K=3`,
+even when equality is only up to row permutation.
+
+Take
+
+    a=(8,3,3,3,3,3,3,1) <=_w G_3.
+
+Every child has mass nine and lies below `G_2=(4,3,1,1)`, so every child part is at most four.  The
+parent row of size eight must split as `4+4` between the mixed child and one pure child, say `M`
+and `L`.  No other parent row can make a part four.  Hence any equal pair must be `L=M`, with common
+type `(4,q)`.  The child prefix bounds leave only
+
+    q=(3,1,1), (2,2,1), (2,1,1,1), or (1,1,1,1,1).
+
+The remaining components must form six parent rows of size three and one of size one.  Thus every
+two must pair with a one and exactly one one remains unmatched.  For `q=(3,1,1)`, the third child
+must contain at least three twos, but the mixed remainder has only two ones.  For `q=(2,2,1)`, the
+two left twos compete for the sole mixed one.  For `q=(2,1,1,1)`, the left two and at least three
+right twos compete for three mixed ones.  The all-one remainder would force six parts of size at
+least two into the third child's mass nine.  All four cases are impossible because pure parts can
+pair only with mixed parts, never with each other.
+
+This is not an unsolvable state.  It has the explicit valid split
+
+    L=(4,3,1,1),       M=(4,2,2,1),       R=(3,3,2,1),
+
+obtained by matching `L4+M4`, twice `L1+M2`, and `R2+M1`, and leaving
+`L3,R3,R3,R1` unmatched.  The three child types are distinct.
+
+An exact partial-matching census finds 16 such exceptions among the 1,206 `K=3` parent types:
+1,190 admit an identical-child split.  A nearby statement survives completely at this level:
+every `K=3` target has a valid split with two children equal or one Robin--Hood transfer apart, and
+every target has one whose three child types form a dominance chain.  In the displayed split the
+chain is `L>M>R`, with both steps unit transfers.  These weaker statements are finite observations,
+not general theorems.  Method, the full exception family and reproduction source are in the
+[identical-child census](../../evidence/singleton_identical_children_census_2026-08-29.md).
+
 ### Why strict alternation is insufficient
 
 The sequence

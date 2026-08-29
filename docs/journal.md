@@ -11200,3 +11200,37 @@ The dependency-free exact-cover source and full results are in
 `tools/singleton_cut_splice_survey.py` and
 `evidence/singleton_cut_splice_survey_2026-08-29.md`.  Exact `K<=3` normal-form enumeration took
 3.2 seconds for the strongest passing variant.  All exploratory Python processes exited.
+
+## 2026-08-29 -- identical children fail, but adjacent children survive `K=3`
+
+The proposal that every majorized parent has a valid split with two identical normalized child
+sequences is false at `K=3`.  For fixed child partitions `L,M,R`, normalized recombination is
+exactly a partial matching from the mixed parts to the disjoint pure multiset `L union R`; matched
+values add and unmatched values remain separate rows.  Exhausting this formulation shows that all
+2 and 15 parents at `K=1,2` have an equal pair, but only 1,190 of the 1,206 `K=3` parents do.
+
+The clean counterexample is `a=(8,3^6,1)<=G_3`.  Since child entries are at most four, its eight
+must split as `4+4` between `M` and one pure child, say `L`; these are the only children containing
+four and hence the only possible equal pair.  If `L=M=(4,q)`, then
+`q` is one of `(3,1,1)`, `(2,2,1)`, `(2,1^3)`, `(1^5)`.  The remaining components must form six
+threes and one one, so every two needs a one and only one one remains unmatched.  In the four
+cases, respectively: at least three right twos compete for two mixed ones; two left twos compete
+for one mixed one; at least four pure twos compete for three mixed ones; or the third child's mass
+nine would need six parts of size at least two.  Thus equality is impossible.
+
+The state has the valid all-distinct split
+
+    L=(4,3,1,1), M=(4,2,2,1), R=(3,3,2,1).
+
+Match `L4+M4`, twice `L1+M2`, and `R2+M1`; leave `L3,R3,R3,R1`.  This also exposes the useful
+salvage: `L>M>R`, and both dominance steps are single Robin--Hood transfers.  Exact enumeration
+finds that every `K=3` parent has a split with at least two children at transfer distance at most
+one, and every parent has a split whose three children form a dominance chain.  These statements
+are finite only; call the first the Adjacent-Children Split Conjecture if it survives `K=4` probes.
+
+There are 16 exact equal-pair exceptions.  Besides the displayed state they are compactly listed
+as `(8,5,5,1^9)`, `(7,6,6,2,1^6)`, `(7,6,6,1^8)`,
+`(7,2^t,1^(20-2t))` for `0<=t<=10`, and `(6,6,6,1^9)`.  The dependency-free census checked all
+3,375 ordered triples of the 15 child types in 2.4 seconds.  Source, hand proof, and reproduction
+are in `tools/singleton_identical_children_census.py` and
+`evidence/singleton_identical_children_census_2026-08-29.md`.
