@@ -1117,6 +1117,66 @@ in a rank-lexicographically optimized realization must lie at an internal rank
 
     1<=ell<=K-1.                                                (BQ0)
 
+### Boolean coordinate exposure, not accidental multiplicity
+
+The quotas (BQ) are literally deletion and contraction of one Boolean coordinate.  Label the
+parent columns by subsets `S subset [K]`, with
+
+    degree(S)=2^(K-|S|).
+
+Expose a prospective first-test coordinate `t`.  If `t notin S`, the corresponding child column
+has half the parent capacity and occurs once in each pure branch, so `S` must be bisected between
+the two row colors.  If `t in S`, deleting `t` leaves one child column of the same capacity, so
+`S` is unrestricted and belongs to the mixed branch.  At rank `ell`, the two cases have cardinalities
+`binomial(K-1,ell)` and `binomial(K-1,ell-1)`.  Conversely, because columns of one rank have
+identical degrees, any choice meeting (BQ) can be labelled by the subsets omitting or containing a
+fixed `t`.  Hence the Balanced Pascal Realization Lemma is exactly:
+
+> **Boolean Coordinate-Exposure Lemma (open, equivalent form).** Realize the row degrees `x` on
+> the subset columns above and expose one coordinate `t` so that every column not containing `t`
+> is exactly bisected by one row coloring; columns containing `t` are unrestricted.
+
+This is the first-test deletion/contraction operation itself, not a generic realization aided by
+fortunate repeated capacities.
+
+One tempting use of the coordinate symmetry gives no new theorem.  For a row subset containing
+`p` selected `A` rows and `q` selected `B` rows, the capacity after exposing `t` is
+
+    sum_(ell=0..K-1) binomial(K-1,ell)
+        (min(p,2^(K-1-ell))+min(q,2^(K-1-ell)))
+      + sum_(ell=1..K) binomial(K-1,ell-1)
+        min(p+q,2^(K-ell))
+      = H(p)+H(q)+H(p+q).                                      (CE1)
+
+Maximizing over `p+q=s` balances `p,q` and gives exactly the parent prefix rank `H_K(s)`.  Thus
+maximizing away the color counts discards the off-diagonal integer choice and returns the
+already-proved convex-hull equality.  It cannot rule out a lattice hole.
+
+There is also an exact limit on what the subset labels contribute.  Fix an unlabelled incidence
+realization and a row coloring.  At each rank `ell`, label its columns by the `ell`-subsets of
+`[K]` independently of every other rank.  The realization admits an exposure of a fixed coordinate
+`t` if and only if at least `binomial(K-1,ell)` columns at every rank are bisected: label any such
+columns by the subsets omitting `t` and label the remainder by the subsets containing `t`.
+Conversely, an exposure supplies exactly those bisected columns.  Call this the
+**Independent-Relabelling Lemma**.
+
+Consequently the Boolean labels do not themselves impose any lower- or upper-shadow relation
+between adjacent ranks.  Such a relation can be destroyed by independently permuting the labels
+inside one rank without changing the incidence matrix, coloring, or legality.  A
+Kruskal--Katona/LYM argument would become legitimate only after an augmenting construction produced
+a distinguished *coupled* labelling and proved that its reached sets were shadow-closed.  No such
+construction is currently known, so assuming shadow closure would merely add an unproved stronger
+hypothesis.
+
+What survives relabelling, and is therefore intrinsic, is the complete Pascal package: rank
+`ell` has degree `2^(K-ell)`, deletion quota `binomial(K-1,ell)`, contraction allowance
+`binomial(K-1,ell-1)`, and the deletion columns at rank `ell` can be paired arbitrarily with the
+contraction columns at rank `ell+1`.  The remaining integral target is to combine these data with
+the switch-minimal defect relations (BR0)--(BR4).  If `Phi>0`, one must turn the resulting
+rank-by-rank defects and forced doubled/single nestings into a violated parent prefix; proving that
+implication is the unresolved Pascal step.  A scalar sum over ranks, or Boolean shadows supplied
+only by relabelling, is insufficient.
+
 This formulation does not assume that a previously selected coloring can be repaired locally.
 It is therefore an exact restatement of the Row-Coloring Lemma, unlike the stronger local targets
 below.  A possible constructive proof would start with an arbitrary Gale--Ryser realization and

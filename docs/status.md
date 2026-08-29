@@ -79,6 +79,14 @@ columns of degree `2^(K-ell)`, only `binomial(K-1,ell)` must balance; the other
 `binomial(K-1,ell-1)` are mixed, and these labels may be chosen after the incidence realization.
 The unique top-degree column can always be balanced by Ryser reduction, and the bottom degree-one
 rank has no balance requirement, so any first quota obstruction is internal.
+These quotas are exactly Boolean coordinate deletion/contraction: rank-`ell` columns are labelled
+by `ell`-subsets, those omitting the exposed first-test coordinate must balance, and those
+containing it are mixed.  Maximizing away the color counts only reproduces the known parent rank
+and cannot detect lattice holes.  The labels may be permuted independently at every rank, so they
+do not by themselves induce Boolean shadow closure; any shadow proof would first have to construct
+a coupled labelling from the incidence exchange.  The live equivalent route retains only the
+intrinsic data--dyadic degrees, adjacent Pascal quotas and doubled/single pairings--and must combine
+them with the global defect relations (BR0)--(BR4) to force a parent-prefix contradiction.
 A first global switch lemma now compresses any
 minimum-square obstruction: doubled columns of one capacity have imbalances differing by at most
 one and therefore one common sign; cross-capacity defects satisfy a Lipschitz bound, and a nonzero

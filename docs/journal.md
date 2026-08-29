@@ -11061,3 +11061,32 @@ Connect the unique degree-`2^K` column to the largest `2^K` residual degrees usi
 reduction, then color half of that neighborhood on each side; the remaining margins stay
 realizable.  The top quota is therefore exact, while the degree-one rank has quota zero.  Any
 rank-lexicographically first failure must be one of the internal Pascal levels.
+
+## 2026-08-28 -- Pascal quotas are Boolean coordinate deletion/contraction
+
+The binomial split is the first test itself, not a numerical aid.  Label a parent column by
+`S subset [K]` and give it degree `2^(K-|S|)`.  Exposing coordinate `t` bisects every column with
+`t notin S` into the two pure copies; a column with `t in S` contracts to the mixed child after
+deleting `t`.  The counts at rank `ell` are exactly `binomial(K-1,ell)` and
+`binomial(K-1,ell-1)`.  Since equal-rank columns are interchangeable, this Boolean
+Coordinate-Exposure Lemma is equivalent to the Binomial Balanced-Columns formulation.
+
+The obvious symmetry argument is insufficient.  Summing the deletion and contraction capacities
+for selected color counts `(p,q)` gives exactly `H(p)+H(q)+H(p+q)`; maximizing at fixed `p+q`
+returns the parent rank `H_K`.  Thus maximizing away the color split passes to the convex
+relaxation and erases the integral choice of which columns delete and which contract.  It cannot
+exclude the lattice holes that are the whole open problem.
+
+There is an important relabelling barrier.  Column labels can be assigned independently inside
+each rank.  For a fixed coordinate `t`, any chosen quota of bisected columns can be labelled by the
+sets omitting `t`, with the rest labelled by the sets containing it.  Hence coordinate exposure is
+exactly the binomial rank quotas; it does not supply a cross-rank shadow relation.  A proposed
+stopped-exchange-to-shadow argument would first have to construct a distinguished coupled
+labelling and prove its closure, and no such construction is currently available.  Treating the
+arbitrary labels as already shadow-closed would be circular.
+
+The intrinsic next target therefore remains the global minimum-defect realization.  Use dyadic
+degrees, adjacent deletion/contraction quotas, their arbitrary pairings, the tight-band identity,
+and (BR0)--(BR4) to show that a positive minimum defect forces a violated parent prefix.  This is
+an equivalent Pascal-specific goal; merely summing rank multiplicities still repeats the
+convex-hull argument.

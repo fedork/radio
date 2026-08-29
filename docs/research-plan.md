@@ -265,6 +265,26 @@ rows, while the degree-one rank has quota zero.  A rank-lexicographic contradict
 start with the first deficient internal rank `1<=ell<=K-1` and assume every larger-degree quota is
 already exact.
 
+Treat these quotas as Boolean coordinate deletion/contraction, not as helpful repetitions.  Label
+rank-`ell` columns by the `ell`-subsets of `[K]`.  Exposing coordinate `t` requires exactly the
+columns omitting `t` to balance and leaves the columns containing `t` unrestricted.  Equation
+(CE1) shows the precise relaxation trap: maximizing over the color counts gives only
+`H(p)+H(q)+H(p+q)` and then the known parent rank.  It loses precisely the integer column selection
+that must be proved.
+
+Do not infer Boolean shadow closure from these labels.  The Independent-Relabelling Lemma shows
+that labels can be permuted independently inside every rank; coordinate exposure is exactly the
+rank quotas and contains no further cross-rank incidence relation.  A shadow proof would first
+have to construct and justify a coupled labelling from an augmenting search.  Until such a rule is
+found, Kruskal--Katona/LYM is not an available conclusion.
+
+Work instead with the intrinsic deletion/contraction data: dyadic degrees, the two adjacent Pascal
+quotas, their arbitrary rank-to-rank pairing, the tight-band identity (TB3), and the global
+switch-minimal relations (BR0)--(BR4).  The next equivalent target is: if the minimum square defect
+`Phi` is positive, use those binomial multiplicities and doubled/single nestings to derive a
+violated parent prefix.  This keeps the Pascal recursion at the core without adding non-invariant
+Boolean structure.
+
 Do not spend another census on a rule that fixes donor and recipient to one side.  Exact method,
 classification and the uniform construction are in the
 [Adjacent-Fiber census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md); local landscape
