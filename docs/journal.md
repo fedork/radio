@@ -11273,8 +11273,9 @@ The interior cut-unique state `(8,5^3,1^4)` is a useful clean model: its childre
 
     (0,4,4), (4,1,0), (3,2,0), (0,2,3), (1,0,0)^2, (0,0,1)^2.
 
-This suggests the Rigidity-Heredity Conjecture: every child-unique parent has child-unique children
-and a repeated child.  It passes exactly through `K=3`.  A direct `K=4` triple product would have
+This suggested the Rigidity-Heredity Conjecture: every child-unique parent has child-unique children
+and a repeated child.  It passes exactly through `K=3` but is refuted by the subsequent `K=4`
+entry below.  A direct `K=4` triple product would have
 1,754,049,816 cases, so no such run was attempted.  The correct exact extension is parent-first
 and stops after finding two child orbits among the 5,997,038 parents.  Restricting to the `9^3`
 rigid child triples is exploratory only until heredity is proved.
@@ -11284,3 +11285,64 @@ and interpretation are in `evidence/singleton_unique_split_survey_2026-08-29.md`
 row-pattern script accidentally searched all 3,375 child triples instead of the eight relevant
 counterexample triples; it was terminated after 30 seconds with no result, and the narrowed run
 then completed in 2.7 seconds.  No exploratory Python process remains.
+
+## 2026-08-29 -- exact `K=4` split multiplicity refutes strict rigidity heredity
+
+The proposed parent-first census was much cheaper than the naive `1206^3` child-triple product.
+`tools/singleton_split_multiplicity_census.cpp` enumerates each parent row directly as
+`(p,a-p,0)` or `(0,a-p,p)`, quotients equal parent rows by monotone choice indices, and rejects a
+partial child as soon as it violates a prefix of `G_(K-1)`.  It canonicalizes `L<->R` at leaves.
+With an orbit cap of four, the one-, two- and three-child-orbit layers and their allocation counts
+are exact; only the bulk is reported as at least four.
+
+The implementation first reproduced the independent Python results through `K=3`: child-orbit
+layers `9,19,6,1172` and allocation-orbit layers `6,4,8` at `K=3`, including all nine forced child
+triples.  A 10,000-parent `K=4` gate took 0.062 seconds.  The first complete stop-after-two run took
+38.959 seconds and found 30 child-unique parents.  The final orbit-cap-four run, with normalized
+allocation storage and lower-layer classification, exhausted all 5,997,038 parents in 96.5534
+in-process elapsed seconds / 101 wrapper wall seconds.  It visited 1,765,546,548 search nodes and
+30,162,788 complete allocations, exited zero under a one-hour/4-GiB cap, and its temporary log
+passed provenance checking with build id
+`abc2dd99be783536c9d20bd91f765246016b84c92aa009d8b5c33f82a55d025b`.  The log is small and fully
+reproducible, so it was not promoted to the artifact store.
+
+The exact `K=4` child-orbit layers `(1,2,3,>=4)` are
+
+    (30,123,106,5,996,779),
+
+and the exact allocation-orbit layers `(1,2,3)` are `(8,19,32)`.  Thus extending the survey to
+two and three solutions adds 229 boundary states, while the entire `<=3` corpus is only 259 of
+5,997,038 parents (about 0.00432%).
+
+The original Rigidity-Heredity Conjecture is false.  The child-unique parent
+
+    (16,15,9^3,5^3,1^8)
+
+has the forced all-distinct triple
+
+    (8,6,5,4,1^4), (8,7,4,3,2,1^3), G_3.
+
+The first two children each have exactly two child orbits at `K=3`; only the third is rigid.  This
+simultaneously refutes strict child rigidity and forced repetition.  Across all 30 rigid parents,
+5/15/10 have one/two/three rigid children and only 13 repeat a child.
+
+The failure reveals a more useful filtration: every child in a forced `K=4` triple has one or two
+child orbits, and every such triple contains at least one rigid child.  Call the possible general
+statement the Multiplicity-Filtration Conjecture.  In the exact two-orbit `K=4` layer, 40 parents
+admit three rigid children, 80 first require a two-orbit child, and three first require a
+three-orbit child.  In the three-orbit parent layer the corresponding exclusive counts are
+20,78,6,2 for best maximum child multiplicity `1,2,3,>=4`.  This makes the expansion beyond
+singular states useful as a boundary microscope, although it says nothing directly about the
+5,996,779-state bulk.
+
+Rigid children are not available to every parent.  The independent complete `K=3` Python index
+finds the unique no-rigid-child state `(3^9)`.  The reason is elementary: a row three cannot make
+the part four in the three non-unit rigid child types.  If `(1^9)` is mixed, both pure masses nine
+would have to be sums of twos; if it is pure, it occupies all rows and excludes the opposite pure
+child.  The best number of rigid children over all `K=3` parents has histogram `1,60,331,814` for
+zero through three.  At `K=3` every rigid parent has at most one upward one-unit neighbor, but five
+nonrigid parents share that property, so simple boundary degree is not a characterization.
+
+Full definitions, correctness argument and reproduction are in
+`evidence/singleton_split_multiplicity_census_2026-08-29.md`.  All census and exploratory Python
+processes exited; no process from this work remains.

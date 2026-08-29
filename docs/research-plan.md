@@ -214,21 +214,25 @@ partial-matching formulation rather than labelled row enumeration.  The countere
 the 16-state exception family, and the exact finite salvage are in the
 [identical-child census](../evidence/singleton_identical_children_census_2026-08-29.md).
 
-Use the multiplicity-free corpus as a separate structural probe.  At `K=3` exactly nine parents
-have one child-type orbit and six have one full normalized cut.  Their children all belong to the
-four child-unique `K=2` states, and every forced triple repeats a child.  First try to prove the
-**Rigidity-Heredity Conjecture**: a child-unique parent has three child-unique children and a
-repeated child type.  Then classify how a fixed rigid triple can have more than one normalized
-recombination.  The `K=2` all-`(2,1)` fiber and the `K=3` `(C,D,D)` fiber are the only low-level
-collisions and may expose the missing cut coordinate in the proposed parent/children isomorphism.
-The especially useful fully rigid interior state is `(8,5^3,1^4)`, whose forced children are
-`(G_2,(4,2,2,1),G_2)` and whose cut is unique.
+The multiplicity probe is now complete through `K=4`.  A compiled parent-first counter avoids the
+`1206^3` triple product and exhausts all 5,997,038 parents.  The child-orbit layers one, two, three
+and at least four have exact sizes `30,123,106,5,996,779`; allocation-orbit layers one, two and
+three have sizes `8,19,32`.  The `K<=3` **Rigidity-Heredity Conjecture is refuted**: a forced `K=4`
+triple can be all-distinct and contain two children that each have two child orbits.  Do not try to
+prove or use strict heredity.
 
-For `K=4`, do not enumerate all `1206^3=1,754,049,816` child triples.  Build a compiled parent-first
-counter over the 5,997,038 known parent types and stop each search when a second normalized child
-orbit is found; only child-unique survivors need exact cut counting.  Restricting children to the
-nine-state rigid spine would reduce the exploratory candidate set to `9^3`, but it is not an exact
-census until Rigidity-Heredity is proved.  Full `K<=3` corpus and definitions are in the
+The useful replacement is the **Multiplicity-Filtration Conjecture**: a child-unique parent has at
+least one child-unique child and every child has at most two child orbits.  It is exact through
+`K=4`: of the 30 child-unique parents, 10 have three rigid children and the other 20 use only the
+one- and two-orbit layer.  Test a theoretical implication from singularity of the weighted
+matching projection to this bounded child multiplicity; do not launch `K=5`, whose parent corpus is
+far beyond exhaustive enumeration.  The two- and three-orbit `K=4` layers are only 229 additional
+states and provide the right finite boundary corpus for finding the first bifurcation rule.  Keep
+the limitation explicit: 5,996,779 parents remain in the bulk, and `(3^9)@3` already proves that
+an arbitrary parent need not admit even one rigid child.  Exact method, low-layer child statistics
+and reproduction are in the
+[multiplicity record](../evidence/singleton_split_multiplicity_census_2026-08-29.md); the original
+`K<=3` table is in the
 [unique-split record](../evidence/singleton_unique_split_survey_2026-08-29.md).
 
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in

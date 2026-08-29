@@ -86,19 +86,22 @@ literal prospective “isomorphism” is therefore unique factorization of the p
 child triple plus this weighted matching, not an identification with the three child partitions
 alone.
 
-This motivates a **Rigidity-Heredity Conjecture**: if a parent has a unique normalized child-type
+This suggested a **Rigidity-Heredity Conjecture**: if a parent has a unique normalized child-type
 orbit, then all three children are themselves child-unique and at least two of them coincide.  It
-holds through `K=3`.  A proof would reduce candidate rigid `K=4` triples from all `1206^3` ordered
-triples to the `9^3` triples on the rigid spine, but using that reduction in an exhaustive proof
-before proving heredity would be circular.
+holds through `K=3` but is now refuted by the exact parent-first `K=4` census.  Of the 30
+child-unique `K=4` parents, 20 use at least one two-orbit child and 17 have three distinct children.
+The surviving finite pattern is weaker: every forced child has one or two child orbits, and every
+forced triple contains at least one child-unique child.  See the
+[multiplicity census](singleton_split_multiplicity_census_2026-08-29.md).
 
-## Why `K=4` needs a different census
+## The completed `K=4` extension
 
-A direct extension would inspect 1,754,049,816 ordered triples of the 1,206 `K=3` child types.
-That is the wrong enumeration.  Since only uniqueness matters, a `K=4` implementation should work
-parent-first and stop as soon as it finds a second child-type orbit; only the rare survivors need
-complete row-allocation counting.  The existing `K=4` corpus has 5,997,038 parents, so a
-stop-after-two compiled search is plausible, while the naive triple product is not.
+A direct extension over 1,754,049,816 ordered triples of the 1,206 `K=3` child types is the wrong
+enumeration.  `tools/singleton_split_multiplicity_census.cpp` instead works parent-first and stops
+at the fourth child orbit.  It exhausts all 5,997,038 `K=4` parents in 96.5534 seconds of
+in-process elapsed time on the recorded Apple M4 Pro run.  Exactly 30 are child-unique and eight
+are cut-unique; the exact two- and three-child-orbit layers contain 123 and 106 parents.  This
+supersedes the proposed-but-unimplemented census described in the original version of this note.
 
 ## Reproduction
 

@@ -142,14 +142,17 @@ also one whose three child types form a dominance chain.  These are finite obser
 the [counterexample proof and census](../evidence/singleton_identical_children_census_2026-08-29.md).
 The counterexample decomposition is not singular: it has four normalized child-type orbits and
 six normalized row-allocation orbits after the `L<->R` symmetry.
-A full rigidity survey now removes this multiplicity.  Among all 1,206 `K=3` parents, exactly nine
-have one normalized child triple and six also have one normalized cut.  All nine use only the four
-child-unique `K=2` states, and every forced triple has a repeated child.  Thus child rigidity is
-hereditary and symmetric through `K=3`.  The map is not quite an isomorphism: the same child triple
-`((4,2,2,1),G_2,G_2)` is forced for two different parents, whose cut multiplicities are two and
-four.  The six fully rigid parents include the interior state `(8,5^3,1^4)`, with forced children
-`(G_2,(4,2,2,1),G_2)`.  A naive `K=4` extension would inspect 1,754,049,816 child triples; use a
-parent-first stop-after-two counter instead.  See the
+The parent-first multiplicity census is now complete through `K=4`.  The exact child-orbit layers
+one, two, three and at least four have sizes `30,123,106,5,996,779`; the cut-orbit layers one, two
+and three have sizes `8,19,32`.  This refutes the apparent `K<=3` Rigidity-Heredity pattern.  The
+child-unique parent `(16,15,9^3,5^3,1^8)` has the forced all-distinct triple
+`(8,6,5,4,1^4)`, `(8,7,4,3,2,1^3)`, `G_3`; the first two children each have two child orbits.
+The failure is controlled: every forced child of all 30 child-unique `K=4` parents lies in the
+one- or two-orbit `K=3` layer, and every forced triple contains at least one rigid child.  Among
+the 30, exactly 5/15/10 have one/two/three rigid children and only 13 repeat a child.  This suggests
+a Multiplicity-Filtration Conjecture, not strict heredity.  Rigid children are not universal for
+arbitrary parents: `(3^9)@3` has none.  See the
+[multiplicity census](../evidence/singleton_split_multiplicity_census_2026-08-29.md) and original
 [unique-split survey](../evidence/singleton_unique_split_survey_2026-08-29.md).
 Canonical/distinct-slot witness leaves remain unconditional, arbitrary
 `[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the

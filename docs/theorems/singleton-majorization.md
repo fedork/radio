@@ -1735,7 +1735,7 @@ chain is `L>M>R`, with both steps unit transfers.  These weaker statements are f
 not general theorems.  Method, the full exception family and reproduction source are in the
 [identical-child census](../../evidence/singleton_identical_children_census_2026-08-29.md).
 
-### The rigid split corpus and a hereditary spine (2026-08-29)
+### The rigid split corpus and a multiplicity filtration (2026-08-29)
 
 The multiplicity can be removed exactly at low levels.  Call a parent **child-unique** if it has
 one normalized child-type triple `(L,M,R)` modulo `L<->R`, and **cut-unique** if that triple also
@@ -1746,6 +1746,7 @@ has one normalized row-allocation multiset.  Complete counts are
 | 1 | 2 | 2 | 2 |
 | 2 | 15 | 4 | 3 |
 | 3 | 1,206 | 9 | 6 |
+| 4 | 5,997,038 | 30 | 8 |
 
 Write the four child-unique `K=2` states as
 
@@ -1767,10 +1768,10 @@ rigid corpus.  The interior example `(8,5^3,1^4)` is especially clean: its force
     (0,4,4), (4,1,0), (3,2,0), (0,2,3),
     (1,0,0)^2, (0,0,1)^2.
 
-This finite corpus gives a precise form to the proposed parent/children resemblance.  Every child
-of a child-unique `K=3` parent is itself one of the four child-unique `K=2` states, and every unique
-triple has a repeated child.  Rigidity is therefore hereditary and symmetric through `K=3`, even
-though two identical children are false for general parents.
+This finite `K=3` corpus gives a precise form to the proposed parent/children resemblance.  Every
+child of a child-unique `K=3` parent is itself one of the four child-unique `K=2` states, and every
+unique triple has a repeated child.  Rigidity is therefore hereditary and symmetric through
+`K=3`, even though two identical children are false for general parents.
 
 It is not yet a literal isomorphism.  The `CDD` collision maps one child triple to two parents, and
 those parents have two and four cuts.  At `K=2`, the all-`(2,1)` triple similarly maps to both
@@ -1783,10 +1784,43 @@ vertices, a cut matches mixed vertices to pure vertices, and the parent rows are
 unmatched weights.  Hence the natural rigid isomorphism is
 `parent <-> (child triple, unique weighted matching)`, not `parent <-> child triple` alone.
 
-The resulting **Rigidity-Heredity Conjecture** says that every child-unique parent has three
-child-unique children and a repeated child type.  Proving it would reduce candidate rigid triples
-at `K=4` from `1206^3` to `9^3`.  Until it is proved, that restriction cannot be used for an
-exhaustive `K=4` census.  Exact definitions, the complete corpus and source are in the
+The natural Rigidity-Heredity Conjecture said that every child-unique parent has three child-unique
+children and a repeated child type.  The exact parent-first `K=4` census refutes both clauses.  A
+single counterexample is
+
+    a=(16,15,9^3,5^3,1^8),
+
+whose forced child triple is
+
+    (8,6,5,4,1^4), (8,7,4,3,2,1^3), G_3.
+
+The three children are distinct.  The first two each have exactly two child orbits at `K=3`, while
+only `G_3` is child-unique.  This parent has two allocation orbits.
+
+The failure exposes a weaker recursive filtration.  Among the 30 child-unique `K=4` parents,
+exactly 5, 15 and 10 have respectively one, two and three child-unique children; every other
+forced child has exactly two child orbits.  Only 13 of the 30 forced triples repeat a child.  Thus
+the surviving finite statement is
+
+> **Multiplicity-Filtration Conjecture.** A child-unique parent has at least one child-unique
+> child, and all of its children have at most two child orbits.
+
+It is verified only through `K=4`.  The exact child-orbit layers one, two, three and at least four
+at `K=4` contain respectively `30,123,106,5,996,779` parents.  The corresponding allocation-orbit
+layers one, two and three contain `8,19,32`.  Extending the survey beyond singular fibers is
+therefore genuinely informative: it reveals the first bifurcation of rigidity rather than merely
+adding noisy solutions.
+
+Rigid children are not universal in the full parent corpus.  The state `(3^9)<=_w G_3` has no
+split containing any of the four rigid `K=2` children.  A row of size three cannot make the part
+four present in `B,C,D`, so the only candidate is `A=(1^9)`.  If `A` is mixed, the two pure
+children would each need odd mass nine from remainders of size two; if `A` is pure, it occupies
+all rows and legality leaves the opposite pure child empty.  Hence even one rigid child can fail.
+
+The complete multiplicity census, its parent-first proof method, measured cost and low-layer
+structure are in the
+[multiplicity record](../../evidence/singleton_split_multiplicity_census_2026-08-29.md).  The
+original `K<=3` corpus remains in the
 [unique-split survey](../../evidence/singleton_unique_split_survey_2026-08-29.md).
 
 ### Why strict alternation is insufficient
