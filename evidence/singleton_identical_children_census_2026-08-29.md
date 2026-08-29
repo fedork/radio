@@ -78,6 +78,29 @@ triple is
 Match `L4+M4`, the two `L1+M2`, and `R2+M1`; leave `L3,R3,R3,R1` unmatched.  The resulting parent
 is exactly `(8,3^6,1)`, and all three children are majorized by `G_2`.
 
+### The counterexample split is not unique
+
+The exact enumeration finds eight ordered child-type triples, or four after the genuine outcome
+symmetry `L<->R` (the mixed child is structurally distinguished).  Refining the quotient by the
+multiset of row triples `(l_i,m_i,r_i)` gives six normalized allocation orbits:
+
+| normalized `(L,M,R)` representative | allocation orbits |
+|---|---:|
+| `((3,2,2,2),(4,1^5),(4,2,2,1))` | 1 |
+| `((3,2,2,2),(4,2,1^3),(4,3,1,1))` | 1 |
+| `((3,3,2,1),(4,2,1^3),(4,2,2,1))` | 2 |
+| `((3,3,2,1),(4,2,2,1),(4,3,1,1))` | 2 |
+
+The last line contains the split displayed above, after exchanging `L` and `R`.  A visibly
+different solution from the first line is
+
+    L=(3,2,2,2),       M=(4,1,1,1,1,1),       R=(4,2,2,1).
+
+Match `R4+M4`, match the three `L`-twos and two `R`-twos with the five `M`-ones, and leave `L3`
+and `R1` unmatched.  This again gives `(8,3^6,1)` and is not related to the previous split by
+left/right exchange or equal-row permutation.  Counting actual transcript colorings inside each
+child would only create more realizations; the numbers above count normalized numerical splits.
+
 ## A surviving nearby statement
 
 The failure is only one unit away from the proposed symmetry.  In the displayed split,

@@ -18,6 +18,7 @@ from singleton_cut_splice_survey import canonical_chains, dominated_partitions
 
 
 Partition = tuple[int, ...]
+Row = tuple[int, int, int]
 
 
 def profile(k: int) -> Partition:
@@ -154,6 +155,80 @@ def expected_k3_exceptions() -> set[Partition]:
     return exceptions
 
 
+def normalized_allocations(
+    target: Partition, left: Partition, mixed: Partition, right: Partition
+) -> set[tuple[Row, ...]]:
+    """Enumerate row triples modulo equal-part and equal-parent-row permutations."""
+    pure = [("L", value) for value in left] + [("R", value) for value in right]
+    target_values = set(target)
+    results: set[tuple[Row, ...]] = set()
+    rows: list[Row] = []
+
+    def visit(mixed_index: int, available: list[tuple[str, int]]) -> None:
+        if mixed_index == len(mixed):
+            final = rows + [
+                (value, 0, 0) if side == "L" else (0, 0, value)
+                for side, value in available
+            ]
+            if tuple(sorted(map(sum, final), reverse=True)) == target:
+                results.add(tuple(sorted(final, reverse=True)))
+            return
+
+        value = mixed[mixed_index]
+        if value in target_values:
+            rows.append((0, value, 0))
+            visit(mixed_index + 1, available)
+            rows.pop()
+
+        seen: set[tuple[str, int]] = set()
+        for index, (side, pure_value) in enumerate(available):
+            if (side, pure_value) in seen or value + pure_value not in target_values:
+                continue
+            seen.add((side, pure_value))
+            rows.append(
+                (pure_value, value, 0)
+                if side == "L"
+                else (0, value, pure_value)
+            )
+            visit(mixed_index + 1, available[:index] + available[index + 1 :])
+            rows.pop()
+
+    visit(0, pure)
+    return results
+
+
+def counterexample_solution_orbits() -> dict[tuple[Partition, Partition, Partition], int]:
+    target = (8, 3, 3, 3, 3, 3, 3, 1)
+    children = dominated_partitions(9, profile(2))
+    orbits: set[tuple[Partition, Partition, Partition, tuple[Row, ...]]] = set()
+    for left in children:
+        for mixed in children:
+            for right in children:
+                if target not in recombinations(left, mixed, right):
+                    continue
+                for rows in normalized_allocations(target, left, mixed, right):
+                    swapped_rows = tuple(
+                        sorted(
+                            (
+                                (right_part, middle, left_part)
+                                for left_part, middle, right_part in rows
+                            ),
+                            reverse=True,
+                        )
+                    )
+                    direct = (left, mixed, right, rows)
+                    swapped = (right, mixed, left, swapped_rows)
+                    orbits.add(min(direct, swapped))
+
+    counts: dict[tuple[Partition, Partition, Partition], int] = {}
+    for left, mixed, right, _ in orbits:
+        triple = (left, mixed, right)
+        counts[triple] = counts.get(triple, 0) + 1
+    assert len(counts) == 4
+    assert sum(counts.values()) == 6
+    return counts
+
+
 def main() -> None:
     started = monotonic()
     verify_counterexample()
@@ -179,6 +254,13 @@ def main() -> None:
             print(f"K=3 no_equal_pair={len(missing)}")
             for target in missing:
                 print(f"  {target}")
+    solution_orbits = counterexample_solution_orbits()
+    print(
+        f"counterexample_child_type_orbits={len(solution_orbits)} "
+        f"counterexample_allocation_orbits={sum(solution_orbits.values())}"
+    )
+    for triple, count in sorted(solution_orbits.items()):
+        print(f"  children={triple} allocation_orbits={count}")
     print("counterexample=(8,3,3,3,3,3,3,1) status=VALID")
     print("counterexample_children=((4,3,1,1),(4,2,2,1),(3,3,2,1))")
     print(f"seconds={monotonic() - started:.3f}")

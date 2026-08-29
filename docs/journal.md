@@ -11222,7 +11222,13 @@ The state has the valid all-distinct split
 
     L=(4,3,1,1), M=(4,2,2,1), R=(3,3,2,1).
 
-Match `L4+M4`, twice `L1+M2`, and `R2+M1`; leave `L3,R3,R3,R1`.  This also exposes the useful
+Match `L4+M4`, twice `L1+M2`, and `R2+M1`; leave `L3,R3,R3,R1`.  The split is not unique: exact
+enumeration gives eight ordered child-type triples, four modulo the genuine `L<->R` symmetry, and
+six normalized row-allocation orbits.  The four child-type representatives have allocation counts
+`1,1,2,2`; a visibly inequivalent triple is `(3,2,2,2)`, `(4,1^5)`, `(4,2,2,1)`.  Thus the equality
+failure is structural rather than forced by a singular decomposition.
+
+The displayed split also exposes the useful
 salvage: `L>M>R`, and both dominance steps are single Robin--Hood transfers.  Exact enumeration
 finds that every `K=3` parent has a split with at least two children at transfer distance at most
 one, and every parent has a split whose three children form a dominance chain.  These statements

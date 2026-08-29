@@ -140,6 +140,8 @@ split `(4,3,1,1)`, `(4,2,2,1)`, `(3,3,2,1)`.  The adjacent repair survives the c
 census: every target has a split with two children equal or one Robin--Hood transfer apart, and
 also one whose three child types form a dominance chain.  These are finite observations only; see
 the [counterexample proof and census](../evidence/singleton_identical_children_census_2026-08-29.md).
+The counterexample decomposition is not singular: it has four normalized child-type orbits and
+six normalized row-allocation orbits after the `L<->R` symmetry.
 Canonical/distinct-slot witness leaves remain unconditional, arbitrary
 `[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
 unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers

@@ -1720,6 +1720,13 @@ This is not an unsolvable state.  It has the explicit valid split
 obtained by matching `L4+M4`, twice `L1+M2`, and `R2+M1`, and leaving
 `L3,R3,R3,R1` unmatched.  The three child types are distinct.
 
+This valid split is not singular.  There are eight ordered child-type triples producing the
+counterexample, four after the genuine `L<->R` outcome symmetry, and six normalized row-allocation
+orbits after also quotienting equal child parts and equal parent rows.  For example the inequivalent
+triple `(3,2,2,2)`, `(4,1^5)`, `(4,2,2,1)` recombines by matching the two-bearing pure parts to the
+five mixed ones and matching the two fours.  Thus the failure of identical children is structural,
+not an artifact of a unique exceptional decomposition.
+
 An exact partial-matching census finds 16 such exceptions among the 1,206 `K=3` parent types:
 1,190 admit an identical-child split.  A nearby statement survives completely at this level:
 every `K=3` target has a valid split with two children equal or one Robin--Hood transfer apart, and
