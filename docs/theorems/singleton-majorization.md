@@ -1735,6 +1735,60 @@ chain is `L>M>R`, with both steps unit transfers.  These weaker statements are f
 not general theorems.  Method, the full exception family and reproduction source are in the
 [identical-child census](../../evidence/singleton_identical_children_census_2026-08-29.md).
 
+### The rigid split corpus and a hereditary spine (2026-08-29)
+
+The multiplicity can be removed exactly at low levels.  Call a parent **child-unique** if it has
+one normalized child-type triple `(L,M,R)` modulo `L<->R`, and **cut-unique** if that triple also
+has one normalized row-allocation multiset.  Complete counts are
+
+| `K` | all parents | child-unique | cut-unique |
+|---:|---:|---:|---:|
+| 1 | 2 | 2 | 2 |
+| 2 | 15 | 4 | 3 |
+| 3 | 1,206 | 9 | 6 |
+
+Write the four child-unique `K=2` states as
+
+    A=(1^9), B=(4,1^5), C=(4,2,2,1), D=G_2.
+
+The nine unique `K=3` child triples are represented by
+
+    AAA, ABB, DCD, BDB, CDC, CDD, BDD, CDD, DDD.              (RU1)
+
+The repeated `CDD` corresponds to two different parents.  In the same order the parents are
+
+    (1^27), (8,1^19), (8,5^3,1^4), (8,7,1^12), (8,7,2^6),
+    (8,7,3^3,1^3), (8,7,4,1^8), (8,7,4,2^3,1^2), G_3.       (RU2)
+
+The cut counts are respectively `1,1,1,1,1,2,2,4,1`.  Thus the six count-one rows are the fully
+rigid corpus.  The interior example `(8,5^3,1^4)` is especially clean: its forced children are
+`(D,C,D)`, and its forced normalized cut is
+
+    (0,4,4), (4,1,0), (3,2,0), (0,2,3),
+    (1,0,0)^2, (0,0,1)^2.
+
+This finite corpus gives a precise form to the proposed parent/children resemblance.  Every child
+of a child-unique `K=3` parent is itself one of the four child-unique `K=2` states, and every unique
+triple has a repeated child.  Rigidity is therefore hereditary and symmetric through `K=3`, even
+though two identical children are false for general parents.
+
+It is not yet a literal isomorphism.  The `CDD` collision maps one child triple to two parents, and
+those parents have two and four cuts.  At `K=2`, the all-`(2,1)` triple similarly maps to both
+`(4,2,2,1)` and `G_2`, with two cuts and one.  Child types lose exactly this cut information.  The
+fully cut-unique subcorpus removes the ambiguity locally, but no general reconstruction formula is
+proved.
+
+In the partial-matching language, the missing datum is explicit: the child parts are weighted
+vertices, a cut matches mixed vertices to pure vertices, and the parent rows are matched sums plus
+unmatched weights.  Hence the natural rigid isomorphism is
+`parent <-> (child triple, unique weighted matching)`, not `parent <-> child triple` alone.
+
+The resulting **Rigidity-Heredity Conjecture** says that every child-unique parent has three
+child-unique children and a repeated child type.  Proving it would reduce candidate rigid triples
+at `K=4` from `1206^3` to `9^3`.  Until it is proved, that restriction cannot be used for an
+exhaustive `K=4` census.  Exact definitions, the complete corpus and source are in the
+[unique-split survey](../../evidence/singleton_unique_split_survey_2026-08-29.md).
+
 ### Why strict alternation is insufficient
 
 The sequence

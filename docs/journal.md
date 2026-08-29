@@ -11240,3 +11240,47 @@ as `(8,5,5,1^9)`, `(7,6,6,2,1^6)`, `(7,6,6,1^8)`,
 3,375 ordered triples of the 15 child types in 2.4 seconds.  Source, hand proof, and reproduction
 are in `tools/singleton_identical_children_census.py` and
 `evidence/singleton_identical_children_census_2026-08-29.md`.
+
+## 2026-08-29 -- the multiplicity-free split corpus forms a hereditary spine
+
+An exact survey separated two notions of rigidity.  A parent is child-unique when one normalized
+`(L,M,R)` type orbit produces it modulo `L<->R`; it is cut-unique when that orbit also has one
+normalized row-triple multiset.  The counts `(all, child-unique, cut-unique)` are
+
+    K=1: (2,2,2),       K=2: (15,4,3),       K=3: (1206,9,6).
+
+Write the four child-unique `K=2` types as `A=(1^9)`, `B=(4,1^5)`, `C=(4,2,2,1)`, `D=G_2`.
+The nine unique `K=3` child triples are
+
+    AAA, ABB, DCD, BDB, CDC, CDD, BDD, CDD, DDD,
+
+for parents
+
+    (1^27), (8,1^19), (8,5^3,1^4), (8,7,1^12), (8,7,2^6),
+    (8,7,3^3,1^3), (8,7,4,1^8), (8,7,4,2^3,1^2), G_3.
+
+Their normalized cut counts are `1,1,1,1,1,2,2,4,1`.  Thus the complete fully rigid `K=3`
+corpus has six members.  Every forced child is itself child-unique at `K=2`, and every forced
+triple repeats a child.  This is the first clean recursive signal supporting the user's proposed
+parent/children resemblance: although identical children fail in the full corpus, they are forced
+on the rigid spine.
+
+The correspondence is not literally injective.  The repeated `CDD` triple maps to two parents,
+with two and four cuts.  The same phenomenon occurs one level earlier: the all-`(2,1)` child triple
+maps to `(4,2,2,1)` with two cuts and `G_2` with one.  Child types therefore lose a cut coordinate.
+The interior cut-unique state `(8,5^3,1^4)` is a useful clean model: its children are forced to
+`(D,C,D)`, and its row triples are uniquely
+
+    (0,4,4), (4,1,0), (3,2,0), (0,2,3), (1,0,0)^2, (0,0,1)^2.
+
+This suggests the Rigidity-Heredity Conjecture: every child-unique parent has child-unique children
+and a repeated child.  It passes exactly through `K=3`.  A direct `K=4` triple product would have
+1,754,049,816 cases, so no such run was attempted.  The correct exact extension is parent-first
+and stops after finding two child orbits among the 5,997,038 parents.  Restricting to the `9^3`
+rigid child triples is exploratory only until heredity is proved.
+
+`tools/singleton_unique_split_survey.py` reproduces the complete corpus in 3.3 seconds; definitions
+and interpretation are in `evidence/singleton_unique_split_survey_2026-08-29.md`.  One preliminary
+row-pattern script accidentally searched all 3,375 child triples instead of the eight relevant
+counterexample triples; it was terminated after 30 seconds with no result, and the narrowed run
+then completed in 2.7 seconds.  No exploratory Python process remains.

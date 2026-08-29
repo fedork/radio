@@ -214,6 +214,23 @@ partial-matching formulation rather than labelled row enumeration.  The countere
 the 16-state exception family, and the exact finite salvage are in the
 [identical-child census](../evidence/singleton_identical_children_census_2026-08-29.md).
 
+Use the multiplicity-free corpus as a separate structural probe.  At `K=3` exactly nine parents
+have one child-type orbit and six have one full normalized cut.  Their children all belong to the
+four child-unique `K=2` states, and every forced triple repeats a child.  First try to prove the
+**Rigidity-Heredity Conjecture**: a child-unique parent has three child-unique children and a
+repeated child type.  Then classify how a fixed rigid triple can have more than one normalized
+recombination.  The `K=2` all-`(2,1)` fiber and the `K=3` `(C,D,D)` fiber are the only low-level
+collisions and may expose the missing cut coordinate in the proposed parent/children isomorphism.
+The especially useful fully rigid interior state is `(8,5^3,1^4)`, whose forced children are
+`(G_2,(4,2,2,1),G_2)` and whose cut is unique.
+
+For `K=4`, do not enumerate all `1206^3=1,754,049,816` child triples.  Build a compiled parent-first
+counter over the 5,997,038 known parent types and stop each search when a second normalized child
+orbit is found; only child-unique survivors need exact cut counting.  Restricting children to the
+nine-state rigid spine would reduce the exploratory candidate set to `9^3`, but it is not an exact
+census until Rigidity-Heredity is proved.  Full `K<=3` corpus and definitions are in the
+[unique-split record](../evidence/singleton_unique_split_survey_2026-08-29.md).
+
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
 exactly the parent majorization polymatroid.  One constructive form asks that every unit

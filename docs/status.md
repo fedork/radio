@@ -142,6 +142,15 @@ also one whose three child types form a dominance chain.  These are finite obser
 the [counterexample proof and census](../evidence/singleton_identical_children_census_2026-08-29.md).
 The counterexample decomposition is not singular: it has four normalized child-type orbits and
 six normalized row-allocation orbits after the `L<->R` symmetry.
+A full rigidity survey now removes this multiplicity.  Among all 1,206 `K=3` parents, exactly nine
+have one normalized child triple and six also have one normalized cut.  All nine use only the four
+child-unique `K=2` states, and every forced triple has a repeated child.  Thus child rigidity is
+hereditary and symmetric through `K=3`.  The map is not quite an isomorphism: the same child triple
+`((4,2,2,1),G_2,G_2)` is forced for two different parents, whose cut multiplicities are two and
+four.  The six fully rigid parents include the interior state `(8,5^3,1^4)`, with forced children
+`(G_2,(4,2,2,1),G_2)`.  A naive `K=4` extension would inspect 1,754,049,816 child triples; use a
+parent-first stop-after-two counter instead.  See the
+[unique-split survey](../evidence/singleton_unique_split_survey_2026-08-29.md).
 Canonical/distinct-slot witness leaves remain unconditional, arbitrary
 `[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
 unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers
