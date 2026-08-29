@@ -235,6 +235,19 @@ and reproduction are in the
 `K<=3` table is in the
 [unique-split record](../evidence/singleton_unique_split_survey_2026-08-29.md).
 
+The complete low-fiber parent--solution relation supplies a sharper route than multiplicity alone.
+Prove and use the **Dyadic Tight-Prefix Factorization Lemma**: a tight even prefix `t=2^j` forces
+pure row counts `t/2,t/2`, saturates the corresponding three child prefixes, and factors the
+allocation into a Pascal head and contracted tail; `t=1` has the analogous `0,1` endpoint.  This
+is already proved as a structural lemma.  The next
+existence target is its natural strengthening: establish Row-Coloring simultaneously for every
+triple of prefix/suffix intervals obtained by recursively contracting `G_K`.  At `K=4,t=4`, exact
+head and tail multiplicities multiply and explain 131/259 low parents; 228/259 have some internal
+dyadic equality.  Do not replace the contracted problems by symmetric `G_j` instances--they are
+asymmetric, and doing so would be the same gap as postponing Pascal structure.  The exact product,
+pure-anchor residual and the 83-state failure of low-layer transfer closure are in the
+[factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
+
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
 exactly the parent majorization polymatroid.  One constructive form asks that every unit

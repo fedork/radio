@@ -1823,6 +1823,54 @@ structure are in the
 original `K<=3` corpus remains in the
 [unique-split survey](../../evidence/singleton_unique_split_survey_2026-08-29.md).
 
+### Dyadic tight-prefix factorization (2026-08-29)
+
+The parent--solution relation has an exact Pascal product on tight dyadic faces.  Let
+`h=G_(K-1)` with prefix function `H`, and suppose a parent's first `t` rows are tight:
+
+    sum_(i<=t) a_i = H_K(t).
+
+In any legal split, let `p` of those rows face the left pure child and `q=t-p` face the right.
+Their child contributions have total mass at most
+
+    H(p)+H(t)+H(q) <= H_K(t).
+
+The parent equality forces equality throughout.  When `t=2^j` with `j>=1`, the Pascal profile has
+a strict drop after `t/2`, so concavity makes `p=q=t/2` the unique maximizer up to exchanging the
+pure sides.  The top rows therefore saturate child prefixes of sizes `t/2,t,t/2`; the remaining
+rows fill the contracted suffix profiles.  Conversely, legal allocations of those disjoint prefix
+and suffix problems concatenate.  The endpoint `t=1` similarly forces pure counts `0,1`.  Call
+this the **Dyadic Tight-Prefix Factorization Lemma**.
+
+At `K=4,t=4`, the head capacities are
+
+    (8,7), (8,7,4,4), (8,7),
+
+and the tail capacities are
+
+    (4,4,1^4), (1^4), (4,4,1^4).
+
+Thus the pure head shapes and mixed tail shape are fixed.  Child-shape choices form a literal
+head--tail Cartesian product.  The low head layers have sizes `3,4,1` and the low tail layers
+`7,19,6`; convolution gives exactly `21,85,25` full parents of multiplicity one, two and three.
+This accounts for 131 of the 259 low-multiplicity `K=4` parents.  More generally, 228 of the 259
+have some tight prefix at `t=1,2,4,8`.
+
+This is a construction rule, but not yet the singleton converse: the prefix and suffix problems
+have asymmetric contracted child capacities and are not both instances of the original symmetric
+statement.  A recursive proof along this route must strengthen the induction to every Pascal
+interval triple.  Exact proof, corpus analysis and reproduction are in the
+[factorization record](../../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
+
+The residual finite pattern is a pure-anchor filtration.  Of the 259 low parents, 258 admit a
+solution with a child-unique pure child.  The exception `(16,15,9^3,5,3^4,1^6)` has a two-orbit
+pure child.  Every low parent also has an economical deformation from a closest rigid ancestor:
+some resulting child triple is componentwise below the ancestor's forced triple, with total child
+transfer distance no larger than the parent distance.  This accounts for 592 of 594 solution
+orbits.  However only 176 parents are reachable from the rigid corpus by unit transfers while
+remaining inside the low layer.  The other 83 require intermediate high-multiplicity states, so
+the boundary is not a transfer-closed proof domain.
+
 ### Why strict alternation is insufficient
 
 The sequence

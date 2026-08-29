@@ -130,6 +130,10 @@ strict heredity.  The next layer reveals that rigidity normally bifurcates into 
 and it supplies a plausible filtration for induction.  It is still a structural microscope, not a
 proof route for the converse: 5,996,779 `K=4` parents lie outside these layers.
 
+The subsequent complete parent--solution analysis identifies an exact dyadic tight-prefix product
+inside this microscope; see the
+[low-multiplicity factorization record](singleton_low_multiplicity_factorization_2026-08-29.md).
+
 ## Rigid children are not universal
 
 The separate exact `K=3` survey in `tools/singleton_rigid_child_survey.py` asks for the largest

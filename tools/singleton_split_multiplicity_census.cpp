@@ -113,6 +113,24 @@ std::string show_key(const ChildKey &key, int largest) {
            show(expand(key.right, largest)) + ')';
 }
 
+std::string show_allocation(const AllocationKey &allocation) {
+    AllocationKey ordered = allocation;
+    std::sort(ordered.begin(), ordered.end(), [](const auto &lhs, const auto &rhs) {
+        const int lhs_sum = lhs[0] + lhs[1] + lhs[2];
+        const int rhs_sum = rhs[0] + rhs[1] + rhs[2];
+        return std::tuple{lhs_sum, lhs[0], lhs[1], lhs[2]} >
+               std::tuple{rhs_sum, rhs[0], rhs[1], rhs[2]};
+    });
+    std::string out = "(";
+    for (std::size_t i = 0; i < ordered.size(); ++i) {
+        if (i) out += ',';
+        out += '(' + std::to_string(ordered[i][0]) + ',' +
+               std::to_string(ordered[i][1]) + ',' +
+               std::to_string(ordered[i][2]) + ')';
+    }
+    return out + ')';
+}
+
 struct SplitSearch {
     const Sequence &state;
     Sequence child_prefix{0};
@@ -121,6 +139,7 @@ struct SplitSearch {
     std::vector<std::vector<Choice>> choices;
     std::set<ChildKey> solutions;
     std::set<AllocationKey> allocation_orbits;
+    std::map<ChildKey, std::set<AllocationKey>> allocations_by_solution;
     std::uint64_t nodes = 0;
     std::uint64_t complete_allocations = 0;
     int solution_limit = 2;
@@ -217,13 +236,15 @@ struct SplitSearch {
             ++complete_allocations;
             const bool swap_sides = partition_less(
                 right.counts, left.counts, child_largest);
-            solutions.insert(canonical_key(left, mixed, right, child_largest));
+            const ChildKey key = canonical_key(left, mixed, right, child_largest);
+            solutions.insert(key);
             AllocationKey allocation = allocation_key(rows, swap_sides);
             if (left.counts == right.counts) {
                 const AllocationKey swapped = allocation_key(rows, !swap_sides);
                 allocation = std::min(allocation, swapped);
             }
-            allocation_orbits.insert(std::move(allocation));
+            allocation_orbits.insert(allocation);
+            allocations_by_solution[key].insert(std::move(allocation));
             return;
         }
 
@@ -264,6 +285,7 @@ struct Census {
         Sequence parent;
         std::set<ChildKey> children;
         int allocation_orbits = 0;
+        std::map<ChildKey, std::set<AllocationKey>> allocations_by_solution;
     };
 
     struct UniqueParent {
@@ -338,7 +360,8 @@ struct Census {
         if (!search.stopped()) {
             ++cut_counts[static_cast<int>(search.allocation_orbits.size())];
             low_states.push_back({state, search.solutions,
-                                  static_cast<int>(search.allocation_orbits.size())});
+                                  static_cast<int>(search.allocation_orbits.size()),
+                                  search.allocations_by_solution});
         }
 
         if (states % 100000 == 0) {
@@ -367,7 +390,7 @@ struct Census {
         }
     }
 
-    void run(bool report = true) {
+    void run(bool report = true, bool report_low = false) {
         Sequence state;
         enumerate(total, parent.front(), state);
         if (state_limit == 0 && state_skip == 0 && orbit_limit == 4) {
@@ -427,6 +450,22 @@ struct Census {
             std::cout << "CHILD_UNIQUE parent=" << show(item.parent)
                       << " children=" << show_key(item.children, child.front())
                       << " allocation_orbits=" << item.allocation_orbits << '\n';
+        if (report_low) {
+            for (const LowParent &item : low_states) {
+                std::cout << "LOW_PARENT parent=" << show(item.parent)
+                          << " child_orbits=" << item.children.size()
+                          << " allocation_orbits=" << item.allocation_orbits << '\n';
+                int solution = 0;
+                for (const ChildKey &key : item.children) {
+                    const auto &allocations = item.allocations_by_solution.at(key);
+                    std::cout << "LOW_SOLUTION index=" << ++solution
+                              << " children=" << show_key(key, child.front())
+                              << " allocation_orbits=" << allocations.size()
+                              << " representative="
+                              << show_allocation(*allocations.begin()) << '\n';
+                }
+            }
+        }
     }
 };
 
@@ -437,13 +476,14 @@ int main(int argc, char **argv) {
     const std::uint64_t limit = argc > 2 ? std::strtoull(argv[2], nullptr, 10) : 0;
     const std::uint64_t skip = argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 0;
     const int orbit_limit = argc > 4 ? std::atoi(argv[4]) : 2;
+    const bool report_low = argc > 5 && std::atoi(argv[5]) != 0;
     if (k < 1 || k > 4 || (limit == 0 && skip != 0) || orbit_limit < 2) {
         std::cerr << "usage: singleton_split_multiplicity_census"
-                  << " k [state-limit [state-skip [orbit-limit]]]\n";
+                  << " k [state-limit [state-skip [orbit-limit [report-low]]]]\n";
         return 2;
     }
     Census census(k, limit, skip, orbit_limit);
-    census.run();
+    census.run(true, report_low);
     if (k >= 2 && limit == 0 && skip == 0) {
         Census lower(k - 1, 0, 0, 4);
         lower.run(false);

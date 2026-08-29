@@ -154,6 +154,16 @@ a Multiplicity-Filtration Conjecture, not strict heredity.  Rigid children are n
 arbitrary parents: `(3^9)@3` has none.  See the
 [multiplicity census](../evidence/singleton_split_multiplicity_census_2026-08-29.md) and original
 [unique-split survey](../evidence/singleton_unique_split_survey_2026-08-29.md).
+The full 259-state low-multiplicity relation now exposes an exact construction on saturated
+Pascal faces.  If an even dyadic prefix `t=2^j` is tight, every legal split must balance its pure
+row counts `t/2,t/2` and saturate child prefixes `t/2,t,t/2`; head and contracted tail allocations
+then concatenate (the `t=1` endpoint forces pure counts `0,1`).  At `K=4,t=4` this gives an exact
+head--tail product accounting for 131 low parents, with multiplicity layers `21,85,25`.  Overall
+228/259 low parents have an internal tight
+dyadic prefix, and 258/259 admit a rigid pure anchor.  This does not finish induction because the
+contracted capacity triples are asymmetric; the strengthened Pascal-interval statement is open.
+See the
+[low-fiber factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
 Canonical/distinct-slot witness leaves remain unconditional, arbitrary
 `[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
 unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers

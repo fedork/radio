@@ -11346,3 +11346,48 @@ nonrigid parents share that property, so simple boundary degree is not a charact
 Full definitions, correctness argument and reproduction are in
 `evidence/singleton_split_multiplicity_census_2026-08-29.md`.  All census and exploratory Python
 processes exited; no process from this work remains.
+
+## 2026-08-29 -- low multiplicity reveals an exact dyadic Pascal product
+
+The complete one--three-orbit `K=4` relation was exported, including one representative cut for
+every parent--child-shape orbit.  Its 259 parents have 594 child-shape orbits and 1,741 allocation
+orbits, using only 48 distinct `K=3` child shapes.  A second complete census with the reporting
+extension took
+97.7258 in-process seconds / 101 wrapper wall seconds under a 30-minute, 4-GiB cap, visited the
+same 1,765,546,548 search nodes and 30,162,788 complete allocations, and exited zero.  The log and
+the small `K=3` control passed provenance checking with build id
+`b3ad4bc8a693a00ca9cbebfa6cbd8bb9e440122660a3626277b62b6ac92369fb`.
+
+The survey exposed a general lemma.  If a parent prefix of even dyadic length `t=2^j` is tight, the
+mass of those rows in any split is at most `H(p)+H(t)+H(t-p)`.  Equality with `H_K(t)` forces
+`p=t/2`, because the Pascal child profile drops strictly after the dyadic midpoint, and forces all
+three contribution subsets to saturate prefixes of sizes `t/2,t,t/2`; `t=1` similarly forces pure
+counts `0,1`.  The remaining rows fill the contracted suffix profiles.  Conversely the two
+row-disjoint allocations concatenate.  This proves the Dyadic Tight-Prefix Factorization Lemma.
+
+For `K=4,t=4`, head capacities are `(8,7),(8,7,4,4),(8,7)` and tail capacities are
+`(4,4,1^4),(1^4),(4,4,1^4)`.  Hence pure head and mixed tail shapes are fixed and child-shape
+orbits form an exact Cartesian product.  The local head layers have sizes `3,4,1`; tail layers
+have sizes `7,19,6`.  Their truncated product gives full layers `21,85,25`, accounting for 131 of
+the 259 parents.  This includes the formerly observed `3 x 7` rigid rectangle and explains why
+the head chooses the mixed child while the tail chooses the pure children.  Overall 228/259 low
+parents have a tight prefix at one of `1,2,4,8`.
+
+There is a second, finite recursive signal.  Exactly 258/259 parents admit a rigid pure child.  The
+exception `(16,15,9^3,5,3^4,1^6)` has a two-orbit pure child.  Every parent has an economical
+solution below a closest rigid ancestor: total child transfer distance is at most the parent
+distance.  This covers 592/594 solution orbits.  The low boundary is not itself transfer-closed:
+only 176 parents are reachable from the rigid 30 by one-unit edges that remain in the 259-state
+corpus, so the other 83 must pass through multiplicity at least four.
+
+Two tempting interpretations were rejected.  Ordinary sorted best fit fails already on `G_4`:
+it selects `(8,5^3,1^4)` as the cheapest rigid pure anchor, while the unique children are all
+`G_3`.  Also, dyadic factorization does not close the original induction by itself; its head and
+tail child capacities are asymmetric contracted Pascal intervals.  The next live target is a
+Row-Coloring theorem for all such interval triples, not an illicit replacement by smaller
+symmetric `G_j` instances.
+
+The exact analysis and proof are in
+`evidence/singleton_low_multiplicity_factorization_2026-08-29.md`; reproduction assertions are in
+`tools/singleton_low_multiplicity_analysis.py`.  Both complete census processes and all short
+analysis processes exited; no process from this work remains.
