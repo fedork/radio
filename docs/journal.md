@@ -11128,3 +11128,39 @@ lifting a convenient Gale--Ryser matrix is another false shortcut.
 
 No long-running process or new census was used for this result; the derivations and parity
 counterexample are symbolic.  The repository baseline checks were green before the edit.
+
+## 2026-08-29 -- canonical bottom cells give direct transfers, but scheduling is global
+
+The Pascal chain codes make one part of the proposed no-exchange proof exact.  Number the canonical
+chains by binary codes `j` and let `d(j)` be the code length.  Chain `j` contains one word for every
+rank skeleton with at least `d(j)` outer positions, so its length is
+`sum_(s=d(j)..K) binomial(K,s)`.  If `d(j)<d(q)`, the donor word with skeleton
+`0^(K-d(j))1^d(j)` begins with enough inner symbols that every word of the shorter receiver chain
+becomes comparable before an outer-label conflict is possible.  Moving this one word is therefore
+a literal direct recoloring.  This proves that every first Robin--Hood transfer out of the
+canonical `G_K` coloring is available without a component swap.
+
+The full compatible-receiver set is also explicit.  If a donor word has outer positions `t_r`, a
+depth-`e` receiver code must agree with its first `m` outer labels, where
+`m=#{r:t_r-r<=K-e}`.  The available receivers form one dyadic code cylinder of size
+`2^(e-1-m)` until `m` reaches `e`, when none remain.  This is the rigorous version of using the
+multiple identical Pascal targets: as donor cells are exposed, their receiver block halves at
+known binary thresholds.
+
+Two obstructions prevent declaring victory.  First, the direct-move property is not invariant
+under arbitrary choices.  At `K=3`, move `112` from canonical chain
+`(112,121,120,211,210,201,200)` to `(122,212,221,220)`.  The six-word donor then has no vertex
+compatible with `(102,012,021,020)`, despite the remaining size gap `6-4=2`.  Second, individual
+receiver compatibility is not closed under union: at `K=2`, both `10` and `12` are compatible
+with `{02}`, but they conflict with each other.  Thus the residual problem is a global list-coloring
+schedule on laminar dyadic receiver cylinders, not scalar load balancing.
+
+This suggests the Canonical Monotone-Transfer Conjecture: after padding by empty colors, every
+`a<=_w G_K` can be reached from the canonical coloring by a globally chosen sequence of direct
+unit recolorings.  It is sufficient and stronger than the desired existence theorem.  The new
+dependency-free `tools/singleton_monotone_transfer_census.py` constructs such paths for all 1,206
+full-mass dominated types at `K=3`: a unit-ready representative pass reaches 1,201 types and
+targeted searches reach the remaining five.  Measured wall time was 3.0 seconds.  This is exact
+finite evidence only; the missing theorem is a scheduling invariant that simultaneously balances
+the dyadic code cylinders and keeps the words in every receiver mutually compatible.  Full method
+and output are in `evidence/singleton_monotone_transfer_census_2026-08-29.md`.

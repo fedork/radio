@@ -175,6 +175,20 @@ and a correct-margin matrix whose four upper columns force an impossible odd cyc
 bisections.  The exact proof must choose or switch the incidence matrix jointly with its lift; see
 the [Pascal-rank-poset formulation](theorems/singleton-majorization.md#the-pascal-rank-poset-and-the-griggs-dominance-connection-2026-08-29).
 
+A concrete stronger route now realizes the no-exchange proposal exactly.  The canonical chains
+have binary codes; if chain `C_j` is longer than `C_q`, its rank-`2^d-1` bottom word is comparable
+with every word of `C_q`, so the first unit transfer is a direct recoloring.  For an arbitrary
+exposed donor word, the compatible receivers in one equal-length code block form a dyadic cylinder
+whose prefix length is given by (PR8).  Prove the **Canonical Monotone-Transfer Conjecture**: every
+target below `G_K` has some globally scheduled path of these direct moves.  It is sufficient but
+stronger than the converse.  Exact construction reaches all 1,206 `K=3` targets; arbitrary move
+order is false, and incoming words that share a receiver cylinder can conflict with one another.
+The next noncircular target is therefore a laminar receiver-list invariant that controls both code
+loads and within-receiver compatibility.  Do not collapse it to scalar load balancing or assume
+that individual compatibility is closed under union; see the
+[direct-transfer section](theorems/singleton-majorization.md#a-canonical-direct-transfer-lemma-and-the-remaining-global-schedule-2026-08-29)
+and [census](../evidence/singleton_monotone_transfer_census_2026-08-29.md).
+
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
 exactly the parent majorization polymatroid.  One constructive form asks that every unit

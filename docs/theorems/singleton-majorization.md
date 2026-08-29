@@ -1524,6 +1524,112 @@ The remaining freedom is now exact: construct **some** rank-incidence realizatio
 carry hyperedges have the recursive common bisections.  Counting margins, sorting ranks, or lifting
 a canonical Gale--Ryser realization without switches all discard that choice.
 
+### A canonical direct-transfer lemma and the remaining global schedule (2026-08-29)
+
+The nested decomposition has a stronger local property that is special to the Pascal construction.
+Index its chains by `C_j`, `0<=j<2^K`, and put
+
+    d(0)=0,                 d(j)=1+floor(log_2 j) for j>0.
+
+Read the outer symbols of a word from left to right, write `0` for outer symbol `0` and `1` for
+outer symbol `2`, and regard the resulting string as least-significant-bit first.  Unwinding the
+recursive chain construction shows that `C_j` contains exactly one word over every binary rank
+skeleton having at least `d(j)` one-bits: its successive outer labels are the bits of `j`, padded
+by zeroes.  Consequently
+
+    |C_j|=L_(d(j)),          L_d=sum_(s=d..K) binomial(K,s).     (PR7)
+
+This description gives an exchange with no recoloring at all.
+
+> **Canonical Bottom-Cell Transfer Lemma.** If `|C_j|>|C_q|`, one element can be moved from
+> `C_j` to `C_q` while both sets remain chains.
+
+*Proof.*  Write `d=d(j)<d(q)`.  In `C_j` take the word whose binary rank skeleton is
+`0^(K-d)1^d`, namely rank `2^d-1`.  Its first `K-d` actual symbols are all `1`.  Every word of
+`C_q` has more than `d` outer symbols, so it must have an outer symbol somewhere among those first
+`K-d` positions.  At the first such position the two words differ as `1` versus `0` or `2`, hence
+they are comparable before any possible `0`/`2` conflict.  The selected word is therefore
+comparable with every member of `C_q`.  Deleting it from `C_j` and adjoining it to `C_q` preserves
+both chains. ∎
+
+Thus every first unit Robin--Hood transfer out of the canonical `G_K` coloring can be implemented
+by moving one vertex directly.  Empty recipient classes, supplied by padding to `3^K` color
+slots, are easier still.  This proves the precise local form of the intuition that the longer
+Pascal chains contain compatible transfer targets.
+
+The complete compatibility set also has a Pascal form.  Let a word `x` from a depth-`d` canonical
+chain have outer positions
+
+    0<=t_0<...<t_(s-1)<K
+
+and outer-label bits `b_0,...,b_(s-1)`.  Consider receiver chains of a shorter length, hence of
+code depth `e>d`.  Put
+
+    m_e(x)=#{r : t_r-r<=K-e}.                                  (PR8)
+
+The counted indices form an initial interval because `t_r-r`, the number of inner symbols before
+the `r`th outer symbol, is nondecreasing.  A depth-`e` receiver code `q` is compatible with `x` if
+and only if its binary code, padded by zeroes, agrees with `b_r` for every `r<m_e(x)`.  Indeed, a
+first disagreeing outer label at occurrence `r` creates a conflict exactly when a receiver word
+can copy the rank skeleton through position `t_r` and still place enough outer symbols to reach
+depth `e`; that is precisely `t_r-r<=K-e`.
+
+For `m_e(x)<e`, the compatible receivers are therefore one dyadic cylinder of size
+
+    2^(e-1-m_e(x));                                             (PR9)
+
+for `m_e(x)>=e` there are none, since the required leading bit of a depth-`e` code is one whereas
+the depth-`d` donor code is already padded by zero.  The bottom cell used in the lemma has
+`t_r=K-d+r`, so `m_e(x)=0` for every `e>d`: its cylinder is the entire receiver block.  As
+successive cells are exposed, the allowable block halves only at the explicit thresholds (PR8).
+This is the rigorous form of “pick one of the many identical targets with the right coloring.”
+
+There remains a real list-coloring interaction.  Individual compatibility with one receiver is
+not closed under union: already at `K=2`, the words `10` and `12` are each compatible with the
+canonical singleton chain `{02}`, but they conflict with each other.  Thus (PR8)--(PR9) turn the
+global schedule into a laminar dyadic receiver-list problem, but one must also keep the incoming
+words assigned to each receiver mutually compatible.  Ignoring that second condition would be a
+new form of the same arbitrary-incidence lifting error exposed by (PR6).
+
+The property is not automatically preserved.  At `K=3`, use the canonical chains
+
+    C_1=(112,121,120,211,210,201,200),
+    C_2=(102,012,021,020),
+    C_3=(122,212,221,220).
+
+The word `112` can be moved directly from `C_1` to `C_3`.  Afterwards the donor has size six and
+`C_2` has size four, but no second direct transfer between that pair exists: `121,120` each
+conflict with `102`, while `211,210,201,200` each conflict with `012`.  Hence iterating the lemma
+arbitrarily does not prove dominance closure.  The choice of the earlier recipient changes which
+later moves remain available; this is exactly where a global schedule, rather than a local
+exchange rule, is needed.
+
+The resulting sufficient statement is clean.
+
+> **Canonical Monotone-Transfer Conjecture.** Pad the canonical `G_K` coloring of `Q_K` by empty
+> classes.  For every full-mass partition `a<=_w G_K`, there is a path from that coloring to one
+> of type `a` in which every step moves one vertex from a class of size at least two more than the
+> recipient, and that vertex is already nonadjacent to the entire recipient class.
+
+This conjecture would prove the Singleton Majorization Converse and would realize the proposed
+“no cyclic reassignment” idea literally: the schedule is global, but each scheduled operation is
+a single direct move.  It is stronger than the required existence theorem, so it must not be used
+as an equivalent reformulation.
+
+There is exact finite evidence for the new statement.  At `K=3`, all 1,206 full-mass dominated
+types are reachable by such monotone direct moves.  A forward pass retaining one coloring of each
+type for which every current size gap still has a direct move reaches 1,201 types; targeted direct
+paths reach the remaining five.  This is a constructive census, not an inference from the earlier
+Row-Coloring census.  The source and exact output are in the
+[monotone-transfer census record](../../evidence/singleton_monotone_transfer_census_2026-08-29.md).
+
+The next proof obligation on this route is therefore sharply delimited: given a target `a` below
+the current type, prove that **some** admissible direct move preserves reachability to `a`.
+Requiring every admissible move to preserve a pairwise-transfer invariant is false by the displayed
+`K=3` example.  A viable invariant must remember the recursively duplicated recipient classes (or
+equivalently their Pascal chain codes), because choosing among equal-size recipients is what keeps
+later direct moves available.
+
 ### Why strict alternation is insufficient
 
 The sequence
