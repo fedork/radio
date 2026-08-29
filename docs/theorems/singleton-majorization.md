@@ -1630,6 +1630,64 @@ Requiring every admissible move to preserve a pairwise-transfer invariant is fal
 equivalently their Pascal chain codes), because choosing among equal-size recipients is what keeps
 later direct moves available.
 
+### A low-level cut-and-splice normal form (2026-08-29)
+
+The direct-transfer path may be stronger than necessary.  There is a simpler global construction
+visible in the canonical chains.  Order every `C_j` by Pascal rank and call a consecutive subset a
+**canonical interval**.  Cut the canonical chains into such intervals and use each interval once.
+The following finite statement is exact.
+
+> **Two-Interval Splicing Theorem (`K<=3`, exhaustive).** Every full-mass
+> `a<=_w G_K`, for `K<=3`, has a chain partition of type `a` in which every target chain is either
+> one canonical interval or the union of two canonical intervals satisfying all three conditions:
+>
+> 1. their source chains have different code depths;
+> 2. their Pascal-rank ranges are disjoint; and
+> 3. their union is a chain.
+
+The proof is an exact-cover enumeration on the actual words of `{0,1,2}^K`.  It independently
+enumerates the 2, 15 and 1,206 dominated types at `K=1,2,3`, constructs all permitted interval
+unions, and covers every word exactly once with the requested part sizes.  At `K=3`, 821 candidates
+suffice and all 1,206 targets pass.  This is a finite computer proof, not an induction in `K`; the
+source and full restriction survey are in the
+[cut-and-splice record](../../evidence/singleton_cut_splice_survey_2026-08-29.md).
+
+Rank separation makes condition 3 especially small.  If interval `I` is wholly below interval
+`J`, then `I union J` is a chain exactly when the top endpoint of `I` is below the bottom endpoint
+of `J`; transitivity handles every other cross-pair.  Thus a target chain follows one canonical
+chain, crosses one endpoint edge, and follows a second canonical chain.  It never needs an
+arbitrary collection of recolored cells.
+
+Splicing is genuinely doing work.  Cuts without joins cover only 11 of 15 types at `K=2` and 591
+of 1,206 at `K=3`.  On the other hand, same-depth splices and rank-interleaved splices are never
+needed at `K=3`.  Orienting every splice from smaller to larger source depth therefore gives a
+directed acyclic source graph.  This realizes the no-cycle intuition at the level of the final
+partition, without asserting a sequence of unit transfers.
+
+Two tempting further restrictions are false.  Allowing only adjacent source depths misses
+`(8,3,3,3,3,3,3,1)`, even though allowing depth gap at most two covers all `K=3` targets.  Also,
+neither fixed rank direction works: forcing the shallower interval always below the deeper one
+misses `(8,7,3,3,3,1,1,1)`, while the reverse convention misses
+`(8,7,4,3,2,1,1,1)`.  The global matching must choose the rank direction of each splice.
+
+This suggests another clean sufficient statement.
+
+> **Pascal Two-Interval Splicing Conjecture.** The displayed normal form exists for every `K` and
+> every full-mass `a<=_w G_K`.
+
+Unlike the Carry-Compatible Gale--Ryser Lemma, this is a strengthening rather than an equivalent
+reformulation.  Unlike the Canonical Monotone-Transfer Conjecture, it asks only for the final
+partition and supplies no direct-move history.  Its prospective proof is a coupled cutting and
+endpoint-matching theorem: choose interval endpoints in the canonical Pascal chains so that the
+resulting fragments of the requested lengths can be paired across distinct depths.  The strict
+depth orientation removes cyclic dependencies, while majorization should provide the Hall
+inequalities for the endpoint matching.  Establishing that last implication is the open step.
+
+At `K=4` the normal form has 456 intervals and 20,542 candidates.  Five deliberately varied
+majorized targets have exact covers; among 100 seeded Robin--Hood-walk targets, 85 have covers and
+15 hit a 20,000-node cap, with no exhaustive failure.  This is exploratory evidence only and does
+not establish the conjecture at `K=4`.
+
 ### Why strict alternation is insufficient
 
 The sequence

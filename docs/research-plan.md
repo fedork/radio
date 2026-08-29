@@ -189,6 +189,20 @@ that individual compatibility is closed under union; see the
 [direct-transfer section](theorems/singleton-majorization.md#a-canonical-direct-transfer-lemma-and-the-remaining-global-schedule-2026-08-29)
 and [census](../evidence/singleton_monotone_transfer_census_2026-08-29.md).
 
+Also pursue the simpler final-state route exposed by the low-level survey.  Prove the **Pascal
+Two-Interval Splicing Conjecture**: cut the canonical chains into rank intervals and pair at most
+two intervals per target chain, with every pair rank-separated and drawn from distinct source
+depths.  This is exact for every `K<=3` target.  It is not a disguised cuts-only assertion--cuts
+alone miss 615 of 1,206 `K=3` types--and neither fixed rank direction nor adjacent-depth pairing is
+valid.  Orient splice edges by source depth to obtain a DAG, then formulate the remaining choice as
+a coupled interval-cut and endpoint-matching problem.  The useful next lemma is that parent
+majorization supplies Hall for some global choice of interval endpoints; do not assume the cuts
+can be chosen before the matching.  This route is sufficient rather than equivalent and does not
+produce a monotone unit-transfer history.  Definitions, exact counterexamples to the stronger
+forms, and `K=4` probes are in the
+[cut-and-splice section](theorems/singleton-majorization.md#a-low-level-cut-and-splice-normal-form-2026-08-29)
+and [survey](../evidence/singleton_cut_splice_survey_2026-08-29.md).
+
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
 exactly the parent majorization polymatroid.  One constructive form asks that every unit

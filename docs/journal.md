@@ -11164,3 +11164,39 @@ targeted searches reach the remaining five.  Measured wall time was 3.0 seconds.
 finite evidence only; the missing theorem is a scheduling invariant that simultaneously balances
 the dyadic code cylinders and keeps the words in every receiver mutually compatible.  Full method
 and output are in `evidence/singleton_monotone_transfer_census_2026-08-29.md`.
+
+## 2026-08-29 -- low-level solutions have a two-interval Pascal normal form
+
+A survey of the actual `K<=3` chain partitions found a substantially smaller global construction
+than a direct-transfer schedule.  Cut each canonical Pascal chain into contiguous rank intervals.
+Every one of the 2, 15 and 1,206 full-mass dominated types at `K=1,2,3` has an exact cover in which
+each target chain uses one interval or splices two intervals from source chains of different
+depths; the two rank ranges are disjoint.  At `K=3`, 821 candidate chains suffice.  Since two
+rank-separated chain intervals join exactly when their boundary endpoints are comparable, this is
+an endpoint-matching form rather than arbitrary recoloring.
+
+The restriction survey separates the useful structure from artifacts.  Cuts alone cover 2/2,
+11/15 and 591/1,206 types, so joins are essential.  Same-depth and rank-interleaved joins are not
+needed at `K=3`.  Depth gap at most two still covers everything, but adjacent depths miss
+`(8,3^6,1)`.  Forcing shallower intervals always below deeper ones misses `(8,7,3^3,1^3)`; forcing
+the reverse misses `(8,7,4,3,2,1^3)`.  Thus splice edges may be oriented by strict source depth,
+which makes the source graph acyclic, but their direction in rank order must remain adaptive.
+
+This motivates the Pascal Two-Interval Splicing Conjecture for general `K`.  It is a sufficient
+strengthening, not equivalent to Row-Coloring, and it need not give a monotone unit-move history.
+The precise open step is a coupled cut-and-endpoint-matching theorem: parent majorization must
+guarantee Hall for some simultaneous choice of interval endpoints.  Choosing cuts first would
+repeat the arbitrary-incidence error.
+
+At `K=4` there are 456 intervals and 20,542 normal-form candidates.  Five varied selected targets
+have exact covers.  A fixed-seed 100-target Robin--Hood-walk probe passed 85; 15 reached a
+20,000-node cap and none failed exhaustively, using 340,651 nodes and 49.4 seconds.  A separate
+valid balanced target `(6^13,3)` reached a 500,000-node cap after 111.1 seconds and is likewise
+inconclusive.  An apparent fast rejection of `(9^9)` was discarded: it is not majorized by `G_4`,
+because its nine-part prefix is 81 while the corresponding `G_4` prefix is 74.  The durable tool
+now checks every selected `K=4` target before search.
+
+The dependency-free exact-cover source and full results are in
+`tools/singleton_cut_splice_survey.py` and
+`evidence/singleton_cut_splice_survey_2026-08-29.md`.  Exact `K<=3` normal-form enumeration took
+3.2 seconds for the strongest passing variant.  All exploratory Python processes exited.
