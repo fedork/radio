@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <queue>
 #include <set>
 #include <string>
 #include <tuple>
@@ -21,11 +22,12 @@
 // marked recipient row in the same child coordinate.  All other row
 // allocations remain fixed.  The resulting allocation must still give three
 // children majorized by G_(K-1).  This is stronger than merely rebuilding a
-// cut from a coloring common to x and y.
+// cut from a coloring common to x and y.  Separate single-state/edge modes
+// support K<=5 diagnostics without attempting the full higher-level DAG.
 
 namespace {
 
-constexpr int MAX_VALUE = 8;
+constexpr int MAX_VALUE = 32;
 using Sequence = std::vector<int>;
 using Counts = std::array<std::uint8_t, MAX_VALUE + 1>;
 using Row = std::array<std::uint8_t, 3>;
@@ -238,6 +240,63 @@ struct AllocationSearch {
     }
 };
 
+int row_sum(const Row &row) {
+    return row[0] + row[1] + row[2];
+}
+
+std::vector<int> transported_images(const Allocation &source,
+                                    const std::vector<Allocation> &targets,
+                                    int donor, int recipient, int child_largest) {
+    std::vector<int> result;
+    std::array<Allocation, 2> orientations{source, reflected(source)};
+    const int orientation_count = orientations[0] == orientations[1] ? 1 : 2;
+    for (int orientation = 0; orientation < orientation_count; ++orientation) {
+        const Allocation &rows = orientations[orientation];
+        for (int donor_index = 0;
+             donor_index < static_cast<int>(rows.size()); ++donor_index) {
+            if (row_sum(rows[donor_index]) != donor) continue;
+            const int recipient_begin = recipient == 0 ? -1 : 0;
+            const int recipient_end = recipient == 0 ? 0 : static_cast<int>(rows.size());
+            for (int recipient_index = recipient_begin;
+                 recipient_index < recipient_end; ++recipient_index) {
+                if (recipient_index >= 0 &&
+                    row_sum(rows[recipient_index]) != recipient)
+                    continue;
+                for (int coordinate = 0; coordinate < 3; ++coordinate) {
+                    if (!rows[donor_index][coordinate]) continue;
+                    Allocation moved = rows;
+                    --moved[donor_index][coordinate];
+                    if (recipient_index < 0) {
+                        Row added{};
+                        ++added[coordinate];
+                        moved.push_back(added);
+                    } else {
+                        ++moved[recipient_index][coordinate];
+                    }
+                    const Row &new_donor = moved[donor_index];
+                    const Row &new_recipient = recipient_index < 0
+                        ? moved.back() : moved[recipient_index];
+                    if ((new_donor[0] && new_donor[2]) ||
+                        (new_recipient[0] && new_recipient[2]))
+                        continue;
+
+                    std::vector<Choice> choices;
+                    choices.reserve(moved.size());
+                    for (const Row &row : moved)
+                        choices.push_back({row[0], row[1], row[2]});
+                    const Allocation key = canonical_allocation(choices, child_largest);
+                    const auto found = std::lower_bound(targets.begin(), targets.end(), key);
+                    if (found != targets.end() && *found == key)
+                        result.push_back(static_cast<int>(found - targets.begin()));
+                }
+            }
+        }
+    }
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+}
+
 struct StateData {
     Sequence state;
     std::vector<Allocation> allocations;
@@ -268,6 +327,7 @@ struct EdgeSummary {
 struct Survey {
     int k;
     int examples;
+    int maximum_area;
     Sequence profile;
     Sequence child;
     Sequence parent_prefix{0};
@@ -280,8 +340,9 @@ struct Survey {
     std::uint64_t allocation_nodes = 0;
     std::uint64_t complete_allocations = 0;
 
-    Survey(int level, int requested_examples)
-        : k(level), examples(requested_examples), profile(singleton_base(level)),
+    Survey(int level, int requested_examples, int requested_area = -1)
+        : k(level), examples(requested_examples), maximum_area(requested_area),
+          profile(singleton_base(level)),
           child(singleton_base(level - 1)), padded_rows(1) {
         for (int value : profile) {
             total += value;
@@ -294,13 +355,27 @@ struct Survey {
         return parent_prefix[std::min(count, static_cast<int>(profile.size()))];
     }
 
+    int dominance_area(const Sequence &state) const {
+        int area = 0;
+        for (int index = 0; index < padded_rows; ++index) {
+            const int base = index < static_cast<int>(profile.size()) ? profile[index] : 0;
+            const int value = index < static_cast<int>(state.size()) ? state[index] : 0;
+            area += index * (value - base);
+        }
+        return area;
+    }
+
+    void add_state(const Sequence &state) {
+        const int index = static_cast<int>(states.size());
+        state_index[state] = index;
+        StateData data;
+        data.state = state;
+        states.push_back(std::move(data));
+    }
+
     void enumerate_states(int remaining, int maximum, Sequence &state) {
         if (remaining == 0) {
-            const int index = static_cast<int>(states.size());
-            state_index[state] = index;
-            StateData data;
-            data.state = state;
-            states.push_back(std::move(data));
+            add_state(state);
             return;
         }
         const int used = total - remaining;
@@ -312,9 +387,53 @@ struct Survey {
         }
     }
 
+    void enumerate_area_states() {
+        using Pending = std::pair<int, Sequence>;
+        std::priority_queue<Pending, std::vector<Pending>, std::greater<Pending>> pending;
+        std::map<Sequence, int> seen;
+        pending.push({0, profile});
+        seen[profile] = 0;
+        while (!pending.empty()) {
+            const auto [area, state] = pending.top();
+            pending.pop();
+            if (seen.at(state) != area) continue;
+            Sequence values = state;
+            values.erase(std::unique(values.begin(), values.end()), values.end());
+            Sequence recipients = values;
+            if (static_cast<int>(state.size()) < padded_rows) recipients.push_back(0);
+            for (int donor : values) {
+                for (int recipient : recipients) {
+                    if (donor < recipient + 2) continue;
+                    const Sequence target = transferred_state(state, donor, recipient);
+                    const int target_area = dominance_area(target);
+                    if (target_area <= area) {
+                        std::cerr << "NONINCREASING_DOMINANCE_AREA source=" << show(state)
+                                  << " target=" << show(target) << '\n';
+                        std::exit(1);
+                    }
+                    if (target_area > maximum_area || seen.contains(target)) continue;
+                    seen[target] = target_area;
+                    pending.push({target_area, target});
+                }
+            }
+        }
+        std::vector<std::pair<int, Sequence>> ordered;
+        ordered.reserve(seen.size());
+        for (const auto &[state, area] : seen) ordered.push_back({area, state});
+        std::sort(ordered.begin(), ordered.end());
+        for (const auto &[area, state] : ordered) {
+            (void)area;
+            add_state(state);
+        }
+    }
+
     void build_states() {
-        Sequence state;
-        enumerate_states(total, profile.front(), state);
+        if (maximum_area >= 0) {
+            enumerate_area_states();
+        } else {
+            Sequence state;
+            enumerate_states(total, profile.front(), state);
+        }
         for (StateData &data : states) {
             AllocationSearch search(data.state, child);
             search.run();
@@ -357,6 +476,7 @@ struct Survey {
                     Sequence target = transferred_state(state, donor, recipient);
                     const auto found = state_index.find(target);
                     if (found == state_index.end()) {
+                        if (maximum_area >= 0) continue;
                         std::cerr << "TRANSFER_LEFT_CORPUS source=" << show(state)
                                   << " target=" << show(target) << '\n';
                         std::exit(1);
@@ -368,65 +488,9 @@ struct Survey {
         }
     }
 
-    static int row_sum(const Row &row) {
-        return row[0] + row[1] + row[2];
-    }
-
-    int find_allocation(int state, const Allocation &key) const {
-        const auto &values = states[state].allocations;
-        const auto found = std::lower_bound(values.begin(), values.end(), key);
-        if (found == values.end() || *found != key) return -1;
-        return static_cast<int>(found - values.begin());
-    }
-
     std::vector<int> images(const UnitEdge &edge, const Allocation &source) const {
-        std::vector<int> result;
-        std::array<Allocation, 2> orientations{source, reflected(source)};
-        const int orientation_count = orientations[0] == orientations[1] ? 1 : 2;
-        for (int orientation = 0; orientation < orientation_count; ++orientation) {
-            const Allocation &rows = orientations[orientation];
-            for (int donor_index = 0;
-                 donor_index < static_cast<int>(rows.size()); ++donor_index) {
-                if (row_sum(rows[donor_index]) != edge.donor) continue;
-                const int recipient_begin = edge.recipient == 0 ? -1 : 0;
-                const int recipient_end = edge.recipient == 0 ? 0 : static_cast<int>(rows.size());
-                for (int recipient_index = recipient_begin;
-                     recipient_index < recipient_end; ++recipient_index) {
-                    if (recipient_index >= 0 &&
-                        row_sum(rows[recipient_index]) != edge.recipient)
-                        continue;
-                    for (int coordinate = 0; coordinate < 3; ++coordinate) {
-                        if (!rows[donor_index][coordinate]) continue;
-                        Allocation moved = rows;
-                        --moved[donor_index][coordinate];
-                        if (recipient_index < 0) {
-                            Row added{};
-                            ++added[coordinate];
-                            moved.push_back(added);
-                        } else {
-                            ++moved[recipient_index][coordinate];
-                        }
-                        const Row &new_donor = moved[donor_index];
-                        const Row &new_recipient = recipient_index < 0
-                            ? moved.back() : moved[recipient_index];
-                        if ((new_donor[0] && new_donor[2]) ||
-                            (new_recipient[0] && new_recipient[2]))
-                            continue;
-
-                        std::vector<Choice> choices;
-                        choices.reserve(moved.size());
-                        for (const Row &row : moved)
-                            choices.push_back({row[0], row[1], row[2]});
-                        Allocation key = canonical_allocation(choices, child.front());
-                        const int target_index = find_allocation(edge.target, key);
-                        if (target_index >= 0) result.push_back(target_index);
-                    }
-                }
-            }
-        }
-        std::sort(result.begin(), result.end());
-        result.erase(std::unique(result.begin(), result.end()), result.end());
-        return result;
+        return transported_images(source, states[edge.target].allocations,
+                                  edge.donor, edge.recipient, child.front());
     }
 
     std::string show_edge(const EdgeSummary &summary) const {
@@ -455,8 +519,9 @@ struct Survey {
         const std::array<std::uint64_t, 4> expected_allocations{0, 2, 57, 1063464};
         std::uint64_t allocation_count = 0;
         for (const StateData &state : states) allocation_count += state.allocations.size();
-        if (states.size() != expected_states[k] || edge_count != expected_edges[k] ||
-            allocation_count != expected_allocations[k]) {
+        if (maximum_area < 0 &&
+            (states.size() != expected_states[k] || edge_count != expected_edges[k] ||
+             allocation_count != expected_allocations[k])) {
             std::cerr << "ALLOCATION_DAG_REGRESSION states=" << states.size()
                       << " edges=" << edge_count
                       << " allocations=" << allocation_count << '\n';
@@ -576,8 +641,9 @@ struct Survey {
 
         const auto elapsed = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - started).count();
-        std::cout << "ALLOCATION_FIBER_DAG k=" << k
-                  << " states=" << states.size()
+        std::cout << "ALLOCATION_FIBER_DAG k=" << k;
+        if (maximum_area >= 0) std::cout << " maximum_area=" << maximum_area;
+        std::cout << " states=" << states.size()
                   << " transfers=" << edge_count
                   << " allocation_orbits=" << allocation_count
                   << " search_nodes=" << allocation_nodes
@@ -681,6 +747,133 @@ struct Survey {
 }  // namespace
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--area") {
+        if (argc < 4) {
+            std::cerr << "usage: singleton_allocation_fiber_dag --area k maximum-area [examples]\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int maximum_area = std::atoi(argv[3]);
+        const int examples = argc > 4 ? std::atoi(argv[4]) : 12;
+        if (k < 1 || k > 5 || maximum_area < 0 || examples < 0) {
+            std::cerr << "area mode supports 1<=k<=5 and nonnegative bounds\n";
+            return 2;
+        }
+        Survey survey(k, examples, maximum_area);
+        survey.run();
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--edge") {
+        if (argc < 7) {
+            std::cerr << "usage: singleton_allocation_fiber_dag --edge k donor recipient value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int donor = std::atoi(argv[3]);
+        const int recipient = std::atoi(argv[4]);
+        if (k < 1 || k > 5 || donor < recipient + 2) {
+            std::cerr << "edge mode supports 1<=k<=5 and a Robin--Hood value pair\n";
+            return 2;
+        }
+        Sequence source;
+        for (int index = 5; index < argc; ++index)
+            source.push_back(std::atoi(argv[index]));
+        const Sequence profile = singleton_base(k);
+        if (!std::is_sorted(source.begin(), source.end(), std::greater<int>()) ||
+            std::any_of(source.begin(), source.end(), [](int value) { return value <= 0; }) ||
+            source.empty() || source.front() > MAX_VALUE ||
+            std::accumulate(source.begin(), source.end(), 0) !=
+                std::accumulate(profile.begin(), profile.end(), 0) ||
+            std::find(source.begin(), source.end(), donor) == source.end() ||
+            (recipient > 0 &&
+             std::find(source.begin(), source.end(), recipient) == source.end())) {
+            std::cerr << "source state or marked values are invalid\n";
+            return 2;
+        }
+        const Sequence child = singleton_base(k - 1);
+        Sequence target = source;
+        target.erase(std::find(target.begin(), target.end(), donor));
+        if (donor > 1) target.push_back(donor - 1);
+        if (recipient > 0)
+            target.erase(std::find(target.begin(), target.end(), recipient));
+        target.push_back(recipient + 1);
+        std::sort(target.begin(), target.end(), std::greater<int>());
+
+        const auto started = std::chrono::steady_clock::now();
+        AllocationSearch source_search(source, child);
+        source_search.run();
+        AllocationSearch target_search(target, child);
+        target_search.run();
+        std::vector<bool> inherited(target_search.allocations.size(), false);
+        std::uint64_t links = 0;
+        for (const Allocation &allocation : source_search.allocations) {
+            const std::vector<int> images = transported_images(
+                allocation, target_search.allocations, donor, recipient, child.front());
+            links += images.size();
+            for (int image : images) inherited[image] = true;
+        }
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        const std::size_t inherited_count = std::count(inherited.begin(), inherited.end(), true);
+        std::cout << "ALLOCATION_FIBER_EDGE k=" << k
+                  << " source=" << show(source)
+                  << " move=" << donor << "->" << recipient
+                  << " target=" << show(target)
+                  << " fibers=" << source_search.allocations.size() << "->"
+                  << target_search.allocations.size()
+                  << " links=" << links
+                  << " inherited=" << inherited_count
+                  << " novel=" << target_search.allocations.size() - inherited_count
+                  << " search_nodes=" << source_search.nodes + target_search.nodes
+                  << " seconds=" << seconds << '\n';
+        if (target_search.allocations.size() <= 20)
+            for (int index = 0;
+                 index < static_cast<int>(target_search.allocations.size()); ++index)
+                std::cout << (inherited[index] ? "INHERITED " : "NOVEL ")
+                          << show_allocation(target_search.allocations[index]) << '\n';
+        return target_search.allocations.empty() ? 1 : 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--state") {
+        if (argc < 4) {
+            std::cerr << "usage: singleton_allocation_fiber_dag --state k value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        if (k < 1 || k > 5) {
+            std::cerr << "single-state mode supports 1<=k<=5\n";
+            return 2;
+        }
+        Sequence state;
+        for (int index = 3; index < argc; ++index)
+            state.push_back(std::atoi(argv[index]));
+        if (!std::is_sorted(state.begin(), state.end(), std::greater<int>()) ||
+            std::any_of(state.begin(), state.end(), [](int value) { return value <= 0; })) {
+            std::cerr << "state must be positive and nonincreasing\n";
+            return 2;
+        }
+        const Sequence profile = singleton_base(k);
+        if (state.empty() || state.front() > MAX_VALUE ||
+            std::accumulate(state.begin(), state.end(), 0) !=
+                std::accumulate(profile.begin(), profile.end(), 0)) {
+            std::cerr << "state has the wrong range or mass\n";
+            return 2;
+        }
+        const auto started = std::chrono::steady_clock::now();
+        AllocationSearch search(state, singleton_base(k - 1));
+        search.run();
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        std::cout << "ALLOCATION_FIBER_STATE k=" << k
+                  << " state=" << show(state)
+                  << " allocation_orbits=" << search.allocations.size()
+                  << " search_nodes=" << search.nodes
+                  << " complete_allocations=" << search.complete
+                  << " seconds=" << seconds << '\n';
+        if (search.allocations.size() <= 20)
+            for (const Allocation &allocation : search.allocations)
+                std::cout << "ALLOCATION " << show_allocation(allocation) << '\n';
+        return search.allocations.empty() ? 1 : 0;
+    }
     const int k = argc > 1 ? std::atoi(argv[1]) : 3;
     const int examples = argc > 2 ? std::atoi(argv[2]) : 12;
     if (k < 1 || k > 3 || examples < 0) {

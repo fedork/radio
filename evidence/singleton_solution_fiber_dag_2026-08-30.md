@@ -146,6 +146,168 @@ This is a concrete meaning of **phase change**: a tight pure-side Hall inequalit
 two rows from sharing a side; after the unit transfer it becomes equality, and a four-row Pascal
 reassociation creates a new exact `h,h,h` decomposition.
 
+## The complete first Lorenz shell
+
+The local pattern is now proved at every level and classified at every immediate dominance cover.
+Write
+
+    v_d=sum_(s=d..K) binomial(K,s),
+    G_K=(v_0,v_1,v_2^2,v_3^4,...,v_K^(2^(K-1))).
+
+For `1<=d<=K-1`, transfer one coin from the last `v_d` row to the first `v_(d+1)` row and call the
+result `X_(K,d)`.  These are exactly the states at Lorenz area
+
+    D(x)=sum_t(H_(G_K)(t)-H_x(t))=1.
+
+Let `h=G_(K-1)`.  If the top `2s` parent rows contain `p` rows of color `A`, their instance of the
+Fixed-Color Hall inequality and the Pascal prefix identity imply
+
+    2H_h(s)-epsilon <= H_h(p)+H_h(2s-p),
+
+where `epsilon=1` only at the transferred prefix.  The loss from the balanced maximum when
+`p!=s` is at least `h_s-h_(s+1)`.  At `s=2^(e-1)` this jump is exactly
+
+    binomial(K-1,e-1).
+
+Thus one unit of Lorenz slack can unbalance only the first dyadic boundary.  All deeper jumps cost
+at least two.  Taking differences between successive dyadic prefix counts gives the exact fibers:
+
+| parent | feasible coloring orbits | inherited from `G_K` | new |
+|---|---:|---:|---:|
+| `G_K` | 1 | -- | -- |
+| `X_(K,1)`, `K>=3` | 3 | 2 | 1, namely `(PB)` |
+| `X_(K,d)`, `2<=d<=K-1` | 4 | 4 | 0 |
+
+Existence of the inherited orbits is constructive.  Choose canonical donor and recipient chains
+of the desired first-test colors and move the canonical bottom cell.  That word starts with the
+mixed symbol `1`, so both row colors remain fixed.  At `d=1`, `(PB)` supplies the sole third
+coloring.  Since area strictly increases on every normalized Robin--Hood edge, an area-one state
+has no possible predecessor other than `G_K`; hence this also proves that `(PB)` is the unique
+noncanonical coloring source in the whole first shell.  The full proof is in the theorem note.
+
+Complete allocation enumeration independently gives a stable finer pattern through `K=5`:
+
+| level(s) | cut orbits over `G_K` | over `X_(K,1)` | over each deeper `X_(K,d)` |
+|---|---:|---:|---:|
+| `K=3,4,5` | 1 | 4 = 3 inherited + 1 new | 6 = 6 inherited |
+
+This allocation count is finite evidence, not an all-level theorem.  Its recursive interpretation
+is useful: a transfer at boundary `d>=2` places the one-unit defect at boundary `d-1` in one child;
+the top boundary instead permits the local Pascal reassociation.
+
+## Greedy-source reduction and higher Pascal phases
+
+The one-unit conclusion does not extend to accumulated slack.  There is an exact global reduction
+of every possible coloring source to a small family of rigid Pascal recombinations.
+
+For a fixed padded `A/B` coloring, define the integral polymatroid rank
+
+    f(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).
+
+Condition (C) says exactly that the colored row demands form an integer base of `f`.  Repeatedly
+make any feasible headward exchange from a no-smaller row to a no-larger row.  The sum of squares
+strictly increases.  When no exchange remains, the polymatroid greedy criterion says, with
+`h=G_(K-1)`, that row `i` has size
+
+    h_i+h_(r_i),
+
+where `r_i` is its occurrence number within its color.  The sums must occur in nonincreasing
+order.  Exactly `2^(K-1)` occurrences of each color are positive, so the terminal has `2^K`
+rows.  Conversely, every balanced word with nonincreasing sums has the explicit allocation
+
+    A row i: (h_(r_i),h_i,0),       B row i: (0,h_i,h_(r_i)),
+
+and hence three children equal to `h`.  Reversing the ascent proves:
+
+> Every feasible coloring descends by literal color-preserving transfers from a self-sorted
+> Pascal greedy shuffle.  In particular every coloring-source orbit is one of these shuffles.
+
+This makes the proposed parent/decomposition isomorphism exact at phase anchors.  A dynamic
+program enumerates the shuffles without enumerating parent partitions.  Greedy tight prefixes
+forbid a predecessor using unequal target rows; testing all equal-row separations by (C) then
+classifies the genuine sources exactly.
+
+| `K` | greedy-shuffle orbits | source orbits | source-area multiplicities |
+|---:|---:|---:|---|
+| 2 | 2 | 1 | `0` |
+| 3 | 2 | 2 | `0, 1` |
+| 4 | 5 | 2 | `0, 1` |
+| 5 | 6 | 6 | `0, 1, 4^2, 5, 19` |
+| 6 | 25 | 6 | `0, 1, 5^2, 6, 23` |
+| 7 | 25 | 25 | `0, 1, 6^2, 7, 15^2, 16^2, 21^4, 22^2, 27, 42, 60^2, 61^2, 66^2, 67, 87` |
+| 8 | 227 | 30 | `0, 1, 7^2, 8, 21^2, 22^2, 28^4, 29^2, 31, 52, 84^2, 85^2, 91^2, 92, 115, 224^2, 225, 241, 427` |
+
+The first higher family has a closed form.  At dyadic boundary `s=2^(e-1)`, the price of one
+color-count imbalance is
+
+    c_e=h_s-h_(s+1)=binomial(K-1,e-1).
+
+Move `c_e` coins between the adjacent `v_e` and `v_(e+1)` boundary rows of `G_K`.  The new row gap
+is `binomial(K-1,e)-binomial(K-1,e-1)`.  At `K=2e` it is zero, and the would-be phase inherits by
+separating those equal rows.  For `K>=2e+1` it is positive and two self-sorted shuffles give source
+colorings.  Thus the `e=2` phases first occur at `K=5`, area four, and the `e=3` phases first occur
+at `K=7`, area fifteen.  The theorem note gives the two explicit block words and proof.
+
+At `K=5`, the two area-four sources lie over
+
+    (32,31,26,22,20,16^3,6^8,1^16).
+
+An independent exhaustive ideal through `D=5` confirms the greedy classification locally:
+
+| quantity | `K=5`, `D<=5` |
+|---|---:|
+| parent states | 267 |
+| parent transfers | 866 |
+| coloring orbits | 5,089 |
+| literal links | 19,113 |
+| nonempty parent edges | 866 |
+| noncanonical sources | 4: areas `1,4,4,5` |
+| parents reached from the canonical coloring | 267 |
+
+The area-nineteen source lies outside this ideal but is classified globally by the greedy-source
+theorem and exact predecessor test.  Restricting to dominance-cover edges is insufficient even
+inside `D<=5`: that sub-DAG reaches only 266 of the 267 parents.  Long one-coin moves are therefore
+not merely shortcuts in the solution relation.
+
+The remaining statement is the **Pascal-Shuffle Coverage Lemma**: the parent projections of the
+downward exchange cones from all self-sorted shuffles cover every partition dominated by `G_K`.
+By the reduction above this is equivalent to the Row-Coloring Lemma.  It is a much sharper version
+of the original phase-change idea, but it remains open.
+
+## Exact downward-closed `K=4` neighborhood
+
+Padding to 81 rows, `D(x)` is also
+
+    D(x)=sum_i (i-1)(x_i-(G_4)_i).
+
+Every normalized Robin--Hood move strictly increases it.  Therefore `{x:D(x)<=B}` is a genuine
+order ideal: all predecessors of every surveyed fiber vertex are present.  Source claims inside
+the ideal cannot be artifacts of truncation.
+
+The complete `B=14` result is:
+
+| quantity | coloring relation | complete-allocation relation |
+|---|---:|---:|
+| parent states | 2,852 | 2,852 |
+| parent transfers | 26,067 | 26,067 |
+| fiber orbits | 60,486 | 871,752 |
+| literal transport links | 719,077 | 9,969,849 |
+| nonempty parent edges | 26,067 | 26,067 |
+| fiber orbits reached canonically | 52,728 | 784,351 |
+| parent states reached canonically | 2,852 | 2,852 |
+| noncanonical source orbits | 1 | 1 |
+
+In both relations the sole extra source is `(PB)`.  In the allocation relation its descendant set
+contains 434,873 cuts.  It covers all 87,401 cuts missed by the canonical component and overlaps
+that component on 347,472.  Already at area two an edge out of `G_4` creates a cut relative to that
+one predecessor, but an alternate incoming edge inherits it.  This is the first concrete reason
+the parent graph must be treated as a DAG rather than a selected transfer tree.
+
+The result is exact only for `D<=14`.  It proves neither that there are no later phase sources nor
+that the canonical component hits every one of the 5,997,038 `K=4` parents.  It does show that
+multiple interacting unit defects produce extensive birth/death churn without producing a second
+new source anywhere in this complete initial ideal.
+
 ## Consequence for a proof strategy
 
 The experiment supports the user's global-schedule idea, but it separates two possible claims.
@@ -164,11 +326,12 @@ compose along a path.
 A minimal-counterexample proof now has a precise target.  Let `R(x)` be the allocations over `x`
 reachable from the canonical cut.  If a first parent with `R(x)=empty` existed, every incoming
 edge would have a nonempty full transport relation but all of its source endpoints would avoid the
-reachable fibers of the predecessors.  The Pascal phase calculation shows what a new source of
-the full solution relation looks like.  A proof must show either that all such source phases are
-explicit Pascal reassociations and harmless to parent coverage, or directly that some incoming
-relation always meets a reachable predecessor fiber.  This retains the whole fiber and avoids the
-earlier mistake of selecting incompatible edge certificates independently.
+reachable fibers of the predecessors.  The greedy reduction now classifies every possible source
+of the coarser Hall-coloring relation as a rigid canonical-child shuffle, and proves that higher
+sources occur.  A proof should therefore establish Pascal-Shuffle Coverage, or directly show that
+some incoming relation always meets a reachable predecessor fiber.  It must allow long unit moves:
+the `K=5`, `D<=5` cover sub-DAG already misses one parent.  This retains the whole fiber and avoids
+the earlier mistake of selecting incompatible edge certificates independently.
 
 ## Reproduction and scope
 
@@ -179,6 +342,11 @@ tools/singleton_solution_fiber_dag.py 3
 tools/singleton_solution_fiber_dag.py --phase-edge 3
 tools/singleton_solution_fiber_dag.py --phase-edge 4
 tools/singleton_solution_fiber_dag.py --phase-edge 5
+tools/singleton_solution_fiber_dag.py --area-ideal 4 14 --examples 20
+tools/singleton_solution_fiber_dag.py --area-ideal 5 5 --examples 30
+for k in 2 3 4 5 6 7 8; do
+  tools/singleton_solution_fiber_dag.py --greedy-sources "$k" --examples 0
+done
 
 CC=clang++ tools/build_radio.py -std=c++20 -O3 -Wall -Wextra -pedantic \
   tools/singleton_allocation_fiber_dag.cpp \
@@ -187,6 +355,15 @@ CC=clang++ tools/build_radio.py -std=c++20 -O3 -Wall -Wextra -pedantic \
 tools/capped_run.sh --seconds 1800 --rss-gb 4 \
   --label singleton-allocation-fiber-k3 -- \
   tools/run_with_provenance.py /tmp/singleton_allocation_fiber_dag 3 0
+
+tools/capped_run.sh --seconds 300 --rss-gb 4 \
+  --label singleton-allocation-area-k4-d14 -- \
+  tools/run_with_provenance.py /tmp/singleton_allocation_fiber_dag \
+    --area 4 14 3
+
+tools/run_with_provenance.py /tmp/singleton_allocation_fiber_dag \
+  --edge 5 31 26 32 31 26 26 16 16 16 16 6 6 6 6 6 6 6 6 \
+    1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
 ```
 
 The final allocation build id is
@@ -200,7 +377,8 @@ An address/undefined-sanitized build
 reproduced the complete `K=3` counts without a diagnostic in 412.236 in-process / 414 wrapper wall
 seconds at 1.86 GB peak RSS.
 
-All exhaustive global claims in this note stop at `K=3`.  The proved phase-birth construction is
-uniform in `K`, and only its small local fiber counts were checked through `K=5`.  Neither survey
-proves the Canonical Allocation-Transport Conjecture or the Singleton Majorization Converse for
-arbitrary `K`.
+The complete allocation-DAG claims stop at `K=3`; the allocation area ideal stops at `K=4`,
+`D=14`.  The Hall-coloring ideals stop at `K=4`, `D=14` and `K=5`, `D=5`.  The
+Greedy-Source Reduction and the dyadic phase family are all-level theorems, while the complete
+greedy-source classifications stop at `K=8`.  None of these results proves Pascal-Shuffle
+Coverage, the Canonical Allocation-Transport Conjecture or the Singleton Majorization Converse.

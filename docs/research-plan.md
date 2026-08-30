@@ -378,11 +378,39 @@ rows are forced to opposite sides by a Hall inequality, while the new top row an
 share a side.  Lorenz slack shows that `G_K` is the phase parent's unique one-unit predecessor.
 Thus the full solution DAG has a genuine new source at every `K>=3`; trying to generate *every*
 solution from `G_K` is false.  At `K=3` it is the only extra source, and its descendants together
-with the canonical descendants cover the entire cut corpus.  The next survey should classify
-source phases in a tractable `K=4` boundary region and test whether they are recursively lifted
-Pascal reassociations.  The next proof step should show either that such phases never become the
-sole supplier over a parent, or directly that every first parent with empty `R(x)` has an incoming
-literal link from a reachable predecessor.  See the
+with the canonical descendants cover the entire cut corpus.
+
+The first requested `K=4` boundary survey is now complete rather than pending.  Measure a parent
+by the integral area `D` between its Lorenz curve and `G_K`; Robin--Hood moves strictly increase
+`D`, so `D<=B` is downward closed and source classifications there have no missing predecessors.
+Through `D=14`, all 2,852 `K=4` parents, 26,067 edges and 871,752 allocation orbits still have only
+the canonical source and the displayed reassociation source.  Every edge lifts and the canonical
+component projects onto every parent.  The all-level first shell is proved more sharply.  At the
+dyadic boundary `2^e`, one off-balance color costs the exact child-profile jump
+`binomial(K-1,e-1)`; one unit of Lorenz slack can therefore create a new coloring only at `e=1`.
+Every deeper immediate cover has four colorings, all inherited, while the top cover has two
+inherited colorings plus the reassociation.  Complete allocation fibers through `K=5` refine this
+to six inherited cuts at every deeper boundary and three inherited plus one new at the top.
+
+The several-defect picture is now sharper, and the former “same reassociation at every collision”
+target is superseded.  Fixed-color Hall feasibility is an integral polymatroid base.  Headward
+exchange to a local maximum proves that every feasible coloring descends from a self-sorted
+Pascal greedy shuffle with row sums `h_i+h_(color occurrence)` and three canonical children.
+Consequently every possible coloring source is one of these finite rigid anchors.  Accumulated
+slack can create higher phases: boundary `e` costs exactly `binomial(K-1,e-1)` and yields two new
+sources once `K>=2e+1`.  At `K=5`, sources occur at areas `0,1,4,4,5,19`; an independent exact
+ideal through area five has 267 parents, 866 nonempty edges and 5,089 colorings, and the canonical
+component still projects onto all 267 parents.  Its cover-edge sub-DAG reaches only 266, so long
+one-coin moves cannot be discarded.
+
+The next proof step is the equivalent **Pascal-Shuffle Coverage Lemma**: prove that the parent
+projections of the color-preserving downward exchange cones of all self-sorted shuffles cover the
+full dominance ideal.  This is the completed global formulation of the phase-change approach; it
+starts only from explicit canonical-child cuts and permits every phase forced by Pascal prices.
+For the stronger allocation route, show directly that every first parent with empty `R(x)` has an
+incoming literal link from a reachable predecessor.  Do not return to a selected transfer tree:
+already at area two a cut born relative to the `G_4` edge is inherited along another predecessor,
+and the `K=5` cover-only miss shows that even the graded cover graph loses useful links.  See the
 [solution-fiber DAG record](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
 
 For an equivalent rather than stronger route, retain the **Balanced Pascal Realization Lemma** in the

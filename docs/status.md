@@ -157,7 +157,31 @@ canonical component almost completely.  This phase birth has a uniform proof for
 after moving the second canonical row toward the third, a four-row Pascal reassociation keeps all
 three children equal to `G_(K-1)` but changes a top-row orientation forbidden at `G_K`.  Therefore
 “generate every solution from `G_K`” is false, while “the canonical component projects onto every
-parent” remains a viable sufficient conjecture.  See the
+parent” remains a viable sufficient conjecture.  The whole first Lorenz shell is now classified
+for every `K>=3`: at dyadic boundary `2^e`, moving one color count off balance costs the exact
+Pascal jump `binomial(K-1,e-1)`.  One unit of parent slack can therefore create a new coloring only
+at `e=1`; the phase parent has three coloring orbits (two inherited plus the reassociation), while
+each deeper immediate cover has four, all inherited.  Complete cut enumeration through `K=5`
+gives the finer stable pattern `1 -> 4` at the top boundary and `1 -> 6` at every deeper boundary,
+with only the reassociation new.
+
+Accumulated slack does create higher phases.  A proved integral-polymatroid reduction now shows
+that every feasible coloring descends from a **self-sorted Pascal greedy shuffle**: a balanced
+binary word whose row sums are `h_i+h_(color occurrence)`.  Every possible coloring source is one
+of these rigid shuffles, has exactly `2^K` positive rows, and has an explicit cut with all three
+children `G_(K-1)`.  At boundary `e`, a deeper phase appears at the exact price
+`binomial(K-1,e-1)` once `K>=2e+1`; the first new pair is at `K=5`, Lorenz area four.  Exact global
+shuffle classification gives 6 source orbits at `K=5` (areas `0,1,4,4,5,19`), 6 at `K=6`, 25 at
+`K=7`, and 30 at `K=8`.  Thus the earlier hope that (PB) is the only all-level source is false.
+
+The bounded transport evidence remains positive.  The exact `K=4`, area-14 allocation ideal has
+2,852 parents, 26,067 edges and 871,752 cut orbits; every edge lifts and the canonical component
+hits every parent.  The independent `K=5` coloring ideal through area five has 267 parents, 866
+nonempty edges and 5,089 coloring orbits; its four noncanonical sources occur exactly at areas
+`1,4,4,5`, yet the canonical component again hits every parent.  Dominance-cover moves alone hit
+only 266 of them, so long one-coin moves matter.  The remaining equivalent target is the open
+**Pascal-Shuffle Coverage Lemma**: the parent projections of all shuffle exchange cones cover the
+whole dominance ideal.  See the
 [solution-fiber theorem section](theorems/singleton-majorization.md#the-solution-fiber-dag-and-a-pascal-phase-birth-2026-08-30)
 and [exact survey](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
 A new low-level shape survey suggests an even simpler global route that discards the transfer

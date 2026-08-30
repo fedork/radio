@@ -11,12 +11,15 @@ means that the donor and recipient rows keep their colors while one coin is
 moved.  Thus the bipartite edge relation records the most literal local
 transport of a first-cut coloring.  The program exhausts the complete k<=3
 state DAG and reports births, deaths, mergers, and forward reachability from
-the G_k fiber.
+the G_k fiber.  It can also survey a downward-closed Lorenz-area ideal at a
+higher level; source vertices found there have every possible predecessor
+present and therefore are genuine sources of the full DAG.
 """
 
 from __future__ import annotations
 
 import argparse
+import heapq
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from itertools import product
@@ -25,6 +28,7 @@ from typing import Iterable
 
 State = tuple[int, ...]
 Coloring = tuple[int, ...]  # A-row multiplicities, indexed by row value.
+GreedyBlock = tuple[int, int, int]  # row value, multiplicity, A multiplicity.
 
 
 def singleton_base(k: int) -> State:
@@ -158,6 +162,169 @@ def transfers(state: State, padded_rows: int) -> Iterable[tuple[int, int, State]
             changed.append(recipient + 1)
             target = tuple(sorted(changed, reverse=True))
             yield donor, recipient, target
+
+
+def dominance_area(profile: State, state: State, padded_rows: int) -> int:
+    """Return the integral area between the Lorenz curves of profile and state."""
+    if len(profile) > padded_rows or len(state) > padded_rows:
+        raise ValueError("state has more rows than its padding")
+    padded_profile = profile + (0,) * (padded_rows - len(profile))
+    padded_state = state + (0,) * (padded_rows - len(state))
+    if sum(padded_profile) != sum(padded_state):
+        raise ValueError("dominance area requires equal total mass")
+    return sum(
+        index * (value - base)
+        for index, (base, value) in enumerate(zip(padded_profile, padded_state))
+    )
+
+
+def enumerate_area_ideal(profile: State, padded_rows: int, maximum_area: int) -> list[State]:
+    """Enumerate the normalized states below profile of area at most maximum_area."""
+    if maximum_area < 0:
+        raise ValueError("maximum area must be nonnegative")
+    pending: list[tuple[int, State]] = [(0, profile)]
+    area_by_state = {profile: 0}
+    while pending:
+        area, state = heapq.heappop(pending)
+        if area_by_state[state] != area:
+            continue
+        for _, _, target in transfers(state, padded_rows):
+            target_area = dominance_area(profile, target, padded_rows)
+            if target_area <= area:
+                raise AssertionError(
+                    f"Robin--Hood transfer did not increase area: {state} -> {target}"
+                )
+            if target_area > maximum_area or target in area_by_state:
+                continue
+            area_by_state[target] = target_area
+            heapq.heappush(pending, (target_area, target))
+    return sorted(area_by_state, key=lambda state: (area_by_state[state], state))
+
+
+def greedy_pascal_orbits(k: int) -> dict[tuple[GreedyBlock, ...], str]:
+    """Return all self-sorted greedy A/B shuffles, with one representative word.
+
+    For h=G_(k-1), position i of a greedy polymatroid base receives mixed
+    part h_i and pure part h_r, where r is that color's occurrence number.
+    A source coloring must have these sums in nonincreasing order.  Equal
+    sums are collapsed to their total and A multiplicities, which is exactly
+    the coloring-orbit quotient.  The unique largest row is fixed in A to
+    quotient global complementation.
+    """
+    if k < 1:
+        raise ValueError("level must be positive")
+    child = singleton_base(k - 1)
+    rows = len(child)
+    partial: dict[tuple[int, tuple[GreedyBlock, ...]], str] = {(0, ()): ""}
+    for index in range(2 * rows):
+        following: dict[tuple[int, tuple[GreedyBlock, ...]], str] = {}
+        for (a_used, blocks), word in partial.items():
+            b_used = index - a_used
+            for in_a in (True, False):
+                if index == 0 and not in_a:
+                    continue
+                used = a_used if in_a else b_used
+                if used >= rows:
+                    continue
+                value = (child[index] if index < rows else 0) + child[used]
+                if blocks and value > blocks[-1][0]:
+                    continue
+                a_next = a_used + int(in_a)
+                if blocks and value == blocks[-1][0]:
+                    old_value, old_total, old_a = blocks[-1]
+                    next_blocks = blocks[:-1] + (
+                        (old_value, old_total + 1, old_a + int(in_a)),
+                    )
+                else:
+                    next_blocks = blocks + ((value, 1, int(in_a)),)
+                key = (a_next, next_blocks)
+                following.setdefault(key, word + ("A" if in_a else "B"))
+        partial = following
+    result = {
+        blocks: word
+        for (a_used, blocks), word in partial.items()
+        if a_used == rows
+    }
+    if len(result) != len(partial):
+        raise AssertionError("greedy shuffle did not finish with balanced colors")
+    return result
+
+
+def greedy_block_data(
+    blocks: tuple[GreedyBlock, ...], largest: int
+) -> tuple[State, Coloring]:
+    state = tuple(value for value, total, _ in blocks for _ in range(total))
+    a_counts = [0] * (largest + 1)
+    for value, _, a_total in blocks:
+        a_counts[value] = a_total
+    totals = multiplicities(state, largest)
+    return state, canonical(tuple(a_counts), totals)
+
+
+def weakly_majorized(state: State, profile: State) -> bool:
+    used = 0
+    bound = 0
+    for index, value in enumerate(state):
+        used += value
+        if index < len(profile):
+            bound += profile[index]
+        if used > bound:
+            return False
+    return sum(state) == sum(profile)
+
+
+def coloring_predecessor(
+    k: int, state: State, coloring: Coloring
+) -> tuple[int, int, State, Coloring] | None:
+    """Find an exact color-preserving headward unit move, if one exists."""
+    profile = singleton_base(k)
+    largest = profile[0]
+    totals = multiplicities(state, largest)
+    hall = Hall(singleton_base(k - 1))
+    values = sorted(set(state), reverse=True)
+
+    for head in values:
+        for tail in values:
+            if head < tail:
+                continue
+            for head_in_a in (True, False):
+                head_count = coloring[head] if head_in_a else totals[head] - coloring[head]
+                if not head_count:
+                    continue
+                for tail_in_a in (True, False):
+                    tail_count = coloring[tail] if tail_in_a else totals[tail] - coloring[tail]
+                    if not tail_count:
+                        continue
+                    if (head, head_in_a) == (tail, tail_in_a) and head_count < 2:
+                        continue
+                    if head + 1 > largest:
+                        continue
+
+                    predecessor = list(state)
+                    predecessor.remove(head)
+                    predecessor.remove(tail)
+                    predecessor.append(head + 1)
+                    if tail > 1:
+                        predecessor.append(tail - 1)
+                    predecessor_state = tuple(sorted(predecessor, reverse=True))
+                    if not weakly_majorized(predecessor_state, profile):
+                        continue
+
+                    predecessor_a = list(coloring)
+                    if head_in_a:
+                        predecessor_a[head] -= 1
+                        predecessor_a[head + 1] += 1
+                    if tail_in_a:
+                        predecessor_a[tail] -= 1
+                        if tail > 1:
+                            predecessor_a[tail - 1] += 1
+                    predecessor_totals = multiplicities(predecessor_state, largest)
+                    predecessor_key = canonical(
+                        tuple(predecessor_a), predecessor_totals
+                    )
+                    if hall.feasible(predecessor_key, predecessor_totals):
+                        return head, tail, predecessor_state, predecessor_key
+    return None
 
 
 @dataclass(frozen=True)
@@ -331,6 +498,263 @@ def inspect_phase_edge(k: int) -> None:
     print("PHASE_CUT " + ",".join(f"({l},{m},{r})" for l, m, r in rows))
     for coloring in sorted(novel):
         print("NOVEL_COLORING " + show_coloring(target, coloring, source[0]))
+
+
+def inspect_greedy_sources(k: int, examples: int) -> None:
+    """Classify every possible coloring-source orbit via polymatroid greediness."""
+    profile = singleton_base(k)
+    largest = profile[0]
+    padded_rows = 3**k
+    hall = Hall(singleton_base(k - 1))
+    records = []
+    for blocks, word in greedy_pascal_orbits(k).items():
+        state, coloring = greedy_block_data(blocks, largest)
+        totals = multiplicities(state, largest)
+        if not hall.feasible(coloring, totals):
+            raise AssertionError(f"greedy coloring is infeasible: {state}")
+        predecessor = coloring_predecessor(k, state, coloring)
+        records.append(
+            (
+                dominance_area(profile, state, padded_rows),
+                state,
+                coloring,
+                word,
+                predecessor,
+            )
+        )
+    records.sort(key=lambda record: record[:4])
+    sources = [record for record in records if record[4] is None]
+    print(
+        f"PASCAL_GREEDY_SOURCE_SURVEY k={k} "
+        f"greedy_orbits={len(records)} source_orbits={len(sources)} "
+        f"inherited_greedy_orbits={len(records) - len(sources)}"
+    )
+    print("SOURCE_AREA_HISTOGRAM " + " ".join(
+        f"{area}:{count}"
+        for area, count in sorted(Counter(record[0] for record in sources).items())
+    ))
+    print("GREEDY_SOURCES")
+    for area, state, coloring, word, _ in sources[:examples]:
+        print(
+            f"  area={area} state={show(state)} word={word} "
+            + show_coloring(state, coloring, largest)
+        )
+    if len(sources) > examples:
+        print(f"  ... {len(sources) - examples} further source orbits omitted")
+
+    inherited = [record for record in records if record[4] is not None]
+    if inherited and examples:
+        print("INHERITED_GREEDY_ORBITS")
+        for area, state, coloring, word, predecessor in inherited[:examples]:
+            if predecessor is None:
+                raise AssertionError("missing predecessor record")
+            head, tail, predecessor_state, _ = predecessor
+            print(
+                f"  area={area} state={show(state)} word={word} "
+                f"reverse={head},{tail} predecessor={show(predecessor_state)} "
+                + show_coloring(state, coloring, largest)
+            )
+        if len(inherited) > examples:
+            print(f"  ... {len(inherited) - examples} further inherited orbits omitted")
+
+
+def run_area_ideal(k: int, maximum_area: int, examples: int) -> None:
+    """Survey an exact downward-closed initial ideal of the solution-fiber DAG."""
+    profile = singleton_base(k)
+    child = singleton_base(k - 1)
+    largest = profile[0]
+    padded_rows = 3**k
+    states = enumerate_area_ideal(profile, padded_rows, maximum_area)
+    state_set = set(states)
+    area = {
+        state: dominance_area(profile, state, padded_rows)
+        for state in states
+    }
+
+    # For the levels whose full state corpus is inexpensive, independently
+    # check that transfer generation really produced the entire area ideal.
+    if k <= 3:
+        expected = {
+            state
+            for state in enumerate_states(profile)
+            if dominance_area(profile, state, padded_rows) <= maximum_area
+        }
+        if state_set != expected:
+            raise AssertionError(
+                f"area-ideal enumeration mismatch: generated={len(state_set)} "
+                f"expected={len(expected)}"
+            )
+
+    hall = Hall(child)
+    fibers: dict[State, frozenset[Coloring]] = {}
+    for state in states:
+        fibers[state] = feasible_fiber(state, largest, hall)
+        if not fibers[state]:
+            raise AssertionError(f"row-coloring counterexample {state}")
+
+    edges: list[Edge] = []
+    incoming: dict[State, list[Edge]] = defaultdict(list)
+    outgoing: dict[State, list[Edge]] = defaultdict(list)
+    for state in states:
+        for donor, recipient, target in transfers(state, padded_rows):
+            if target not in state_set:
+                continue
+            relation = edge_relation(
+                state,
+                target,
+                donor,
+                recipient,
+                largest,
+                fibers[state],
+                fibers[target],
+            )
+            edge = Edge(state, donor, recipient, target, relation)
+            edges.append(edge)
+            incoming[target].append(edge)
+            outgoing[state].append(edge)
+
+    inherited_by_any: dict[State, set[Coloring]] = defaultdict(set)
+    empty_edges = []
+    for edge in edges:
+        if not edge.relation.pairs:
+            empty_edges.append(edge)
+        inherited_by_any[edge.target].update(target for _, target in edge.relation.pairs)
+
+    sources: list[tuple[State, Coloring]] = [
+        (profile, coloring) for coloring in fibers[profile]
+    ]
+    for state in states:
+        if state == profile:
+            continue
+        sources.extend(
+            (state, coloring)
+            for coloring in set(fibers[state]) - inherited_by_any[state]
+        )
+
+    reached: dict[State, set[Coloring]] = defaultdict(set)
+    reached[profile].update(fibers[profile])
+    for state in states:
+        active = reached[state]
+        if not active:
+            continue
+        for edge in outgoing[state]:
+            forward = edge.relation.forward()
+            for coloring in active:
+                reached[edge.target].update(forward.get(coloring, ()))
+
+    # Dominance area grades the normalized partition order.  Retain only its
+    # cover edges to test whether long one-coin jumps are actually needed for
+    # inheritance or forward reachability.
+    cover_edges = [
+        edge for edge in edges if area[edge.target] == area[edge.source] + 1
+    ]
+    cover_incoming: dict[State, list[Edge]] = defaultdict(list)
+    cover_outgoing: dict[State, list[Edge]] = defaultdict(list)
+    for edge in cover_edges:
+        cover_incoming[edge.target].append(edge)
+        cover_outgoing[edge.source].append(edge)
+    cover_source_orbits: list[tuple[State, Coloring]] = [
+        (profile, coloring) for coloring in fibers[profile]
+    ]
+    for state in states:
+        if state == profile:
+            continue
+        cover_inherited = {
+            target
+            for edge in cover_incoming[state]
+            for _, target in edge.relation.pairs
+        }
+        cover_source_orbits.extend(
+            (state, coloring)
+            for coloring in set(fibers[state]) - cover_inherited
+        )
+    cover_reached: dict[State, set[Coloring]] = defaultdict(set)
+    cover_reached[profile].update(fibers[profile])
+    for state in states:
+        for edge in cover_outgoing[state]:
+            forward = edge.relation.forward()
+            for coloring in cover_reached[state]:
+                cover_reached[edge.target].update(forward.get(coloring, ()))
+
+    state_histogram = Counter(area.values())
+    fiber_histogram: Counter[int] = Counter()
+    source_histogram: Counter[int] = Counter()
+    for state in states:
+        fiber_histogram[area[state]] += len(fibers[state])
+    for state, _ in sources:
+        source_histogram[area[state]] += 1
+
+    print(
+        f"SOLUTION_FIBER_AREA_IDEAL k={k} maximum_area={maximum_area} "
+        f"states={len(states)} fibers={sum(map(len, fibers.values()))} "
+        f"transfers={len(edges)} links={sum(len(edge.relation.pairs) for edge in edges)}"
+    )
+    print(
+        f"EDGE_SUMMARY nonempty={len(edges) - len(empty_edges)}/{len(edges)} "
+        f"sources={len(sources)} nonroot_sources={len(sources) - len(fibers[profile])}"
+    )
+    print(
+        f"CANONICAL_COMPONENT reached_states={sum(bool(reached[state]) for state in states)}/"
+        f"{len(states)} reached_fibers={sum(len(reached[state]) for state in states)}/"
+        f"{sum(map(len, fibers.values()))}"
+    )
+    print(
+        f"COVER_SUBDAG edges={len(cover_edges)} "
+        f"nonempty={sum(bool(edge.relation.pairs) for edge in cover_edges)}/"
+        f"{len(cover_edges)} sources={len(cover_source_orbits)} "
+        f"nonroot_sources={len(cover_source_orbits) - len(fibers[profile])} "
+        f"reached_states={sum(bool(cover_reached[state]) for state in states)}/"
+        f"{len(states)} reached_fibers="
+        f"{sum(len(cover_reached[state]) for state in states)}/"
+        f"{sum(map(len, fibers.values()))}"
+    )
+    print("AREA_HISTOGRAM")
+    for value in sorted(state_histogram):
+        reached_states = sum(bool(reached[state]) for state in states if area[state] == value)
+        reached_fibers = sum(len(reached[state]) for state in states if area[state] == value)
+        print(
+            f"  area={value} states={state_histogram[value]} fibers={fiber_histogram[value]} "
+            f"sources={source_histogram[value]} reached_states={reached_states} "
+            f"reached_fibers={reached_fibers}"
+        )
+
+    print("SOURCE_ORBITS")
+    for state, coloring in sorted(sources, key=lambda item: (area[item[0]], item))[:examples]:
+        print(
+            f"  area={area[state]} state={show(state)} fiber={len(fibers[state])} "
+            + show_coloring(state, coloring, largest)
+        )
+    if len(sources) > examples:
+        print(f"  ... {len(sources) - examples} further source orbits omitted")
+
+    cover_missed_states = [state for state in states if not cover_reached[state]]
+    if cover_missed_states:
+        print("COVER_MISSED_STATES")
+        for state in cover_missed_states[:examples]:
+            print(
+                f"  area={area[state]} state={show(state)} fiber={len(fibers[state])}"
+            )
+        if len(cover_missed_states) > examples:
+            print(
+                f"  ... {len(cover_missed_states) - examples} further states omitted"
+            )
+
+    if empty_edges:
+        print("EMPTY_EDGES")
+        for edge in empty_edges[:examples]:
+            print("  " + summarize_edge(edge, fibers))
+        if len(empty_edges) > examples:
+            print(f"  ... {len(empty_edges) - examples} further empty edges omitted")
+
+    missed_states = [state for state in states if not reached[state]]
+    if missed_states:
+        print("CANONICALLY_MISSED_STATES")
+        for state in missed_states[:examples]:
+            print(
+                f"  area={area[state]} state={show(state)} fiber={len(fibers[state])}"
+            )
+        if len(missed_states) > examples:
+            print(f"  ... {len(missed_states) - examples} further states omitted")
 
 
 def run(k: int, examples: int) -> None:
@@ -572,9 +996,22 @@ def main() -> None:
     parser.add_argument("k", nargs="?", type=int, default=3)
     parser.add_argument("--examples", type=int, default=12)
     parser.add_argument("--phase-edge", type=int)
+    parser.add_argument("--area-ideal", nargs=2, type=int, metavar=("K", "AREA"))
+    parser.add_argument("--greedy-sources", type=int, metavar="K")
     args = parser.parse_args()
     if args.phase_edge is not None:
         inspect_phase_edge(args.phase_edge)
+        return
+    if args.greedy_sources is not None:
+        if not 2 <= args.greedy_sources <= 8:
+            parser.error("greedy-source enumeration supports 2 <= K <= 8")
+        inspect_greedy_sources(args.greedy_sources, args.examples)
+        return
+    if args.area_ideal is not None:
+        k, maximum_area = args.area_ideal
+        if not 1 <= k <= 5:
+            parser.error("area-ideal fiber enumeration supports 1 <= K <= 5")
+        run_area_ideal(k, maximum_area, args.examples)
         return
     if not 1 <= args.k <= 3:
         parser.error("the exact implementation currently supports 1 <= k <= 3")

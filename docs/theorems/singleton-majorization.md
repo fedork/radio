@@ -1763,18 +1763,217 @@ But (PB) puts the unchanged top row and the shrunken donor on the same pure side
 transport cannot do.  This is a true phase change: a previously violated pure-side inequality
 becomes equality and a four-row Pascal reassociation creates a new solution.
 
+There is now a complete theorem for the whole first dominance shell, not only this one edge.  Put
+
+    v_d=sum_(s=d..K) binomial(K,s),
+
+so the canonical profile is
+
+    G_K=(v_0,v_1,v_2^2,v_3^4,...,v_K^(2^(K-1))).             (PB1)
+
+For `1<=d<=K-1`, let `X_(K,d)` be obtained by transferring one coin from the last `v_d` row to
+the first `v_(d+1)` row.  These are exactly the `K-1` normalized states whose Lorenz-area deficit
+
+    D(x)=sum_(t>=1) (H_K(t)-H_x(t))
+
+equals one.  A coloring orbit is normalized by equal-row permutations and global side exchange.
+
+> **First-Shell Pascal Phase Theorem.** For every `K>=3`, the feasible Hall-coloring fibers are:
+>
+> - `G_K` has one orbit;
+> - `X_(K,1)` has three orbits, two literally inherited from `G_K` and the (PB) orbit;
+> - every `X_(K,d)` with `2<=d<=K-1` has four orbits, all literally inherited from `G_K`.
+>
+> Consequently the Hall-coloring solution DAG restricted to `D<=1` has exactly two source
+> orbits: the canonical orbit and (PB).  In particular no deeper Pascal block boundary creates a
+> new coloring phase.
+
+*Proof.*  Let `h=G_(K-1)` and let `H` be its saturated prefix function.  In any feasible coloring
+of one of these parents, consider the top `t=2s` rows and let `p` of them have color `A`.  They are
+the `p` largest `A` rows and the `2s-p` largest `B` rows, so (C) and the Pascal prefix identity give
+
+    H_K(2s)-epsilon <= H(2s)+H(p)+H(2s-p),
+    H_K(2s)          = H(2s)+2H(s),                           (PB2)
+
+where `epsilon` is one only at the transferred boundary and zero elsewhere.  Concavity of `H`
+maximizes the last two terms at `p=s`.  If `p!=s`, their loss from the balanced maximum is at least
+
+    h_s-h_(s+1).                                                (PB3)
+
+At the dyadic boundary `s=2^(e-1)`, this is exactly the adjacent Pascal jump
+
+    h_s-h_(s+1)=binomial(K-1,e-1),                              (PB4)
+
+with zero padding after the last child row.  Hence every dyadic prefix is exactly bisected except
+possibly the transferred prefix.  At that prefix an imbalance is possible only for `e=1`, where
+the loss is one; for every `e>=2` it is at least two.
+
+For `G_K`, exact bisection at the successive dyadic endpoints forces the top two distinct rows to
+be opposite and every later equal-value block to split equally.  This is the unique normalized
+canonical coloring.  For `X_(K,d)`, `d>=2`, all endpoints are still bisected.  The color of the
+modified donor row may be chosen in two ways and compensated inside its remaining equal block;
+independently the modified recipient row may be chosen in two ways.  Thus there are at most four
+orbits.  All four exist literally: choose canonical donor and recipient chains of the prescribed
+colors and apply the Canonical Bottom-Cell Transfer Lemma.  Its moved word begins with the mixed
+symbol `1`, so the first-test row colors and every other class are unchanged.
+
+For `d=1`, normalize the largest row to color `A`.  At prefix two, (PB2)--(PB4) allow either one
+or two `A` rows.  Prefix four is again exactly bisected.  If the top two rows are opposite, the
+modified recipient and its equal mate may be oriented in two ways, and both are the literal
+bottom-cell transfers from `G_K`.  If the top two are together, the next two are forced together
+on the other side, giving at most one further orbit; construction (PB) supplies it.  This proves
+the fiber counts.  Finally `D` strictly increases along every Robin--Hood edge.  Every area-one
+parent therefore has only the area-zero parent `G_K` as a possible predecessor.  The two inherited
+orbits (or all four at deeper boundaries) have such predecessors, while (PB) cannot: its top two
+rows are together and the unique `G_K` coloring separates them.  This proves the source claim. ∎
+
+The same statement for **complete allocation fibers** is verified, not proved, through `K=5`.
+At each of `K=3,4,5`, `G_K` has one cut orbit, `X_(K,1)` has four (three inherited and (PB)), and
+each deeper `X_(K,d)` has six, all inherited.  The extra allocation choices record which Pascal
+child receives the descending unit defect.  Thus the first-shell data support a useful recursive
+picture: a defect at a deeper boundary descends one Pascal level inside a child; only a defect at
+the first jump can be absorbed by the local four-row reassociation.
+
+That last sentence applies only to **one unit** of slack.  Several units can meet the exact price
+of a deeper Pascal imbalance and create a genuinely new phase.  The right framework for all such
+phases is an integral-polymatroid greedy reduction.
+
+Fix a coloring of padded labelled rows by `A/B` and put
+
+    f(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).    (PG1)
+
+The Fixed-Color Hall inequalities say exactly that the demand vector `x` is an integer base of
+`f`: `x(S)<=f(S)` for every row set and `x(E)=f(E)=3^K`.  Order the rows by nonincreasing demand.
+If an integer base admits no feasible headward exchange `x+e_i-e_j` with `i<j`, the standard
+polymatroid greedy criterion makes it the greedy base for this order.  Writing `h=G_(K-1)`, its
+coordinates are therefore
+
+    x_i=h_i+h_(r_i),                                           (PG2)
+
+where `r_i` is the occurrence number of the color of row `i`, and `h_i=0` after the `2^(K-1)`th
+positive child row.  Since the coordinates are already ordered, the sums in (PG2) must be
+nonincreasing.
+
+Conversely, any balanced `A/B` word for which the sums (PG2) are nonincreasing gives a legal cut:
+give row `i` mixed part `h_i` and give it pure part `h_(r_i)` on the side named by its color.  The
+mixed parts and each color's pure parts are exactly three copies of `h`.  Call this a
+**self-sorted Pascal greedy shuffle**.
+
+> **Pascal Greedy-Source Reduction.** Every feasible full-mass coloring is reachable, by literal
+> color-preserving Robin--Hood transports, from a self-sorted Pascal greedy shuffle.  Every source
+> orbit of the Hall-coloring solution DAG is therefore one of these shuffles.  Each shuffle has
+> exactly `2^K` positive parent rows and has an explicit cut with all three children equal to
+> `G_(K-1)`.
+
+*Proof.*  Starting from a feasible colored demand vector, perform any feasible headward unit
+exchange from a no-smaller row to a no-larger row and resort.  The sum of squared row demands
+strictly increases, so the process terminates.  At termination the integral-base local-optimality
+criterion for a strictly decreasing row-weight vector gives the greedy formula (PG2).  A zero
+coordinate cannot precede a later positive coordinate.  After the mixed sequence is exhausted,
+this forces both colors to use all `2^(K-1)` positive pure increments before any zero, so there are
+exactly `2^K` positive rows and the word is balanced.  Reversing the exchanges gives the asserted
+literal transports.  The displayed allocation proves the converse construction. ∎
+
+This is the precise restricted isomorphism suggested by the rigid-state surveys: not every parent
+is canonically isomorphic to its cuts, but every point at which a new solution component can enter
+is the sorted recombination of three canonical children, encoded by one balanced binary word.
+It also makes source classification tiny.  A dynamic program only has to retain the current word
+position, its two occurrence counts, and the equal-sum blocks of (PG2).  A greedy shuffle can have
+an incoming edge only by separating two equal parent rows: for unequal rows the earlier greedy
+prefix is tight and forbids a headward exchange.  Testing all equal-row pairs by (C) is therefore
+an exact global source test, independent of the number of dominated parent partitions.
+
+The first new family explains why the first-shell theorem cannot be extrapolated.  Let
+`s=2^(e-1)` and
+
+    c_e=h_s-h_(s+1)=binomial(K-1,e-1).                          (PG3)
+
+Transfer `c_e` coins from the last row of the `v_e` block of `G_K` to the first row of the
+`v_(e+1)` block.  The two rows remain in order precisely when `K>=2e`; their new gap is
+
+    binomial(K-1,e)-binomial(K-1,e-1).                          (PG4)
+
+At `K=2e` they tie and the corresponding greedy colorings inherit through an equal-row exchange.
+For `e>=2` and `K>=2e+1`, they are distinct and there are two source colorings with an imbalance
+of one at the top `2^e` rows.  Explicitly, begin with the canonical greedy word.  In the size-`s`
+block and following size-`2s` block, replace respectively
+
+    A^(s/2) B^(s/2),       A^s B^s
+
+by either
+
+    A^(s/2) B^(s/2-1) A,  B A^(s-1) B^s,
+
+or
+
+    A^(s/2-1) B^(s/2+1),  A^(s+1) B^(s-1).                    (PG5)
+
+The occurrence counts realign after those two blocks.  Formula (PG2) shows that only the two
+boundary rows change, by `-c_e,+c_e`, so all three children remain `h`.  The strict inequality in
+(PG4) keeps the modified rows out of every equal block.  Every other equal block lies inside flat
+mixed and pure blocks of `h`, where changing the order has zero exchange capacity.  Hence no
+headward unit exchange exists and both colorings are source orbits.  For `e=1`, the two
+orientations coalesce under global side exchange and recover (PB).
+
+Thus higher phases appear at the exact Pascal prices, not arbitrarily.  The `e=2` family is born
+at `K=5` with area `binomial(4,1)=4`; the `e=3` family is born at `K=7` with area
+`binomial(6,2)=15`, and so on.  Exact greedy-shuffle/source enumeration gives:
+
+| `K` | self-sorted greedy coloring orbits | source orbits | source-area multiplicities |
+|---:|---:|---:|---|
+| 2 | 2 | 1 | `0` |
+| 3 | 2 | 2 | `0, 1` |
+| 4 | 5 | 2 | `0, 1` |
+| 5 | 6 | 6 | `0, 1, 4^2, 5, 19` |
+| 6 | 25 | 6 | `0, 1, 5^2, 6, 23` |
+| 7 | 25 | 25 | `0, 1, 6^2, 7, 15^2, 16^2, 21^4, 22^2, 27, 42, 60^2, 61^2, 66^2, 67, 87` |
+| 8 | 227 | 30 | `0, 1, 7^2, 8, 21^2, 22^2, 28^4, 29^2, 31, 52, 84^2, 85^2, 91^2, 92, 115, 224^2, 225, 241, 427` |
+
+These are exact finite classifications of **all possible coloring sources** at the displayed
+levels, not samples of the parent corpus.  For example, at `K=5` the two area-four source
+colorings lie over
+
+    (32,31,26,22,20,16^3,6^8,1^16),
+
+and further sources occur at areas five and nineteen.  An independent downward-closed fiber
+census through area five finds exactly the first four noncanonical sources predicted by this
+classification: 267 parents, 866 transfers, 5,089 coloring orbits and 19,113 literal links, with
+every transfer nonempty and every parent reached by the canonical component.
+
+The reduction does not prove that every partition dominated by `G_K` is feasible.  It gives an
+exactly equivalent global target with no arbitrary starting assignment:
+
+> **Pascal-Shuffle Coverage Lemma (open).** The projections of the color-preserving downward
+> exchange cones of all self-sorted Pascal greedy shuffles cover every full-mass partition
+> dominated by `G_K`.
+
+One direction is the explicit shuffle construction and preservation of (C); the other is the
+Greedy-Source Reduction.  This formulation completes the proposed phase-change analysis: the
+phase anchors are now explicit and recursively Pascal-shaped, while coverage of the gaps between
+their cones is the remaining content of singleton majorization.
+
 At `K=3` this is the only noncanonical source orbit.  It lies above
 `(8,6,5,4,1^4)` and reaches 1,059,979 allocation orbits, including all 320 missed by the canonical
 source; the two descendant sets overlap on 1,059,659.  Their union is the entire cut corpus.  The
-coarser Hall-coloring DAG has the same two-source shape.  Exact local fiber enumeration at
-`K=3,4,5` gives one source orbit over `G_K`, three over the phase parent, two inherited and exactly
-one new.
+coarser Hall-coloring DAG has the same two-source shape.
 
-This identifies a useful proof target without pretending the finite picture is an induction.
-Classify source phases of the literal relation as Pascal reassociations, and prove either that the
-canonical component already projects onto every parent or that explicit phase components merge
-before any parent can depend on them exclusively.  The exact definitions, counts, all-level proof
-of (PB), programs and reproduction commands are in the
+There is also an exact downward-closed `K=4` boundary survey.  Because `D` strictly increases on
+every parent edge, the parents with `D<=14` contain every predecessor of each of their vertices.
+They comprise 2,852 parent states and 26,067 transfers.  Their 60,486 Hall-coloring orbits and
+871,752 complete allocation orbits have respectively 719,077 and 9,969,849 literal links.  Every
+edge lifts; the canonical components hit all 2,852 parents.  In both relations (PB) is still the
+only noncanonical source.  The allocation component reaches 784,351 cut orbits; the phase
+component reaches 434,873, covers all 87,401 cuts missed canonically, and overlaps it in 347,472.
+This is a complete theorem about the bounded ideal, not evidence that no further source occurs at
+larger `D`.
+
+The source-classification part of the earlier target is now resolved for Hall colorings by the
+Greedy-Source Reduction: higher Pascal phases really do occur and are not all descendants of
+(PB).  The remaining target is coverage.  Prove the Pascal-Shuffle Coverage Lemma directly, or
+show that the downward cones of the explicit phase anchors merge before leaving a hole in the
+parent projection.  Edgewise nonemptiness through the surveyed ideals supports this statement but
+does not prove it.  The exact definitions, counts, all-level phase constructions, programs and
+reproduction commands are in the
 [solution-fiber DAG record](../../evidence/singleton_solution_fiber_dag_2026-08-30.md).
 
 ### A low-level cut-and-splice normal form (2026-08-29)

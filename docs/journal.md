@@ -11687,11 +11687,11 @@ the literal solution DAG has a true new source at every `K>=3`.  Exact local col
 This both advances and limits the proposed approach.  “Generate every solution from `G_K`” is
 false uniformly.  The useful sufficient statement is the **Canonical Allocation-Transport
 Conjecture**: the canonical component projects onto every parent state.  It is an exact theorem at
-`K=3`, not above.  A proof must retain the reachable subfiber `R(x)` and show that a first parent
-with `R(x)=empty` has an incoming literal link from a reachable predecessor, or classify all
-source phases as explicit Pascal reassociations and prove that no parent depends exclusively on a
-noncanonical phase.  This is genuinely different from selecting one coloring per edge and avoids
-the earlier compatibility circle.
+`K=3`, not above.  At this stage the next target was to retain the reachable subfiber `R(x)` and
+classify its possible phase sources.  The following journal entry carries that classification to
+the Pascal Greedy-Source Reduction, discovers higher phases, and replaces the PB-only picture by
+the Pascal-Shuffle Coverage Lemma.  The need to compose whole fibers rather than select one cut
+per edge remains unchanged.
 
 Measured costs: the coloring DAG takes about four wall seconds.  The full allocation relation took
 31 wall seconds before component propagation; the final clean two-component run took 49.5431
@@ -11709,3 +11709,95 @@ wrapper wall seconds at 1.86 GB peak RSS.
 Final process inventory found no `radio_canon`, `singleton_allocation_fiber`,
 `singleton_solution_fiber`, `singleton_split_multiplicity`, capped runner, `Python -` or
 `python3 -` process remaining.
+
+## 2026-08-30 -- every coloring phase starts at a Pascal greedy shuffle
+
+The solution-fiber survey was extended in two directions.  First, Lorenz area
+
+    D(x)=sum_t(H_(G_K)(t)-H_x(t))
+        =sum_i(i-1)(x_i-(G_K)_i)
+
+grades normalized Robin--Hood moves strictly upward.  The parents with `D<=B` are therefore a
+downward-closed ideal: source claims there cannot be caused by omitted predecessors.  The exact
+`K=4`, `D<=14` coloring ideal has 2,852 parents, 26,067 transfers, 60,486 coloring orbits and
+719,077 links.  The matching complete-allocation ideal has 871,752 cut orbits and 9,969,849
+literal links.  Every edge is nonempty, both canonical components project onto all 2,852 parents,
+and (PB) is the sole noncanonical source in each relation.  The allocation component reaches
+784,351 cuts; the PB component reaches 434,873, covers all 87,401 cuts missed canonically and
+overlaps it on 347,472.
+
+The whole first area shell now has an all-level proof.  Write
+
+    G_K=(v_0,v_1,v_2^2,...,v_K^(2^(K-1))),
+    v_d=sum_(s=d..K) binomial(K,s).
+
+The area-one covers transfer one coin across one internal block boundary.  If the top `2s` rows
+contain `p` rows of color `A`, Hall and the Pascal prefix identity show that an imbalance costs at
+least `h_s-h_(s+1)`.  At `s=2^(e-1)` this is exactly `binomial(K-1,e-1)`.  One unit can therefore
+unbalance only `e=1`.  Consequently `G_K` has one coloring orbit, the top cover has three (two
+inherited and PB), and every deeper cover has four, all inherited.  Complete-allocation
+enumeration at `K=3,4,5` refines the counts to `1 -> 4` at the top and `1 -> 6` at deeper
+boundaries, again with only PB new.
+
+The decisive structural step came from treating fixed-color Hall feasibility as an integral
+polymatroid base.  For padded row colors `A/B`, use
+
+    f(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).
+
+Repeatedly make any feasible headward unit exchange from a no-smaller row to a no-larger row.
+The squared-mass potential strictly increases, so the process stops.  Integral-base local
+optimality makes the terminal the greedy base for its sorted row order.  With `h=G_(K-1)`, its
+rows are exactly
+
+    x_i=h_i+h_(r_i),
+
+where `r_i` is the occurrence number of row `i`'s color.  Positivity forces exactly `2^(K-1)`
+occurrences of each color, hence exactly `2^K` positive rows.  Conversely every balanced binary
+word whose displayed sums are nonincreasing gives an explicit legal cut: put `h_i` in the mixed
+child and `h_(r_i)` in the indicated pure child.  All three children are `h`.
+
+This proves the **Pascal Greedy-Source Reduction**: every feasible coloring descends by literal
+color-preserving transfers from one of these self-sorted shuffles, and every coloring-source orbit
+is among them.  The suggested state/decomposition isomorphism is therefore exact at every phase
+anchor, even though it is false for arbitrary parents.  A dynamic program enumerates shuffle
+orbits without enumerating the parent corpus.  Unequal target rows cannot supply an incoming edge
+because a greedy prefix is tight; exhaustively testing equal-row separations by (C) completes the
+global source classification.  Exact `(greedy orbits, source orbits)` counts are `(2,1)`, `(2,2)`,
+`(5,2)`, `(6,6)`, `(25,6)`, `(25,25)`, `(227,30)` for `K=2,...,8`.
+
+This refutes the tempting extrapolation that PB is the only all-level phase.  At dyadic boundary
+`s=2^(e-1)`, accumulate the exact price
+
+    c_e=h_s-h_(s+1)=binomial(K-1,e-1)
+
+and transfer it between the adjacent `v_e,v_(e+1)` rows of `G_K`.  Their final gap is
+`binomial(K-1,e)-binomial(K-1,e-1)`.  At `K=2e` they tie and the phase inherits by an equal-row
+exchange.  For `K>=2e+1` the gap is strict and two explicit greedy words give source colorings.
+Thus the `e=2` pair first appears at `K=5`, area four, and the `e=3` pair at `K=7`, area fifteen.
+Direct exact predecessor checks reproduce the tie cases `(K,e)=(4,2),(6,3),(8,4)` and the strict
+source cases through `K=9`.
+
+At `K=5` there are six global source coloring orbits, at areas `0,1,4,4,5,19`.  An independent
+complete ideal through `D=5` contains 267 parents, 866 transfers, 5,089 coloring orbits and 19,113
+links.  Every edge is nonempty and the canonical component projects onto all 267 parents despite
+the four noncanonical sources at areas `1,4,4,5`.  The dominance-cover sub-DAG reaches only 266
+parents, so long one-coin transfers are structurally useful rather than dispensable shortcuts.
+
+The resulting exact open target is the **Pascal-Shuffle Coverage Lemma**: the parent projections
+of the color-preserving downward exchange cones of all self-sorted shuffles cover every partition
+dominated by `G_K`.  The Greedy-Source Reduction proves this is equivalent to the Row-Coloring
+Lemma.  The phase-change approach has therefore reached a noncircular conclusion: all anchors and
+all possible births are Pascal-rigid and explicitly constructible; coverage between their cones
+is precisely the remaining singleton-majorization problem.
+
+Exploratory measured costs on the Apple M4 Pro were as follows.  The `K=5`, `D<=5` Python ideal
+took 228 wrapper wall seconds and 0.02 GB peak RSS.  The `K=8` greedy-source classification took
+10 wall seconds and 0.05 GB.  The optimized dirty-source C++ build reproduced the complete `K=3`
+allocation DAG in 48.2982 in-process / 51 wrapper wall seconds at 0.10 GB, and the `K=4`, `D<=14`
+ideal in 14.2275 / 15 seconds at 0.10 GB.  Its address/undefined-sanitized area-14 run completed
+without a diagnostic in 121.882 / 126 seconds at 0.69 GB.  A buffered one-off Python attempt to
+push the greedy enumeration blindly through `K=10` was stopped after roughly 30 seconds when its
+state set began growing rapidly; it produced no retained conclusion, and bounded per-level runs
+through `K=8` replaced it.  One direct default-compiler attempt again linked the C++ utility as C
+rather than C++ and failed after about three seconds; all successful builds used
+`CC=clang++ tools/build_radio.py`.
