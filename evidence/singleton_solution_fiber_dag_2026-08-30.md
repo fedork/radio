@@ -266,8 +266,14 @@ An independent exhaustive ideal through `D=5` confirms the greedy classification
 
 The area-nineteen source lies outside this ideal but is classified globally by the greedy-source
 theorem and exact predecessor test.  Restricting to dominance-cover edges is insufficient even
-inside `D<=5`: that sub-DAG reaches only 266 of the 267 parents.  Long one-coin moves are therefore
-not merely shortcuts in the solution relation.
+inside `D<=5`: that sub-DAG reaches only 266 of the 267 parents.  The missed parent is
+
+    (32,31,26,25,16^4,7,6^7,1^16).
+
+It is the direct transfer of one coin from the last width-26 row of `G_5` to the first width-6
+row, hence has area five.  The long edge carries a canonical coloring, but no chain of area-one
+literal transports from the canonical source reaches any coloring above it.  Long one-coin moves
+are therefore not merely shortcuts in the solution relation.
 
 The remaining statement is the **Pascal-Shuffle Coverage Lemma**: the parent projections of the
 downward exchange cones from all self-sorted shuffles cover every partition dominated by `G_K`.
@@ -366,16 +372,21 @@ tools/run_with_provenance.py /tmp/singleton_allocation_fiber_dag \
     1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
 ```
 
-The final allocation build id is
-`1f29d8c908bc30fc42bfd06ab6c18f1e73445f1fd771da87f54ec5556a2c488e`.
-It was built from clean commit `aa0a61198161a054d4cb7cb7f39e717585464416`.
-The complete component run took 51 wrapper wall seconds, 49.5431 in-process seconds and 0.10 GB
-peak RSS on the recorded Apple M4 Pro.  The earlier full-detail run without the second component
-propagation took 31 wall seconds.  The exact coloring run takes about four wall seconds.
-An address/undefined-sanitized build
-`be0d4f6b02fa3b9761f8b29bbbb48c6349e44f179764878ec44c4e118fe63df5`
-reproduced the complete `K=3` counts without a diagnostic in 412.236 in-process / 414 wrapper wall
-seconds at 1.86 GB peak RSS.
+The final optimized allocation build id is
+`61e923d2a94e106f8ccd7f50ad7ba6a01b1da1f57fdc8b230ff4708ebf55027a`, from clean commit
+`83d87e66aad25ed30d030798c6d93def87af3095`.  It reproduces the complete `K=3` relation in
+48.8522 in-process / 50 wrapper wall seconds at 0.10 GB peak RSS and the `K=4`, `D<=14` ideal in
+14.299 / 16 seconds at 0.10 GB.  Both retained temporary logs pass `tools/check_provenance.py`.
+Clean address/undefined-sanitized build
+`cf5df2f2ff2dc72d6becbcb44b5e678b99a863216b67cd2dba687cadd9f4df5f` reproduces the complete
+area-14 allocation result without a diagnostic in 121.67 in-process / 127 wrapper wall seconds at
+0.69 GB peak RSS; its log also passes the provenance checker.
+
+The Python source at the same clean commit has SHA-256
+`b9507bf6b18ef7616bb771f78670f1504fc221e95165d3582639e4268c30563b`.  Its clean `K=4`, `D<=14`
+coloring run took 61 wrapper wall seconds at 0.03 GB, and its `K=5`, `D<=5` run took 218 seconds at
+0.02 GB.  Running all seven greedy-source classifications `K=2,...,8` from that source took 7.7
+wall seconds in one sequential shell loop.
 
 The complete allocation-DAG claims stop at `K=3`; the allocation area ideal stops at `K=4`,
 `D=14`.  The Hall-coloring ideals stop at `K=4`, `D=14` and `K=5`, `D=5`.  The

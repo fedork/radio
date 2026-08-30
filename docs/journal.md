@@ -11782,6 +11782,13 @@ complete ideal through `D=5` contains 267 parents, 866 transfers, 5,089 coloring
 links.  Every edge is nonempty and the canonical component projects onto all 267 parents despite
 the four noncanonical sources at areas `1,4,4,5`.  The dominance-cover sub-DAG reaches only 266
 parents, so long one-coin transfers are structurally useful rather than dispensable shortcuts.
+The missed cover-parent is
+
+    (32,31,26,25,16^4,7,6^7,1^16),
+
+obtained by the direct width-26 to width-6 transfer from `G_5`.  Its long edge carries a canonical
+coloring, while no area-one transport chain from the canonical source reaches any coloring over
+it.
 
 The resulting exact open target is the **Pascal-Shuffle Coverage Lemma**: the parent projections
 of the color-preserving downward exchange cones of all self-sorted shuffles cover every partition
@@ -11801,3 +11808,18 @@ state set began growing rapidly; it produced no retained conclusion, and bounded
 through `K=8` replaced it.  One direct default-compiler attempt again linked the C++ utility as C
 rather than C++ and failed after about three seconds; all successful builds used
 `CC=clang++ tools/build_radio.py`.
+
+Durable reruns used clean commit `83d87e66aad25ed30d030798c6d93def87af3095`.  Optimized allocation
+build `61e923d2a94e106f8ccd7f50ad7ba6a01b1da1f57fdc8b230ff4708ebf55027a` reproduced `K=3` in
+48.8522 in-process / 50 wrapper wall seconds at 0.10 GB and `K=4`, `D<=14` in 14.299 / 16 seconds
+at 0.10 GB; both logs pass `tools/check_provenance.py`.  Clean sanitized build
+`cf5df2f2ff2dc72d6becbcb44b5e678b99a863216b67cd2dba687cadd9f4df5f` reproduced the area-14
+result without a diagnostic in 121.67 / 127 seconds at 0.69 GB, with valid provenance.  Clean
+Python source SHA-256 `b9507bf6b18ef7616bb771f78670f1504fc221e95165d3582639e4268c30563b`
+reproduced the `K=4` coloring ideal in 61 seconds at 0.03 GB, the `K=5` ideal in 218 seconds at
+0.02 GB, and all `K=2,...,8` greedy-source summaries in 7.7 seconds sequentially.  A one-second
+attempt to wrap the Python script with `run_with_provenance.py` was rejected because that wrapper
+requires a compiled binary sidecar; the clean commit and exact script hash identify the direct
+Python runs instead.
+Final inventory found no `radio_canon`, `singleton_allocation_fiber_dag`,
+`singleton_solution_fiber_dag`, capped runner, `Python -` or `python3 -` process remaining.
