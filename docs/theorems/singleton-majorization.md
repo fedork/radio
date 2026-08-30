@@ -1952,6 +1952,88 @@ Greedy-Source Reduction.  This formulation completes the proposed phase-change a
 phase anchors are now explicit and recursively Pascal-shaped, while coverage of the gaps between
 their cones is the remaining content of singleton majorization.
 
+#### Bidirectional exchanges collapse every coloring phase (2026-08-30)
+
+The source proliferation is entirely caused by orienting every exchange toward the tail.  If a
+unit may move in either direction, there is an all-level connectivity theorem.  This theorem is
+about Hall colorings: the allocation witnessing Hall feasibility may be rebuilt after a move.  It
+does not assert connectivity of the stronger complete-allocation relation.
+
+Pad to `N=3^K` labelled row slots, put `m=2^(K-1)`, and fix a coloring
+`E=A disjoint-union B`.  The feasible full-mass demand vectors are the integer bases of
+
+    f_A(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).       (BG1)
+
+The full-set inequality forces `|A|,|B|>=m`: the parent mass is `3^K`, while each of the three
+terms in (BG1) is at most `3^(K-1)`.  Choose any `m` slots of each color and put the canonical
+`G_K` rows of that color in those slots, leaving every other slot zero.  The result `g^A` is a
+permutation of `G_K` and is an integer base of the same `f_A`, witnessed by the canonical cut.
+
+> **Bidirectional Fiber Connectivity Theorem.** Every feasible padded labelled Hall coloring is
+> connected to a colored permutation of `G_K` by color-preserving unit exchanges whose
+> intermediate parents are full-mass and majorized by `G_K`.  Consequently, after row
+> normalization and global side exchange, the complete Hall-coloring solution graph is one
+> undirected component.
+
+*Proof.*  Integer bases of an integral polymatroid form an M-convex set.  Its unit-exchange graph
+is connected, so the given demand vector and `g^A` are joined by exchanges `x-e_i+e_j` that remain
+bases of (BG1).  Every intermediate base is still a valid parent: if `|S|=t` and
+`p=|S intersection A|`, then concavity of `H` gives
+
+    x(S) <= f_A(S)
+         <= H(t)+H(ceil(t/2))+H(floor(t/2))
+          = H_K(t).                                             (BG2)
+
+Thus its decreasing rearrangement is majorized by `G_K`.  Finally every colored permutation
+`g^A` normalizes to the canonical `G_K` coloring.  Reversing exchanges when necessary joins all
+feasible coloring orbits to that one orbit. ∎
+
+For example, the new directed source at `K=3` joins an inherited coloring over the **same parent**
+in one labelled-row move.  Transfer one coin from its color-`A` row of width six to its color-`B`
+row of width five.  The sorted parent remains `(8,6,5,4,1^4)`, while
+
+    A=(8,6,1,1), B=(5,4,1,1)
+
+becomes the inherited coloring
+
+    A=(8,5,1,1), B=(6,4,1,1).
+
+If normalized self-moves are suppressed and every edge must change the sorted parent, the same
+connection is a three-edge detour:
+
+    (8,7,4,4,1^4) -> (7,7,5,4,1^4) -> (7,6,6,4,1^4)
+                    -> (8,6,5,4,1^4),
+
+where the row-width moves are `8->4`, `7->5`, and then the reverse move `6->7`.  The final coloring
+is the (PB) source.
+
+Exact undirected enumeration agrees.  The complete `K=3` graph has one component containing all
+31,498 coloring orbits.  The complete `K=4`, `D<=14` ideal likewise has one component containing
+all 60,486 orbits.  The truncated `K=5`, `D<=5` ideal has one component of size 5,088 plus one
+isolated area-five source orbit; that source is on the truncation boundary, so its outgoing
+detour lies outside the ideal.  The large component nevertheless projects onto all 267 surveyed
+parents.  The theorem says the isolated orbit reconnects when the full graph is retained.
+
+This removes phase bookkeeping but does **not** prove existence.  Let `F_K` be the union of the
+integer bases of (BG1) over all row colorings, and let `B_K` be all padded full-mass integer vectors
+majorized by `G_K`.  We know
+
+    F_K subset B_K,                 conv(F_K)=conv(permutations of G_K).
+
+The convex-hull equality holds because `F_K` contains every permutation of `G_K`, while those
+permutations are exactly the vertices of the ambient permutahedron.  The Row-Coloring Lemma is
+precisely the missing lattice-saturation statement `F_K=B_K`; connectivity of `F_K` cannot rule
+out a missing interior lattice point.  The generic profile `h=(6,1)` demonstrates the distinction:
+all of its existing colored bases have the same bidirectional connectivity, but the ambient point
+`(12,3,3,3)<=_w(12,7,1,1)` is not colorable.
+
+Thus allowing both directions gives a cleaner global picture: the normalized colored graph is
+connected, while the corresponding labelled union is vertex-spanning and has the right convex
+hull.  The missing assertion is that the labelled union has no lattice holes.  Two sufficient
+forms are to prove that `F_K` itself is M-convex, or that the union of the real base polytopes
+`B(f_A)` is convex.  Either would fill the ambient permutahedron.  Both require the full Pascal
+structure and remain open.
+
 At `K=3` this is the only noncanonical source orbit.  It lies above
 `(8,6,5,4,1^4)` and reaches 1,059,979 allocation orbits, including all 320 missed by the canonical
 source; the two descendant sets overlap on 1,059,659.  Their union is the entire cut corpus.  The

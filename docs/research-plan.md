@@ -403,14 +403,22 @@ ideal through area five has 267 parents, 866 nonempty edges and 5,089 colorings,
 component still projects onto all 267 parents.  Its cover-edge sub-DAG reaches only 266, so long
 one-coin moves cannot be discarded.
 
-The next proof step is the equivalent **Pascal-Shuffle Coverage Lemma**: prove that the parent
-projections of the color-preserving downward exchange cones of all self-sorted shuffles cover the
-full dominance ideal.  This is the completed global formulation of the phase-change approach; it
-starts only from explicit canonical-child cuts and permits every phase forced by Pascal prices.
-For the stronger allocation route, show directly that every first parent with empty `R(x)` has an
-incoming literal link from a reachable predecessor.  Do not return to a selected transfer tree:
-already at area two a cut born relative to the `G_4` edge is inherited along another predecessor,
-and the `K=5` cover-only miss shows that even the graded cover graph loses useful links.  See the
+For a directed proof, the exact remaining statement is the **Pascal-Shuffle Coverage Lemma**:
+the parent projections of the color-preserving downward exchange cones of all self-sorted shuffles
+cover the full dominance ideal.  If transfers may run in either direction, source management is
+unnecessary.  A fixed row coloring gives an integral polymatroid base set, every such set contains
+a colored permutation of `G_K`, and base exchange connects every existing coloring to it.  Thus
+the normalized Hall-coloring graph is universally connected after edges are made undirected.
+Separately, the labelled union over colorings contains every vertex and its convex hull is already
+the complete `G_K` permutahedron.  The exact gap is to prove **no lattice holes**.  Prefer the
+global target that this labelled union is M-convex, or that the union of the corresponding real
+base polytopes is convex; either immediately gives Row-Coloring.  Connectivity plus convex-hull
+coverage is insufficient, as the generic `h=(6,1)` hole shows.  For the stronger allocation
+route, show directly that every first parent with empty `R(x)` has an incoming literal link from a
+reachable predecessor.  Do not return to a
+selected transfer tree: already at area two a cut born relative to the `G_4` edge is inherited
+along another predecessor, and the `K=5` cover-only miss shows that even the graded cover graph
+loses useful links.  See the
 [solution-fiber DAG record](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
 
 For an equivalent rather than stronger route, retain the **Balanced Pascal Realization Lemma** in the

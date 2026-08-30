@@ -11823,3 +11823,78 @@ requires a compiled binary sidecar; the clean commit and exact script hash ident
 Python runs instead.
 Final inventory found no `radio_canon`, `singleton_allocation_fiber_dag`,
 `singleton_solution_fiber_dag`, capped runner, `Python -` or `python3 -` process remaining.
+
+## 2026-08-30 -- bidirectional transfers collapse every Hall-coloring phase
+
+The phrase “transfer from 26 to 6” meant a coin from a row of width 26 to a row of width 6, not
+from the 26th row to the 6th row.  The user's suggestion to permit the reverse direction removes
+the entire directed-source obstruction at the Hall-coloring level.
+
+Pad to `3^K` labelled row slots and fix their colors `A/B`.  With `h=G_(K-1)` and saturated prefix
+function `H`, feasible demand vectors are the integer bases of
+
+    f_A(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).
+
+Full mass forces at least `2^(K-1)` slots of each color.  Choose that many slots per color and put
+the corresponding canonical `G_K` rows there, with zeros elsewhere.  This is a permutation of
+`G_K` in the same base polytope.  Integral-polymatroid exchange therefore connects every existing
+colored parent to a canonical permutation by color-preserving unit moves, with no restriction on
+their direction.  Every intermediate is still a legal parent because, for `p+q=t`,
+
+    f_A(S)=H(t)+H(p)+H(q)
+          <=H(t)+H(ceil(t/2))+H(floor(t/2))=H_K(t).
+
+After normalization all canonical permutations give the canonical coloring orbit.  This proves
+the **Bidirectional Fiber Connectivity Theorem** at every level.  It concerns Hall colorings and
+allows the internal allocation to be rebuilt after a move; it does not prove the analogous claim
+for literal complete-allocation transports.
+
+The directed Pascal sources are therefore orientation artifacts.  In the labelled-row graph the
+`K=3` (PB) source joins an inherited coloring over the same normalized parent in one move:
+
+    A=(8,6,1,1), B=(5,4,1,1) --6->5--> A=(8,5,1,1), B=(6,4,1,1).
+
+The two adjacent widths swap, leaving `(8,6,5,4,1^4)` unchanged.  The original directed parent
+DAG suppressed such self-moves.  If every edge is required to change the normalized parent, a
+shortest exact path from the canonical coloring to (PB) is instead
+
+    (8,7,4,4,1^4) --8->4--> (7,7,5,4,1^4)
+                     --7->5--> (7,6,6,4,1^4)
+             --reverse 6->7--> (8,6,5,4,1^4),
+
+ending at `A=(8,6,1,1)`, `B=(5,4,1,1)`.  Thus two tailward moves go around the phase boundary and
+one headward move enters the directed source.
+
+`tools/singleton_solution_fiber_dag.py` now computes undirected components.  Exact results are:
+
+- complete `K=2`: one component on all 42 coloring orbits over all 15 parents;
+- complete `K=3`: one component on all 31,498 orbits over all 1,206 parents;
+- `K=4`, `D<=14`: one component on all 60,486 orbits over all 2,852 parents;
+- `K=5`, `D<=5`: a 5,088-orbit canonical component plus one isolated orbit, with the canonical
+  component still projecting onto all 267 parents.
+
+The isolated `K=5` orbit is exactly the unique source at area five.  It has no incoming edge and
+all outgoing edges leave the truncated ideal, so this does not contradict the all-level theorem;
+its reconnecting detour has larger area.  The corresponding measured wall times were 4.03 seconds
+for the first complete `K=3` run, 61.24 seconds for `K=4`, and 222.86 seconds for `K=5`.  A one-off
+distinct-parent shortest-path script took 3.7 seconds.  Its first import attempt failed after 0.2
+seconds because the dynamically loaded module had not been registered in `sys.modules`;
+registering it fixed the dataclass import, and the failed attempt produced no result or artifact.
+After adding normalized self-links, exact reruns took 4.84, 63.87 and 223.21 wall seconds
+respectively.  They counted 54,211, 75,100 and 8,687 internal links and left every component and
+projection count unchanged.  The final Python source SHA-256 is
+`1b09af6c4c35e528346a673d2edf72ed2e881b8c53ddefa90d2fdc490c50d8c3`.
+
+This does not prove singleton majorization.  Let `F_K` be the union of all fixed-color integer
+base sets and `B_K` the full integer permutahedron majorized by `G_K`.  Then `F_K subset B_K`,
+`F_K` contains every permutation of `G_K`, and hence `conv(F_K)=conv(B_K)`.  Bidirectional exchange
+proves that the normalized colored graph is connected, but Row-Coloring is exactly the still-open
+assertion that the labelled `F_K` has no lattice holes.  The generic `h=(6,1)` counterexample, with
+missing ambient point `(12,3,3,3)`, shows that connectivity and vertex coverage alone are
+insufficient.
+
+The useful new targets are global and do not mention phase anchors: prove that `F_K` is M-convex,
+or prove that the union of the real fixed-color base polytopes is convex.  Either would fill the
+ambient permutahedron and prove Row-Coloring.  Both are stronger than the current lemma and remain
+open.  Pascal-Shuffle Coverage remains the exact directed formulation, but reverse transfers make
+its source classification unnecessary rather than proving its coverage step.

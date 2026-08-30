@@ -11,9 +11,10 @@ means that the donor and recipient rows keep their colors while one coin is
 moved.  Thus the bipartite edge relation records the most literal local
 transport of a first-cut coloring.  The program exhausts the complete k<=3
 state DAG and reports births, deaths, mergers, and forward reachability from
-the G_k fiber.  It can also survey a downward-closed Lorenz-area ideal at a
-higher level; source vertices found there have every possible predecessor
-present and therefore are genuine sources of the full DAG.
+the G_k fiber.  It also reports components after every relation pair is made
+undirected.  It can survey a downward-closed Lorenz-area ideal at a higher
+level; source vertices found there have every possible predecessor present
+and therefore are genuine sources of the full DAG.
 """
 
 from __future__ import annotations
@@ -402,6 +403,139 @@ class Edge:
     relation: FiberRelation
 
 
+@dataclass(frozen=True)
+class UndirectedSummary:
+    components: int
+    largest_component: int
+    canonical_vertices: int
+    canonical_states: int
+    source_components: int
+    internal_links: int
+
+
+def normalized_self_exchange_pairs(
+    state: State,
+    fiber: frozenset[Coloring],
+) -> frozenset[tuple[Coloring, Coloring]]:
+    """Return color changes induced by a unit move with unchanged row multiset.
+
+    A move d -> d-1 swaps the two row widths after sorting.  The special move
+    1 -> 0 transfers the unit to a padded zero slot and can likewise change
+    the positive row's color.  The directed parent DAG omits both as loops,
+    but the labelled bidirectional exchange graph must retain them.
+    """
+    largest = len(next(iter(fiber))) - 1
+    totals = multiplicities(state, largest)
+    pairs: set[tuple[Coloring, Coloring]] = set()
+    for donor in set(state):
+        recipient = donor - 1
+        if recipient > 0 and not totals[recipient]:
+            continue
+        if recipient == 0 and len(state) == sum(state):
+            continue
+        relation = edge_relation(
+            state,
+            state,
+            donor,
+            recipient,
+            largest,
+            fiber,
+            fiber,
+        )
+        pairs.update(relation.pairs)
+    return frozenset(pairs)
+
+
+def undirected_summary(
+    states: list[State],
+    fibers: dict[State, frozenset[Coloring]],
+    edges: list[Edge],
+    canonical_vertices: Iterable[tuple[State, Coloring]],
+    source_vertices: Iterable[tuple[State, Coloring]],
+) -> UndirectedSummary:
+    """Summarize the graph obtained by allowing every legal transfer backwards.
+
+    Vertices are feasible normalized parent/coloring pairs.  A relation pair on
+    a downward Robin--Hood edge becomes one undirected edge; hence walking it in
+    reverse is precisely a legal headward transfer with both endpoint cuts
+    retained.  Adjacent-width and unit-to-zero exchanges that preserve the
+    normalized parent are included as internal fiber links.
+    """
+    vertices = [
+        (state, coloring)
+        for state in states
+        for coloring in fibers[state]
+    ]
+    index = {vertex: number for number, vertex in enumerate(vertices)}
+    parent = list(range(len(vertices)))
+    size = [1] * len(vertices)
+
+    def find(number: int) -> int:
+        while parent[number] != number:
+            parent[number] = parent[parent[number]]
+            number = parent[number]
+        return number
+
+    def union(left: int, right: int) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root == right_root:
+            return
+        if size[left_root] < size[right_root]:
+            left_root, right_root = right_root, left_root
+        parent[right_root] = left_root
+        size[left_root] += size[right_root]
+
+    for edge in edges:
+        for source_coloring, target_coloring in edge.relation.pairs:
+            union(
+                index[(edge.source, source_coloring)],
+                index[(edge.target, target_coloring)],
+            )
+
+    internal_links: set[
+        tuple[tuple[State, Coloring], tuple[State, Coloring]]
+    ] = set()
+    for state in states:
+        for source_coloring, target_coloring in normalized_self_exchange_pairs(
+            state, fibers[state]
+        ):
+            if source_coloring == target_coloring:
+                continue
+            source = (state, source_coloring)
+            target = (state, target_coloring)
+            internal_links.add(tuple(sorted((source, target))))
+            union(index[source], index[target])
+
+    component_sizes = Counter(find(number) for number in range(len(vertices)))
+    canonical_roots = {
+        find(index[vertex])
+        for vertex in canonical_vertices
+    }
+    source_roots = {
+        find(index[vertex])
+        for vertex in source_vertices
+    }
+    canonical_vertex_count = sum(
+        count for root, count in component_sizes.items() if root in canonical_roots
+    )
+    canonical_state_count = sum(
+        any(
+            find(index[(state, coloring)]) in canonical_roots
+            for coloring in fibers[state]
+        )
+        for state in states
+    )
+    return UndirectedSummary(
+        components=len(component_sizes),
+        largest_component=max(component_sizes.values()),
+        canonical_vertices=canonical_vertex_count,
+        canonical_states=canonical_state_count,
+        source_components=len(source_roots),
+        internal_links=len(internal_links),
+    )
+
+
 def phase_score(edge: Edge, fibers: dict[State, frozenset[Coloring]]) -> tuple[float, int]:
     source_count = len(fibers[edge.source])
     target_count = len(fibers[edge.target])
@@ -684,6 +818,14 @@ def run_area_ideal(k: int, maximum_area: int, examples: int) -> None:
     for state, _ in sources:
         source_histogram[area[state]] += 1
 
+    undirected = undirected_summary(
+        states,
+        fibers,
+        edges,
+        ((profile, coloring) for coloring in fibers[profile]),
+        sources,
+    )
+
     print(
         f"SOLUTION_FIBER_AREA_IDEAL k={k} maximum_area={maximum_area} "
         f"states={len(states)} fibers={sum(map(len, fibers.values()))} "
@@ -697,6 +839,15 @@ def run_area_ideal(k: int, maximum_area: int, examples: int) -> None:
         f"CANONICAL_COMPONENT reached_states={sum(bool(reached[state]) for state in states)}/"
         f"{len(states)} reached_fibers={sum(len(reached[state]) for state in states)}/"
         f"{sum(map(len, fibers.values()))}"
+    )
+    print(
+        f"UNDIRECTED_GRAPH components={undirected.components} "
+        f"largest={undirected.largest_component} "
+        f"canonical_states={undirected.canonical_states}/{len(states)} "
+        f"canonical_fibers={undirected.canonical_vertices}/"
+        f"{sum(map(len, fibers.values()))} "
+        f"source_components={undirected.source_components} "
+        f"internal_links={undirected.internal_links}"
     )
     print(
         f"COVER_SUBDAG edges={len(cover_edges)} "
@@ -834,6 +985,7 @@ def run(k: int, examples: int) -> None:
     for state, state_edges in incoming.items():
         for edge in state_edges:
             inherited_by_any[state].update(target for _, target in edge.relation.pairs)
+    source_orbits = [(profile, coloring) for coloring in fibers[profile]]
     novel_states = []
     novel_orbits = 0
     for state in states:
@@ -843,6 +995,7 @@ def run(k: int, examples: int) -> None:
         if novel:
             novel_states.append((len(novel), state, len(fibers[state])))
             novel_orbits += len(novel)
+            source_orbits.extend((state, coloring) for coloring in novel)
 
     ordered = sorted(states, key=lambda state: (sum(v * v for v in state), state), reverse=True)
     if ordered[0] != profile:
@@ -868,6 +1021,21 @@ def run(k: int, examples: int) -> None:
         reached, reached_states = propagate({start})
         reached_pairs = sum(len(reached[state]) for state in states)
         start_results.append((reached_states, reached_pairs, start))
+
+    undirected = undirected_summary(
+        states,
+        fibers,
+        edges,
+        ((profile, coloring) for coloring in fibers[profile]),
+        source_orbits,
+    )
+    expected_undirected = {1: (1, 0), 2: (1, 34), 3: (1, 54211)}
+    if k in expected_undirected:
+        observed = (undirected.components, undirected.internal_links)
+        if observed != expected_undirected[k]:
+            raise AssertionError(
+                f"undirected regression: {observed} != {expected_undirected[k]}"
+            )
 
     print(f"SOLUTION_FIBER_DAG k={k} states={len(states)} transfers={len(edges)}")
     print(
@@ -895,6 +1063,15 @@ def run(k: int, examples: int) -> None:
         f"FORWARD_ALL_STARTS reached_states={all_reached_states}/{len(states)} "
         f"reached_fiber_orbits={sum(len(all_reached[state]) for state in states)}/"
         f"{sum(map(len, fibers.values()))}"
+    )
+    print(
+        f"UNDIRECTED_GRAPH components={undirected.components} "
+        f"largest={undirected.largest_component} "
+        f"canonical_states={undirected.canonical_states}/{len(states)} "
+        f"canonical_fibers={undirected.canonical_vertices}/"
+        f"{sum(map(len, fibers.values()))} "
+        f"source_components={undirected.source_components} "
+        f"internal_links={undirected.internal_links}"
     )
     unreachable = [
         (len(set(fibers[state]) - all_reached[state]), state)

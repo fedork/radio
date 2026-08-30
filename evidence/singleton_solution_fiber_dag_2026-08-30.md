@@ -314,6 +314,66 @@ that the canonical component hits every one of the 5,997,038 `K=4` parents.  It 
 multiple interacting unit defects produce extensive birth/death churn without producing a second
 new source anywhere in this complete initial ideal.
 
+## Bidirectional collapse of the coloring phases
+
+Making every legal coloring-transport link undirected removes the source obstruction completely
+in the full graph.  This has an all-level proof, not merely a census explanation.  For a fixed
+coloring `E=A disjoint-union B`, the feasible padded demand vectors are the integer bases of
+
+    f_A(S)=H(|S|)+H(|S intersection A|)+H(|S intersection B|).
+
+A full-mass base forces at least `2^(K-1)` row slots of each color.  Put the canonical rows of each
+color into any that many slots and put zero in the rest.  This gives a colored permutation of
+`G_K` in the same base polytope.  The integral-polymatroid exchange theorem connects any two
+integer bases by color-preserving unit exchanges.  Every intermediate remains a majorized parent,
+because for `|S|=t` and `p=|S intersection A|`, concavity gives
+
+    f_A(S) <= H(t)+H(ceil(t/2))+H(floor(t/2))=H_K(t).
+
+Hence every **existing** Hall coloring connects bidirectionally to the canonical coloring after
+normalizing rows.  The quotient retains self-links induced by a move `d->d-1`: labelled rows swap
+their adjacent widths, so the sorted parent is unchanged but its coloring can change.  The special
+`1->0` move similarly transfers a unit to a padded zero slot.  The theorem permits the Hall
+allocation to be rebuilt at each vertex; it is not a theorem about the stronger
+complete-allocation transport graph.
+
+The new `UNDIRECTED_GRAPH` output checks the predicted quotient connectivity:
+
+| corpus | parents | coloring orbits | internal links | components | canonical component | parent projection |
+|---|---:|---:|---:|---:|---:|---:|
+| complete `K=2` | 15 | 42 | 34 | 1 | 42 | 15 / 15 |
+| complete `K=3` | 1,206 | 31,498 | 54,211 | 1 | 31,498 | 1,206 / 1,206 |
+| `K=4`, `D<=14` | 2,852 | 60,486 | 75,100 | 1 | 60,486 | 2,852 / 2,852 |
+| `K=5`, `D<=5` | 267 | 5,089 | 8,687 | 2 | 5,088 | 267 / 267 |
+
+The second `K=5` component is a single orbit: the unique source at area five has no incoming link,
+and every outgoing edge leaves the truncated ideal.  The all-level theorem says it reconnects by
+a detour at larger area in the full graph.  The smaller Pascal phase connects to an inherited
+coloring over the same parent in one move:
+
+    A=(8,6,1,1), B=(5,4,1,1) --6->5--> A=(8,5,1,1), B=(6,4,1,1).
+
+The widths swap, so the normalized parent stays `(8,6,5,4,1^4)`.  If such normalized self-moves
+are suppressed, the explicit connection is instead the three-edge detour:
+
+    (8,7,4,4,1^4) --8->4--> (7,7,5,4,1^4)
+                     --7->5--> (7,6,6,4,1^4)
+             --reverse 6->7--> (8,6,5,4,1^4),
+
+whose endpoint is exactly that directed (PB) source.
+
+This is a simplification, but not the converse.  If `F_K` is the union of all fixed-color integer
+bases and `B_K` is the integer permutahedron majorized by `G_K`, then `F_K subset B_K`, every
+permutation of `G_K` lies in `F_K`, and therefore `conv(F_K)=conv(B_K)`.  Row-Coloring is exactly
+the assertion that this labelled, vertex-spanning set has no missing lattice points.  Separately,
+the theorem proves that its normalized colored graph is connected.  The generic counterexample
+`h=(6,1)`, `a=(12,3,3,3)` shows why these two facts cannot fill a hole.
+
+Bidirectionality therefore supersedes phase enumeration as a necessary proof mechanism.  A clean
+sufficient next target is to show that `F_K` is M-convex, or that the union of its real fixed-color
+base polytopes is convex.  Either would imply lattice saturation because the convex hull is already
+the whole `G_K` permutahedron.  Neither statement is currently proved.
+
 ## Consequence for a proof strategy
 
 The experiment supports the user's global-schedule idea, but it separates two possible claims.
@@ -387,6 +447,11 @@ The Python source at the same clean commit has SHA-256
 coloring run took 61 wrapper wall seconds at 0.03 GB, and its `K=5`, `D<=5` run took 218 seconds at
 0.02 GB.  Running all seven greedy-source classifications `K=2,...,8` from that source took 7.7
 wall seconds in one sequential shell loop.
+
+The bidirectional-component extension has Python source SHA-256
+`1b09af6c4c35e528346a673d2edf72ed2e881b8c53ddefa90d2fdc490c50d8c3`.  Direct exact reruns took
+4.84 wall seconds for complete `K=3`, 63.87 seconds for `K=4`, `D<=14`, and 223.21 seconds for
+`K=5`, `D<=5`.  They produced the component and internal-link counts above.
 
 The complete allocation-DAG claims stop at `K=3`; the allocation area ideal stops at `K=4`,
 `D=14`.  The Hall-coloring ideals stop at `K=4`, `D=14` and `K=5`, `D=5`.  The

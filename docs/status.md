@@ -184,6 +184,23 @@ only 266 of them, so long one-coin moves matter.  The remaining equivalent targe
 whole dominance ideal.  See the
 [solution-fiber theorem section](theorems/singleton-majorization.md#the-solution-fiber-dag-and-a-pascal-phase-birth-2026-08-30)
 and [exact survey](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
+
+Allowing legal row-width transfers in both directions collapses this directed phase structure.
+For one fixed padded row coloring, Hall-feasible demands are the integer bases of an integral
+polymatroid; its exchange graph is connected and contains a colored permutation of `G_K`.
+Therefore every existing Hall coloring is bidirectionally connected to the canonical coloring,
+at every `K`.  Exact quotient graphs agree: all 31,498 `K=3` coloring orbits and all 60,486
+`K=4`, area-14 orbits form one component.  The `K=5`, area-five truncation has a 5,088-orbit
+canonical component plus one boundary-isolated source, but the canonical component still projects
+onto all 267 parents and the isolated orbit reconnects outside the truncation.  This theorem
+removes the need to manage Pascal sources if reverse moves are allowed, but it assumes a feasible
+coloring and hence does not prove existence.  The exact residual problem is again no lattice
+holes.  The normalized colored solution graph is connected; separately, the labelled union of
+fixed-color base sets contains every vertex of the `G_K` permutahedron and has that whole
+permutahedron as its convex hull.  Prove that the labelled union contains every integer point.
+M-convexity of that union or convexity of the union of real base polytopes would be clean
+sufficient strengthenings.  They remain open.
+
 A new low-level shape survey suggests an even simpler global route that discards the transfer
 history.  Through `K=3`, every target chain can be made from one contiguous interval of a canonical
 Pascal chain or by splicing two rank-separated intervals from source chains of different depths.
