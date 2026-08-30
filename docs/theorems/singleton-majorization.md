@@ -28,6 +28,13 @@ Two-Anchor Reduction then deletes the universal pure column and one matching mix
 that exact-support case to a smaller Balanced Residual Coloring Lemma for `G_(K-1)-1`.  This new
 residual lemma is still open, so the proof status does not change.
 
+Repeated halving has also been made into a complete finite search rather than another fixed
+assignment rule.  For fixed Pascal margins, row-color swaps and `2x2` incidence switches connect
+every realization-and-bisection pair.  Hence exhaustive search from a canonical Havel--Hakimi
+matrix finds a legal first cut if and only if one exists.  A much shorter two-move defect descent
+passes the complete exact-support corpus through `K=4` and substantial `K=5,6` probes, but its
+escape lemma is open; see the switch section below.
+
 ## Definitions
 
 We write all sequences in nonincreasing order and pad them with trailing zeros when needed.
@@ -219,6 +226,17 @@ therefore the special operator
 prove directly that the particular sequence `Q_K=T(Q_(K-1))` preserves strong niceness, or at least
 preserves the dominance-ideal support.  The coefficient recurrence is a clean setting in which to
 try the same two-coordinate balancing transfer as in the Row-Coloring Lemma.
+
+Even support-level closure under this special operator is false for a generic seed.  Let `E_3` be
+the empty three-vertex graph.  The graph `T(E_3)` is nice with maximum stable-partition profile
+`(6,3)`, but `T(T(E_3))` has maximum profile `(12,9,3,3)` and has no stable partition of the
+dominated type `(12,9,2,2,2)`.  Indeed, a block of size 12 forces `6+6` across the mixed copy and
+one pure copy; the block of size 9 then forces the remaining `3+6` across the mixed and other pure
+copy.  Three blocks of size two cannot fill the two remaining pure capacities of three without
+using the already-full mixed copy or crossing both joined pure copies.  Thus an induction for the
+particular seed `Q_0=K_1` must retain its complete Pascal profile; the formal operator alone does
+not preserve niceness.  The construction and the short verification that `T(E_3)` is nice are in
+the [Pascal-switch record](../../evidence/singleton_balanced_hh_switch_2026-08-29.md).
 
 ## Proven necessity
 
@@ -1125,6 +1143,58 @@ in a rank-lexicographically optimized realization must lie at an internal rank
 
     1<=ell<=K-1.                                                (BQ0)
 
+### A complete switch graph and a short-descent conjecture (2026-08-29)
+
+The equivalent realization problem has a canonical finite search space.  Fix the exact-support
+row margins, the labelled Pascal column margins, and an equal row bisection.  A **row switch**
+exchanges the colors of one row on each side.  An **incidence switch** replaces a binary submatrix
+`[[1,0],[0,1]]` by `[[0,1],[1,0]]`, or conversely.  Both preserve all required margins.
+
+> **Switch-Graph Completeness Lemma.**  All pairs `(incidence realization, equal row bisection)`
+> with the fixed margins lie in one graph under row and incidence switches.
+
+*Proof.*  Equal bisections are connected by opposite-color row switches.  Binary matrices with
+fixed row and column sums are connected by `2x2` interchanges: decompose the symmetric difference
+of two matrices into alternating bipartite cycles and eliminate the cycles by the standard
+interchange induction.  Applying the two transformations successively proves connectivity. ∎
+
+Consequently exhaustive switch-graph search from any Gale--Ryser realization is an exact decision
+algorithm: it reaches a quota-balanced vertex if and only if the desired first split exists.  This
+does not prove that such a vertex exists for every majorized parent, but it identifies precisely
+what a constructive proof may switch without committing to one coloring or one realization.
+
+A much shorter deterministic search now has substantial finite evidence.  Start with the
+canonical bipartite Havel--Hakimi realization (largest residual rows first, original row order for
+ties) and the alternating row bisection.  At rank `ell`, sort the squared column imbalances and sum
+the `binomial(K-1,ell)` smallest; let `Phi` be the sum over internal ranks.  Then `Phi=0` is exactly
+the binomial balance quota.  Choose a strict row or incidence switch giving the smallest `Phi`,
+with the source-order scan breaking ties.  If none exists, take the first `Phi`-neutral row or
+incidence switch in the fixed scan order--including a same-color incidence switch--that exposes a
+strict switch, and then take that strict switch.
+
+> **Canonical Two-Move Pascal-Switch Conjecture (open, sufficient).**  This descent never gets
+> stuck at positive `Phi`.
+
+If true, every one or two switches lowers a nonnegative integer, so the algorithm terminates at a
+legal split and induction proves the converse.  It passes all 408,776 exact-support `K=4` parents,
+the first 500,000 `K=5` parents, disjoint higher `K=5` windows and the stated `K=5,6` random,
+walk and adversarial probes.  These higher-level runs are finite evidence only.
+
+Two boundary examples explain why both freedoms are real.  At `K=5`, the canonical matrix for
+
+    (32,31,26,26,16^3,4^15,2^10)
+
+has no legal row bisection (there is a short rank-count proof), but one incidence switch between a
+rank-1 and rank-2 column makes it balanced.  Strict descent alone first fails at
+
+    (32,31,26,26,16^3,9,6^9,2^2,1^13):
+
+a neutral row switch followed by a strict row switch reaches zero.  Thus the new conjecture is not
+the already-refuted canonical-coloring rule, and it does not assume that every step improves.
+Exact supports, traces, complete counts, reproduction commands and the counterexample to the
+tempting one-discrepancy invariant are in the
+[Pascal-switch record](../../evidence/singleton_balanced_hh_switch_2026-08-29.md).
+
 ### Boolean coordinate exposure, not accidental multiplicity
 
 The quotas (BQ) are literally deletion and contraction of one Boolean coordinate.  Label the
@@ -1167,6 +1237,15 @@ realization and a row coloring.  At each rank `ell`, label its columns by the `e
 columns by the subsets omitting `t` and label the remainder by the subsets containing `t`.
 Conversely, an exposure supplies exactly those bisected columns.  Call this the
 **Independent-Relabelling Lemma**.
+
+The relabelling freedom cannot be replaced by one fixed Boolean address on the rows.  A tempting
+simultaneous-halving strengthening labels the `2^K` rows by bit strings and requires the column
+`S` to be a subcube `{x:x|S=p_S}`.  It already fails for the canonical target
+`G_2=(4,3,1,1)`.  With four rows there are one universal column, two coordinate half-columns and
+one singleton column.  A degree-four row must lie in both halves and receive the singleton; its
+two square-neighbors then each lie in one half and have degree at least two, forcing
+`(4,2,2,1)` instead.  Thus recursive coordinate exposure must allow branch-dependent relabelling;
+it cannot be frozen into one global row cube.
 
 Consequently the Boolean labels do not themselves impose any lower- or upper-shadow relation
 between adjacent ranks.  Such a relation can be destroyed by independently permuting the labels

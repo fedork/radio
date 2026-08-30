@@ -367,6 +367,29 @@ cycle by switching among identical Pascal columns or turn a switch-minimal odd o
 violated parent prefix.  Unlike Core--Blocker Escape, this would prove an equivalent statement,
 not a local strengthening.
 
+Repeated halving now has a proved complete search space.  Starting from any one Gale--Ryser
+matrix and equal row bisection, arbitrary opposite-color row swaps and `2x2` incidence switches
+reach every other matrix-and-bisection pair with the same margins.  Exhaustive switch-graph search
+is therefore a universal exact constructor/refuter for one parent; it is not itself an existence
+proof.  Use this graph for new surveys instead of inventing another irrevocable assignment rule.
+The canonical matrix alone is false at `K=5` for
+`(32,31,26,26,16^3,4^15,2^10)`, although one rank-1/rank-2 incidence switch repairs it.  Strict
+defect descent alone is also false: `(32,31,26,26,16^3,9,6^9,2^2,1^13)` needs a neutral row swap
+before a strict one.
+
+The clean sufficient target is now the **Canonical Two-Move Pascal-Switch Conjecture**.  Build the
+canonical Havel--Hakimi matrix, alternate its rows, and let `Phi` be the sum, rank by rank, of the
+required number of smallest squared column imbalances.  Prove that the deterministic walk always
+has either a strict decrease or one neutral switch exposing a strict decrease.  This would
+terminate because `Phi` is a nonnegative integer and would prove the converse after
+Minimum-Support Reduction and induction.  It passes every one of the 408,776 exact-support `K=4`
+parents, the first 500,000 `K=5` parents, separated `K=5` windows, and the recorded `K=5,6`
+adversarial/walk probes.  These are finite observations only.  A proof should characterize the
+cut exposed when both move types fail and sum it across the adjacent Pascal quotas; do not assume
+that every canonical column has discrepancy at most one, since an exact `K=5` counterexample has
+discrepancy two in an allowed buffer column.  Details and reproduction are in the
+[Pascal-switch record](../evidence/singleton_balanced_hh_switch_2026-08-29.md).
+
 The first switch normalization is now proved.  Minimize the sum of squared doubled-column
 imbalances over all realizations, row colorings, and doubled/single labels.  At parent rank `ell`,
 there are `binomial(K,ell)` identical columns and only `binomial(K-1,ell)` need balance; the other
@@ -400,7 +423,10 @@ Do not infer Boolean shadow closure from these labels.  The Independent-Relabell
 that labels can be permuted independently inside every rank; coordinate exposure is exactly the
 rank quotas and contains no further cross-rank incidence relation.  A shadow proof would first
 have to construct and justify a coupled labelling from an augmenting search.  Until such a rule is
-found, Kruskal--Katona/LYM is not an available conclusion.
+found, Kruskal--Katona/LYM is not an available conclusion.  Likewise do not freeze all recursive
+exposures into one global bit address on the rows: the resulting Boolean-subcube model already
+misses `G_2=(4,3,1,1)`, forcing `(4,2,2,1)` instead.  Later branches must be free to relabel their
+rows independently.
 
 Work instead with the intrinsic deletion/contraction data: dyadic degrees, the two adjacent Pascal
 quotas, their arbitrary rank-to-rank pairing, the tight-band identity (TB3), and the global
@@ -458,10 +484,13 @@ counts semi-ordered legal decompositions of type `lambda`.  Exact recursive coun
 `Q_3` is **strongly nice**: `c_K(mu)>=c_K(lambda)` whenever `mu<=lambda`, for all 1,206 supported
 types and 463,886 comparable pairs.  Strong niceness would imply the converse immediately.  The
 graph recursion is `Q_K=Q_(K-1) disjoint-union (Q_(K-1) join Q_(K-1))`; disjoint union preserves
-strong niceness but graph join does not in general, so the proof obligation is closure under this
-special combined operator, not an existing generic theorem.  See the
+strong niceness but graph join does not in general.  Even the special combined operator does not
+preserve support niceness for a generic recursively generated seed: `T(E_3)` is nice, whereas
+`T(T(E_3))` omits the dominated type `(12,9,2,2,2)`.  Any induction for the particular seed
+`Q_0=K_1` must therefore retain its full Pascal hierarchy, not just the formal operator.  See the
 [theorem formulation](theorems/singleton-majorization.md#a-stronger-chromatic-symmetric-function-target-2026-08-27)
-and [exact census](../evidence/singleton_strong_niceness_2026-08-27.md).
+the [exact census](../evidence/singleton_strong_niceness_2026-08-27.md), and the
+[operator counterexample](../evidence/singleton_balanced_hh_switch_2026-08-29.md#three-other-global-shortcuts-rejected).
 
 The complete feasible split-count fiber is less promising as an induction variable.  At `K=3` it
 is always an integer interval, but continuous hinge and mixed-mass endpoint bounds miss parity and

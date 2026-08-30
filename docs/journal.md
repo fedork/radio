@@ -11513,3 +11513,115 @@ The proof, exact finite status, counterexamples and reproduction commands are in
 `evidence/singleton_two_anchor_residual_2026-08-29.md`.
 Final process inventory found no `radio_canon`, census utility, capped runner, `Python -` or
 `python3 -` process remaining.
+
+## 2026-08-29 -- repeated halving becomes a complete Pascal switch search, but not yet a proof
+
+The user asked why the two-anchor construction should stop after two anchors and proposed keeping
+the halving process all the way down.  The useful answer is to stop making irrevocable row
+assignments.  After Minimum-Support Reduction, fix the `2^K` parent rows and write the conjugate
+Pascal capacities as labelled binary columns.  At rank `ell` there are `binomial(K,ell)` columns
+of degree `2^(K-ell)`; exactly `binomial(K-1,ell)` must be bisected by one common equal row
+coloring, while the other `binomial(K-1,ell-1)` are the mixed columns.  This is exactly the
+Balanced Pascal Realization Lemma, so recursively exposing one coordinate is the rigorous form of
+“keep halving.”
+
+There is now a proved complete finite search space.  Opposite-color row swaps connect all equal
+row bisections.  The standard binary-matrix interchange theorem connects all zero--one incidence
+matrices with the fixed row and labelled column margins by `2x2` switches: decompose the symmetric
+difference into alternating bipartite cycles and eliminate them by interchanges.  Taking the two
+operations successively proves that every realization-and-bisection pair lies in one switch graph.
+Thus breadth-first search from any Gale--Ryser realization finds a balanced vertex if and only if
+one exists.  This is a universal exact algorithm for each finite parent, but it is not an
+existence proof: connectivity alone does not say that the graph contains a zero-defect vertex.
+
+The short constructive candidate starts with the canonical Havel--Hakimi realization and odd/even
+row coloring.  In each internal rank, sort the squared column imbalances and retain the required
+number of smallest values; their sum over ranks is `Phi`.  Zero is exactly a legal cut.  The tested
+deterministic walk takes the strict move giving minimum `Phi`; if there is none, it takes the first
+neutral row or incidence switch that exposes a strict move.  This gives the **Canonical Two-Move
+Pascal-Switch Conjecture**: the walk never stops at positive `Phi`.  If proved, `Phi` drops every
+one or two moves, and Minimum-Support Reduction plus induction proves Singleton Majorization.  It
+is a sufficient strengthening, not an equivalent restatement.
+
+Two exact counterexamples prevent this from being misreported as an easier theorem.  The canonical
+matrix for
+
+    (32,31,26,26,16^3,4^15,2^10)
+
+has no legal row bisection: the grouped search closes after 15,139 nodes, and the rank-count proof
+is written out in `evidence/singleton_balanced_hh_switch_2026-08-29.md`.  With the alternating
+coloring, however, one `2x2` switch between global columns 4 and 7 on rows 12 and 23 changes the
+rank energy profile `(0,1,0,0)` to zero.  Hence the choice of incidence realization is essential.
+Strict descent alone is also false.  For
+
+    (32,31,26,26,16^3,9,6^9,2^2,1^13),
+
+no row or incidence move strictly lowers the initial energy one; the neutral row swap `(5,8)`
+followed by the strict swap `(9,14)` reaches zero.  The algorithm therefore needs a globally
+chosen setup move even though this example needs no cycle.
+
+`tools/singleton_balanced_hh_census.cpp` implements the construction, exact canonical-coloring
+checks and switch descent.  The final optimized build
+`53ccceb84295839a9a68d8b92912ec4ee9f0770f9b14b788566f71cdc4ab223e`
+gave these independently reproducible results:
+
+- complete exact-support `K=3`: 160/160 pass, with alternating coloring already sufficient;
+- complete exact-support `K=4`: 408,776/408,776 pass in 3.628 seconds; 69,664 need one row
+  switch, none needs an incidence or neutral move, and maximum initial energy is two;
+- first 500,000 exact-support `K=5` parents: all pass in 22.916 seconds; 190,975 total moves,
+  including 347 incidence switches and 12 neutral moves, with at most two moves for one parent;
+- a 500,000-iteration `K=5` difficulty hill climb found no failure in 112.593 in-process seconds /
+  116 wrapper wall seconds; its best parent starts at energy three and needs two strict row swaps.
+
+The identical source built as
+`ade0deedd3cd2c952f9f71d1ea92a1a9097e717da51f23e86e6b481a5b40b668`
+also passed the separated `K=5` windows and the 100,000-state `K=6` Robin--Hood walk; the latter
+used 43,513 moves, including 417 incidence switches, had maximum three moves and maximum initial
+energy four, and took 88.95 seconds.  A new 100,000-iteration `K=6` difficulty hill climb also
+found no failure; its best state started at energy five and needed three strict row swaps, at a
+cost of 169.971 in-process seconds / 171 wrapper wall seconds.  These `K>=5` runs are falsification
+evidence only.  The
+complete sanitized `K=3` run passes address/undefined sanitizers under build
+`c6771476620eb57218b5d2c4eda3ec6777e1a57292126380da0b769391fea99d`.
+
+Several seductive simplifications were deliberately attacked rather than accumulated as new
+conjectures:
+
+- Canonical columns need not all have imbalance at most one.  A 338,984-iteration adversarial
+  search found
+  `(23,22,22,22,18,17,14,11,11,10,10,7,7,6,6,5,5,5,3,3,2^4,1^8)`,
+  with imbalance two in a rank-3 canonical column.  Its quota energy is already zero: the bad
+  column is an allowed mixed buffer.  The search cost 61.2 seconds.  A proof must track quota
+  defect, not maximum discrepancy.
+- Assigning actual Pascal ranks irrevocably fails.  Largest-residual sequential assignment fails
+  at `(3,2,2,2)@K=2`; maximum-weight rank matching repairs `K=2` but fails at
+  `(8,5,4,4,3,1,1,1)@K=3`, even with longest-future-chain urgency.  These tiny checks took about
+  0.2 seconds.  Incidence switches are the necessary backward correction.
+- Simultaneously freezing every recursive cut into one global Boolean row address is much too
+  strong.  If every subset-column must be a coordinate subcube, even `G_2=(4,3,1,1)` is
+  impossible: the row of degree four fixes the two half-columns and the singleton, forcing its two
+  square-neighbors to have degree at least two and yielding `(4,2,2,1)`.  Exhaustive enumeration
+  took 0.2 seconds and found only 3 of the 4 exact-support `K=2` types and 38 of 160 at `K=3`.
+  Recursive branches must relabel independently.
+- The formal graph operator is not the missing induction theorem.  With
+  `T(G)=G disjoint-union (G join G)`, `T(E_3)` is nice with maximum profile `(6,3)`, but
+  `T(T(E_3))`, whose maximum profile is `(12,9,3,3)`, has no stable partition of the dominated
+  type `(12,9,2,2,2)`.  The short packing proof is in the evidence note.  The exploratory generic
+  ideal/operator surveys took between 0.5 and 17.1 seconds.  A proof for `Q_K=T^K(K_1)` must keep
+  the exact Pascal seed hierarchy.
+- A generic even-margin Havel--Hakimi discrepancy search found a non-Pascal counterexample at
+  eight rows in 13 seconds, so the observed descent cannot be justified by a general matrix
+  balancing theorem.  One earlier one-switch Python search was stopped after more than 30 seconds
+  without a retained conclusion.  An initial Python probe also hit the unavailable
+  `int.bit_count` method and was corrected after 0.2 seconds; none of these failed attempts is
+  evidence for the positive conjecture.
+
+This route is the current noncircular conclusion.  Repeated halving is workable and now has a
+complete state graph; the fixed realization, fixed coloring and irrevocable-rank versions are
+false.  The remaining proof obligation is one Pascal augmenting-cut theorem: if the canonical
+two-move walk stops at positive `Phi`, use the dyadic degrees and adjacent binomial quotas to turn
+its stopped switch cut into a violated prefix of the parent.  No such derivation is proved yet, so
+the Singleton Majorization Converse remains open.  Full definitions, traces, proofs, run table and
+commands are in `evidence/singleton_balanced_hh_switch_2026-08-29.md`.
+Final inventory found no `radio_canon`, `singleton_balanced_hh`, capped runner, `Python -` or
+`python3 -` process remaining.
