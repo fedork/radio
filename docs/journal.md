@@ -11694,9 +11694,10 @@ noncanonical phase.  This is genuinely different from selecting one coloring per
 the earlier compatibility circle.
 
 Measured costs: the coloring DAG takes about four wall seconds.  The full allocation relation took
-31 wall seconds before component propagation; the final two-component run took 48.3171 in-process /
-51 wrapper wall seconds at 0.10 GB peak RSS under a 1,800-second/4-GB cap.  Final allocation build
-`1be819ec2136c736a43fa68ef38d8e41936e82f5f863ecf40545d80da88f5cc4`.  A first attempt to build
+31 wall seconds before component propagation; the final clean two-component run took 49.5431
+in-process / 51 wrapper wall seconds at 0.10 GB peak RSS under a 1,800-second/4-GB cap.  Final
+allocation build `1f29d8c908bc30fc42bfd06ab6c18f1e73445f1fd771da87f54ec5556a2c488e`
+from clean commit `aa0a61198161a054d4cb7cb7f39e717585464416`.  A first attempt to build
 the independent C++ split counter with `clang` instead of `clang++` failed at link time after about
 five wall seconds and produced no result; rebuilding through `CC=clang++ tools/build_radio.py`
 gave the independent totals above.  Exact definitions, commands and the all-level phase proof are
@@ -11705,3 +11706,6 @@ Address/undefined-sanitized build
 `be0d4f6b02fa3b9761f8b29bbbb48c6349e44f179764878ec44c4e118fe63df5` independently reproduced
 the complete relation and component counts without a diagnostic in 412.236 in-process / 414
 wrapper wall seconds at 1.86 GB peak RSS.
+Final process inventory found no `radio_canon`, `singleton_allocation_fiber`,
+`singleton_solution_fiber`, `singleton_split_multiplicity`, capped runner, `Python -` or
+`python3 -` process remaining.

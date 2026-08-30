@@ -190,8 +190,9 @@ tools/capped_run.sh --seconds 1800 --rss-gb 4 \
 ```
 
 The final allocation build id is
-`1be819ec2136c736a43fa68ef38d8e41936e82f5f863ecf40545d80da88f5cc4`.
-The complete component run took 51 wrapper wall seconds, 48.3171 in-process seconds and 0.10 GB
+`1f29d8c908bc30fc42bfd06ab6c18f1e73445f1fd771da87f54ec5556a2c488e`.
+It was built from clean commit `aa0a61198161a054d4cb7cb7f39e717585464416`.
+The complete component run took 51 wrapper wall seconds, 49.5431 in-process seconds and 0.10 GB
 peak RSS on the recorded Apple M4 Pro.  The earlier full-detail run without the second component
 propagation took 31 wall seconds.  The exact coloring run takes about four wall seconds.
 An address/undefined-sanitized build
