@@ -241,8 +241,10 @@ tools/run_with_provenance.py /tmp/singleton_balanced_hh_census 6 hill 100000 290
 
 The fixed-canonical counterexample and its one-switch repair are reproduced by `canonical-state`
 and `state` modes using the expanded form of `a*` above.  Complete `K=4` output is locked by
-internal regression counts.  The final optimized build is
-`53ccceb84295839a9a68d8b92912ec4ee9f0770f9b14b788566f71cdc4ab223e`; the identical source under
-output-name build `ade0deedd3cd2c952f9f71d1ea92a1a9097e717da51f23e86e6b481a5b40b668`
-produced the stated `K=6` walk.  Address/undefined sanitizers pass the complete `K=3` run under
-build `c6771476620eb57218b5d2c4eda3ec6777e1a57292126380da0b769391fea99d`.
+internal regression counts.  Clean committed-source build
+`37f2edf7635cf35e18f1843702959905720bfc55d75480b4e1bfcba260ade110`
+reproduces the complete `K=4` run, the first 500,000 `K=5` parents and both exact boundary cases.
+Identical-source builds `53ccceb84295839a9a68d8b92912ec4ee9f0770f9b14b788566f71cdc4ab223e`
+and `ade0deedd3cd2c952f9f71d1ea92a1a9097e717da51f23e86e6b481a5b40b668` produced the hill probes
+and the stated `K=6` walk respectively.  Address/undefined sanitizers pass the complete `K=3` run
+under clean build `50751955c54ffa2a0b9fad77a6fc347ccd0a4f08c0906f6dd1a3bd73cf7d035f`.

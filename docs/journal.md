@@ -11561,9 +11561,12 @@ followed by the strict swap `(9,14)` reaches zero.  The algorithm therefore need
 chosen setup move even though this example needs no cycle.
 
 `tools/singleton_balanced_hh_census.cpp` implements the construction, exact canonical-coloring
-checks and switch descent.  The final optimized build
+checks and switch descent.  Clean committed-source build
+`37f2edf7635cf35e18f1843702959905720bfc55d75480b4e1bfcba260ade110`
+reproduces the complete `K<=4` results, first 500,000 `K=5` parents and exact boundary cases;
+identical-source build
 `53ccceb84295839a9a68d8b92912ec4ee9f0770f9b14b788566f71cdc4ab223e`
-gave these independently reproducible results:
+also ran the adversarial probes.  Together they give these independently reproducible results:
 
 - complete exact-support `K=3`: 160/160 pass, with alternating coloring already sufficient;
 - complete exact-support `K=4`: 408,776/408,776 pass in 3.628 seconds; 69,664 need one row
@@ -11580,9 +11583,8 @@ used 43,513 moves, including 417 incidence switches, had maximum three moves and
 energy four, and took 88.95 seconds.  A new 100,000-iteration `K=6` difficulty hill climb also
 found no failure; its best state started at energy five and needed three strict row swaps, at a
 cost of 169.971 in-process seconds / 171 wrapper wall seconds.  These `K>=5` runs are falsification
-evidence only.  The
-complete sanitized `K=3` run passes address/undefined sanitizers under build
-`c6771476620eb57218b5d2c4eda3ec6777e1a57292126380da0b769391fea99d`.
+evidence only.  The complete sanitized `K=3` run passes address/undefined sanitizers under clean
+build `50751955c54ffa2a0b9fad77a6fc347ccd0a4f08c0906f6dd1a3bd73cf7d035f`.
 
 Several seductive simplifications were deliberately attacked rather than accumulated as new
 conjectures:
