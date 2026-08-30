@@ -308,6 +308,8 @@ struct Census {
     std::uint64_t multiple = 0;
     std::uint64_t search_nodes = 0;
     std::uint64_t complete_allocations = 0;
+    std::uint64_t recorded_child_orbits = 0;
+    std::uint64_t recorded_allocation_orbits = 0;
     std::uint64_t max_nodes = 0;
     Sequence worst_state;
     std::vector<UniqueParent> unique_states;
@@ -339,6 +341,8 @@ struct Census {
         ++states;
         search_nodes += search.nodes;
         complete_allocations += search.complete_allocations;
+        recorded_child_orbits += search.solutions.size();
+        recorded_allocation_orbits += search.allocation_orbits.size();
         if (search.nodes > max_nodes) {
             max_nodes = search.nodes;
             worst_state = state;
@@ -435,6 +439,8 @@ struct Census {
                   << " unique=" << unique << " multiple=" << multiple
                   << " nodes=" << search_nodes
                   << " complete_allocations=" << complete_allocations
+                  << " recorded_child_orbits=" << recorded_child_orbits
+                  << " recorded_allocation_orbits=" << recorded_allocation_orbits
                   << " max_nodes=" << max_nodes
                   << " worst_state=" << show(worst_state)
                   << " seconds=" << seconds << '\n';

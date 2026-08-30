@@ -355,7 +355,37 @@ state; global transfer closure permits an arbitrary new coloring at the next sta
 requires a common coloring; Core--Blocker Escape requires a nearby common coloring from every
 failed one.  No reverse implication to either local statement is proved.
 
-Return first to the equivalent **Balanced Pascal Realization Lemma** in the
+A new whole-fiber experiment is the cleanest way to pursue the global-transfer intuition without
+making incompatible local choices.  Over each parent keep every normalized legal first-cut
+allocation; over each Robin--Hood edge retain the literal links that move only the marked coin in
+one fixed child.  At `K=3` this gives 1,063,464 allocation orbits and 26,135,976 links.  Every one
+of the 8,916 parent edges lifts, and the component of the unique canonical `G_3` cut projects onto
+all 1,206 parents, although 916 edges kill some source cuts and 320 individual cut orbits are not
+canonically reachable.  Therefore the promising sufficient target is the **Canonical
+Allocation-Transport Conjecture**: the canonical component projects onto every parent at every
+level.  Work with the reachable subfiber `R(x)`; edgewise Adjacent-Fiber certificates alone do not
+compose.
+
+The survey also supplies a proved model of a phase boundary rather than another guessed rule.  For
+`U=2^(K-1)` and `w=U-K`, transfer the second canonical parent row to the third and reassociate the
+four head allocations as
+
+    (U,U,0),(0,U-1,U),(U-1,w,0),(0,w,U-1)
+      -> (0,U,U),(0,U-1,U-1),(U,w,0),(U-1,w,0).
+
+All three children remain `G_(K-1)`, but this cut has no literal predecessor: the original top two
+rows are forced to opposite sides by a Hall inequality, while the new top row and shrunken donor
+share a side.  Lorenz slack shows that `G_K` is the phase parent's unique one-unit predecessor.
+Thus the full solution DAG has a genuine new source at every `K>=3`; trying to generate *every*
+solution from `G_K` is false.  At `K=3` it is the only extra source, and its descendants together
+with the canonical descendants cover the entire cut corpus.  The next survey should classify
+source phases in a tractable `K=4` boundary region and test whether they are recursively lifted
+Pascal reassociations.  The next proof step should show either that such phases never become the
+sole supplier over a parent, or directly that every first parent with empty `R(x)` has an incoming
+literal link from a reachable predecessor.  See the
+[solution-fiber DAG record](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
+
+For an equivalent rather than stronger route, retain the **Balanced Pascal Realization Lemma** in the
 [theorem note](theorems/singleton-majorization.md#an-equivalent-balanced-column-realization).
 For `c=G_(K-1)'`, Gale--Ryser supplies a `0`--`1` matrix with row degrees `x` and paired column
 degrees `(2c_t,c_t)`.  Choose the realization so that all degree-`2c_t` neighborhoods admit one

@@ -1717,6 +1717,66 @@ Requiring every admissible move to preserve a pairwise-transfer invariant is fal
 equivalently their Pascal chain codes), because choosing among equal-size recipients is what keeps
 later direct moves available.
 
+### The solution-fiber DAG and a Pascal phase birth (2026-08-30)
+
+There is a complementary way to retain exactly the compatibility that a one-representative walk
+forgets.  Above every normalized parent `x<=_w G_K`, keep the whole finite fiber of legal first
+cuts.  Above a parent transfer `x->y`, join two cuts when one coin moves from the marked donor row
+to the marked recipient row in the same child coordinate and every other row allocation remains
+fixed.  Call this the **literal allocation-transport relation**.  It is stronger than
+Adjacent-Fiber: a common Hall coloring may rebuild both endpoint allocations, whereas a literal
+transport may not.
+
+The complete `K=3` relation is unexpectedly coherent.  Across all 1,206 parents, 8,916 parent
+edges and 1,063,464 normalized allocation orbits, every parent edge has a literal lift.  The unique
+cut of `G_3` reaches 1,063,144 allocation orbits and, more importantly, at least one orbit above
+every parent.  Thus the following sufficient strengthening holds exactly at `K=3`.
+
+> **Canonical Allocation-Transport Conjecture.** For every full-mass `a<=_w G_K`, some legal cut
+> above `a` is reachable from the canonical cut above `G_K` by literal allocation transports.
+
+The conjecture would prove the converse, but it is not equivalent to it.  Nor does edgewise
+nonemptiness prove it: 916 of the `K=3` parent edges kill at least one source allocation orbit, so
+independently selected edge certificates need not compose.  The correct inductive object is the
+reachable subfiber `R(x)`, not one chosen cut.
+
+The full solution fiber cannot itself be generated from `G_K`.  There is a uniform, proved Pascal
+phase birth.  For `K>=3`, put `U=2^(K-1)`, `w=U-K`, and `h=G_(K-1)`.  The canonical head rows are
+
+    (U,U,0), (0,U-1,U), (U-1,w,0), (0,w,U-1).
+
+Transfer one parent coin from the second row to the third and replace these four allocations by
+
+    (0,U,U), (0,U-1,U-1), (U,w,0), (U-1,w,0).                (PB)
+
+The new parent has head `(2U,2U-2,2U-K,2U-K-1)`.  All three children remain exactly `h`: the mixed
+parts are unchanged, the two pure heads are both `(U,U-1)`, and the paired Pascal tail is untouched.
+Thus (PB) is a legal cut for every `K>=3`.
+
+This cut has no literal predecessor.  The new parent has Lorenz slack one against `G_K` only at
+prefix two, so `G_K` is its unique more-head-heavy one-unit predecessor.  In any cut of `G_K`, the
+top two parent rows must use opposite pure sides, since
+
+    2U+(2U-1) > 2 H_h(2)=4U-2.
+
+But (PB) puts the unchanged top row and the shrunken donor on the same pure side, which literal
+transport cannot do.  This is a true phase change: a previously violated pure-side inequality
+becomes equality and a four-row Pascal reassociation creates a new solution.
+
+At `K=3` this is the only noncanonical source orbit.  It lies above
+`(8,6,5,4,1^4)` and reaches 1,059,979 allocation orbits, including all 320 missed by the canonical
+source; the two descendant sets overlap on 1,059,659.  Their union is the entire cut corpus.  The
+coarser Hall-coloring DAG has the same two-source shape.  Exact local fiber enumeration at
+`K=3,4,5` gives one source orbit over `G_K`, three over the phase parent, two inherited and exactly
+one new.
+
+This identifies a useful proof target without pretending the finite picture is an induction.
+Classify source phases of the literal relation as Pascal reassociations, and prove either that the
+canonical component already projects onto every parent or that explicit phase components merge
+before any parent can depend on them exclusively.  The exact definitions, counts, all-level proof
+of (PB), programs and reproduction commands are in the
+[solution-fiber DAG record](../../evidence/singleton_solution_fiber_dag_2026-08-30.md).
+
 ### A low-level cut-and-splice normal form (2026-08-29)
 
 The direct-transfer path may be stronger than necessary.  There is a simpler global construction

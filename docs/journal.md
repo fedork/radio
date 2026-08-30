@@ -11627,3 +11627,81 @@ the Singleton Majorization Converse remains open.  Full definitions, traces, pro
 commands are in `evidence/singleton_balanced_hh_switch_2026-08-29.md`.
 Final inventory found no `radio_canon`, `singleton_balanced_hh`, capped runner, `Python -` or
 `python3 -` process remaining.
+
+## 2026-08-30 -- the solution-fiber DAG has a Pascal phase source
+
+The user proposed treating the full set of winning cuts, rather than one chosen coloring, as the
+state variable while moving one coin at a time away from `G_K`.  The normalized parent graph is a
+DAG rather than a tree, because several more-head-heavy parents may transfer to the same child.
+That multiplicity is useful: a solution newly born relative to one predecessor can already be
+inherited from another.
+
+Two exact `K=3` surveys now make this precise.  At the coarse level,
+`tools/singleton_solution_fiber_dag.py` enumerates every Fixed-Color Hall-feasible row coloring
+modulo equal rows and global complementation.  There are 31,498 coloring orbits over all 1,206
+parents and 479,832 color-preserving links over all 8,916 normalized parent transfers.  Every edge
+has a link.  Nevertheless 284 edges kill a source coloring and 3,793 create a target coloring
+relative to that edge, so the fiber is not monotone.  The unique `G_3` coloring reaches 31,242
+orbits but at least one over every parent.
+
+The full-cut census is stronger.  `tools/singleton_allocation_fiber_dag.cpp` independently
+enumerates 1,063,464 normalized row-allocation orbits from 2,125,199 complete oriented allocations
+and 47,165,174 recursive nodes.  The totals agree with an unrestricted run of the earlier split
+multiplicity enumerator.  A literal link moves the marked coin in the same one of `L,M,R` and
+leaves every other row triple fixed.  There are 26,135,976 such links; every parent edge has at
+least one.  Exactly 8,000/8,916 edges kill no source cut, 2,544 create no target cut, and 1,920 do
+neither.  Thus even the strongest local transport exists on every `K=3` edge, but 916 edges prove
+that independently chosen certificates cannot automatically compose.
+
+Composition nevertheless succeeds at the parent level.  The unique canonical cut reaches
+1,063,144/1,063,464 allocation orbits and at least one over all 1,206 parents.  Exactly one
+noncanonical allocation has no literal predecessor from any more-head-heavy parent.  It lies over
+
+    (8,6,5,4,1,1,1,1)
+
+and is
+
+    (0,4,4),(0,3,3),(4,1,0),(3,1,0),(1,0,0)^2,(0,0,1)^2.
+
+All three children are `G_2`.  Its descendant set has 1,059,979 allocation orbits, contains all
+320 missed by the canonical component, and overlaps the canonical component on 1,059,659.  The
+union is the complete corpus.  The coloring DAG has exactly the same two-source shape: its extra
+source is `A=(8,6,1,1)|B=(5,4,1,1)`, its descendants cover all 256 coloring orbits missed by the
+canonical source, and the overlap is 30,675.  The solution graph is therefore a branched and
+rapidly merging two-source DAG, not a uniform product or an arbitrary cloud of exceptions.
+
+The phase source has a general Pascal proof.  Put `U=2^(K-1)`, `w=U-K`, so
+`G_(K-1)` begins `(U,U-1,w,w)`.  Transfer the second canonical parent row toward the third and
+replace the four canonical head allocations by
+
+    (0,U,U),(0,U-1,U-1),(U,w,0),(U-1,w,0).
+
+The new parent begins `(2U,2U-2,2U-K,2U-K-1)` and all three children remain exactly
+`G_(K-1)`.  The cut is not literally inherited: at `G_K` the top two parent rows must be opposite,
+because their sum `4U-1` exceeds the same-side Hall capacity `4U-2`; in the new cut the unchanged
+top row and shrunken donor are together.  The phase parent's Lorenz slack against `G_K` is one
+only at prefix two, proving that `G_K` is its unique more-head-heavy one-unit predecessor.  Hence
+the literal solution DAG has a true new source at every `K>=3`.  Exact local coloring fibers at
+`K=3,4,5` are uniformly `1 -> 3`, with two inherited and one new orbit.
+
+This both advances and limits the proposed approach.  “Generate every solution from `G_K`” is
+false uniformly.  The useful sufficient statement is the **Canonical Allocation-Transport
+Conjecture**: the canonical component projects onto every parent state.  It is an exact theorem at
+`K=3`, not above.  A proof must retain the reachable subfiber `R(x)` and show that a first parent
+with `R(x)=empty` has an incoming literal link from a reachable predecessor, or classify all
+source phases as explicit Pascal reassociations and prove that no parent depends exclusively on a
+noncanonical phase.  This is genuinely different from selecting one coloring per edge and avoids
+the earlier compatibility circle.
+
+Measured costs: the coloring DAG takes about four wall seconds.  The full allocation relation took
+31 wall seconds before component propagation; the final two-component run took 48.3171 in-process /
+51 wrapper wall seconds at 0.10 GB peak RSS under a 1,800-second/4-GB cap.  Final allocation build
+`1be819ec2136c736a43fa68ef38d8e41936e82f5f863ecf40545d80da88f5cc4`.  A first attempt to build
+the independent C++ split counter with `clang` instead of `clang++` failed at link time after about
+five wall seconds and produced no result; rebuilding through `CC=clang++ tools/build_radio.py`
+gave the independent totals above.  Exact definitions, commands and the all-level phase proof are
+in `evidence/singleton_solution_fiber_dag_2026-08-30.md`.
+Address/undefined-sanitized build
+`be0d4f6b02fa3b9761f8b29bbbb48c6349e44f179764878ec44c4e118fe63df5` independently reproduced
+the complete relation and component counts without a diagnostic in 412.236 in-process / 414
+wrapper wall seconds at 1.86 GB peak RSS.
