@@ -11391,3 +11391,55 @@ The exact analysis and proof are in
 `evidence/singleton_low_multiplicity_factorization_2026-08-29.md`; reproduction assertions are in
 `tools/singleton_low_multiplicity_analysis.py`.  Both complete census processes and all short
 analysis processes exited; no process from this work remains.
+
+## 2026-08-29 -- tight-skeleton transfer matrices and minimum-support reduction
+
+Replacing the dyadic-only view by all tight ranks gives an exact structural theorem.  If rank `t`
+is tight, the number `p_t` of left-oriented top rows lies in the full Pascal plateau
+`I(t)=argmax_p(H(p)+H(t-p))`, and all three child prefixes saturate.  Consecutive tight ranks
+`u<v` therefore contract to child bands `h[p_u:p_v]`, `h[u:v]`, and
+`h[u-p_u:v-p_v]`.  Conversely legal band allocations concatenate.  Raw oriented solution counts
+are consequently sums over monotone plateau-count paths of products of local multiplicities--the
+Pascal Tight-Skeleton Factorization Theorem.  The old dyadic Cartesian product is its singleton-
+path case.
+
+The count path is real.  In the `K=4` band `[5,9)`, `(4^4)` fails transitions `2->4` and `3->5`
+but succeeds for `2->5` and `3->4`; four other band states allow every transition.  The stronger
+arbitrary-row prefix statement is false for `(16,15,11,11,4^5)`, and strict exact-head alternation
+fails at `K=5`.  The corrected exact transition search enforces both orientation counts, rather
+than merely the positive child masses.
+
+The main simplification came from retaining the unit block.  If a positive capacity partition has
+at least as many unit as non-unit rows, merging the two smallest parts of any equal-mass dominated
+refinement preserves dominance.  In conjugates, the merge removes cells from columns `1..y` and
+adds them to `x+1..x+y`; the half-unit bound supplies exactly the missing prefix slack.  Every
+`G_K` and every suffix has this shape.  Repeating the merge and then undoing it inside one row
+orientation proves the Minimum-Support Reduction Theorem: the full Row-Coloring Lemma is equivalent
+to its restriction to exactly `2^K` positive rows.  The former arbitrary-row Tail Extension
+Conjecture follows from exact Positive-Band Extension for the terminal band.  At exact support,
+removing one forced pure anchor coin from every row leaves capacities
+`(G_(K-1)-1),G_(K-1),(G_(K-1)-1)` and parent `G_K-1`.
+
+This reduces the complete `K=4` universe from 5,997,038 states to 408,776 exact-support states;
+63,329 of those have no internal tight prefix.  All exact states pass direct allocation search.
+Sorted alternation fails on 1,968 exact states, although none of the 63,329 strict states fails at
+`K=4`.  That last pattern is not general.  The explicit 64-row, mass-729 state
+
+    (63^2,57^2,42^3,23^5,22^5,3^44,2^3)
+
+is strictly below every internal prefix of `G_6`, but odd/even coloring has
+`A_9+B_3=478>H_5(9)+H_5(3)+H_5(12)=477`.
+
+`tools/singleton_pascal_interval_census.cpp` now reproduces these facts.  Complete Positive-Band
+Extension checks pass through `K=4`: 136 bands, 1,722,516 band-state instances and 1,443,610,330
+search nodes in 127.473 in-process seconds / 132 wrapper wall seconds; the independent tail check
+has 37 incoming cases, 1,422,304 state-case instances and 39,273,306 nodes in 5.529 seconds.  The
+final build id is recorded in `evidence/singleton_pascal_tight_skeleton_2026-08-29.md`.
+
+Exploratory checks supported the coalescence proof before it was derived: least-loaded grouping
+passed 736,402 `K=4` suffix states in 19.5 seconds, and the direct two-smallest merge passed 566,578
+generic half-unit instances of total mass at most 24 in 3.5 seconds.  One two-million-sample random
+probe was terminated after 30 seconds, and one broader generic enumeration reached its 30-second
+yield without retained output; both were replaced by the proof and bounded exact check.  Their
+stdin Python processes exited or were explicitly killed.  No solver or exploratory process from
+this work remains.

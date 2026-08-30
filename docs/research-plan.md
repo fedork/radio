@@ -236,17 +236,34 @@ and reproduction are in the
 [unique-split record](../evidence/singleton_unique_split_survey_2026-08-29.md).
 
 The complete low-fiber parent--solution relation supplies a sharper route than multiplicity alone.
-Prove and use the **Dyadic Tight-Prefix Factorization Lemma**: a tight even prefix `t=2^j` forces
-pure row counts `t/2,t/2`, saturates the corresponding three child prefixes, and factors the
-allocation into a Pascal head and contracted tail; `t=1` has the analogous `0,1` endpoint.  This
-is already proved as a structural lemma.  The next
-existence target is its natural strengthening: establish Row-Coloring simultaneously for every
-triple of prefix/suffix intervals obtained by recursively contracting `G_K`.  At `K=4,t=4`, exact
-head and tail multiplicities multiply and explain 131/259 low parents; 228/259 have some internal
-dyadic equality.  Do not replace the contracted problems by symmetric `G_j` instances--they are
-asymmetric, and doing so would be the same gap as postponing Pascal structure.  The exact product,
-pure-anchor residual and the 83-state failure of low-layer transfer closure are in the
-[factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
+The proved **Pascal Tight-Skeleton Factorization Theorem** now supersedes the dyadic-only
+formulation.  At every tight rank `t`, retain the full plateau
+`I(t)=argmax_p(H(p)+H(t-p))`; consecutive tight ranks produce contracted child bands, and global
+allocations are transfer-matrix products along monotone plateau-count paths.  The old dyadic
+head--tail product is the singleton-path case and still explains 131/259 low parents.
+
+The next existence target is now singular.  Prove the **Positive-Band Extension Conjecture**: an
+exact Pascal band extends every admissible incoming count to some outgoing count.  The proved
+Half-Unit Coalescence Lemma removes the formerly separate tail claim.  Since every `G_K` suffix has
+at least as many unit as non-unit entries, merge the two smallest rows until the suffix has its
+canonical row count, apply exact band extension, and lift the split by undoing the merges inside
+one orientation.  In particular, the full converse is equivalent to its minimum-support case of
+exactly `2^K` parent rows.  At `K=4` this shrinks 5,997,038 parents to 408,776 exact-support states;
+63,329 of those have no internal tight prefix.
+
+Positive-Band Extension passes the exhaustive `K=4` census on 1,722,516 band-state instances; the
+old direct suffix census passes 1,422,304 instances as an independent check of the reduction.  Try
+the full band first: after its forced one-coin pure anchors, the exact residual capacities are
+`(G_(K-1)-1),G_(K-1),(G_(K-1)-1)` and `G_K-1`.  Strengthen to all bands only when a tight-prefix
+induction needs it.  In that induction an internal tight subprefix factors immediately, so isolate
+strictly interior exact bands and seek a Pascal-specific augmentation that creates the first tight
+face.  Do not drop exact band row counts or choose a fixed orientation:
+`(16,15,11,11,4^5)` refutes unrestricted prefix refinement, the `[5,9)` band state `(4^4)` forces
+an orientation switch, and even a 64-row parent strictly inside every `G_6` prefix refutes sorted
+alternation.  The theorem, coalescence proof, exact finite evidence and traps are in the
+[tight-skeleton record](../evidence/singleton_pascal_tight_skeleton_2026-08-29.md); the
+original product, pure-anchor residual and 83-state failure of low-layer transfer closure remain in
+the [factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
 
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is

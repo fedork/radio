@@ -20,6 +20,11 @@ legal row condition that a singleton row cannot feed both pure children.  The ex
 statement is the Row-Coloring Lemma below.  It is special to `G_K`; generic base sequences have
 counterexamples.
 
+The arbitrary number of parent rows is no longer part of the gap.  The proved Minimum-Support
+Reduction Theorem coalesces the two smallest rows, using the half-unit tail of `G_K`, until exactly
+`2^K` positive rows remain and lifts any resulting split back.  Thus the open converse is
+equivalent to the exact-support Row-Coloring case; see the tight-skeleton section below.
+
 ## Definitions
 
 We write all sequences in nonincreasing order and pad them with trailing zeros when needed.
@@ -1823,7 +1828,7 @@ structure are in the
 original `K<=3` corpus remains in the
 [unique-split survey](../../evidence/singleton_unique_split_survey_2026-08-29.md).
 
-### Dyadic tight-prefix factorization (2026-08-29)
+### Tight-skeleton factorization and minimum-support reduction (2026-08-29)
 
 The parent--solution relation has an exact Pascal product on tight dyadic faces.  Let
 `h=G_(K-1)` with prefix function `H`, and suppose a parent's first `t` rows are tight:
@@ -1856,10 +1861,66 @@ head--tail Cartesian product.  The low head layers have sizes `3,4,1` and the lo
 This accounts for 131 of the 259 low-multiplicity `K=4` parents.  More generally, 228 of the 259
 have some tight prefix at `t=1,2,4,8`.
 
-This is a construction rule, but not yet the singleton converse: the prefix and suffix problems
-have asymmetric contracted child capacities and are not both instances of the original symmetric
-statement.  A recursive proof along this route must strengthen the induction to every Pascal
-interval triple.  Exact proof, corpus analysis and reproduction are in the
+The dyadic statement is the one-state case of a more general exact factorization.  Define
+
+    I(t)=argmax_p (H(p)+H(t-p)).
+
+At any tight parent prefix `t`, every legal allocation has some number `p_t in I(t)` of
+left-oriented rows and saturates child prefixes `p_t,t,t-p_t`.  Hence consecutive tight ranks
+`u<v` fill the contracted bands
+
+    h[p_u:p_v],       h[u:v],       h[u-p_u:v-p_v].             (TS)
+
+Conversely, a monotone path of such counts and legal allocations of all its bands concatenate to
+a legal global allocation.  At the raw oriented-allocation level, the number of global solutions
+is therefore a sum over count paths of products of local band multiplicities.  This is the
+**Pascal Tight-Skeleton Factorization Theorem**.  The dyadic product above occurs when `I(t)` is a
+singleton.
+
+The exact remaining local target must retain this count path.  The **Positive-Band Extension
+Conjecture** says that every exact parent band dominated by `G_K[u:v]` extends every incoming
+`p_u in I(u)` to some `p_v in I(v)`.  Its all-band form is stronger than the converse needs, but it
+is the natural induction statement.
+
+There is no longer a separate arbitrary-row tail conjecture.  The **Half-Unit Coalescence Lemma**
+says that if a capacity partition has at least as many unit parts as non-unit parts, merging the two
+smallest parts of any dominated refinement preserves dominance.  Every `G_K` and every suffix of
+it has this property.  Repeatedly coalesce a full parent to exactly `2^K` rows; after splitting the
+coalesced state, undo a merge by orienting both original rows alike and dividing the merged pure
+amount between them.  This merely refines each child part, so child majorization is preserved.
+Hence:
+
+> **Minimum-Support Reduction Theorem.**  The Row-Coloring Lemma for all full parents at level `K`
+> follows from its restriction to parents with exactly `2^K` positive rows.
+
+The terminal positive-band case similarly implies arbitrary suffix extension.  The full-band case
+`[0,2^K]` is exactly the minimum-support problem and by itself is sufficient for the full converse.
+In that minimum-support case every row must send a positive pure part and the two orientations have
+exactly `2^(K-1)` rows each.  Removing one pure anchor coin from every row contracts the three
+child capacities to `(G_(K-1)-1),G_(K-1),(G_(K-1)-1)` and the parent capacity to `G_K-1`; this is
+the exact anchored residual core.  The short conjugate-partition proof of coalescence and the rank
+identity for this contraction are in the tight-skeleton record.
+
+Positive-Band Extension passes a complete exact census through `K=4`: all 1,722,516 band-state
+instances across 136 rank bands extend every incoming count.  The `K=4` full band contains only
+408,776 exact-support parents, versus 5,997,038 unrestricted parents; 63,329 of the exact-support
+states have no internal tight prefix.  The old direct tail census also passes all 1,422,304
+state--incoming-count instances across 37 cases, independently checking the now-proved reduction.
+These census results are finite theorems, not a general proof.
+
+The path variable cannot be normalized away.  In the `K=4` band `[5,9)`, the state `(4^4)` fails
+the same-orientation transitions `2->4` and `3->5` but succeeds under the switching transitions
+`2->5` and `3->4`.  Nor may prefix capacities be arbitrarily refined: the nine-row state
+`(16,15,11,11,4^5)` is dominated by `(16,15,11,11,5^4)` but cannot fill the corresponding prefix
+child capacities.  Even exact-head strict alternation fails at `K=5` on
+`(32,31,26,26,16^3,11^2,6^7)`.  More strongly, strict alternation fails at `K=6` on the 64-row
+parent `(63^2,57^2,42^3,23^5,22^5,3^44,2^3)`, even though it is strictly below every internal
+prefix of `G_6`.  Thus the live target is the global Pascal count path, not a fixed alternation or
+an unrestricted collection of interval triples.
+
+Exact proofs, counterexamples, census method and reproduction are in the
+[tight-skeleton record](../../evidence/singleton_pascal_tight_skeleton_2026-08-29.md); the original
+low-fiber product is in the
 [factorization record](../../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
 
 The residual finite pattern is a pure-anchor filtration.  Of the 259 low parents, 258 admit a

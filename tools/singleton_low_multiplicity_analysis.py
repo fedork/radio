@@ -205,6 +205,38 @@ def main() -> None:
         (3, False): 22,
     }
 
+    def has_internal_tight_prefix(parent: Partition) -> bool:
+        running_parent = 0
+        for index, part in enumerate(parent[:15]):
+            running_parent += part
+            if running_parent == parent_prefix[index]:
+                return True
+        return False
+
+    tight_skeleton_coverage = Counter(
+        (int(item["multiplicity"]), has_internal_tight_prefix(parent))
+        for parent, item in k4.items()
+    )
+    assert tight_skeleton_coverage == {
+        (1, True): 29,
+        (1, False): 1,
+        (2, True): 122,
+        (2, False): 1,
+        (3, True): 102,
+        (3, False): 4,
+    }
+    no_tight_skeleton = {
+        parent for parent in k4 if not has_internal_tight_prefix(parent)
+    }
+    assert no_tight_skeleton == {
+        (15, 15) + (1,) * 51,
+        (15,) + (1,) * 66,
+        (14,) + (1,) * 67,
+        (13,) * 4 + (1,) * 29,
+        (2,) + (1,) * 79,
+        (1,) * 81,
+    }
+
     tight_four = {
         (parent[:4], parent[4:]): item
         for parent, item in k4.items()
@@ -332,6 +364,7 @@ def main() -> None:
         pure_anchor_exceptions[0]
     ))
     print("dyadic_tight_prefix=228/259 no_dyadic=31")
+    print("any_internal_tight_prefix=253/259 no_internal_tight=6")
     print(
         "tight_prefix_4_parents=131 head_layers=1:3,2:4,3:1 "
         "tail_layers=1:7,2:19,3:6 full_layers=1:21,2:85,3:25"

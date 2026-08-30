@@ -57,8 +57,14 @@ The lemma gives a concrete construction:
 4. concatenate their child contributions.
 
 It does not by itself prove the full converse, because the two contracted problems are not both
-instances of the original symmetric `G_j` statement.  A general induction would need the same
-existence theorem for all Pascal prefix/suffix capacity triples.
+instances of the original symmetric `G_j` statement.  The correct strengthening must retain the
+exact parent-rank interval and the pure-row count at each tight endpoint.  Allowing arbitrary row
+refinements of a prefix capacity is false: `(16,15,11,11,4^5)` is dominated by
+`(16,15,11,11,5^4)` but cannot fill the corresponding prefix child capacities.  The subsequent
+[tight-skeleton record](singleton_pascal_tight_skeleton_2026-08-29.md) proves the general
+factorization over all tight ranks, proves that two-smallest-row coalescence reduces the full
+problem to exactly `2^K` rows, formulates the remaining count-path extension conjecture, and
+verifies it through `K=4`.
 
 ## The exact `K=4,t=4` product
 
@@ -120,6 +126,8 @@ without such an internal dyadic equality are
 | 3 | 84 | 22 |
 
 Thus tight Pascal factorization explains most of the small-fiber boundary, but not all of it.
+Allowing every internal tight rank, with its full plateau of possible pure-row counts, raises this
+coverage to 253/259.  The remaining six states are listed in the tight-skeleton record.
 
 ## A recursive pure anchor
 

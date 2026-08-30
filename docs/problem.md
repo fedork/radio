@@ -100,7 +100,10 @@ leading atom of each successive dyadic block of `G_k`, so `A = 2^k`, `B = 2^k - 
 ## Why singleton states matter
 
 Weak majorization by `G_k` is a proved necessary condition for singleton solvability; whether it
-is sufficient is the open Singleton Majorization Converse.  The important unconditional terminal
+is sufficient is the open Singleton Majorization Converse.  The proved
+[Minimum-Support Reduction Theorem](theorems/singleton-majorization.md#tight-skeleton-factorization-and-minimum-support-reduction-2026-08-29)
+reduces the open direction to full-mass states with exactly `2^k` positive rows, but that
+exact-support case is still open in general.  The important unconditional terminal
 is narrower: any state whose rows fit into distinct rows of the explicit solvable state `G_k` is
 solvable by deleting edges.  This is what makes a canonical witness tree—one whose every leaf is a
 sub-multiset or distinct-slot substate of `G_k`—a self-contained proof rather than a solver
