@@ -23,7 +23,10 @@ counterexamples.
 The arbitrary number of parent rows is no longer part of the gap.  The proved Minimum-Support
 Reduction Theorem coalesces the two smallest rows, using the half-unit tail of `G_K`, until exactly
 `2^K` positive rows remain and lifts any resulting split back.  Thus the open converse is
-equivalent to the exact-support Row-Coloring case; see the tight-skeleton section below.
+equivalent to the exact-support Row-Coloring case; see the tight-skeleton section below.  The proved
+Two-Anchor Reduction then deletes the universal pure column and one matching mixed column, reducing
+that exact-support case to a smaller Balanced Residual Coloring Lemma for `G_(K-1)-1`.  This new
+residual lemma is still open, so the proof status does not change.
 
 ## Definitions
 
@@ -1922,6 +1925,97 @@ Exact proofs, counterexamples, census method and reproduction are in the
 [tight-skeleton record](../../evidence/singleton_pascal_tight_skeleton_2026-08-29.md); the original
 low-fiber product is in the
 [factorization record](../../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
+
+### Two-anchor Pascal residual reduction (2026-08-29)
+
+The full exact-support band has a second deterministic contraction.  Put
+
+    n=2^(K-1),       M=3^(K-1),       h=G_(K-1),
+    c=(h_1-1,...,h_n-1),
+
+retaining the trailing zeros of `c`, and let `C` be its saturated prefix function.  Then
+
+    H(t)=C(t)+min(t,n).                                      (TA1)
+
+Delete from `G_K'` its universal column of height `2n` and one column of height `n`.  The remaining
+parent profile `J` has
+
+    J'={2d,d : d in c'},
+    Jprefix(t)=C(t)+max_p(C(p)+C(t-p)).                       (TA2)
+
+Equivalently,
+
+    J=(G_K[1:n]-2, G_K[n+1:2n]-1),
+
+with zeros removed.  In Boolean-column labels this deletes exactly `empty` and one singleton
+`{*}`; all other subsets remain.  For `K=4`, for example,
+
+    c=(7,6,3,3,0^4),       J=(14,13,9,9,3^4).
+
+> **Two-Anchor Reduction Theorem.**  Let
+> `a=(a_1>=...>=a_(2n)>0)<=_w G_K` have full mass.  Then `a_n>=2`, and the sorted residual
+>
+>     b=sort(a_1-2,...,a_n-2,a_(n+1)-1,...,a_(2n)-1)          (TA3)
+>
+> is nonnegative, has at most `2n` positive rows and satisfies `b<=_w J`.  If `b` has a coloring
+> `A/B`, with at most `n` positive rows per color, satisfying
+>
+>     B^A_p+B^B_q <= C(p)+C(p+q)+C(q)                        (TA4)
+>
+> for all `p,q`, then `a` has a legal first split into three `h`-majorized children.
+
+*Proof.*  Realize `a` against the conjugate columns of `G_K` by Gale--Ryser.  The degree-`2n`
+column meets every row.  Delete it.  Bipartite Havel--Hakimi allows a remaining maximum-degree
+column of height `n` to meet the `n` largest residual row degrees.  Equal-height columns are
+interchangeable, so label the selected one `{*}`.  Deleting it proves `a_n>=2` and leaves exactly
+(TA3) against the columns (TA2), hence `b<=_w J`.
+
+By the Fixed-Color Hall Lemma, (TA4) allocates `b` to three residual children majorized by `c`.
+Pad both color classes with zero-residual rows until each contains exactly `n` original rows.  Add
+one pure anchor to every row on its orientation side, and add one mixed anchor to each of the
+original top `n` rows.  A pure child prefix increases from at most `C(t)` by `min(t,n)`.  The top
+`t` entries of the mixed child also increase by at most `min(t,n)`, regardless of which residual
+rows received those anchors.  Equation (TA1) therefore bounds all three lifted children by `h`.
+Every row uses only its chosen pure side and the mixed side, so the lift is legal. ∎
+
+This isolates one smaller sufficient target.
+
+> **Balanced Residual Coloring Lemma (open).**  Every full-mass `b<=_w J` with at most `2n`
+> positive rows has a coloring satisfying (TA4), with at most `n` positive rows of each color.
+
+The lemma is a sufficient strengthening, not a proved equivalent: the top-half mixed anchors have
+not been normalized in an arbitrary legal cut.  If it holds at every level, however, the theorem,
+Minimum-Support Reduction and induction prove the full Singleton Majorization converse.  Pascal
+structure is now present at the start rather than postponed: `c'` consists of all nonempty Boolean
+subsets, and `J'` consists of every next-level subset except `empty` and `{*}`.
+
+The complete residual census supports the lemma through `K=4`: all 73 residual states at `K=3`
+and all 160,492 at `K=4` pass, with no coloring failures.  The deterministic two-anchor images of
+all 160 and 408,776 exact-support parents also pass.  A still stronger longest-half rule--exactly
+the largest `n` rows use the mixed child and all three children have exact support--passes all
+exact-support parents through `K=4` and the strict-interior `K=6` alternation counterexample, but
+remains conjectural.
+
+No scalar selection rule explains the result.  Greedy balance fails on 403 residual `K=4` states.
+Globally minimum mass difference, even after imposing both necessary color-row bounds, fails on
+1,067 states.  For
+
+    b=(14,13,9,5,4,4,4,2,2),
+
+all three admissible difference-one partitions violate Hall by one; for example,
+`(14,9,4,2)|(13,5,4,4,2)` fails at `(p,q)=(3,5)`.  The legal split
+`(14,5,4,4)|(13,9,4,2,2)` is less balanced.  Coalescing the two smallest residual rows fails on
+9,804 two-anchor images.  Nor is the residual ideal a fixed product below the color classes of
+`J`: `(6,3,3,3)` is a counterexample already at `K=3`.
+
+A sharper transfer pattern survives.  Every one of the 160,491 noncanonical residual `K=4` states
+has an upward one-unit predecessor admitting a feasible coloring in which the transfer endpoints
+share a color; the first admissible predecessor works except for 77 states, and the second works
+for all 77.  This is not yet a path induction, because independently selected predecessor
+colorings need not be compatible along the entire path.  It suggests an endpoint-rich residual
+augmentation lemma rather than a fixed assignment rule.  Proof details, exact counts, sampled
+higher-level checks, counterexamples and commands are in the
+[two-anchor residual record](../../evidence/singleton_two_anchor_residual_2026-08-29.md).
 
 The residual finite pattern is a pure-anchor filtration.  Of the 259 low parents, 258 admit a
 solution with a child-unique pure child.  The exception `(16,15,9^3,5,3^4,1^6)` has a two-orbit

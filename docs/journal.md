@@ -11443,3 +11443,73 @@ probe was terminated after 30 seconds, and one broader generic enumeration reach
 yield without retained output; both were replaced by the proof and bounded exact check.  Their
 stdin Python processes exited or were explicitly killed.  No solver or exploratory process from
 this work remains.
+
+## 2026-08-29 -- two Pascal anchors isolate a smaller residual coloring lemma
+
+The exact-support reduction has a second deterministic step.  Put `n=2^(K-1)`, `h=G_(K-1)` and
+`c=h-1` with its trailing zeros.  In conjugates, `G_K'` contains one universal doubled column of
+height `2n` and a maximum single column of height `n`.  Delete the universal column.  Bipartite
+Havel--Hakimi allows a height-`n` column to meet the `n` largest remaining row degrees; delete that
+too.  Therefore every sorted exact-support parent `a<=G_K` has `a_n>=2`, and
+
+    b=sort(a_1-2,...,a_n-2,a_(n+1)-1,...,a_(2n)-1)
+
+is dominated by the residual parent `J` induced from three copies of `c`.  Its prefix rank is
+
+    J(t)=C(t)+max_p(C(p)+C(t-p)).
+
+This is exactly Pascal deletion of Boolean columns `empty` and one singleton `{*}`.  It is not an
+ad hoc anchor choice.
+
+If `b` can be colored with at most `n` positive rows per side and satisfies Fixed-Color Hall for
+child capacity `c`, residual allocation followed by restoring one pure anchor on every row and one
+mixed anchor on the original top `n` rows produces three `h`-majorized children.  The lift uses the
+identity `H(t)=C(t)+min(t,n)`; it is independent of which residual rows receive mixed mass.  This
+proves the Two-Anchor Reduction Theorem and leaves the Balanced Residual Coloring Lemma as a new
+sufficient target.  The lemma is still open, so Singleton Majorization remains open.
+
+The extended `tools/singleton_pascal_interval_census.cpp` exhausts the target.  The complete capped
+residual universes contain 73 states at `K=3` and 160,492 at `K=4`; all pass, using 303 and
+1,140,358 exact coloring nodes.  The residuals derived from all 160 and 408,776 exact-support
+parents also pass, using 678 and 2,929,065 nodes.  A stronger direct rule--all children have exact
+support and exactly the longest half uses the mixed child--passes the same parent corpora with
+2,331 and 39,086,058 nodes.  Requiring only exact child support uses 2,735 and 19,587,981 nodes.
+The longest-half rule also finds a split of
+the strict-interior `K=6` alternation counterexample in 169,567 nodes.
+
+The residual census rejected several attempts to turn this into a scalar assignment rule.  Plain
+balanced blocks fail on 403 complete `K=4` residuals.  One-block lookahead passes complete `K=4`
+but fails twice in a deterministic 100,000-state `K=5` walk.  Globally minimizing final color-mass
+difference, subject to both necessary color-row bounds, fails on 1,067 residuals.  The first is
+`(14,13,9,5,4,4,4,2,2)`: all three admissible difference-one partitions violate Hall by one;
+for example, `(14,9,4,2)|(13,5,4,4,2)` fails at `(p,q)=(3,5)`.  The split
+`(14,5,4,4)|(13,9,4,2,2)` is legal at difference three.  Merging the two smallest two-anchor
+residual rows fails for 9,804 original parents.  A fixed product under the feasible
+color classes of canonical `J` is false already for `(6,3,3,3)@K=3`.  These failures confirm that
+the full two-parameter Hall surface, not total balance or a fixed boundary shape, controls the cut.
+
+A one-step transfer pattern remains striking.  Every noncanonical residual in the complete
+`K<=4` corpus has a more head-heavy predecessor with a feasible coloring that puts the marked
+transfer rows on the same side.  At `K=4`, 160,414 of 160,491 states use the first admissible
+predecessor; the remaining 77 all use the second, and none needs a third.  The first miss is
+`(14,13,8,8,5,3^3)`, where reverse values `(8,8)` fail and `(8,5)` work.  Sixty-one of the 77
+misses use equal values, so avoiding ties is not a universal rule.  This does not yet give an
+induction: independently selected common colorings need not agree along a whole predecessor path.
+The next transfer target is an endpoint-rich augmentation lemma with a compatible global potential.
+
+Two higher-level diagnostics remained positive.  A 100,000-state `K=5` dominance walk (at most 500
+transfers, seed 161803398) had zero exact residual failures, 3 greedy failures and 2 lookahead
+failures in 10 wall seconds; exact search used 579,956 nodes, maximum 16.  A 10,000-state `K=6`
+walk (at most 1,000 transfers, seed 271828182) had zero failures for all three algorithms in 10 wall
+seconds; exact search used 110,428 nodes, maximum 24.  A direct 20-state longest-half `K=5` walk
+passed in 15 seconds after 227,641,556 nodes.  The attempted 1,000-state version hit its 120-second
+cap without a batch verdict; it is recorded only as an abort.
+
+The final optimized provenance build id is
+`e42509888792c2be603e4e08c79c06d740b174405e2d7ccd334826f7729298eb`.  Address/undefined
+sanitizers independently pass the complete `K=3` residual coloring, predecessor and longest-half
+modes under build id `5f62ce7fa7ef3a413b4c563aba2cb7afe23de6dee127ff86aff4ecb2b4452528`.
+The proof, exact finite status, counterexamples and reproduction commands are in
+`evidence/singleton_two_anchor_residual_2026-08-29.md`.
+Final process inventory found no `radio_canon`, census utility, capped runner, `Python -` or
+`python3 -` process remaining.

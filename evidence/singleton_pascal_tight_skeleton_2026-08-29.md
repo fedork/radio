@@ -334,9 +334,12 @@ tools/singleton_low_multiplicity_analysis.py \
 ```
 
 The complete band run used build id
-`845ccebcc115cd9bdd34616c953253a08bd3af81ecd3b5b2c93c196890c392b4`; the final source build,
-which adds only regression/reporting checks and the explicit standard-library include and
-reproduces the exact-support and counterexample checks, is
-`8bf9d29627cb7c2bb1af37dc8e3c605ef4315e9425d0c1027209b0e6f35011dc`.
+`845ccebcc115cd9bdd34616c953253a08bd3af81ecd3b5b2c93c196890c392b4`; the source build at the
+conclusion of this particular study, which added regression/reporting checks and reproduced the
+exact-support and counterexample checks, was
+`8bf9d29627cb7c2bb1af37dc8e3c605ef4315e9425d0c1027209b0e6f35011dc`.  The tool was subsequently
+extended with two-anchor residual modes while retaining those regressions; its current provenance
+is recorded in the
+[two-anchor residual record](singleton_two_anchor_residual_2026-08-29.md).
 The complete band run exited zero under its 30-minute/4-GiB cap; all other displayed final runs
 also exited zero.  No process remains.

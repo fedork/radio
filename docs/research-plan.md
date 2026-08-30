@@ -242,28 +242,50 @@ formulation.  At every tight rank `t`, retain the full plateau
 allocations are transfer-matrix products along monotone plateau-count paths.  The old dyadic
 head--tail product is the singleton-path case and still explains 131/259 low parents.
 
-The next existence target is now singular.  Prove the **Positive-Band Extension Conjecture**: an
-exact Pascal band extends every admissible incoming count to some outgoing count.  The proved
-Half-Unit Coalescence Lemma removes the formerly separate tail claim.  Since every `G_K` suffix has
-at least as many unit as non-unit entries, merge the two smallest rows until the suffix has its
-canonical row count, apply exact band extension, and lift the split by undoing the merges inside
-one orientation.  In particular, the full converse is equivalent to its minimum-support case of
-exactly `2^K` parent rows.  At `K=4` this shrinks 5,997,038 parents to 408,776 exact-support states;
-63,329 of those have no internal tight prefix.
+The primary full-band target is now the **Balanced Residual Coloring Lemma**.  Minimum-Support
+Reduction first leaves exactly `2^K` rows.  The proved Two-Anchor Reduction then deletes the
+universal doubled column and one maximum single column: with `n=2^(K-1)`, `h=G_(K-1)` and
+`c=h-1`, subtract two from the longest `n` rows and one from the other `n`.  Bipartite
+Havel--Hakimi proves that the resulting state `b` is dominated by the induced residual profile
 
-Positive-Band Extension passes the exhaustive `K=4` census on 1,722,516 band-state instances; the
-old direct suffix census passes 1,422,304 instances as an independent check of the reduction.  Try
-the full band first: after its forced one-coin pure anchors, the exact residual capacities are
-`(G_(K-1)-1),G_(K-1),(G_(K-1)-1)` and `G_K-1`.  Strengthen to all bands only when a tight-prefix
-induction needs it.  In that induction an internal tight subprefix factors immediately, so isolate
-strictly interior exact bands and seek a Pascal-specific augmentation that creates the first tight
-face.  Do not drop exact band row counts or choose a fixed orientation:
-`(16,15,11,11,4^5)` refutes unrestricted prefix refinement, the `[5,9)` band state `(4^4)` forces
-an orientation switch, and even a 64-row parent strictly inside every `G_6` prefix refutes sorted
-alternation.  The theorem, coalescence proof, exact finite evidence and traps are in the
-[tight-skeleton record](../evidence/singleton_pascal_tight_skeleton_2026-08-29.md); the
-original product, pure-anchor residual and 83-state failure of low-layer transfer closure remain in
-the [factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
+    Jprefix(t)=C(t)+max_p(C(p)+C(t-p)),
+
+where `C` is the prefix function of `c`.  It is enough to color every full `b<=J` of support at
+most `2n` with at most `n` positive rows per color and satisfy
+
+    B^A_p+B^B_q <= C(p)+C(p+q)+C(q).
+
+Residual Hall allocation followed by one pure anchor on every row and one mixed anchor on the
+original longest half then gives the desired split.  In Boolean columns this removes exactly
+`empty` and one singleton `{*}`, so Pascal structure defines the residual rather than merely
+supplying repeated targets afterward.
+
+This residual lemma passes all 73 states at `K=3` and all 160,492 at `K=4`; the two-anchor images
+of all 160/408,776 exact-support parents also pass.  The stronger Longest-Half Mixed Conjecture,
+which gives all three children exact support and forbids the bottom half from using the mixed
+child, also passes the complete exact-support `K<=4` corpus and the strict-interior `K=6`
+alternation counterexample.  Prefer the weaker residual lemma as the proof target.  A useful
+transfer clue is that every one of the 160,491 noncanonical
+`K=4` residuals has an endpoint-coherent upward predecessor; 160,414 use the first admissible
+predecessor and the remaining 77 use the second.  Turning that one-step fact into an induction
+requires a compatible global choice of predecessor colorings.
+
+Do not replace the full Hall surface by a scalar objective.  Plain balance, globally minimum final
+mass difference, residual two-smallest coalescence and a fixed product below the canonical boundary
+all have exact counterexamples.  In particular `(14,13,9,5,4,4,4,2,2)` needs color-mass difference three
+although difference one is possible under both necessary row-count bounds.  The theorem, complete
+counts, stronger finite
+pattern and counterexamples are in the
+[two-anchor residual record](../evidence/singleton_two_anchor_residual_2026-08-29.md).
+
+The broader **Positive-Band Extension Conjecture** remains a separate tight-skeleton route.  It
+passes the exhaustive `K=4` census on 1,722,516 band-state instances, and the old direct suffix
+census passes 1,422,304 instances.  Pursue arbitrary bands only if a tight-prefix induction needs
+them: internal tight subprefixes factor immediately, but `(16,15,11,11,4^5)` refutes unrestricted
+prefix refinement, `(4^4)` in band `[5,9)` forces an orientation switch, and a 64-row strict
+`G_6` interior state refutes sorted alternation.  See the
+[tight-skeleton record](../evidence/singleton_pascal_tight_skeleton_2026-08-29.md) and original
+[factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
 
 Equivalently, the Pascal Orthant-Saturation Lemma says that the magnitudes of the integer points in
 the signed Hall bisubmodular polyhedron contain every lattice point of their convex hull, which is
