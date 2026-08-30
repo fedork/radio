@@ -11893,8 +11893,97 @@ assertion that the labelled `F_K` has no lattice holes.  The generic `h=(6,1)` c
 missing ambient point `(12,3,3,3)`, shows that connectivity and vertex coverage alone are
 insufficient.
 
-The useful new targets are global and do not mention phase anchors: prove that `F_K` is M-convex,
-or prove that the union of the real fixed-color base polytopes is convex.  Either would fill the
-ambient permutahedron and prove Row-Coloring.  Both are stronger than the current lemma and remain
-open.  Pascal-Shuffle Coverage remains the exact directed formulation, but reverse transfers make
-its source classification unnecessary rather than proving its coverage step.
+The surviving global target is to prove that the primitive integer set `F_K` is M-convex.  The
+real fixed-color cover proposed at this stage was subsequently refuted, first in padded form at
+`K=2` and then at exact support at every `K>=3`; see the next entry.  Pascal-Shuffle Coverage
+remains the exact directed formulation, but reverse transfers make its source classification
+unnecessary rather than proving its coverage step.
+
+## 2026-08-30 -- real coverage fails at exact support; the lattice is essential
+
+The first real relaxation failed because it allowed more than `2^K` positive rows.  Restricting to
+exact support looked much stronger: each fixed-color base has `2^(K-1)` rows per side and every
+coordinate is at least one, and the union still contains every vertex of the `G_K` permutahedron.
+That strengthening is nevertheless false.
+
+The exact denominator-five `K=3` grid gives the first counterexample
+
+    (8,7,4,(8/5)^5) <=_w (8,7,4,4,1,1,1,1).
+
+Every four-versus-four coloring distributes the first three rows `2+1`.  The whole side containing
+two heads, together with the remaining head, has demand `111/5`; its `(4,1)` Hall capacity is only
+`H(5)+H(4)+H(1)=22`.  The minimum maximum excess is exactly `1/5`, attained for example by
+`A=(8,4,8/5,8/5)`, `B=(7,(8/5)^3)`.
+
+The first grid run
+
+    python3 tools/singleton_solution_fiber_dag.py --exact-rational-grid 3 5
+
+took 65.38 wall seconds.  Denominators one through four again had respectively 160, 3,997, 34,704
+and 179,482 states and no holes.  Denominator five had 56 holes among 675,341 states.  A second
+48.43-second pass enumerated them and computed their exact best defects: all 56 are
+`(x,y,z,8^5)` with `x+y+z=95`, and all have minimum scaled defect one.  The padded `K=2` grids had
+already exposed `(4,3,(2/3)^3)`; the new failure is genuinely at exact support.
+
+The entire face extends to every level.  Write `m=2^(K-1)`, `M=3^(K-1)`, `g=G_K`, and replace the
+last `m+1` rows of `g` by their common average
+
+    t=1+K/(m+1).
+
+The resulting exact-support real state
+
+    a=(g_1,...,g_(m-1),t^(m+1))
+
+is majorized by `g`.  In any balanced coloring one side contains `u>=m/2` head rows.  Put
+`v=m-1-u`; the set consisting of that whole side and the `v` remaining head rows has Hall excess
+
+    E(v)=H_K(m-1)+(v+1)t-2M-H(v).
+
+Because `h_(v+1)>=h_(m/2)=K>t`, this is minimized at `v=m/2-1`, where
+
+    E_min=((K-2)m-2)/(2(m+1)).
+
+It is positive for every `K>=3` and equals `23/17>1` at `K=5`.  Thus both exact-support real
+convexity and the fallback universal real defect-below-one conjecture are false.  Scaling by
+`m+1` gives integer holes for the scaled profile `(m+1)G_(K-1)`, but does not touch the primitive
+integer conjecture.  This sharply identifies the necessary ingredient: a proof must use the unit
+lattice of the primitive Pascal profile, not only its ratios, convex hull or support size.
+
+The fractional-color set `Y(a)` remains convex, and its active Hall sets still uncross by
+submodularity.  The all-level family proves that these continuous facts cannot force a zero--one
+color vector.  The only live version is integer-aware: for primitive integral `a`, prove directly
+that `Y(a)` has a zero--one point, equivalently prove Row-Coloring/M-convex lattice saturation.
+The raw integer lower endpoints are not supermodular even for canonical `G_3`, so ordinary
+generalized-polymatroid integrality does not supply that missing step.  Ordinary Lorentzianity of
+the full chromatic symmetric function is also unavailable because `Q_3` has an induced claw while
+the relevant Lorentzian support conditions force claw-freeness.
+
+`tools/singleton_solution_fiber_dag.py` gained reproducible `--rational-grid` and
+`--exact-rational-grid` modes.  The padded `K=2` run through denominator five took 1.14 seconds;
+the exact-support `K=2` run through denominator six took 0.08 seconds; the successful `K=3` run
+through denominator four took 15.19 seconds.  An earlier unoptimized denominator-four run was
+stopped after 169.52 seconds after completing denominators one through three; optimizing balanced
+subset enumeration replaced it.  A first denominator-six padded attempt was stopped after 68.98
+seconds after reproducing denominators one through five.  A direct balanced-color verification of
+the all-level scaled family confirmed `K=3,4`; including `K=5` accidentally requested roughly
+three hundred million balanced subsets, so that pass was interrupted after 30 seconds.  The
+analytic proof above makes that enumeration unnecessary.  No process from these runs remained.
+
+After the tool was extended to report exact minimum defects and list every hole, the final
+denominator-five rerun took 64.65 seconds.  It reproduced all counts and reported
+`scaled_defects=1:56`; the temporary listing contained exactly 56 hole lines, all ending in
+`scaled_defect=1`.
+
+The counterexample face also yields the **Integral Final-Band Extension Lemma**.  The canonical
+final `m+1` rows are `(K+1,1^m)`, while a legal allocation of a tight first `m-1` rows has head
+counts `m/2-1,m/2`.  The head-light side therefore has `m/2+1` tail slots.  Every positive integral
+tail of the required mass has exactly `K` coins above its unit baseline and hence at most
+`K<=m/2+1` non-unit rows.  Put all of them on that side, concatenate the canonical tail band, and
+redistribute the excess by same-color Robin--Hood moves, which preserve every fixed-color Hall
+inequality.  Thus every legal head-band allocation extends; constructing such an allocation is
+the only remaining issue on this tight face.  This demonstrates rather than merely asserts how
+the primitive lattice destroys the fractional obstruction.  A multiplicity-based script confirmed
+the constructed integer replacement through `K=6` in 28.61 seconds.  A preceding attempt also
+reached `K=6` but
+was interrupted at 30 seconds after it continued blindly into the much larger `K=7` coloring
+space; it left no process or artifact.

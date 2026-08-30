@@ -15,6 +15,13 @@ the G_k fiber.  It also reports components after every relation pair is made
 undirected.  It can survey a downward-closed Lorenz-area ideal at a higher
 level; source vertices found there have every possible predecessor present
 and therefore are genuine sources of the full DAG.
+
+The rational-grid modes scale both the parent and child profiles by a common
+denominator.  Dividing a reported state by that denominator therefore tests
+real, rather than only integral, coverage by the fixed-color Hall polytopes.
+The exact-support mode retains exactly 2^K positive rows; the unrestricted
+mode allows all 3^K padded row slots.  Missing-state summaries include the
+minimum scaled Hall defect; --list-rational-holes prints every hole.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ import argparse
 import heapq
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from itertools import product
+from itertools import combinations, product
 from typing import Iterable
 
 
@@ -58,7 +65,11 @@ def show_coloring(state: State, coloring: Coloring, largest: int) -> str:
     return f"A={show(tuple(a))} B={show(tuple(b))}"
 
 
-def enumerate_states(profile: State) -> list[State]:
+def enumerate_states(
+    profile: State,
+    minimum_rows: int = 0,
+    maximum_rows: int | None = None,
+) -> list[State]:
     total = sum(profile)
     maximum = profile[0]
     prefix = [0]
@@ -69,13 +80,29 @@ def enumerate_states(profile: State) -> list[State]:
 
     def visit(remaining: int, previous: int, used: int, parts: list[int]) -> None:
         if remaining == 0:
-            states.append(tuple(parts))
+            if len(parts) >= minimum_rows:
+                states.append(tuple(parts))
+            return
+        if maximum_rows is not None:
+            available = maximum_rows - len(parts)
+            if available <= 0 or remaining > available * previous:
+                return
+        required = max(0, minimum_rows - len(parts))
+        if remaining < required:
             return
         for value in range(min(previous, remaining, maximum), 0, -1):
             next_used = used + value
             count = len(parts) + 1
             bound = prefix[min(count, len(profile))]
             if next_used > bound:
+                continue
+            if maximum_rows is not None:
+                available_after = maximum_rows - count
+                remaining_after = remaining - value
+                if remaining_after > available_after * value:
+                    continue
+            required_after = max(0, minimum_rows - count)
+            if remaining - value < required_after:
                 continue
             parts.append(value)
             visit(remaining - value, value, next_used, parts)
@@ -121,6 +148,26 @@ class Hall:
                     return False
         return True
 
+    def maximum_excess(self, a_counts: Coloring, totals: Coloring) -> int:
+        """Return the largest demand-minus-capacity Hall violation."""
+        a_values: list[int] = []
+        b_values: list[int] = []
+        for value in range(len(totals) - 1, 0, -1):
+            a_values.extend([value] * a_counts[value])
+            b_values.extend([value] * (totals[value] - a_counts[value]))
+
+        pa = [0]
+        pb = [0]
+        for value in a_values:
+            pa.append(pa[-1] + value)
+        for value in b_values:
+            pb.append(pb[-1] + value)
+        return max(
+            demand_a + demand_b - self.h(p + q) - self.h(p) - self.h(q)
+            for p, demand_a in enumerate(pa)
+            for q, demand_b in enumerate(pb)
+        )
+
 
 def complement(coloring: Coloring, totals: Coloring) -> Coloring:
     return tuple(total - a for total, a in zip(totals, coloring))
@@ -143,6 +190,136 @@ def feasible_fiber(state: State, largest: int, hall: Hall) -> frozenset[Coloring
         if hall.feasible(oriented, totals):
             result.add(oriented)
     return frozenset(result)
+
+
+def has_feasible_coloring(state: State, largest: int, hall: Hall) -> bool:
+    """Return after the first feasible coloring, without materializing its fiber."""
+    totals = multiplicities(state, largest)
+    ranges = [range(count + 1) for count in totals[1:]]
+    for choice in product(*ranges):
+        oriented = (0,) + choice
+        if oriented != canonical(oriented, totals):
+            continue
+        if hall.feasible(oriented, totals):
+            return True
+    return False
+
+
+def has_balanced_feasible_coloring(state: State, largest: int, hall: Hall) -> bool:
+    """Test a 2m-row state by its balanced labelled row subsets.
+
+    Full mass forces m rows of each color.  Fixing the first row in A quotients
+    global color reversal and is substantially faster on rational grids than
+    scanning every value-multiplicity vector.
+    """
+    rows = len(state)
+    side_rows = hall.child_rows
+    if rows != 2 * side_rows:
+        raise ValueError("balanced coloring requires exactly twice the child support")
+    totals = multiplicities(state, largest)
+    for chosen in combinations(range(1, rows), side_rows - 1):
+        a_counts = [0] * (largest + 1)
+        a_counts[state[0]] += 1
+        for index in chosen:
+            a_counts[state[index]] += 1
+        if hall.feasible(tuple(a_counts), totals):
+            return True
+    return False
+
+
+def minimum_coloring_excess(
+    state: State,
+    largest: int,
+    hall: Hall,
+    exact_support: bool,
+) -> int:
+    """Minimize the maximum scaled Hall excess over colorings."""
+    totals = multiplicities(state, largest)
+    best: int | None = None
+    if exact_support:
+        rows = len(state)
+        side_rows = hall.child_rows
+        if rows != 2 * side_rows:
+            raise ValueError("exact-support defect requires balanced row counts")
+        for chosen in combinations(range(1, rows), side_rows - 1):
+            a_counts = [0] * (largest + 1)
+            a_counts[state[0]] += 1
+            for index in chosen:
+                a_counts[state[index]] += 1
+            excess = hall.maximum_excess(tuple(a_counts), totals)
+            best = excess if best is None else min(best, excess)
+    else:
+        ranges = [range(count + 1) for count in totals[1:]]
+        for choice in product(*ranges):
+            oriented = (0,) + choice
+            if oriented != canonical(oriented, totals):
+                continue
+            excess = hall.maximum_excess(oriented, totals)
+            best = excess if best is None else min(best, excess)
+    if best is None:
+        raise AssertionError("state had no coloring choices")
+    return best
+
+
+def inspect_rational_grid(
+    k: int,
+    maximum_denominator: int,
+    exact_support: bool,
+    list_holes: bool,
+) -> None:
+    """Exhaust normalized rational grids for real Hall-polytope coverage.
+
+    A denominator-d grid point x is represented by the integer state d*x.
+    Scaling the child profile by d scales every Hall inequality by d, so an
+    empty fiber exactly certifies that x is outside every real fixed-color
+    base polytope.
+    """
+    if maximum_denominator < 1:
+        raise ValueError("maximum denominator must be positive")
+    padded_rows = 3**k
+    support = 2**k
+    for denominator in range(1, maximum_denominator + 1):
+        parent = tuple(denominator * value for value in singleton_base(k))
+        child = tuple(denominator * value for value in singleton_base(k - 1))
+        if exact_support:
+            states = enumerate_states(parent, support, support)
+        else:
+            states = enumerate_states(parent, 0, padded_rows)
+        hall = Hall(child)
+        missing: list[State] = []
+        for state in states:
+            feasible = (
+                has_balanced_feasible_coloring(state, parent[0], hall)
+                if exact_support
+                else has_feasible_coloring(state, parent[0], hall)
+            )
+            if not feasible:
+                missing.append(state)
+        mode = "exact-support" if exact_support else "padded"
+        first = show(missing[0]) if missing else "none"
+        defects = Counter(
+            minimum_coloring_excess(state, parent[0], hall, exact_support)
+            for state in missing
+        )
+        defect_summary = (
+            ",".join(f"{defect}:{count}" for defect, count in sorted(defects.items()))
+            if defects
+            else "none"
+        )
+        print(
+            f"RATIONAL_HALL_GRID k={k} denominator={denominator} mode={mode} "
+            f"states={len(states)} missing={len(missing)} first_missing={first} "
+            f"scaled_defects={defect_summary}"
+        )
+        if list_holes:
+            for state in missing:
+                defect = minimum_coloring_excess(
+                    state, parent[0], hall, exact_support
+                )
+                print(
+                    f"RATIONAL_HALL_HOLE k={k} denominator={denominator} "
+                    f"mode={mode} state={show(state)} scaled_defect={defect}"
+                )
 
 
 def transfers(state: State, padded_rows: int) -> Iterable[tuple[int, int, State]]:
@@ -1175,6 +1352,20 @@ def main() -> None:
     parser.add_argument("--phase-edge", type=int)
     parser.add_argument("--area-ideal", nargs=2, type=int, metavar=("K", "AREA"))
     parser.add_argument("--greedy-sources", type=int, metavar="K")
+    parser.add_argument(
+        "--rational-grid", nargs=2, type=int, metavar=("K", "MAX_DENOMINATOR")
+    )
+    parser.add_argument(
+        "--exact-rational-grid",
+        nargs=2,
+        type=int,
+        metavar=("K", "MAX_DENOMINATOR"),
+    )
+    parser.add_argument(
+        "--list-rational-holes",
+        action="store_true",
+        help="print every missing rational-grid state and its scaled Hall defect",
+    )
     args = parser.parse_args()
     if args.phase_edge is not None:
         inspect_phase_edge(args.phase_edge)
@@ -1183,6 +1374,22 @@ def main() -> None:
         if not 2 <= args.greedy_sources <= 8:
             parser.error("greedy-source enumeration supports 2 <= K <= 8")
         inspect_greedy_sources(args.greedy_sources, args.examples)
+        return
+    if args.rational_grid is not None:
+        k, maximum_denominator = args.rational_grid
+        if not 1 <= k <= 2:
+            parser.error("padded rational-grid enumeration supports 1 <= K <= 2")
+        if maximum_denominator < 1:
+            parser.error("the maximum denominator must be positive")
+        inspect_rational_grid(k, maximum_denominator, False, args.list_rational_holes)
+        return
+    if args.exact_rational_grid is not None:
+        k, maximum_denominator = args.exact_rational_grid
+        if not 1 <= k <= 3:
+            parser.error("exact-support rational-grid enumeration supports 1 <= K <= 3")
+        if maximum_denominator < 1:
+            parser.error("the maximum denominator must be positive")
+        inspect_rational_grid(k, maximum_denominator, True, args.list_rational_holes)
         return
     if args.area_ideal is not None:
         k, maximum_area = args.area_ideal

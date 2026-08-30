@@ -2029,10 +2029,90 @@ all of its existing colored bases have the same bidirectional connectivity, but 
 
 Thus allowing both directions gives a cleaner global picture: the normalized colored graph is
 connected, while the corresponding labelled union is vertex-spanning and has the right convex
-hull.  The missing assertion is that the labelled union has no lattice holes.  Two sufficient
-forms are to prove that `F_K` itself is M-convex, or that the union of the real base polytopes
-`B(f_A)` is convex.  Either would fill the ambient permutahedron.  Both require the full Pascal
-structure and remain open.
+hull.  The missing assertion is that the labelled union has no lattice holes.  Proving `F_K`
+M-convex is an exact exchange form of that assertion: it is sufficient by hole-freeness, and if
+the Row-Coloring Lemma holds then `F_K=B_K`, which is already M-convex.
+
+#### Real convexity fails even at exact support (2026-08-30)
+
+Convexity of the union of **all padded real** fixed-color base polytopes is false even for the
+Pascal profile at `K=2`.  Put `h=(2,1)`.  Then
+
+    x=(4,3,2/3,2/3,2/3) <=_w (4,3,1,1),
+
+but `x` has no Hall coloring.  Full mass forces at least two rows of each color.  Put row four in
+`A`; row three must be in `B`, since `7>2H(2)=6`.  If `A` has two rows, `(p,q)=(1,3)` has demand
+`25/3>8`; if it has three rows, `(3,1)` gives the same violation.  Scaling by three gives the
+integer hole `(12,9,2,2,2)` for the non-Pascal scaled child `3G_1=(6,3)`.  Thus no homogeneous
+real-polytope or scale-invariant argument can prove the primitive integer theorem.
+
+The obstruction uses five positive rows, while `G_2` has four.  It is therefore natural, but also
+false, to hope that exact support repairs real coverage.  On exactly `2^K=2m` labelled rows put
+
+    U_K^min = union_(|A|=m) B(f_A).
+
+This union lies in `Perm(G_K)` and contains all of its vertices.  Nevertheless it need not fill
+that permutahedron.  Already
+
+    (8,7,4,(8/5)^5) <=_w G_3=(8,7,4,4,1,1,1,1)              (BG3)
+
+has no balanced Hall coloring.  Any four-versus-four coloring splits the first three rows `2+1`;
+the whole side containing two, together with the remaining head row, has mass `111/5`, above its
+`(4,1)` capacity `H(5)+H(4)+H(1)=22`.
+
+This has an all-level form.  Let `M=3^(K-1)`, `m=2^(K-1)`, `g=G_K`, and flatten the final `m+1`
+coordinates of `g` to their average:
+
+    a=(g_1,...,g_(m-1),t^(m+1)),       t=1+K/(m+1).           (BG4)
+
+Then `a<=_w g` and has exact support.  In every balanced coloring one side contains at least
+`m/2` of the first `m-1` rows.  Taking that whole side plus the remaining head rows on the other
+side gives Hall excess at least
+
+    ((K-2)m-2)/(2(m+1)).                                      (BG5)
+
+This is positive for every `K>=3` and already exceeds one at `K=5`.  Multiplication by `m+1`
+gives an integer hole for the scaled profile `(m+1)G_(K-1)`, but not for the primitive profile.
+Consequently neither a real exact-support cover nor a universal real defect-below-one theorem can
+prove the integer Singleton Majorization Converse.  The primitive unit lattice is essential.
+
+The primitive lattice repairs the entire final band on this tight face.  The last `m+1` rows of
+`G_K` are `(K+1,1^m)`, and `I(m-1)={m/2-1,m/2}`.  Hence the head-light side of every legal
+allocation of a tight first `m-1` rows has `m/2+1` tail slots.  Any positive integral tail has only
+`K` coins above its unit baseline and therefore at most `K<=m/2+1` non-unit rows.  Assign all of
+them to the head-light side, concatenate the canonical tail allocation, and obtain the desired
+tail by same-color Robin--Hood transfers.  Such transfers only decrease the largest demand at
+every fixed pair of color counts.  This proves the **Integral Final-Band Extension Lemma**: every
+legal head-band allocation extends across an arbitrary integral tail on the tight `m-1` face.  It
+does not supply that head allocation, so it is a genuine partial result rather than the converse.
+
+The rational census locates the first face exactly.  At `K=3`, denominators one through four have
+no hole on 160, 3,997, 34,704 and 179,482 normalized states.  Denominator five has 56 holes among
+675,341 states, beginning with `(40,35,20,8^5)`; all 56 lie on the face
+`(x,y,z,8^5)`, `x+y+z=95`, and have scaled Hall defect one.  Exact support **does** give real
+coverage at `K=2`, by the direct largest-with-smallest coloring proof in the evidence record.
+
+The failed real statement still has a useful rounding formulation.  Linearly interpolate `H`; for
+a fixed exact-support parent `a`, let `Y(a)` contain the vectors `y in [0,1]^E`, `y(E)=m`,
+satisfying
+
+    a(S) <= r_y(S):=H(|S|)+H(y(S))+H(|S|-y(S))               (BG6)
+
+for every `S`.  Integral `y` are exactly Hall colorings, while the all-half vector is feasible by
+parent majorization.  The set `Y(a)` is convex because each constraint is a superlevel set of a
+concave function of `y(S)`.  For fixed `y`, `r_y` is submodular.  Hence active sets uncross: if
+`X,Z` are tight, modularity of `a` and submodularity of `r_y` force `X union Z` and
+`X intersection Z` to be tight as well.  The counterexamples (BG3)--(BG5) show that this
+uncrossing cannot force an integral `y` for real `a`.
+
+This does not immediately make `Y(a)` an integral generalized polymatroid.  For canonical `G_3`,
+the least allowed integral color count is one on rows `{8,7}`, zero on a unit row, and zero on
+`{8,7,1}`; the lower-bound function is therefore not supermodular.  The only surviving version is
+integer-aware: prove that `Y(a)` contains a zero--one point when the parent `a` itself is integral
+for the primitive Pascal profile.  This is the exact-support Row-Coloring Lemma, not a continuous
+shortcut to it.  Definitions, the all-level counterexample proof, the short `K=2` theorem, exact
+commands and all grid counts are in the
+[exact-support real-cover record](../../evidence/singleton_exact_support_real_cover_2026-08-30.md).
 
 At `K=3` this is the only noncanonical source orbit.  It lies above
 `(8,6,5,4,1^4)` and reaches 1,059,979 allocation orbits, including all 320 missed by the canonical

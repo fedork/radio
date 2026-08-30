@@ -369,10 +369,13 @@ the assertion that this labelled, vertex-spanning set has no missing lattice poi
 the theorem proves that its normalized colored graph is connected.  The generic counterexample
 `h=(6,1)`, `a=(12,3,3,3)` shows why these two facts cannot fill a hole.
 
-Bidirectionality therefore supersedes phase enumeration as a necessary proof mechanism.  A clean
-sufficient next target is to show that `F_K` is M-convex, or that the union of its real fixed-color
-base polytopes is convex.  Either would imply lattice saturation because the convex hull is already
-the whole `G_K` permutahedron.  Neither statement is currently proved.
+Bidirectionality therefore supersedes phase enumeration as a necessary proof mechanism.  The
+surviving clean target is to show that the primitive integer set `F_K` is M-convex.  The initially
+proposed real fixed-color cover is now refuted, first in padded form at `K=2` and then at exact
+support at every `K>=3`; see the
+[real-cover counterexample record](singleton_exact_support_real_cover_2026-08-30.md).  Thus
+M-convexity is an integer-lattice assertion here, not a consequence of convexity of the real
+union.
 
 ## Consequence for a proof strategy
 

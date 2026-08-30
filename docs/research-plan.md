@@ -411,15 +411,25 @@ a colored permutation of `G_K`, and base exchange connects every existing colori
 the normalized Hall-coloring graph is universally connected after edges are made undirected.
 Separately, the labelled union over colorings contains every vertex and its convex hull is already
 the complete `G_K` permutahedron.  The exact gap is to prove **no lattice holes**.  Prefer the
-global target that this labelled union is M-convex, or that the union of the corresponding real
-base polytopes is convex; either immediately gives Row-Coloring.  Connectivity plus convex-hull
-coverage is insufficient, as the generic `h=(6,1)` hole shows.  For the stronger allocation
-route, show directly that every first parent with empty `R(x)` has an incoming literal link from a
-reachable predecessor.  Do not return to a
+global integer target that this labelled union is M-convex.  Do **not** replace it by convexity of
+the real fixed-color union: that strengthening fails for primitive Pascal profiles.  The padded
+`K=2` point `(4,3,2/3,2/3,2/3)` is outside every fixed-color base, and even exact support fails at
+`K=3` for `(8,7,4,(8/5)^5)`.  Flattening the final `m+1` rows gives such a hole at every `K>=3`,
+and its forced defect exceeds one from `K=5`, so a universal real subunit-excess theorem is false
+too.  The primitive integer lattice, not only Pascal ratios, must therefore enter any successful
+saturation or augmentation proof.  Exploit the proved Integral Final-Band Extension Lemma as the
+model: on the tight `m-1` face, any legal head-band allocation leaves a side with enough slots for
+all non-unit tail rows, and same-color transfers finish the coloring.  The open step on that face
+is the head band, not the tail; globally it is to construct analogous finite receiver blocks
+through all Pascal bands.  Connectivity plus convex-hull coverage is insufficient, as the generic
+`h=(6,1)` hole shows.  For the stronger
+allocation route, show directly that every first parent with empty `R(x)` has an incoming literal
+link from a reachable predecessor.  Do not return to a
 selected transfer tree: already at area two a cut born relative to the `G_4` edge is inherited
 along another predecessor, and the `K=5` cover-only miss shows that even the graded cover graph
 loses useful links.  See the
-[solution-fiber DAG record](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
+[solution-fiber DAG record](../evidence/singleton_solution_fiber_dag_2026-08-30.md) and the
+[real-cover counterexamples](../evidence/singleton_exact_support_real_cover_2026-08-30.md).
 
 For an equivalent rather than stronger route, retain the **Balanced Pascal Realization Lemma** in the
 [theorem note](theorems/singleton-majorization.md#an-equivalent-balanced-column-realization).
