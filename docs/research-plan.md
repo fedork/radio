@@ -214,6 +214,14 @@ is:
    complete `K=4` converse prove every `G_5`-majorized singleton state recursively solvable.  See
    the [prefix-cylinder record](../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).
 
+   The reusable analytic content is now separated as the
+   [Exact Prefix-Cylinder Extension Lemma](theorems/singleton-majorization.md#exact-prefix-cylinder-extension-lemma).
+   For one fixed prefix coloring and tail word, its support-function inequalities are necessary
+   and sufficient to cover every dominated completion, and the support values obey the exact
+   finite recurrence used by the census.  The Three-Bound Prefix Corollary is a closed-form but
+   weaker sufficient test.  This does not characterize the union over different colorings;
+   eliminating that existential choice remains item 5.
+
    Thus `K=6` is the proved first failure level, and distance 14 is minimum for exact-support
    recursive unsolvability as well as no-first-cut failure.  Now minimize the **non-unit core**
    beyond the fixed face under support and a clearly specified dominance/normalization order, and
@@ -224,7 +232,10 @@ is:
 5. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color
-   Hall base sets contains the requested integer point.
+   Hall base sets contains the requested integer point.  The exact prefix-cylinder lemma solves
+   the universal-completion problem **inside one chosen coloring scheme**; the remaining step is
+   a compact law for choosing among schemes, plausibly by eliminating them into a laminar Hall
+   dual rather than another scalar statistic.
 
 Separately, replace each nonembedded majorized witness leaf by an individual exact/canonical
 strategy rather than a blanket lemma.  See the

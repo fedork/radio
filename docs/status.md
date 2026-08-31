@@ -120,9 +120,14 @@ checks the remaining 149,913,293 and finds no hole.  The 14-way ranked run recon
 and completes in 74m49s at 1.31 GB peak RSS; see the
 [prefix-cylinder record](../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).  At `K=6`, the
 remaining questions are uniqueness within the distance-14 shell and smaller non-unit cores under
-other orders.  The structural target is now a compact laminar/Hall-dual law explaining why the
-majorization outer bound is exact through `K=5` and first acquires a thin balanced-band hole at
-`K=6`.  The ordered programme is recorded under P6 in [research-plan.md](research-plan.md).
+other orders.  The computation's analytic core is now the
+[Exact Prefix-Cylinder Extension Lemma](theorems/singleton-majorization.md#exact-prefix-cylinder-extension-lemma):
+for a fixed prefix coloring and tail word, exact suffix support functions characterize uniform
+coverage of the entire completion cylinder, with a closed-form Three-Bound Prefix Corollary.  The
+remaining structural target is a compact laminar/Hall-dual law that eliminates the choice among
+colorings and explains why the majorization outer bound is exact through `K=5` but first acquires a
+thin balanced-band hole at `K=6`.  The ordered programme is recorded under P6 in
+[research-plan.md](research-plan.md).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -186,7 +191,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
-| **H4** | Structural theory | The Singleton Majorization Converse is exhaustively true through `K=5` and false for every `K>=6`; hence `K=6` is the proved first failure level.  Prefix cylinders plus exact Hall fallback close all 1,431,800,647,444 exact-support `K=5` parents.  The original `K=6` counterexample is the unique first-cut hole on its fixed rank-15/32 face, and exhaustive search makes distance 14 globally minimal for exact-support recursive unsolvability.  Next classify the distance-14 holes/non-unit cores and seek the laminar Hall-dual law behind the phase change.  The excess-`q` Pareto-assembly avenue remains parked. |
+| **H4** | Structural theory | The Singleton Majorization Converse is exhaustively true through `K=5` and false for every `K>=6`; hence `K=6` is the proved first failure level.  Prefix cylinders plus exact Hall fallback close all 1,431,800,647,444 exact-support `K=5` parents, and the Exact Prefix-Cylinder Extension Lemma now isolates their reusable sufficient criterion.  The original `K=6` counterexample is the unique first-cut hole on its fixed rank-15/32 face, and exhaustive search makes distance 14 globally minimal for exact-support recursive unsolvability.  Next classify the distance-14 holes/non-unit cores and seek the laminar Hall-dual law eliminating the coloring choice.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established
 
@@ -213,7 +218,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 - **Singleton necessity, a negative converse theorem, and two further theorems** — Singleton
   Majorization Necessity, Unit-Group Elimination and Subgraph Monotonicity are proved.  The
   full-mass exact-support `K=6` state in the opening section refutes the converse.  Row-Coloring is
-  nevertheless exhaustively true through `K=5`, making `K=6` the proved first failure level.  The signed Hall rank,
+  nevertheless exhaustively true through `K=5`, making `K=6` the proved first failure level.  The
+  Exact Prefix-Cylinder Extension Lemma is a sharp uniform-completion criterion for a fixed
+  coloring scheme, with an explicit weaker corollary.  The signed Hall rank,
   convex-hull identity, switch connectivity and tight-skeleton factorization remain useful exact
   formulations of the hole, not missing steps toward a universal proof.  Subgraph Monotonicity is elementary
   but was load-bearing and unwritten: it is

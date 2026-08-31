@@ -12299,6 +12299,32 @@ operational docs now mark both mixed snapshots unsafe for current work, retire t
 instructions, and preserve the old load/restore numbers only as historical performance data.
 The final table, witness and documentation checks, plus `git diff --check`, all passed.
 
+## 2026-08-31 -- exact sufficient lemma behind the prefix-cylinder proof
+
+Promoted the `K=5` prefix optimization from an implementation description to an analytic result.
+Fix a colored parent prefix and a rank-coloring word for the unknown suffix.  For each Fixed-Color
+Hall pair `(p,q)`, maximize the selected suffix demand over the complete finite set of positive,
+sorted, majorized suffix completions.  The resulting support-function inequalities are necessary
+and sufficient for that **one uniform coloring scheme** to satisfy Hall on every completion in the
+cylinder.  This is the Exact Prefix-Cylinder Extension Lemma.  Its proof is immediate but useful:
+the largest `p` and `q` colored rows split into fixed-prefix contributions plus the first requested
+tail rows, after which taking the maximum commutes with the finite family of Hall tests.
+
+The suffix support functions obey the exact recurrence already used by the census: choose the next
+positive value subject to sortedness, residual mass and the next parent-prefix cap, charge it when
+its tail color is still requested, and recurse.  Induction on the remaining positions proves the
+recurrence exact.  A closed Three-Bound Prefix Corollary upper-bounds any selection of `j` suffix
+rows by the minimum of the parent-prefix allowance, the remaining-mass/positivity allowance and
+`j` times the next-row maximum.  This corollary is short enough for hand use but forgets tail-color
+positions; the sharp recurrence was computationally decisive at `K=5`.
+
+The scope matters.  The lemma exactly solves uniform completion for a **fixed** coloring scheme;
+it does not eliminate the existential union over different schemes.  The latter remains the real
+necessary-and-sufficient problem and is the natural place for a laminar Hall-dual theorem.  The
+publication inventory now leads its singleton theory claim with the complete level boundary:
+majorization is sufficient exactly through `K=5` and fails for every `K>=6`; the exact extension
+lemma is listed separately as the reusable sufficient mechanism.
+
 ## 2026-08-31 -- complete `K=5` converse by exact prefix cylinders
 
 The proposed early-prefix exclusion works, and it settles the level.  A generated prefix of a

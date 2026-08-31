@@ -1,4 +1,4 @@
-# Singleton majorization: necessity and counterexamples at every `K>=6`
+# Singleton majorization: exact through `K=5`, false for every `K>=6`
 
 ## Status (resolved negatively 2026-08-30)
 
@@ -359,6 +359,114 @@ no row subset exceeds its neighborhood capacity.  Among subsets with `p,q` rows,
 is `A_p+B_q`, giving (C).  Reading the assigned columns in each child gives a `0`-`1` matrix whose
 row sums are that child's sequence and whose column sums are bounded by `h'`; the usual same Hall
 criterion is exactly weak majorization by `h`.  The support restrictions make the split legal. ∎
+
+## Exact Prefix-Cylinder Extension Lemma
+
+The Fixed-Color Hall Lemma also gives a useful exact **positive** certificate.  It is the analytic
+content of the prefix-cylinder computation that closes `K=5`.
+
+Let `g=(g_1,...,g_N)` be a parent majorization bound, with prefix function `P`.  Fix a
+nonincreasing parent prefix
+
+    x=(x_1,...,x_t),                 S=sum_i x_i,
+
+and integers `z=N-t`, `R` and `M`, where `R` is the remaining mass and `M<=x_t` bounds the next
+row (with the evident omission when `t=0`).
+Let `C(x;R,M)` be the set of all positive nonincreasing suffixes
+
+    b=(b_1,...,b_z),   M>=b_1>=...>=b_z>=1,
+
+such that `sum b_i=R` and
+
+    S + sum_{i=1..j} b_i <= P(t+j)       for 1<=j<=z.                 (PC1)
+
+Assume this set is nonempty.  Color the rows of `x` by `A/B`, and fix a word
+`sigma in {A,B}^z` which colors the suffix by rank.  Write `u,v` for the numbers of fixed-prefix
+rows colored `A,B`, write `u_sigma,v_sigma` for the two letter counts in `sigma`, and let
+`alpha_p,beta_q` be the sums of the largest `min(p,u)` and `min(q,v)` fixed rows of the indicated
+color.  Here "valid" means `0<=p<=u+u_sigma` and `0<=q<=v+v_sigma`.  For valid `p,q`, put
+
+    r=(p-u)_+,   s=(q-v)_+.
+
+For `b in C(x;R,M)`, let `T_sigma(r,s;b)` be the sum of the first `r` suffix rows marked `A` and
+the first `s` suffix rows marked `B`, and define the exact support value
+
+    U_sigma(r,s) = max_{b in C(x;R,M)} T_sigma(r,s;b).                (PC2)
+
+> **Exact Prefix-Cylinder Extension Lemma.** Every completion `(x,b)`, with
+> `b in C(x;R,M)`, satisfies the Fixed-Color Hall inequalities under this one fixed prefix
+> coloring and suffix word if and only if, for every valid `p,q`,
+>
+> `alpha_p + beta_q + U_sigma((p-u)_+,(q-v)_+)`
+>
+> `<= H(p+q)+H(p)+H(q).`                                             (PC3)
+>
+> Consequently (PC3) is sufficient for every completion in the cylinder to have a legal first
+> split into three children weakly majorized by `h`.  If every `h`-majorized singleton state is
+> solvable in the remaining tests, then every completion in the cylinder is recursively solvable.
+
+*Proof.* Since every fixed-prefix row is at least every suffix row, the `p` largest `A` rows of a
+completion consist, up to immaterial ties, of the largest `min(p,u)` fixed `A` rows followed by the
+first `(p-u)_+` suffix rows marked `A`; similarly on side `B`.  Thus the left side of the
+Fixed-Color Hall inequality is exactly
+
+    alpha_p + beta_q + T_sigma((p-u)_+,(q-v)_+;b).
+
+Taking its maximum over all suffixes in the cylinder gives (PC3).  Hence (PC3) is equivalent to
+the same fixed coloring satisfying every Hall inequality for every completion.  The final claim is
+the Fixed-Color Hall Lemma. ∎
+
+The word "exact" here has a precise scope: (PC3) is necessary and sufficient for this **one
+uniform coloring scheme** to cover the whole cylinder.  It is not necessary for a cylinder whose
+different completions are allowed unrelated colorings.
+
+### Exact finite recurrence
+
+The support values in (PC2) require no relaxation or enumeration of complete parents.  Let
+`F_j(R',M',r,s)` denote the maximum selected mass after the first `j` suffix positions have been
+fixed, with remaining mass `R'`, next-row bound `M'`, and `r,s` requested rows still to select.
+At position `j`, range over the integers `w` satisfying
+
+    1 <= w <= M',
+    z-j-1 <= R'-w <= (z-j-1)w,
+    S+(R-R')+w <= P(t+j+1).                                         (PC4)
+
+If `sigma_(j+1)=A` and `r>0`, add `w` and replace `r` by `r-1`; do the analogous operation for
+`B,s`.  Then
+
+    F_j(R',M',r,s)
+      = max_w { selected(w) + F_(j+1)(R'-w,w,r',s') },               (PC5)
+
+with terminal value zero exactly when `j=z`, `R'=0` and `r=s=0`, and minus infinity otherwise.
+Induction on the remaining positions proves
+
+    U_sigma(r,s)=F_0(R,M,r,s).                                      (PC6)
+
+Future prefix constraints are enforced by the later instances of (PC4).  Thus (PC5) is an exact
+finite integer recurrence for the lemma's coefficients.  The `K=5` census specializes `sigma` to
+the two alternating words and evaluates (PC5) by memoization.
+
+### A closed-form sufficient corollary
+
+For `0<=j<=z`, put
+
+    Q(j)=min(P(t+j)-S, R-(z-j), jM).                                 (PC7)
+
+Any `j` suffix rows have sum at most the sum of the largest `j`; the three terms in (PC7) bound
+that prefix respectively by parent majorization, positivity of the remaining `z-j` rows, and the
+row maximum.  Therefore
+
+    U_sigma(r,s) <= Q(r+s).                                         (PC8)
+
+It follows that the entirely explicit inequalities
+
+    alpha_p + beta_q + Q((p-u)_+ +(q-v)_+)
+      <= H(p+q)+H(p)+H(q)                                           (PC9)
+
+are sufficient to cover the cylinder.  This **Three-Bound Prefix Corollary** is weaker than the
+sharp lemma because it forgets the positions and colors of the selected tail rows.  It is often a
+quick human certificate; the exact support values (PC2)--(PC6) were needed for the efficient
+complete `K=5` proof.
 
 The full converse was therefore equivalent to the following purely two-color statement.
 

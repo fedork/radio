@@ -16,6 +16,12 @@ unit padding then extend the exact-support result to every `G_5`-majorized singl
 
 ## Prefix-cylinder certificate
 
+The general statement and proof are now recorded as the
+[Exact Prefix-Cylinder Extension Lemma](../docs/theorems/singleton-majorization.md#exact-prefix-cylinder-extension-lemma).
+In particular, the test below is necessary and sufficient for the one fixed prefix coloring and
+alternating tail word to work uniformly over the entire cylinder; it is not merely a sampled or
+one-sided estimate.  The lemma also gives a weaker closed-form Three-Bound Prefix Corollary.
+
 Fix a generated parent prefix `x=(a_1,...,a_t)` of mass `S`.  Its completions have `z=32-t`
 positive rows, remaining mass `R`, maximum next value `M`, and every completed prefix is bounded by
 the corresponding prefix of `G_5`.  Color the fixed rows `A/B`; color the unknown suffix by a fixed

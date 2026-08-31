@@ -54,27 +54,53 @@ Before submission: package the `m=6` rejection logs and the canonical 473 witnes
 
 ## Theory suitable for a theorem section or a companion paper
 
-### T1 — Singleton Majorization Necessity and a `K=6` counterexample to sufficiency
+### T1 — exact level boundary for the Singleton Majorization Converse
 
 Every singleton state solvable in `K` tests is weakly majorized by the explicit base sequence
-`G_K`.  The converse is false: the full-mass exact-support state
-`(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` but has no legal first split and is
-unsolvable in six tests.  The transcript-conflict graph and Fixed-Color Hall criterion give the
-short tight-rank proof.  A complete 5,189,450,419-parent Hall census additionally proves that its
-transfer distance 14 is globally minimal among full-mass exact-support parents with no majorized
-first cut; this is not recursive-unsolvability minimality.  See
+`G_K`.  Conversely, every `G_K`-majorized singleton state is solvable for `K<=5`.  For every
+`K>=6` the converse is false: an explicit infinite family gives a full-mass exact-support parent
+with no legal first cut.  Its first member,
+`(64,63,57^2,42^4,22^7,8^15,7^2,1^32)`, is majorized by `G_6` but has no legal first split and is
+unsolvable in six tests.  Thus `K=6` is the exact first failure level.  The transcript-conflict
+graph and Fixed-Color Hall criterion give the short tight-rank proof.  The `K=5` direction is a
+computer-assisted theorem: exact prefix cylinders cover 1,431,650,734,151 of the
+1,431,800,647,444 normalized parents, and uncapped Hall search closes the rest.  A separate complete
+5,189,450,419-parent Hall census proves that transfer distance 14 is globally minimal among
+full-mass exact-support recursively unsolvable `K=6` parents.  See
 [singleton-majorization.md](theorems/singleton-majorization.md) and the
-[transfer-shell record](../evidence/singleton_transfer_shell_census_2026-08-31.md).  Canonical and
-distinct-slot witness leaves remain independently checkable from the explicit strategy for `G_K`.
+[complete `K=5` record](../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).  Canonical and
+distinct-slot witness leaves remain independently checkable from the explicit strategy for `G_K`;
+the first-failure and distance claims also have independent records linked from the theorem note.
 
-Publication value: the necessity theorem gives a reusable obstruction, while the counterexample
-resolves Aigner's stated converse question negatively and gives an explicit non-nice transcript
-graph/chain-partition type.  The exact distance census supplies a sharp finite minimality statement.
+Publication value: this completely classifies the levels at which Aigner's majorization condition
+is sufficient, resolves his stated converse question negatively, and gives both a short first
+counterexample and an infinite family.  The exact distance census supplies a sharp finite
+minimality statement.
 
-Before submission: independently audit the short proof and perform a focused literature/novelty
-search before claiming priority.  Cite Aigner for the historical necessity result and question.
+Before submission: independently audit the short and infinite-family proofs, package the `K=5`
+reproduction and perform a focused literature/novelty search before claiming priority.  Cite
+Aigner for the historical necessity result and question.
 
-### T2 — Unit-Group Elimination Theorem
+### T2 — Exact Prefix-Cylinder Extension Lemma
+
+For a fixed coloring of an exposed parent prefix and a fixed rank-coloring word on its unknown
+suffix, the maximum left side of every Fixed-Color Hall inequality over **all** dominated suffix
+completions is an integer support function.  Bounding these exact support values by the Hall
+capacities is necessary and sufficient for that one uniform scheme to give every completion a
+majorized first cut.  The support values obey a short exact finite recurrence.  A closed-form
+three-bound corollary replaces each value by the minimum of the available parent-prefix mass,
+remaining-mass and row-maximum bounds.  See
+[singleton-majorization.md](theorems/singleton-majorization.md#exact-prefix-cylinder-extension-lemma).
+
+Publication value: this is the reusable sufficient lemma behind the `K=5` computation.  It cleanly
+separates an analytic universal certificate from finite search, and compresses enormous families
+of parent partitions without assuming the false global converse.
+
+Before submission: give pseudocode for the recurrence and a small independently checkable
+certificate transcript; be explicit that exactness is relative to a fixed uniform coloring scheme,
+not a closed-form characterization of the union over all colorings.
+
+### T3 — Unit-Group Elimination Theorem
 
 Appending `u` resolved `1:1` components affects solvability only through the total leaf capacity:
 the non-unit core must be solvable and the total mass must not exceed `3^K`; see
@@ -83,7 +109,7 @@ the non-unit core must be solvable and the total mass must not exceed `3^K`; see
 Publication value: short but useful normalization theorem. It belongs naturally as a corollary
 or implementation consequence of T1, rather than as a standalone headline.
 
-### T3 — Vertex-splitting pullback and full-star majorization
+### T4 — Vertex-splitting pullback and full-star majorization
 
 Every general bipartite part can be split into singleton stars, yielding a sound necessary
 majorization condition for arbitrary multipart states; see
@@ -95,7 +121,7 @@ format and a major solver reduction. It is a strong theory/algorithm bridge.
 Before submission: distinguish clearly between this necessary condition and exact solvability;
 the width-two counterexample in the same note shows why no naive one-sequence extension is exact.
 
-### T4 — synchronized-majorization predicates
+### T5 — synchronized-majorization predicates
 
 Every predicate `R_d` is necessary for solvability, and `R_K` is exact.  The previously claimed
 nesting `R_(d+1)=>R_d` is unproved because its base step used the false singleton converse.  The
