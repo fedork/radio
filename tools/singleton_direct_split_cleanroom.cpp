@@ -602,6 +602,118 @@ Partition transfer_state(int step, bool padded) {
     return state;
 }
 
+void enumerate_dominated_exact_length(
+    const Partition &capacity,
+    const std::function<void(const Partition &)> &accept) {
+    const std::vector<int> capacity_prefix = prefix_sums(capacity);
+    const int total_mass = capacity_prefix.back();
+    Partition current;
+    std::function<void(int, int)> visit = [&](int remaining, int maximum) {
+        const std::size_t position = current.size();
+        if (position == capacity.size()) {
+            if (remaining == 0) {
+                accept(current);
+            }
+            return;
+        }
+        const int remaining_slots =
+            static_cast<int>(capacity.size() - position - 1);
+        const int used_mass = total_mass - remaining;
+        for (int value = std::min(maximum, remaining); value >= 1; --value) {
+            if (used_mass + value > capacity_prefix[position + 1]) {
+                continue;
+            }
+            const int mass_after = remaining - value;
+            if (mass_after < remaining_slots
+                || mass_after > remaining_slots * value) {
+                continue;
+            }
+            current.push_back(value);
+            visit(mass_after, value);
+            current.pop_back();
+        }
+    };
+    visit(total_mass, capacity.front());
+}
+
+int transfer_distance(const Partition &from, const Partition &to) {
+    if (from.size() != to.size()) {
+        throw std::invalid_argument("transfer distance requires equal support");
+    }
+    int l1_distance = 0;
+    for (std::size_t i = 0; i < from.size(); ++i) {
+        l1_distance += std::abs(from[i] - to[i]);
+    }
+    if (l1_distance % 2 != 0) {
+        throw std::logic_error("equal-mass transfer distance is not integral");
+    }
+    return l1_distance / 2;
+}
+
+bool k6_tight_band_face_survey() {
+    const Partition head = repeated(
+        {{64, 1}, {63, 1}, {57, 2}, {42, 4}, {22, 7}});
+    const Partition canonical_band = repeated({{22, 1}, {7, 16}});
+    const Partition expected_hole = repeated({{8, 15}, {7, 2}});
+    const Partition tail(32, 1);
+
+    std::uint64_t states = 0;
+    std::uint64_t feasible = 0;
+    std::uint64_t holes = 0;
+    std::uint64_t total_nodes = 0;
+    std::uint64_t maximum_nodes = 0;
+    Partition worst_band;
+    Partition unique_hole;
+    int minimum_hole_distance = std::numeric_limits<int>::max();
+    bool replay_ok = true;
+
+    enumerate_dominated_exact_length(canonical_band, [&](const Partition &band) {
+        Partition parent = head;
+        parent.insert(parent.end(), band.begin(), band.end());
+        parent.insert(parent.end(), tail.begin(), tail.end());
+        DirectSplitSolver solver(6, parent);
+        const SearchResult result = solver.solve();
+        ++states;
+        total_nodes += result.stats.nodes;
+        if (result.stats.nodes > maximum_nodes) {
+            maximum_nodes = result.stats.nodes;
+            worst_band = band;
+        }
+        if (result.feasible) {
+            ++feasible;
+            std::string error;
+            if (!verify_solution(solver.rows(), solver.child_profile(), result, error)) {
+                std::cerr << "FAIL K6 tight-band face replay band="
+                          << compact_partition(band) << ": " << error << '\n';
+                replay_ok = false;
+            }
+        } else {
+            ++holes;
+            unique_hole = band;
+            minimum_hole_distance = std::min(
+                minimum_hole_distance, transfer_distance(canonical_band, band));
+        }
+    });
+
+    const bool ok = replay_ok && states == 176 && feasible == 175 && holes == 1
+        && unique_hole == expected_hole && minimum_hole_distance == 14
+        && total_nodes == 141216 && maximum_nodes == 9345
+        && worst_band == expected_hole;
+    std::cout << "K6_TIGHT_BAND_FACE_SURVEY"
+              << " complete=" << (ok ? "YES" : "NO")
+              << " band=(15,32)"
+              << " states=" << states
+              << " feasible=" << feasible
+              << " holes=" << holes
+              << " unique_hole=" << compact_partition(unique_hole)
+              << " minimum_transfer_distance="
+              << (holes == 0 ? -1 : minimum_hole_distance)
+              << " total_nodes=" << total_nodes
+              << " max_nodes=" << maximum_nodes
+              << " worst_band=" << compact_partition(worst_band) << '\n';
+    return ok;
+}
+
 void print_stats(const SearchStats &stats) {
     std::cout << " nodes=" << stats.nodes
               << " options=" << stats.options
@@ -787,6 +899,7 @@ int regression() {
                          std::array<Partition, 3>{g5, j13_mixed, j13_right});
     ok &= run_named_case("transfer-j14-padded", 6, transfer_state(14, true), false);
     ok &= run_named_case("transfer-j14-core", 6, transfer_state(14, false), false);
+    ok &= k6_tight_band_face_survey();
     ok &= tiny_comparisons();
 
     std::cout << "CLEANROOM_SINGLETON_DIRECT_SPLIT verified=" << (ok ? "YES" : "NO")
@@ -833,7 +946,11 @@ int main(int argc, char **argv) {
         if (std::string(argv[1]) == "solve") {
             return solve_cli(argc, argv);
         }
-        std::cerr << "usage: " << argv[0] << " regression | solve K ROW [ROW ...]\n";
+        if (std::string(argv[1]) == "survey-k6-band15-32") {
+            return k6_tight_band_face_survey() ? 0 : 1;
+        }
+        std::cerr << "usage: " << argv[0]
+                  << " regression | survey-k6-band15-32 | solve K ROW [ROW ...]\n";
         return 64;
     } catch (const std::exception &error) {
         std::cerr << "error: " << error.what() << '\n';
