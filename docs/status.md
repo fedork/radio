@@ -12,6 +12,11 @@ has no legal first split into three `G_5`-majorized children and is therefore un
 tests.  The short proof and independent direct-split/Hall regressions are in the
 [`K=6` counterexample record](../evidence/singleton_k6_counterexample_2026-08-30.md).
 
+The proof uses only its first 32 rows.  Hence the unit-free mass-697 core
+`(64,63,57^2,42^4,22^7,8^15,7^2)` is already an unsolvable majorized state; the trailing `1^32`
+is canonical full-mass padding.  Any minimality search must specify a nontrivial order after this
+unit deletion.
+
 The obstruction is exactly Pascal-shaped.  The parent is tight at ranks 15 and 32, forcing the two
 color-count transitions `7/8 -> 16`.  The 17 intervening rows `(8^15,7^2)` must send 22 coins
 to the mixed child.  Mixed-child saturation at ranks 15 and 32, together with

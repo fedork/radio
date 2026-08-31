@@ -29,6 +29,16 @@ statements:
 The necessity direction remains true: every singleton state solvable in `K`
 tests is weakly majorized by `G_K`.
 
+The proof uses only the first 32 rows.  Consequently the smaller unit-free core
+
+    a_core=(64,63,57^2,42^4,22^7,8^15,7^2)                    (K6-1c)
+
+of mass 697 is already majorized by `G_6` and unsolvable in six tests.  The
+displayed full-mass state (K6-1) is its canonical padding by 32 unit rows; it is
+retained because it answers the stronger full-mass exact-support question with
+all unit rows left in place.  Searches for a “smaller” obstruction should
+therefore minimize the non-unit core, not merely delete this harmless padding.
+
 ## Majorization
 
 The first 15 entries of (K6-1) agree with `G_6`.  Between ranks 16 and 31 it

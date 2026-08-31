@@ -22,6 +22,15 @@ counterexample answers that question negatively for the present formulation.  Pu
 priority beyond the sources surveyed here has not yet been audited.  See also
 [the scan note](../aigner-1988-scan.md).
 
+The same proof involves only the first 32 rows, so the unit-free core
+
+    (64,63,57^2,42^4,22^7,8^15,7^2)
+
+of mass 697 is already a counterexample.  The 32 trailing units in the displayed full-mass form
+are harmless padding under Unit-Group Elimination.  Thus “smaller counterexample” should mean a
+smaller non-unit core, a lower level, or a smaller transfer/dominance measure—not merely deleting
+those units.
+
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the
 legal row condition that a singleton row cannot feed both pure children.  The exact Row-Coloring

@@ -12098,3 +12098,17 @@ The requested next programme is now in P6: a clean-room direct-row-split solver 
 Hall implementation; a general Tight-Band Capacity Obstruction and a census of which holes it
 explains; a `K=5`/minimal-counterexample search; and a useful necessary-and-sufficient recursive
 support criterion beyond the tautological transcript-poset chain-partition characterization.
+
+The proof in fact uses only the first 32 rows.  Deleting the trailing `1^32` gives the direct
+unit-free counterexample
+
+    (64,63,57^2,42^4,22^7,8^15,7^2),
+
+of mass 697 and support 32: it is still majorized by `G_6`, is tight at rank 32, and the identical
+two-case argument rules out a first cut.  The full-mass state remains useful because it refutes the
+stronger exact-support formulation with every unit row retained.  Future minimality claims must
+therefore specify level, non-unit support, mass, transfer distance, or a dominance order; merely
+deleting unit padding is not a substantive smaller obstruction.  The current direct `SplitSearch`
+regression was designed for full-mass exact-capacity inputs and must not be cited as an independent
+check of this underfull core without first implementing child slack correctly.  The analytic
+tight-prefix proof needs no such extension.

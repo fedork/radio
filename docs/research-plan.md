@@ -174,8 +174,9 @@ retained as historical structure and finite lower-level theorems.  The next sing
    exhaustive small-`K` controls;
 2. formulate the rank-15/32 argument as a general **Tight-Band Capacity Obstruction**, then survey
    whether it explains every low-level hole or only this one;
-3. settle `K=5`, and minimize the counterexample under level, support, transfer distance and a
-   clearly specified dominance/normalization order;
+3. settle `K=5`, and minimize the **non-unit core** under level, support, transfer distance and a
+   clearly specified dominance/normalization order.  Deleting the harmless `1^32` padding already
+   gives the 32-row mass-697 core, so that does not count as a new smaller obstruction;
 4. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color
