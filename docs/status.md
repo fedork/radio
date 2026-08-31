@@ -133,6 +133,20 @@ colorings and explains why the majorization outer bound is exact through `K=5` b
 thin balanced-band hole at `K=6`.  The ordered programme is recorded under P6 in
 [research-plan.md](research-plan.md).
 
+The ordinary recursive solver is now usable for targeted `K=6` shell windows without adopting the
+research Hall algorithm. Survey builds disable cache lookup/retention at level 6—distinct
+full-mass, exact-support parents cannot dominate one another—but retain the valuable `K<=5` child
+cache. A clean deterministic distance-14 window of 10,000 parents returned 10,000 exact positives,
+zero negatives and zero `MAYBE` in 1.709 solver CPU seconds; canonical, `j=13`, and the known `j=14`
+hole reproduce independently. This is a candidate validator and targeted sampler, not a substitute
+for the much faster exhaustive Hall census. See the
+[production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
+
+The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
+binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the
+193 search. The on-demand `r7iz.xlarge` instance is `i-0318c3349a0df835b`; use
+`tools/sa193_status.sh` (now defaulting to `run10`) rather than the terminated historical instance.
+
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
 

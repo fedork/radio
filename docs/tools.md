@@ -582,6 +582,15 @@ equal source parts have one canonical choice. A nonzero `RADIO_CACHE_INSERT_NODE
 only as a diagnostic override; if used, `cache=partial:N/N` means a final verdict with a sound
 partial closure, not `MAYBE`.
 
+For a broad survey whose distinct parents all lie on one equal-mass/equal-support level, compile
+with `-DRADIO_CACHE_DISABLED_LEVEL=k`. It disables both cache lookup and retention only at that
+level while preserving the useful lower-level child cache; the provenance banner records the
+choice. The `K=6` shell wrapper is
+`tools/singleton_k6_main_solver_survey.sh DISTANCE SKIP LIMIT [BUDGET]`. Its ranker emits an exact
+deterministic transfer-shell window, and its oracle runs with level 6 disabled under a one-hour,
+8-GiB cap (override with `RADIO_SURVEY_SECONDS` / `RADIO_SURVEY_RSS_GB`). See the
+[benchmark and scope record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
+
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
 reloads it linearly instead of re-deriving every dominance closure. Snapshot v4 begins the
 necessity-only singleton-majorization epoch; v1--v3 snapshots are rejected even by `restore-any`.

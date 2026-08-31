@@ -12631,3 +12631,54 @@ The first harness draft incorrectly included `(1:1)`, which Unit Group Trivialit
 cache insertion; sanitizer then caught its collision with branch metadata slot 1. Restricting the
 census to the normalized cache domain removed the invalid input, and ASan+UBSan passed both this
 regression and the full K=6 production regression.
+
+## 2026-08-31 -- post-refutation cold Sa(193) rerun launched
+
+The AWS account inventory contained no live or stopped `Project=radio-sa193` compute before launch.
+The right-sized launcher was committed and pushed as `9e9e25a`, then started a cold, on-demand
+`r7iz.xlarge` at 2026-08-31 23:29:01 UTC: instance `i-0318c3349a0df835b`, 32 GiB RAM, 50-GiB gp3
+root volume `vol-020083ad3e3df88c4`, 24-GiB solver RSS guard, fourteen-day stop backstop, and unique
+S3 prefix `run10`. The 2026-08-31 AWS price API gave $0.372/hour for this Oregon type, one quarter
+of the old `r7iz.4xlarge` price while preserving the same processor family. The launch remains
+On-Demand because the requested cold single-session derivation is not cheaply restartable.
+
+Remote provenance checks found the intended necessity-only cache epoch, commit
+`9e9e25ae1d5063207322071b9d4d4d626fc6e965`, `MAX_K=10`, `MAX_N=MAX_PART_N=193`, no cache-insertion
+cutoff, no warm cache, and build ID
+`54419a4988bb53065d8855cd66d09e6f133896816aecdea635692c0ef33a7492`.
+`tools/check_provenance.py` passed on the live raw output. The mandatory in-process `Sa(192)`
+control returned SOLVABLE in 389.9 CPU seconds before the `Sa(193)` search began. At the first
+post-control watchdog snapshot the solver was live at 0.49 GB RSS with no rb-tainted contraction
+suppression. `tools/sa193_status.sh` now defaults to `run10` and resolves its separate instance by
+the `RunPrefix` tag instead of reporting the terminated historical host.
+
+## 2026-08-31 -- ordinary solver becomes practical for targeted K6 shell windows
+
+A first broad-oracle benchmark exposed a cache-policy mismatch rather than a search cost. The
+ordinary current solver decided diverse distance-14 parents in milliseconds, but positive
+downward-closure insertion exhausted the 30-bit branch-handle space after six top-level positives
+and 24.6 seconds. The failed process drove local swap use to 22.6 GiB, then terminated; no solver or
+Python process was left running. Build ID was
+`aa7a9d35bc9437be76e06af6c46a58793d0f2214abba47f2910a00921e4984c9`.
+
+For full-mass exact-support shell parents, same-level dominance reuse is impossible: all states
+have the same length and total mass, so componentwise dominance between two sorted parents implies
+equality. `RADIO_CACHE_DISABLED_LEVEL=6` therefore bypasses both cache lookup and retention at the
+surveyed parent level while retaining the useful `K<=5` child cache. It is provenance-visible and
+changes cache hit rate only. A focused regression verifies that the disabled level retains no trie
+or L1 fact while an enabled child level does.
+
+The exact transfer-shell completion ranker now emits deterministic rank windows in oracle protocol,
+and `tools/singleton_k6_main_solver_survey.sh` builds the ranker plus a correctly sized ordinary
+oracle under a one-hour/8-GiB cap. The clean committed distance-14 window at offset 5,000,000,000
+classified 10,000 states as 10,000 SOLVABLE, zero UNSOLVABLE, zero MAYBE in 1.709 solver CPU
+seconds. It also reproduced canonical `G_6` as positive, `j=13` as positive in 2.9 ms, and padded
+`j=14` as negative in 5.0 ms. The production solver is therefore suitable for targeted windows and
+independent candidate validation, but not for the complete 9,960,648,265-state shell; exhaustive
+discovery should remain with the hundreds-of-times-faster specialized Hall census. Full commands,
+scope and hashes are in
+`evidence/singleton_k6_main_solver_survey_2026-08-31.md`.
+
+The same work fixed `tools/capped_run.sh` to preserve piped stdin explicitly when it backgrounds a
+monitored child; a four-byte stdin smoke test passed. The full transfer-shell regression, the new
+disabled-level cache regression, and the existing production singleton regression all passed.

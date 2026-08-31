@@ -227,6 +227,12 @@ is:
    `(64,63,57^2,42^4,22^7,8^15)` improves the non-unit obstruction to support 30 and mass 683;
    deleting one 8 makes that truncation feasible.  Now minimize beyond this state under support
    and a clearly specified dominance/normalization order, and classify other distance-14 holes.
+   The production solver can now inspect deterministic distance-shell rank windows with its
+   useless level-6 parent cache disabled while retaining all `K<=5` child facts. A 10,000-parent
+   distance-14 window took 1.709 solver CPU seconds, so use it for targeted sampling and independent
+   candidate validation; it remains far too slow to replace the specialized Hall census for all
+   9,960,648,265 parents. Reproduction is in the
+   [main-solver survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
    Feed every new hole
    through the extractor; an uncertified hole is the concrete input for the laminar/general-Hall
    programme;

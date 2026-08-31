@@ -1,11 +1,11 @@
 # The `Sa(193)` AWS runs — final solver record, verifier replays and the closed census
 
-This page is the operational record for the completed cold runs, the solver-core verifier replays
-and the k=8 census that ran on the original shared instance; the findings go to
-[journal.md](journal.md) as usual. As of 2026-08-31 all EC2 compute tagged
-`Project=radio-sa193` is wound down. The persistent `oracle-serve` instance added on 2026-08-21
-was terminated after the singleton-majorization refutation made its mixed warm cache unsafe; its
-encrypted EBS volume was deliberately retained. See
+This page is the operational record for the completed cold runs, the solver-core verifier replays,
+the k=8 census, and the current post-refutation cold rerun; the findings go to
+[journal.md](journal.md) as usual. As of 2026-08-31, `run10` is live on a separate current-main
+instance. The persistent `oracle-serve` instance added on 2026-08-21 was terminated after the
+singleton-majorization refutation made its mixed warm cache unsafe; its encrypted EBS volume was
+deliberately retained. See
 [Persistent oracle-serve instance](#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date).
 
 ## What is left
@@ -17,7 +17,7 @@ encrypted EBS volume was deliberately retained. See
 | uncolored level replay | terminated: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived |
 | colored level replay | terminated: `i-0901e2b2c266f7db2`, volume `vol-0bdc1e36eea39386c` confirmed deleted |
 | persistent oracle | **terminated** 2026-08-31 14:25:41 UTC: `i-002cabc654b2078ed`; encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and `available` |
-| active jobs | none — the post-termination AWS query returned no pending, running, stopping or stopped `Project=radio-sa193` instance |
+| active jobs | `run10` cold `Sa(193)` rerun on `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live |
 | retained oracle volumes | five unattached 50-GiB volumes, 250 GiB total: `vol-0053276ecc6d1adf4`, `vol-03a28c8c01ae591a1`, `vol-0621d09062d023bce`, `vol-0ef7c8664c6cab66e`, and the final instance's `vol-04260ae18b515e7f5`; not deleted because this request authorized instance termination, not data deletion |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` — unaffected by termination, and the only copy of the run3/run/run2/run4-7 raw logs |
@@ -106,6 +106,7 @@ fix. Run9 is the proof source.
 | `run7/` | progress-gated pass-2 `NO_DEADLINE` handoff (`e648e83`) | 2026-08-11 15:45:30 | stopped 2026-08-11 22:13:30; archived; `/root/run7/radio_sa193_v7` |
 | `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | completed; performance only; 412561.4 CPU s, 1.32 GB peak RSS |
 | `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
+| `run10/` | post-refutation current main (`9e9e25a`) | 2026-08-31 23:29:01 | **live cold diagnostic rerun** on `i-0318c3349a0df835b`; build `54419a4988bb53065d8855cd66d09e6f133896816aecdea635692c0ef33a7492`; control passed |
 
 The `pareto_k8_aws` census **finished** at 2026-08-19 22:34:43 UTC with `exit_status=0`, after
 507,838 seconds at one full core and a 9.4 GiB working set that never approached its 20 GiB guard.
