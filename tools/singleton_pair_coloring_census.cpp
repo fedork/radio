@@ -30,6 +30,10 @@
 // Equal pairs have only one normalized orientation.  Thus the search branches only where a
 // pair straddles two distinct values; for k=4 there can be at most fifteen such decisions even
 // though a full-mass partition can contain 81 rows.
+//
+// The transfer-shell modes instead keep exactly 2^k positive rows and full mass.  They stream a
+// fixed half-l1 shell around G_k, prove the shell count by memoized suffix DP, and can split its
+// deterministic DFS rank interval across independent threads through k=6.
 
 namespace {
 
@@ -3091,6 +3095,10 @@ void sample_uniform_states(int k, std::uint64_t sample_count, std::uint64_t seed
                   << " exact_B=" << show(first_reserve_solution.b) << '\n';
 }
 
+// Exact-support shell d consists of the positive, sorted, full-mass parents
+// majorized by G_k whose l1 distance from G_k is 2d.  These constants come
+// from the independent TransferShellCounter in singleton_tight_band_certificate.cpp;
+// count_completions below rederives every requested shell before searching it.
 std::uint64_t expected_transfer_shell_states(int k, int distance) {
     static const std::uint64_t k3[] = {
         1, 5, 18, 35, 42, 31, 17, 8, 3};
@@ -3207,6 +3215,8 @@ struct TransferShellCensus {
         if (remaining_difference < 0 || remaining_difference > available_l1
             || ((available_l1 - remaining_difference) & 1) != 0) return 0;
 
+        // Once the sorted prefix is fixed, these four scalars contain every
+        // constraint on the suffix: mass, order, dominance rank and l1 use.
         const std::uint64_t key =
             completion_key(position, remaining, maximum, used_l1);
         if (const auto found = completion_memo.find(key);
@@ -3376,6 +3386,9 @@ ParallelTransferShellResult run_parallel_transfer_shell(
     std::vector<std::unique_ptr<TransferShellCensus>> workers;
     std::vector<int> statuses(worker_count, 1);
     workers.reserve(worker_count);
+    // Completion counts rank the deterministic DFS without visiting skipped
+    // leaves.  Contiguous rank windows are therefore disjoint and exhaustive;
+    // summing tested states back to expected is the final shard-cover check.
     const std::uint64_t base = expected / worker_count;
     const std::uint64_t remainder = expected % worker_count;
     std::uint64_t offset = 0;
@@ -3421,7 +3434,7 @@ ParallelTransferShellResult run_parallel_transfer_shell(
         std::cout << "TRANSFER_SHELL_PARALLEL_COLORING_CENSUS K=" << k
                   << " distance=" << distance
                   << " workers=" << worker_count
-                  << " complete=YES"
+                  << " complete=" << (result.verified ? "YES" : "NO")
                   << " verified=" << (result.verified ? "YES" : "NO")
                   << " expected_states=" << expected
                   << " tested=" << result.states
@@ -3435,7 +3448,8 @@ ParallelTransferShellResult run_parallel_transfer_shell(
                   << " seconds=" << result.seconds
                   << " states_per_second="
                   << (result.seconds == 0.0
-                          ? 0.0 : result.states / result.seconds) << '\n';
+                          ? 0.0 : result.states / result.seconds)
+                  << '\n' << std::flush;
     return result;
 }
 
@@ -3680,6 +3694,45 @@ int main(int argc, char **argv) {
                   << " B=" << show(exact.solution.b) << '\n';
         return 0;
     }
+    if (argc >= 2 && std::string(argv[1]) == "--transfer-shell-counts") {
+        if (argc != 4) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-counts k maximum-distance\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int maximum_distance = std::atoi(argv[3]);
+        if (k < 2 || k > 6 || maximum_distance < 0
+            || expected_transfer_shell_states(k, maximum_distance) == 0) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-counts k maximum-distance\n";
+            return 2;
+        }
+        bool verified = true;
+        std::uint64_t states = 0;
+        std::uint64_t memo_states = 0;
+        for (int distance = 0; distance <= maximum_distance; ++distance) {
+            TransferShellCensus census(k, distance, 0, 0);
+            const std::uint64_t counted = census.count_completions(
+                0, census.mass, census.parent.front(), 0);
+            verified = verified
+                && counted == expected_transfer_shell_states(k, distance);
+            if (counted > std::numeric_limits<std::uint64_t>::max() - states) {
+                std::cerr << "TRANSFER_SHELL_COUNT_OVERFLOW K=" << k
+                          << " maximum_distance=" << maximum_distance << '\n';
+                return 2;
+            }
+            states += counted;
+            memo_states += census.completion_memo.size();
+        }
+        std::cout << "TRANSFER_SHELL_COUNT_CHECK K=" << k
+                  << " maximum_distance=" << maximum_distance
+                  << " shells=" << maximum_distance + 1
+                  << " states=" << states
+                  << " memo_states=" << memo_states
+                  << " verified=" << (verified ? "YES" : "NO") << '\n';
+        return verified ? 0 : 1;
+    }
     if (argc >= 2
         && std::string(argv[1]) == "--transfer-shell-parallel") {
         if (argc != 5) {
@@ -3753,7 +3806,8 @@ int main(int argc, char **argv) {
                   << " seconds=" << total.seconds
                   << " states_per_second="
                   << (total.seconds == 0.0
-                          ? 0.0 : total.states / total.seconds) << '\n';
+                          ? 0.0 : total.states / total.seconds)
+                  << '\n' << std::flush;
         return total.verified ? 0 : 1;
     }
     if (argc >= 2 && std::string(argv[1]) == "--transfer-ball") {
