@@ -133,7 +133,7 @@ k,m,n1,bound,status,source,note
 9,2,511,max,proven-theorem,docs/literature.md#aigner-1986,exact formula n(k;2)=2^k-1
 9,3,503,max,proven-theorem,docs/literature.md#aigner-1986,exact formula n(k;3)=2^k-k
 9,4,496,max,proven-theorem,docs/literature.md#li-wu-triesch-2018,exact formula n(k;4)=2^k-2k+2; independent verified witness
-9,5,481,max,proven-theorem,docs/literature.md#li-wu-triesch-2018+evidence/sb_m5_k9_frontier.txt,"Theorem 2 of Li--Wu--Triesch proves 481; exact replay refutes 482; the separate majorized-terminal tree is conditional on the open singleton converse"
+9,5,481,max,proven-theorem,docs/literature.md#li-wu-triesch-2018+evidence/sb_m5_k9_frontier.txt,"Theorem 2 of Li--Wu--Triesch proves 481; exact replay refutes 482; the separate majorized-terminal tree is not a proof because singleton-majorization sufficiency is false"
 9,6,473,max,proven-exhaustive,witnesses/canon_473_6_at9.tree+evidence/sb_m6_k9_frontier.txt,"verified witness at 473; exact replay refutes 474; old lemma-10 happens to match here but fails at k=10"
 9,65,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
 9,66,112,lower,legacy,cache-2025:parsed_260.txt,Sb(112:m) logged solvable in 9; source log not located
@@ -182,4 +182,4 @@ k,m,n1,bound,status,source,note
 9,95,97,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(98:95) exhaustively refuted in the proof-safe cold run9 session
 9,96,96,upper,proven-exhaustive,sa193-cold-2026-08-16:run9_out_sa193.txt+evidence/sa193_unsolvable_in_10.txt,Sb(97:96) exhaustively refuted in the proof-safe cold run9 session
 10,5,985,max,proven-theorem,docs/literature.md#li-wu-triesch-2018,Theorem 2 exact formula
-10,6,973,upper,proven-exhaustive,evidence/sb_m6_k10_frontier.txt,"Sb(974:6) is exhaustively refuted, so n(10,6)<=973; the 973 majorized-terminal tree is conditional on the open singleton-majorization converse"
+10,6,973,upper,proven-exhaustive,evidence/sb_m6_k10_frontier.txt,"Sb(974:6) is exhaustively refuted, so n(10,6)<=973; the 973 majorized-terminal tree is not a lower proof because singleton-majorization sufficiency is false"

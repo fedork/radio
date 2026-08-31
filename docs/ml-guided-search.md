@@ -145,7 +145,7 @@ estimating solvability, and a policy `pi(c | S,k)` ordering the OR-branches, app
 - Finding a **canonical/distinct-slot witness** is risk-free under guidance. Whatever tree a learned
   policy finds is checked by `tools/check_witness.py` against the explicit `G_k` strategy and
   Subgraph Monotonicity, and such a tree stands *even if the solver is wrong*. A majorized-only
-  tree remains conditional on the open converse.
+  tree is not an achievability proof because singleton-majorization sufficiency is false.
 - Proving **unsolvability** requires exhausting the OR-branches. A learned value can reorder them or
   allocate budget, but any pruning by it is unsound and would silently manufacture false negatives —
   the exact failure the 2023 corpus already shipped 37 times.

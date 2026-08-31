@@ -46,8 +46,9 @@ directly checked details are in [aigner-1988-scan.md](aigner-1988-scan.md).
   three `K_{m,n}` child graphs, and gives the historical singleton sequence `N(k) = G_k`.
 - Corollary 3.26 gives the exact `m=2` result, while the answer to Exercise 3.3.1 gives the
   exact `m=3` result. This independently cross-checks the corresponding Aigner 1986 claims.
-- Proposition 3.25 is only a necessary majorization condition. Its stated open converse is a
-  useful guard against overstating what this older source proves.
+- Proposition 3.25 is only a necessary majorization condition. Its stated open converse is now
+  resolved negatively by the explicit `K=6` state in this repository; the source itself proves
+  only necessity.
 
 ### Stanley 1998
 
@@ -57,7 +58,8 @@ R. P. Stanley, “Graph colorings and related symmetric functions: ideas and app
 
 - Defines a graph to be **nice** when its stable-partition types form a dominance ideal.  Since
   stable sets in an incomparability graph are poset chains, the full-mass Singleton Majorization
-  Converse is exactly niceness of the transcript graph `Q_K`.
+  Converse was exactly niceness of the transcript graph `Q_K`; the new missing type proves that
+  `Q_6` is not nice.
 - Records Griggs's Boolean-lattice dominance conjecture in this language.  This is the right
   adjacent literature for the singleton question: majorization of chain sizes is a recognized
   global existence problem, not a consequence of Greene--Kleitman prefix extremality.
@@ -74,10 +76,10 @@ Będlewo (2008).
 - States the generalized Griggs conjectural template: a finite normalized-matching poset should
   admit a chain partition of every size partition dominated by its nested-chain-decomposition
   partition.
-- The transcript poset `P_K=V^K` is now proved locally to be normalized matching and to have nested
-  chain shape `G_K`.  Therefore the full-mass singleton converse is exactly the `P_K` instance of
-  this template.  The survey supplies terminology and context, not a theorem resolving this
-  special family.
+- The transcript poset `P_K=V^K` is proved locally to be normalized matching and to have nested
+  chain shape `G_K`.  The full-mass singleton converse was exactly the `P_K` instance of this
+  template.  The `K=6` counterexample therefore supplies a negative instance of the template for
+  this family; the survey supplies the terminology, not the negative result.
 
 ### Andreae 1989
 
@@ -225,12 +227,12 @@ Applied Mathematics* 113 (2001), 299–302.
 | `n(9,2)=511` | proved construction/lower bound | exact maximum | Aigner 1986 |
 | `n(9,3)=503` | proved construction/lower bound | exact maximum | Aigner 1986 |
 | `n(9,4)=496` | verified witness/lower bound | exact maximum | Li--Wu--Triesch 2018 |
-| `n(9,5)=481` | conjectured 480, witnessed 480 | exact maximum; local arbitrary-majorization tree is conditional | Li--Wu--Triesch 2018 plus local exact rejection at 482 |
+| `n(9,5)=481` | conjectured 480, witnessed 480 | exact maximum; local arbitrary-majorization tree is unsupported | Li--Wu--Triesch 2018 plus local exact rejection at 482 |
 | old `m=5` closed form / `BBBD` profile | conjectured equality | refuted as equality at `k=9`; still a lower construction | same |
 | `n(9,6)=473` | verified lower bound | exact maximum after retained 473/474 replay | local exact replay |
 
 The local replay is retained in `evidence/sb_m5_k9_frontier.txt`, its structurally checked but
-conditional tree in `witnesses/majorized_481_5_at9.tree`, and the root-type scan in
+unsupported relaxed-terminal tree in `witnesses/majorized_481_5_at9.tree`, and the root-type scan in
 `evidence/sb_m5_k9_root_transition.txt`.  The adjacent exact `m=6` boundary is in
 `evidence/sb_m6_k9_frontier.txt`.
 

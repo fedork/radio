@@ -131,7 +131,7 @@ is
       > 276,815,343 = H(513)+H(256)+H(769).
 
 The excess is 2,431.  Hence both (PA) and the proposed high-support strict-alternation algorithm are
-false.  This does **not** refute the Row-Coloring Lemma; it says that these same rows need a different,
+false.  This did **not by itself** refute the Row-Coloring conjecture; it said that these same rows need a different,
 globally chosen orientation if the lemma is true.
 
 For adjacent pairs `(x_i,y_i)`, let `d_i=x_i-y_i`, choose a sign `epsilon_i` according to which

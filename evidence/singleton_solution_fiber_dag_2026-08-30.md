@@ -1,5 +1,10 @@
 # Singleton solution-fiber DAG (`K=3`, 2026-08-30)
 
+**Superseded universal conclusion (2026-08-30).**  The exact `K=3` fiber counts and connectivity
+results below remain valid.  Pascal-Shuffle Coverage and universal transfer closure are false:
+the final unit transfer into the explicit `K=6` counterexample takes a nonempty first-cut fiber to
+an empty one.  See [the counterexample](singleton_k6_counterexample_2026-08-30.md).
+
 ## Question and the correct graph
 
 Start at the canonical state `G_K` and repeatedly make a normalized unit Robin--Hood transfer
@@ -275,10 +280,10 @@ row, hence has area five.  The long edge carries a canonical coloring, but no ch
 literal transports from the canonical source reaches any coloring above it.  Long one-coin moves
 are therefore not merely shortcuts in the solution relation.
 
-The remaining statement is the **Pascal-Shuffle Coverage Lemma**: the parent projections of the
+The now-refuted remaining statement was the **Pascal-Shuffle Coverage Conjecture**: the parent projections of the
 downward exchange cones from all self-sorted shuffles cover every partition dominated by `G_K`.
-By the reduction above this is equivalent to the Row-Coloring Lemma.  It is a much sharper version
-of the original phase-change idea, but it remains open.
+By the reduction above this was equivalent to the Row-Coloring conjecture.  It is a much sharper version
+of the original phase-change idea, but the `K=6` hole now refutes it universally.
 
 ## Exact downward-closed `K=4` neighborhood
 

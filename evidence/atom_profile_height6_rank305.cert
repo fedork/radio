@@ -1,4 +1,6 @@
-# Exact sixteen-atom rank-305 aligned-profile construction.
+# Exact sixteen-atom rank-305 tree in the relaxed aligned-profile model.
+# Its leaves use singleton majorization, whose universal converse is false; this
+# certificate is not a group-testing achievability construction.
 #
 # Discover/regenerate (about two minutes on the recorded M4 Pro run):
 #   python3 tools/check_dc_tree_lift.py evidence/atom_profile_height6_dc16.cert \

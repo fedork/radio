@@ -1252,6 +1252,224 @@ std::vector<std::pair<Sequence, Sequence>> boundary_colorings(
 
 int main(int argc, char **argv) {
     if (argc == 2 &&
+        std::string(argv[1]) == "singleton-k6-counterexample") {
+        const int k = 6;
+        const Sequence parent_values = singleton_base(k);
+        const Capacity parent(parent_values);
+        const Sequence child_values = singleton_base(k - 1);
+        const Capacity child(child_values);
+
+        // G_6 with the tight rank interval [15,31) changed from
+        // (22,7^15) to the equally massive refinement (8^15,7).
+        Sequence state{64, 63};
+        state.insert(state.end(), 2, 57);
+        state.insert(state.end(), 4, 42);
+        state.insert(state.end(), 7, 22);
+        state.insert(state.end(), 15, 8);
+        state.insert(state.end(), 2, 7);
+        state.insert(state.end(), 32, 1);
+
+        int state_mass = 0;
+        int state_prefix = 0;
+        bool dominated = state.size() == parent_values.size() &&
+                         std::is_sorted(state.begin(), state.end(),
+                                        std::greater<int>());
+        for (std::size_t index = 0; index < state.size(); ++index) {
+            state_mass += state[index];
+            state_prefix += state[index];
+            dominated = dominated && state_prefix <= parent.H(index + 1);
+        }
+        dominated = dominated && state_mass == parent.mass;
+        if (!dominated || parent.mass != 729 || state.size() != 64 ||
+            parent.H(15) != 563 || parent.H(31) != 690 ||
+            state_prefix != 729) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR dominance"
+                      << " state_mass=" << state_mass
+                      << " parent_mass=" << parent.mass
+                      << " support=" << state.size()
+                      << " prefix15=" << parent.H(15)
+                      << " prefix31=" << parent.H(31) << '\n';
+            return 1;
+        }
+        int prefix15 = 0;
+        int prefix31 = 0;
+        for (int index = 0; index < 15; ++index) prefix15 += state[index];
+        for (int index = 0; index < 31; ++index) prefix31 += state[index];
+        if (prefix15 != parent.H(15) || prefix31 != parent.H(31)) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR anchors"
+                      << " prefix15=" << prefix15
+                      << " prefix31=" << prefix31 << '\n';
+            return 1;
+        }
+
+        int first_failed_transfer = -1;
+        for (int transfers = 0; transfers <= 14; ++transfers) {
+            Sequence path_state{64, 63};
+            path_state.insert(path_state.end(), 2, 57);
+            path_state.insert(path_state.end(), 4, 42);
+            path_state.insert(path_state.end(), 7, 22);
+            path_state.push_back(22 - transfers);
+            path_state.insert(path_state.end(), transfers, 8);
+            path_state.insert(path_state.end(), 15 - transfers, 7);
+            path_state.push_back(7);
+            path_state.insert(path_state.end(), 32, 1);
+            std::sort(path_state.begin(), path_state.end(),
+                      std::greater<int>());
+            BalancedColorSearch path_search(
+                path_state, child, static_cast<int>(child_values.size()));
+            const bool found = path_search.run();
+            if (!found && first_failed_transfer < 0)
+                first_failed_transfer = transfers;
+            std::cout << "TRANSFER_PATH step=" << transfers
+                      << " band_donor=" << 22 - transfers
+                      << " found=" << (found ? "YES" : "NO")
+                      << " nodes=" << path_search.nodes << '\n';
+            if (transfers == 13) {
+                SplitSearch last_search(path_state, child, child, child);
+                if (!found || !last_search.run()) {
+                    std::cerr << "SINGLETON_K6_INTERNAL_ERROR"
+                              << " last_feasible_transfer\n";
+                    return 1;
+                }
+                Sequence left;
+                Sequence mixed;
+                Sequence right;
+                for (const Choice &choice : last_search.solution) {
+                    if (choice.left) left.push_back(choice.left);
+                    if (choice.mixed) mixed.push_back(choice.mixed);
+                    if (choice.right) right.push_back(choice.right);
+                }
+                std::sort(left.begin(), left.end(), std::greater<int>());
+                std::sort(mixed.begin(), mixed.end(), std::greater<int>());
+                std::sort(right.begin(), right.end(), std::greater<int>());
+                std::cout << "LAST_FEASIBLE_SPLIT step=13"
+                          << " left=" << show(left)
+                          << " mixed=" << show(mixed)
+                          << " right=" << show(right)
+                          << " nodes=" << last_search.nodes << '\n';
+            }
+        }
+        if (first_failed_transfer != 14) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR transfer_path"
+                      << " first_failed=" << first_failed_transfer << '\n';
+            return 1;
+        }
+
+        // This is a direct exhaustive test of every coloring of equal rows.
+        // Fixed-Color Hall then decides whether any coloring admits a split.
+        BalancedColorSearch full_search(
+            state, child, static_cast<int>(child_values.size()));
+        const bool full_found = full_search.run();
+        if (full_found) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR full_split_found"
+                      << " nodes=" << full_search.nodes << '\n';
+            return 1;
+        }
+
+        // Also exhaust the integer row splits themselves, without invoking
+        // the fixed-color reduction.
+        SplitSearch direct_search(state, child, child, child);
+        const bool direct_found = direct_search.run();
+        if (direct_found) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR direct_split_found"
+                      << " nodes=" << direct_search.nodes << '\n';
+            return 1;
+        }
+
+        Sequence residual;
+        for (int index = 0; index < 32; ++index)
+            residual.push_back(state[index] - 2);
+        for (int index = 32; index < 64; ++index)
+            if (state[index] > 1) residual.push_back(state[index] - 1);
+        std::sort(residual.begin(), residual.end(), std::greater<int>());
+        Sequence residual_child_values = child_values;
+        for (int &value : residual_child_values) --value;
+        while (!residual_child_values.empty() &&
+               residual_child_values.back() == 0)
+            residual_child_values.pop_back();
+        const Capacity residual_child(residual_child_values);
+        const Capacity residual_parent(induced_parent(
+            residual_child, residual_child, residual_child));
+        int residual_prefix = 0;
+        bool residual_dominated = true;
+        for (std::size_t index = 0; index < residual.size(); ++index) {
+            residual_prefix += residual[index];
+            residual_dominated = residual_dominated &&
+                                 residual_prefix <= residual_parent.H(index + 1);
+        }
+        residual_dominated = residual_dominated &&
+                             residual_prefix == residual_parent.mass;
+        BalancedColorSearch residual_search(
+            residual, residual_child, static_cast<int>(child_values.size()));
+        const bool residual_found = residual_search.run();
+        if (!residual_dominated || residual_found) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR residual"
+                      << " dominated=" << (residual_dominated ? "YES" : "NO")
+                      << " found=" << (residual_found ? "YES" : "NO")
+                      << " nodes=" << residual_search.nodes << '\n';
+            return 1;
+        }
+
+        // Independently test the four endpoint transitions forced by the two
+        // tight ranks.  Each transition must fail on the changed 16-row band.
+        const int begin = 15;
+        const int end = 31;
+        TransitionBandCensus band_census(
+            child_values, parent_values, begin, end);
+        Sequence band_state(15, 8);
+        band_state.push_back(7);
+        if (band_census.transitions.size() != 4 ||
+            band_census.parent.values != Sequence({22, 7, 7, 7, 7, 7, 7, 7,
+                                                    7, 7, 7, 7, 7, 7, 7, 7})) {
+            std::cerr << "SINGLETON_K6_INTERNAL_ERROR transitions="
+                      << band_census.transitions.size()
+                      << " band=" << show(band_census.parent.values) << '\n';
+            return 1;
+        }
+        std::uint64_t band_nodes = 0;
+        for (const Transition &transition : band_census.transitions) {
+            SplitSearch search(
+                band_state, transition.left, transition.mixed,
+                transition.right, transition.to - transition.from,
+                (end - transition.to) - (begin - transition.from));
+            const bool found = search.run();
+            band_nodes += search.nodes;
+            std::cout << "FORCED_TRANSITION from=" << transition.from
+                      << " to=" << transition.to
+                      << " left=" << show(transition.left.values)
+                      << " mixed=" << show(transition.mixed.values)
+                      << " right=" << show(transition.right.values)
+                      << " found=" << (found ? "YES" : "NO")
+                      << " nodes=" << search.nodes << '\n';
+            if (found) {
+                std::cerr << "SINGLETON_K6_INTERNAL_ERROR band_split_found"
+                          << " from=" << transition.from
+                          << " to=" << transition.to << '\n';
+                return 1;
+            }
+        }
+
+        std::cout << "SINGLETON_K6_COUNTEREXAMPLE"
+                  << " verified=YES"
+                  << " k=" << k
+                  << " state=" << show(state)
+                  << " mass=" << state_mass
+                  << " support=" << state.size()
+                  << " tight_ranks=(15,31)"
+                  << " full_coloring_found=NO"
+                  << " full_nodes=" << full_search.nodes
+                  << " direct_split_found=NO"
+                  << " direct_nodes=" << direct_search.nodes
+                  << " residual=" << show(residual)
+                  << " residual_coloring_found=NO"
+                  << " residual_nodes=" << residual_search.nodes
+                  << " first_failed_transfer=" << first_failed_transfer
+                  << " forced_transitions=4"
+                  << " band_nodes=" << band_nodes << '\n';
+        return 0;
+    }
+
+    if (argc == 2 &&
         std::string(argv[1]) == "strict-exact-alternation-counterexample") {
         const int k = 6;
         const Sequence parent = singleton_base(k);

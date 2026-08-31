@@ -76,7 +76,7 @@ Anything claiming evidence must name a `source`; `tools/check_tables.py` enforce
 
 ```
 tools/check_tables.py                    # invariants, formulas, generated blocks
-tools/check_witness.py witnesses/*.tree  # verify structure and flag conditional terminals
+tools/check_witness.py witnesses/*.tree  # verify structure and flag unsupported majorization terminals
 ```
 
 Both are fast, dependency-free, and worth running on every change.

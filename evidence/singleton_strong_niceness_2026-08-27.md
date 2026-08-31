@@ -1,5 +1,9 @@
 # Transcript-graph strong-niceness census (2026-08-27)
 
+**Superseded universal status (2026-08-30).**  The exact `Q_3` coefficient census below remains
+valid.  The explicit [`K=6` missing type](singleton_k6_counterexample_2026-08-30.md) proves that
+`Q_6` is not nice and hence not strongly nice; closure for the transcript recursion is false.
+
 ## Why this implies the desired support statement
 
 For the transcript conflict graph `Q_K`, write
@@ -109,9 +113,9 @@ has no corresponding general closure theorem; see
 
 Moreover `Q_3` contains an induced claw.  Therefore the theorem that a graph and all its induced
 subgraphs are strongly nice exactly when it is claw-free does not apply to the transcript family.
-The still-open target is closure for the special combined operator
+The formerly proposed target was closure for the special combined operator
 
     T(G)=G disjoint-union (G join G),
 
 or only the weaker assertion that `T` preserves the principal dominance-ideal support occurring in
-this recursion.
+this recursion.  The `Q_6` missing type refutes both universal claims.

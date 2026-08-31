@@ -4,7 +4,8 @@
 Li--Wu--Triesch prove the exact piecewise value of n(k,5).  This module rewrites
 their two construction types in the corrected A/B/C/D assembly notation used by
 this repository.  It also verifies the singleton-majorization inequalities for a
-conditional eventual D-branch construction; sufficiency is the open converse.  The words BBBD, ABBD and AABD below
+formerly conditional eventual D-branch construction; the converse needed for that inference is
+false.  The words BBBD, ABBD and AABD below
 remain mass identities, not assertions that a symmetric aligned atom tree exists.
 
 Run without arguments for the transition levels, or name levels explicitly:

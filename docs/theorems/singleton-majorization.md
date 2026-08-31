@@ -1,6 +1,6 @@
-# Singleton majorization: proved necessity and the open converse
+# Singleton majorization: proved necessity and a `K=6` counterexample to the converse
 
-## Status (corrected 2026-08-26)
+## Status (resolved negatively 2026-08-30)
 
 For a singleton state
 
@@ -10,30 +10,39 @@ the implication
 
 `solvable in K tests  =>  (a1,a2,...) <=_w G_K`
 
-is proved below.  The converse is strongly supported but is **not proved in this repository**.
-Aigner proved the same necessary direction and explicitly left the converse open in 1988; see
+is proved below.  The converse is **false**.  The full-mass exact-support state
+
+    (64,63,57^2,42^4,22^7,8^15,7^2,1^32) <=_w G_6
+
+has no legal first split into three `G_5`-majorized children and is therefore not solvable in six
+tests.  The proof uses two tight Pascal ranks and one integral unit of mixed mass per intervening
+row; see [the counterexample proof](../../evidence/singleton_k6_counterexample_2026-08-30.md).
+Aigner proved the necessary direction and explicitly left the converse open in 1988; this
+counterexample answers that question negatively for the present formulation.  Publication
+priority beyond the sources surveyed here has not yet been audited.  See also
 [the scan note](../aigner-1988-scan.md).
 
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the
-legal row condition that a singleton row cannot feed both pure children.  The exact remaining
-statement is the Row-Coloring Lemma below.  It is special to `G_K`; generic base sequences have
-counterexamples.
+legal row condition that a singleton row cannot feed both pure children.  The exact Row-Coloring
+reformulation below is also false, now for the genuine Pascal profile at `K=6` rather than only for
+generic bases.
 
-The arbitrary number of parent rows is no longer part of the gap.  The proved Minimum-Support
-Reduction Theorem coalesces the two smallest rows, using the half-unit tail of `G_K`, until exactly
-`2^K` positive rows remain and lifts any resulting split back.  Thus the open converse is
-equivalent to the exact-support Row-Coloring case; see the tight-skeleton section below.  The proved
-Two-Anchor Reduction then deletes the universal pure column and one matching mixed column, reducing
-that exact-support case to a smaller Balanced Residual Coloring Lemma for `G_(K-1)-1`.  This new
-residual lemma is still open, so the proof status does not change.
+The counterexample has exactly the minimum `2^6` positive rows, so the proved Minimum-Support
+Reduction is sharp but cannot prove sufficiency.  The proved Two-Anchor Reduction maps it to the
+explicit residual hole
 
-Repeated halving has also been made into a complete finite search rather than another fixed
-assignment rule.  For fixed Pascal margins, row-color swaps and `2x2` incidence switches connect
-every realization-and-bisection pair.  Hence exhaustive search from a canonical Havel--Hakimi
-matrix finds a legal first cut if and only if one exists.  A much shorter two-move defect descent
-passes the complete exact-support corpus through `K=4` and substantial `K=5,6` probes, but its
-escape lemma is open; see the switch section below.
+    (62,61,55^2,40^4,20^7,6^15,5^2)
+
+below `(62,61,55^2,40^4,20^8,5^16)`.  Hence the formerly proposed Balanced Residual Coloring
+Lemma is false as well.
+
+The prior finite searches remain correct within their stated ranges: the converse holds through
+`K=4`.  They did not cover the `K=6` hole.  The state is reached from `G_6` by fourteen unit
+Robin--Hood transfers; the first thirteen intermediate bands retain a majorized first cut, and the
+last transfer destroys the entire cut fiber.  This supplies the phase change that the transfer
+surveys were seeking and shows why a global downward-closure proof cannot exist.  Whether `K=5`
+already contains a different counterexample remains undecided.
 
 ## Definitions
 
@@ -144,7 +153,7 @@ The graph has the exact recursion
 The three copies are the transcripts starting in `1`, `0`, and `2`: the `0` and `2` copies are
 completely joined, while the `1` copy has no edges to either.
 
-### A stronger chromatic-symmetric-function target (2026-08-27)
+### A stronger chromatic-symmetric-function target (refuted at `K=6`)
 
 Write the chromatic symmetric function as
 
@@ -160,6 +169,11 @@ implies nice, meaning that the stable-partition support is a dominance ideal.  T
 existence problem globally: it asks for monotonicity of the number of decompositions, rather than
 selecting one decomposition by a local rule.
 
+The `K=6` state in the status section is a partition dominated by the canonical coloring type
+`G_6` that does not occur.  Therefore `Q_6` is not nice and (SN) is false at `K=6`.  The material
+below is retained because the coefficient recurrence and the lower-level finite theorems remain
+correct, not as a live route to a universal proof.
+
 The graph recursion gives an exact coefficient recurrence.  For a fixed labelled color of size
 `w`, its counts in the left/mixed/right copies must be
 
@@ -167,7 +181,7 @@ The graph recursion gives an exact coefficient recurrence.  For a fixed labelled
 
 After assigning every color, the three child coefficients multiply, and summing all assignments
 gives `c_K`.  The provenance-built `tools/singleton_strong_niceness.cpp` evaluates this recurrence
-without invoking the open converse.  It verifies (SN) for `K=3` on all 1,206 possible supported
+without assuming the converse.  It verifies (SN) for `K=3` on all 1,206 possible supported
 types and all 463,886 comparable ordered pairs (4,740,395 recursive allocation nodes).  This is
 another finite theorem only, not an induction proof.
 
@@ -182,13 +196,11 @@ injection
 
 Trying to build (INJ) recursively identifies the same structural obstruction as the Hall proof.
 If the donor has more occurrences than the recipient in the mixed child, or in a pure child that
-the recipient may legally use, child-level strong niceness performs the transfer.  The unresolved
-case has donor and recipient on opposite pure sides, with no donor excess in the mixed child.  A
+the recipient may legally use, child-level strong niceness performs the transfer.  The
+then-unresolved case put donor and recipient on opposite pure sides, with no donor excess in the mixed child.  A
 two-color Kempe exchange need not work—the induced-claw example below already proves that—and an
-injective construction must route through a third color or a global augmenting chain.  That is
-strictly stronger than merely finding one feasible coloring for the target state, and its stopped
-augmenting paths would have to overcome the same opposite-color tight separators isolated by the
-Pascal Adjacent-Fiber Lemma.
+injective construction would have had to route through a third color or a global augmenting chain.
+The final transfer into the `K=6` counterexample proves that no such universal injection exists.
 
 Exact arbitrary-precision probes at `K=4` have not refuted (INJ): the coefficient rises on the
 first canonical balancing transfer, and one exact ten-transfer walk is monotone.  A longer request
@@ -212,20 +224,19 @@ has six.
 
 Consequently, counting child triples computes a sum of decomposition coefficients, whereas the
 converse asks for the size of their support.  Proving that the number of *distinct* outputs equals
-`|S_K|` would indeed prove the Row-Coloring Lemma, because the image is already contained in
+`|S_K|` would indeed prove the Row-Coloring conjecture, because the image is already contained in
 `S_K`; however, determining that distinct-output count is exactly the assertion that every relevant
 coefficient is nonzero.  A uniform division by a fiber size is impossible even at `K=1`.
 
-There is no immediate closure theorem for the displayed graph recursion.  Strong niceness is
+There is no closure theorem for the displayed graph recursion.  Strong niceness is
 closed under disjoint union, but not under graph join in general; moreover `Q_3` contains an induced
-claw, so the hereditary claw-free characterization does not apply.  The useful new proof target is
-therefore the special operator
+claw, so the hereditary claw-free characterization does not apply.  The formerly proposed target
+was the special operator
 
     T(G) = G disjoint-union (G join G):
 
-prove directly that the particular sequence `Q_K=T(Q_(K-1))` preserves strong niceness, or at least
-preserves the dominance-ideal support.  The coefficient recurrence is a clean setting in which to
-try the same two-coordinate balancing transfer as in the Row-Coloring Lemma.
+and preservation of strong niceness, or even dominance-ideal support, along the particular sequence
+`Q_K=T(Q_(K-1))`.  The `Q_6` counterexample refutes both preservation claims.
 
 Even support-level closure under this special operator is false for a generic seed.  Let `E_3` be
 the empty three-vertex graph.  The graph `T(E_3)` is nice with maximum stable-partition profile
@@ -273,7 +284,7 @@ induced subgraph of `Q_K`.  Hence every prefix of `a` is at most `H_K(t)`.  This
 
 This proof does not use the false decomposition lemma.
 
-## The exact remaining Row-Coloring Lemma
+## The Fixed-Color Hall criterion and the refuted Row-Coloring conjecture
 
 Put `h=G_{K-1}` and let `H(t)` be its saturated prefix-sum function.  Color every parent row either
 `A` or `B`; an `A` row is allowed to feed the left pure child and the mixed child, while a `B` row
@@ -300,9 +311,9 @@ is `A_p+B_q`, giving (C).  Reading the assigned columns in each child gives a `0
 row sums are that child's sequence and whose column sums are bounded by `h'`; the usual same Hall
 criterion is exactly weak majorization by `h`.  The support restrictions make the split legal. ∎
 
-The full converse is therefore equivalent to the following purely two-color statement.
+The full converse was therefore equivalent to the following purely two-color statement.
 
-> **Row-Coloring Lemma (open).** If `a <=_w G_K`, the rows of `a` can be colored `A/B` so that
+> **Row-Coloring Conjecture (false at `K=6`).** If `a <=_w G_K`, the rows of `a` can be colored `A/B` so that
 > (C) holds for every `p,q`.
 
 Indeed, the Fixed-Color Hall Lemma produces three `G_{K-1}`-majorized children, and induction would
@@ -312,8 +323,26 @@ The parent majorization inequalities are only the balanced slice of (C):
 
 `H_K(t) = H(t)+H(ceil(t/2))+H(floor(t/2)).`
 
-The missing proof must show that the rows can be colored so that all *off-diagonal* pairs `(p,q)`
-also hold.  This is where strict alternation and simple load balancing fail.
+The `K=6` counterexample at the top of this note satisfies every balanced parent inequality but no
+coloring satisfies all off-diagonal pairs.  Equivalently, no legal first allocation exists.  Here
+is the short obstruction.  For `h=G_5`, let `H` be its prefix function.  The parent is tight at
+ranks 15 and 31, forcing the color counts `(p,q)` at those ranks to lie in
+
+    {7,8} x {15,16}.
+
+The 16 intervening rows have values `(8^15,7)`.  Tightness forces their mixed pieces to total
+`H(31)-H(15)=21`; if one were zero, 30 mixed pieces would have mass
+`H(15)+21=242>H(30)=241`.  Thus every band row sends at least one integral coin to the mixed child.
+In the four possible count transitions, one pure child consequently needs either 58 coins from
+eight rows, which can retain at most 56, or 64 coins from nine rows, which can retain at most 63.
+This contradiction proves:
+
+> **Singleton Majorization Counterexample Theorem.** Singleton majorization is necessary but not
+> sufficient.  The state `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` and is
+> unsolvable in six tests.
+
+The full calculation, direct split enumeration and transfer-path boundary are in the
+[counterexample record](../../evidence/singleton_k6_counterexample_2026-08-30.md).
 
 The base has the elementary `2`-flat properties
 
@@ -394,8 +423,9 @@ matrix together with one sign for every row so that, in every doubled column `T`
 incident rows have either sign.  Saturation then makes the split exactly `c(T)+c(T)`; the single
 column `T union {*}` supplies the mixed incidence.  Conversely, combine the paired pure columns
 of any legal cut and retain its mixed columns.  This proves the Boolean-column formulation without
-using the open converse.  The unresolved content is the **row coherence**: one sign must serve all
-doubled-column incidences of a row.
+assuming the converse.  The `K=6` counterexample shows that the demanded **row coherence** need not
+exist: one sign must serve all doubled-column incidences of a row, and the two tight ranks make
+those requirements incompatible.
 
 This formulation exposes more structure in a tight Hall separator.  Put `h=G_r`, let `H` be its
 saturated prefix function, and fix a coherent allocation for a feasible coloring `A/B`.  Suppose
@@ -437,7 +467,7 @@ transfer obstruction.  It is stronger than the generic observation that an oppos
 set is the only obstruction: the set saturates the whole dyadic hierarchy term by term, and the
 donor-recipient gap forces a nontrivial repeated rank between its two color counts.
 
-The Boolean labels do **not** finish the proof by themselves.  Static Hall capacity has already
+The Boolean labels did **not** finish the hoped-for proof.  Static Hall capacity has already
 summed over all equal columns, so an arbitrary stopped search need not be closed under Boolean
 shadows.  Nor can one demand nested or laminar doubled supports.  At `K=3`, the legal state
 `(8,7,4,1^8)` forces combined pure-degree profile `(4,4,4,1^6)` or `(4,4,3,1^7)` for doubled
@@ -480,12 +510,11 @@ first genuine one-row failure is
 An exact prefix census of 10,000 `K=4` states contains 94,936 failed normalized colorings: 74,090
 reach success at distance one and 20,846 at distance two.  None needs more.  More specifically,
 every failed coloring in all checked landscapes reaches success by one row flip or one
-opposite-color swap.  This motivates the stronger **Two-Row Color-Exchange Lemma**: every
+opposite-color swap.  This motivated the stronger **Two-Row Color-Exchange Conjecture**: every
 failed feasible coloring has another feasible coloring, successful for the transfer, obtained by
-one flip or one swap (up to equal-row identity and global color complementation).  It would finish
-the Adjacent-Fiber step immediately.  The result is exhaustive only through `K=3`; the `K=4`
-prefix is finite evidence, not a proof.  A proof still has to derive the exchange from the
-duplicated rank forced by (TB3), rather than merely counting its capacity.  Exact definitions,
+one flip or one swap (up to equal-row identity and global color complementation).  It would have
+finished the Adjacent-Fiber step immediately, but the final `K=6` transfer has no feasible target
+coloring and refutes it.  The lower-level finite results remain exact.  Exact definitions,
 counts and reproduction commands are in the
 [coloring-landscape record](../../evidence/singleton_coloring_landscape_2026-08-28.md).
 
@@ -510,18 +539,16 @@ bisubmodular polyhedron `P(rho)`.  Its abstract delta-exchange directions have s
 see [Iwamasa, Theorem 3](https://arxiv.org/abs/2303.06320).  This is the correct structural analogue
 of the observed one-flip-or-one-swap rule.
 
-It is not yet a proof.  The feasible colorings of a fixed state are the boundary slice
+This analogy did not provide a proof.  The feasible colorings of a fixed state are the boundary slice
 
     P(rho) intersection {z: |z_i|=a_i for every i}.
 
 Flipping row `i` changes `z_i` by `2a_i`, whereas bisubmodular delta exchange only guarantees unit
 moves of support one or two through intermediate points with smaller absolute coordinates.  An
-intersection with the fixed-absolute-value slice need not inherit the exchange axiom.  The precise
-remaining theorem is therefore a **Pascal fixed-absolute exchange lemma**: for the Pascal `H`, the
-unit exchange chain can be compressed to a boundary move consisting of one row flip or one row
-swap, chosen so that the transfer margin becomes positive.  The Tight Pascal-Band Lemma supplies
-the repeated internal rank needed for that compression; proving that it prevents the chain from
-ending in the interior is the unresolved step.
+intersection with the fixed-absolute-value slice need not inherit the exchange axiom.  The proposed
+**Pascal fixed-absolute exchange lemma** asserted that, for the Pascal `H`, the unit exchange chain
+could be compressed to a boundary move consisting of one row flip or one row swap that makes the
+transfer margin positive.  The final transfer into the `K=6` hole refutes that universal assertion.
 
 #### Exact boundary-exchange calculus (2026-08-28)
 
@@ -560,8 +587,8 @@ The Tight Pascal-Band Lemma gives `q>=p+2` and
 Any successful one-flip repair must therefore flip a row of `Y` from `B` to `A`.  Any successful
 one-swap repair must exchange a row of `Y` with a row of `A-X`.  Indeed, every other flip or swap
 leaves `r(S)` unchanged or decreases it, whereas the transferred demand on `S` is `x(S)+1`.
-Conversely, every such crossing move gains the amount in (CG) on this particular cut.  The only
-remaining issue is that it may expose an oppositely imbalanced blocker elsewhere.
+Conversely, every such crossing move gains the amount in (CG) on this particular cut.  It may,
+however, expose an oppositely imbalanced blocker elsewhere.
 
 Plain dyadic-band descent is false.  At `K=3`, for
 
@@ -576,26 +603,26 @@ cannot follow an arbitrary blocker and use the band alone as a decreasing potent
 flip of a width-two row succeeds in this example, so the failure points instead toward a global
 choice over the whole cut.
 
-There is a simpler monotone target.  Orient the failed coloring so that the donor is in `A` and
+The formerly proposed simpler monotone target oriented the failed coloring so that the donor is in `A` and
 the recipient in `B`, and select a tight transfer separator `S=X union Y`.  Call a crossing move
 **positive** when it is feasible for the original demand and either
 
 1. flips a positive-width row `v in Y` from `B` to `A`; or
 2. swaps `v in Y` with `u in A-X` and has `x_v>x_u`.
 
-Equivalently, the move strictly increases the total mass colored `A`.  The remaining local claim
-can be stated as follows.
+Equivalently, the move strictly increases the total mass colored `A`.  The proposed local claim was:
 
-> **Positive Pascal Crossing Lemma (open).** Every failed material-row coloring has a tight
+> **Positive Pascal Crossing Conjecture (false universally).** Every failed material-row coloring has a tight
 > transfer separator across which some positive crossing flip or swap is feasible.
 
-This lemma alone proves the Adjacent-Fiber Lemma; the crossing move need not solve the transfer
+This statement would prove the Adjacent-Fiber property; the crossing move need not solve the transfer
 immediately.  If it moves the recipient or the donor (but not both, since the donor is at least two
 larger), the two marked rows acquire the same color and the same-color argument finishes.  Otherwise
 their orientation stays `A/B`.  If the new coloring still fails, repeat from one of its tight
 separators.  Each nonterminal step strictly increases the integer `A`-mass, while the pure Hall
 inequality bounds that mass by `2*3^(K-1)`, so cycling is impossible and the process terminates at a
-common coloring.  A zero recipient is easier: its padded zero row may be assigned the donor's color
+common coloring.  The last transfer into the `K=6` counterexample has no feasible target coloring
+at all, so the claimed universal termination and hence the conjecture are false.  A zero recipient is easier: its padded zero row may be assigned the donor's color
 without affecting feasibility, and after the transfer the marked rows already share a color.
 
 The arbitrary choice of `S` can now be removed, and with it the apparent alternating blocker
@@ -620,7 +647,7 @@ the flip is feasible for both `x` and the transferred demand.  If `N_v` is nonem
 
 There is an exact global swap rule:
 
-> **Core--Blocker Escape Lemma (open Pascal step).** For some `v in C intersection B`, either
+> **Core--Blocker Escape Conjecture (false universally).** For some `v in C intersection B`, either
 > `N_v` is empty, or `P_v intersection (A-U)` contains a row `u` with `x_u<x_v`.
 
 Indeed, in the second case swap `u` and `v`.  Sets containing `v` but not `u` are safe because
@@ -640,15 +667,14 @@ set containing `u` but not `v` has the replacement slack above; a set containing
 would have been an old member of `D`, contradicting `v in C` or `u notin U`; and a set containing
 `v` but not `u`, with new color counts `(p,q)`, gains
 `h_p-h_(q+1)>=h_(p+1)-h_q>=2`; if it were newly tight, the old coloring would be infeasible.  The
-flip case is the same argument without `u`.  Thus the Core--Blocker Escape Lemma implies
+flip case is the same argument without `u`.  Thus the Core--Blocker Escape Conjecture would imply
 Adjacent-Fiber in one recoloring.
 
 This is a sharp **local strengthening**: compute the dangerous tight-set lattice, scan its
 `B`-core, and either take a feasible flip or intersect that flip's blockers and take a smaller
 outside-`A` row.  It uses no alternation, endpoint special case, exchange cycle, or arbitrary
-separator.  Its existence is still unproved, and it is not the sole remaining obligation for the
-Row-Coloring Lemma: it asks every failed coloring for an immediately adjacent common coloring,
-whereas the exact global statement may recolor and rebuild the incidence realization arbitrarily.
+separator.  Its universal existence is false: the final transfer into the `K=6` hole has no target
+coloring.  The local implication and finite lower-level evidence remain valid.
 The finite evidence for the earlier maximum-gain
 rule also supports this stronger statement: every observed successful one-flip/one-swap neighbor
 must cross every member of `D`, hence has exactly the core/hull membership above.
@@ -676,7 +702,7 @@ The dangerous lattice has compatible prefix geometry.  `U intersection (A-{i})` 
 in a dangerous tight set, replacing an included ordinary `A` row by a heavier omitted one would
 either violate old feasibility or give another dangerous tight set.  Also, if `v in C intersection
 B`, every strictly heavier `B` row lies in `C` (equal rows may exchange their labelled roles).
-Hence, after sorting within colors, the Core--Blocker Escape Lemma is a one-dimensional staircase:
+Hence, after sorting within colors, the Core--Blocker Escape Conjecture has a one-dimensional staircase:
 the common `A`-prefix `P_v intersection A` grows monotonically as `v` descends through the
 dangerous `B`-core, and one must prove that it crosses the ordinary `A`-prefix `U intersection A`
 before its newly reached row becomes at least as large as `v`.  The marked donor is the one
@@ -694,11 +720,10 @@ Then `u in P_v` exactly when
 
 for every `(a,b)`.  These are precisely the provisional-flip inequalities on sets omitting `u`;
 all sets containing `u` are safe after the positive swap by the replacement argument.  Thus this
-strong local conjecture can be attacked entirely with sorted prefixes: if every staircase step
-fails (ST2), choose one violating pair per step and use (TB3)/(CU) to sum them into a parent-prefix
-violation.  Arbitrary labelled blocker sets no longer need to be tracked.
+strong local conjecture had an entirely sorted-prefix formulation.  The `K=6` hole proves that its
+failed staircase inequalities need not sum to a parent-prefix violation.
 
-Uncrossing now has a quantitative form that exposes the remaining work on that route.  Let
+Uncrossing has the following quantitative form, retained as a description of why that route stops.  Let
 `S=X union Y in D` have counts `(p,q)`, and let a blocker `T=P union Q in N_v` have old counts
 `(a,b)`, slack `delta`, and flip loss `L=h_b-h_(a+1)>delta`.  If `Delta` is the submodularity
 defect of `r` on `S,T`, tightness of `S` gives
@@ -718,17 +743,16 @@ to `Delta`.  If `m` Pascal columns lie in the band intersection, then
     m (|X minus P|+|Q minus Y|) <= Delta < L.                  (CU)
 
 In particular, when the entire blocker band lies in the target band, `m=L` and (CU) forces the
-signed nesting `X subset P`, `Q subset Y`.  The missing general argument must use the duplicated
+signed nesting `X subset P`, `Q subset Y`.  The hoped-for next step was to use the duplicated
 columns guaranteed by (TB3), across all `v in C intersection B`, to force one blocker's common
-intersection past `U` onto a smaller `A` row, or else sum the residual nonnested defects into a
-violated parent prefix inequality.  Only the `A`-heavy flip blockers remain; an alternating-cut
-descent is unnecessary.
+intersection past `U` or a violated parent prefix.  The counterexample proves that this conclusion
+does not follow universally.
 
 The finite evidence remains substantial.  Through `K=3` and in the first 5,000 `K=4` states,
 every maximum-`A`-mass crossing neighbor is successful for the transfer, every tie at the maximum
 is successful, and the smallest observed maximum gain is one.  Three further disjoint windows also
 have a successful maximum-gain crossing neighbor.  These observations do not prove the
-Core--Blocker Escape Lemma.
+Core--Blocker Escape Conjecture.
 
 Standard delta-matroid exchange does not supply that termination.  The fixed-absolute coloring
 family is not even a delta-matroid in general for Pascal `H`.  At `K=3`, take
@@ -762,7 +786,7 @@ that can be supported on any specified `t` rows is
 
 `max_(p+q=t) D(p,q) = H(t)+H(ceil(t/2))+H(floor(t/2)) = H_K(t).`
 
-Consequently, the Row-Coloring Lemma would follow at once if `F_h` were an **integral
+Consequently, the Row-Coloring conjecture would have followed at once if `F_h` were an **integral
 polymatroid**.  Its rank inequalities would then be exactly
 
 `sum_(i in S) a_i <= H_K(|S|),`
@@ -775,12 +799,10 @@ At full mass this is the same M-convex exchange property used for supports of ge
 permutahedra; see
 [Matherne--Morales--Selover, Section 1.3.1](https://arxiv.org/html/2201.07333v4#S1.SS3.SSS1).
 
-This formulation does not yet prove the exchange axiom or the balanced row orientation in (D).
-The examples below show why a one-step
-greedy augmentation is too strong, but they do not rule out a global augmenting-path proof.  For a
-generic base `h`, `F_h` is not a polymatroid, consistently with the counterexamples above.  The
-remaining structural question is whether the Pascal multiplicities and power-of-two column
-capacities make it one for `h=G_r`.
+The `K=6` lattice hole proves that `F_(G_5)` is not an integral polymatroid and that the global
+augmentation claim is false.  The examples below record earlier failures of still stronger greedy
+rules.  Thus the Pascal multiplicities and power-of-two capacities do not repair the generic
+failure.
 
 ### Padded pure-first allocation (2026-08-27)
 
@@ -843,15 +865,14 @@ three and there are no degree-two points.  The two length-four intervals must th
 common three-point block on opposite sides.  The length-eight interval contains the block and at
 least one of those two extensions, creating a degree-two point, a contradiction.
 
-The useful algorithmic target is therefore an **adaptive balanced-support augmentation**.  Insert
+The formerly proposed algorithmic target was an **adaptive balanced-support augmentation**.  Insert
 the paired pure columns in decreasing capacity, rerouting earlier incidences along alternating
 paths when a side lacks `c_j` usable rows; a row may change orientation only after its pure
 incidences have been rerouted.  Once all pairs are placed and the residual remains majorized by
 `h`, Gale--Ryser finishes the mixed child.  Choosing, say, the shortest lexicographically first
-augmenting path would make this a universal deterministic algorithm.  The still-unproved step is
-that an augmenting path always exists.  A failed augmentation exposes an opposite-orientation
-tight cut, so proving that the Pascal multiplicities always let that cut be crossed is the same
-separator-elimination problem isolated by the adjacent-fiber formulation above.
+augmenting path would have made this a universal deterministic algorithm.  A failed augmentation
+exposes an opposite-orientation tight cut.  The `K=6` hole proves that the Pascal multiplicities do
+not always let that cut be crossed.
 
 #### Equal blocks and the canonical mixed-only tail
 
@@ -991,11 +1012,11 @@ but that cut has `J_a(1)=4`, `J_a(2)=7`, and exhaustive search finds no cut meet
 targets simultaneously.  Thus the full hinge profile is the right intrinsic language, but its
 coordinates have genuine lattice coupling and cannot be normalized independently.
 
-The first-coordinate shadow remains a clean **Scalar Shape-Balance Conjecture**: require only
+The first-coordinate shadow was a clean **Scalar Shape-Balance Conjecture**: require only
 
     J_a(1) in floor/ceiling(min(2^(K-1) theta(a), #{i:a_i>=2})).
 
-This is still stronger than the Row-Coloring Lemma and is not proved.  An exact reconstruction
+This is stronger than Row-Coloring and therefore is also false universally.  An exact reconstruction
 survey finds no failure among all 1,206 full-mass states at `K=3` or all 5,997,038 at `K=4`.
 `tools/singleton_shape_survey.cpp` reproduces both censuses and the full-profile counterexample.
 The scalar rule is therefore a plausible coarse induction invariant, not by itself a certificate:
@@ -1020,7 +1041,7 @@ non-atom-sized rows intact; demanding that the atom-sized piece be the larger on
 false as well.  This does not refute the weaker condition imposed only on genuinely split rows.
 The exact atom-restricted modes of `tools/singleton_shape_survey.cpp` reproduce the obstruction.
 
-### Global signed lifting and the no-holes target (2026-08-26)
+### Global signed lifting and the lattice hole at `K=6`
 
 There is a cleaner global formulation that removes value blocks and forward choices entirely.
 Fix a labelled row set `E` and, for disjoint `X,Y subset E`, define
@@ -1047,8 +1068,8 @@ inequalities proves that `f` is bisubmodular.  Thus the integral signed feasible
 
 has the standard signed-exchange, or BS-convex, structure of an integral bisubmodular
 polyhedron.  See [Iwamasa 2023](https://arxiv.org/abs/2303.06320) for the exchange
-characterizations.  Bisubmodularity itself is not the missing proof: the generic bases above
-produce the same kind of `f` and still have uncolorable parent demands.
+characterizations.  Bisubmodularity itself does not imply orthant saturation: the generic bases
+above, and now the Pascal `K=6` base, have uncolorable parent demands.
 
 Fold the signed set into the nonnegative orthant:
 
@@ -1072,14 +1093,14 @@ For the reverse inclusion, the vertices of the cardinality-based polymatroid on 
 coordinate permutations of `(G_K[1],...,G_K[t],0,...)`.  Each is in `M_h`: take the canonical
 decomposition of `G_K` and delete its rows after `t`.  This proves (E).
 
-Consequently the Row-Coloring Lemma is exactly the following **Pascal Orthant-Saturation
-Lemma**:
+Consequently the Row-Coloring conjecture was exactly the following **Pascal Orthant-Saturation
+Conjecture**:
 
     M_h = conv(M_h) intersection Z_+^E,              for h=G_(K-1).              (F)
 
-In words, folding the integral signed Hall polyhedron creates no lattice holes.  Generic `h`
-can create holes, as the explicit counterexamples above demonstrate.  The complete `K<=4`
-census says that the Pascal folds have no holes at those levels.
+The `K=6` state `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` lies in the right side of (F) but not
+in `M_(G_5)`.  It is therefore an explicit primitive integer lattice hole.  The complete `K<=4`
+census remains a proof that the lower-level Pascal folds have no holes.
 
 ### An equivalent balanced-column realization
 
@@ -1093,7 +1114,7 @@ and one **single column** of degree `c_t`.  For a full-mass demand `x`, Gale--Ry
 if and only if there is a `0`--`1` row/column incidence matrix with row degrees `x` and exactly
 those doubled and single column degrees.
 
-The Row-Coloring Lemma is equivalent to asking for such a matrix together with a coloring of its
+The Row-Coloring conjecture was equivalent to asking for such a matrix together with a coloring of its
 rows `A/B` for which every doubled column is perfectly balanced:
 
     |N(D_t) intersection A|=|N(D_t) intersection B|=c_t.          (BR)
@@ -1110,7 +1131,7 @@ color.  The doubled columns become matchings of prescribed sizes whose union is 
 single columns are unrestricted subsets of the same prescribed sizes.  Thus the exact global
 problem is:
 
-> **Balanced Pascal Realization Lemma (open, equivalent form).** Every full-mass row-degree
+> **Balanced Pascal Realization Conjecture (false at `K=6`, equivalent form).** Every full-mass row-degree
 > sequence majorized by `G_K` has a realization by the doubled/single Pascal columns in which the
 > doubled-column neighborhoods admit the common exact bisection (BR).
 
@@ -1143,7 +1164,7 @@ in a rank-lexicographically optimized realization must lie at an internal rank
 
     1<=ell<=K-1.                                                (BQ0)
 
-### A complete switch graph and a short-descent conjecture (2026-08-29)
+### A complete switch graph and a refuted short descent
 
 The equivalent realization problem has a canonical finite search space.  Fix the exact-support
 row margins, the labelled Pascal column margins, and an equal row bisection.  A **row switch**
@@ -1172,11 +1193,12 @@ with the source-order scan breaking ties.  If none exists, take the first `Phi`-
 incidence switch in the fixed scan order--including a same-color incidence switch--that exposes a
 strict switch, and then take that strict switch.
 
-> **Canonical Two-Move Pascal-Switch Conjecture (open, sufficient).**  This descent never gets
+> **Canonical Two-Move Pascal-Switch Conjecture (false at `K=6`).**  This descent never gets
 > stuck at positive `Phi`.
 
-If true, every one or two switches lowers a nonnegative integer, so the algorithm terminates at a
-legal split and induction proves the converse.  It passes all 408,776 exact-support `K=4` parents,
+If it were true, every one or two switches would lower a nonnegative integer, so the algorithm
+would terminate at a legal split.  The `K=6` hole has no zero-`Phi` vertex and therefore refutes
+the conjecture.  The rule passes all 408,776 exact-support `K=4` parents,
 the first 500,000 `K=5` parents, disjoint higher `K=5` windows and the stated `K=5,6` random,
 walk and adversarial probes.  These higher-level runs are finite evidence only.
 
@@ -1208,9 +1230,9 @@ the two row colors.  If `t in S`, deleting `t` leaves one child column of the sa
 `S` is unrestricted and belongs to the mixed branch.  At rank `ell`, the two cases have cardinalities
 `binomial(K-1,ell)` and `binomial(K-1,ell-1)`.  Conversely, because columns of one rank have
 identical degrees, any choice meeting (BQ) can be labelled by the subsets omitting or containing a
-fixed `t`.  Hence the Balanced Pascal Realization Lemma is exactly:
+fixed `t`.  Hence the Balanced Pascal Realization conjecture is exactly:
 
-> **Boolean Coordinate-Exposure Lemma (open, equivalent form).** Realize the row degrees `x` on
+> **Boolean Coordinate-Exposure Conjecture (false at `K=6`, equivalent form).** Realize the row degrees `x` on
 > the subset columns above and expose one coordinate `t` so that every column not containing `t`
 > is exactly bisected by one row coloring; columns containing `t` are unrestricted.
 
@@ -1252,24 +1274,19 @@ between adjacent ranks.  Such a relation can be destroyed by independently permu
 inside one rank without changing the incidence matrix, coloring, or legality.  A
 Kruskal--Katona/LYM argument would become legitimate only after an augmenting construction produced
 a distinguished *coupled* labelling and proved that its reached sets were shadow-closed.  No such
-construction is currently known, so assuming shadow closure would merely add an unproved stronger
-hypothesis.
+construction can exist for every dominated parent, so assuming shadow closure would merely add a
+false stronger hypothesis.
 
 What survives relabelling, and is therefore intrinsic, is the complete Pascal package: rank
 `ell` has degree `2^(K-ell)`, deletion quota `binomial(K-1,ell)`, contraction allowance
 `binomial(K-1,ell-1)`, and the deletion columns at rank `ell` can be paired arbitrarily with the
-contraction columns at rank `ell+1`.  The remaining integral target is to combine these data with
-the switch-minimal defect relations (BR0)--(BR4).  If `Phi>0`, one must turn the resulting
-rank-by-rank defects and forced doubled/single nestings into a violated parent prefix; proving that
-implication is the unresolved Pascal step.  A scalar sum over ranks, or Boolean shadows supplied
-only by relabelling, is insufficient.
+contraction columns at rank `ell+1`.  The `K=6` hole shows that combining these data with
+the switch-minimal defect relations (BR0)--(BR4) need not produce a violated parent prefix.
+A scalar sum over ranks, or Boolean shadows supplied only by relabelling, is insufficient.
 
 This formulation does not assume that a previously selected coloring can be repaired locally.
-It is therefore an exact restatement of the Row-Coloring Lemma, unlike the stronger local targets
-below.  A possible constructive proof would start with an arbitrary Gale--Ryser realization and
-use degree-preserving switches, while choosing the pairings inside identical doubled columns, to
-remove odd cycles from the union of the paired matchings.  What is missing is a Pascal-specific
-global switching argument; merely repairing one failed coloring is not logically necessary.
+It is therefore an exact restatement of the refuted Row-Coloring conjecture, unlike the stronger
+local targets below.  The counterexample has no switch sequence ending at a balanced realization.
 
 The global switching space has an immediate normalization that the fixed-color route obscures.
 Among all incidence realizations with the prescribed margins and all row colorings, minimize
@@ -1340,13 +1357,12 @@ row meeting them must receive compensating zero or opposite-sign incidences as p
 Thus a switch-minimal counterexample cannot have unrelated defects in the many identical Pascal
 columns.  At each power-of-two capacity, all doubled-column imbalances take at most two consecutive
 values of one sign, capacity levels obey (BR1'), every nonzero value forces nesting against every
-single column at that capacity, and rows obey (BR3).  The
-remaining exact task on this route is to combine those per-capacity defects using the binomial
-multiplicities and show that either another switch exists or their aggregate violates a parent
-prefix inequality.  Unlike the Core--Blocker staircase, (BR1)--(BR2) were obtained by optimizing
-globally over realizations and colorings and therefore do not strengthen the desired conclusion.
+single column at that capacity, and rows obey (BR3).  The `K=6` hole shows that these
+per-capacity defects need not yield another switch or a violated parent prefix.  Conditions
+(BR1)--(BR4) remain necessary structure of a switch-minimal hole; the counterexample supplies the
+concrete object in which their formerly hoped-for conclusion fails.
 
-An equivalent transfer form of the same universal full-mass claim is the following.  If
+An equivalent transfer form of the now-refuted universal full-mass claim was the following.  If
 `x in M_h` and `x_i>=x_j+2`, then
 
     x-e_i+e_j in M_h,                                                        (T)
@@ -1358,16 +1374,16 @@ by `G_K`; (T) would therefore prove (F), and artificial unit rows handle smaller
 As universal full-mass statements, (T) and (F) are equivalent: (F) immediately puts the more
 balanced neighbor back in `M_h`, while (T) reaches every dominated vector from `G_K`.  The next
 statement is different.  Requiring the two endpoints of every transfer to share one feasible
-coloring is a genuine strengthening of (T); no implication from global transfer closure to that
-common-fiber property has been proved.
+coloring is a genuine strengthening of (T).  Both statements are false: along (K6-4) in the
+counterexample record, the final Robin--Hood transfer leaves `M_(G_5)` altogether.
 
-This is the precise global form of the bottom-up coin-transfer proposal.  In the column model,
+This was the precise global form of the bottom-up coin-transfer proposal.  In the column model,
 remove one incidence from donor row `i` and seek an alternating row/column path that installs it
 at recipient `j`, possibly flipping several whole-row orientations.  If the path search stops,
-its reached rows and doubled/single columns give a Hall cut.  The remaining Pascal-specific
-proof obligation is to use the power-of-two capacities and binomial multiplicities in (D) to
-symmetrize that cut and turn it into a violated parent rank inequality.  Ordinary
-bisubmodular exchange does not automatically do this after the absolute-value fold.
+its reached rows and doubled/single columns give a Hall cut.  The hoped-for Pascal-specific step
+was to symmetrize that cut into a violated parent rank inequality.  The `K=6` cut is the explicit
+counterexample: it respects every parent rank inequality, so no such universal symmetrization is
+possible.
 
 There is a sharper local version of exactly that obligation.  For a fixed coloring `A/B`, put
 
@@ -1384,20 +1400,19 @@ if `i,j` have the same color, such a tight set is impossible: replacing `j` by `
 three cardinalities in `r_(A,B)` but increases its demand by at least two, contradicting the
 feasibility of `x`.
 
-Thus only an opposite-color tight separator can obstruct a transfer.  This isolates the following
-particularly economical sufficient statement.
+Thus only an opposite-color tight separator can obstruct a transfer.  This isolated the following
+particularly economical sufficient statement, now refuted.
 
-> **Pascal Adjacent-Fiber Lemma (open).** If `x in M_h`, `h=G_(K-1)`, and
+> **Pascal Adjacent-Fiber Conjecture (false at `K=6`).** If `x in M_h`, `h=G_(K-1)`, and
 > `y=x-e_i+e_j` is a Robin-Hood transfer, then some row coloring is feasible for both `x` and `y`.
 
 The coloring may depend on the chosen transfer; asking one coloring to support every outgoing
-transfer is stronger and is not needed.  The Adjacent-Fiber Lemma would prove (T), hence (F), by
+transfer is stronger and is not needed.  The Adjacent-Fiber statement would prove (T), hence (F), by
 walking from a permutation of `G_K` through unit Robin-Hood transfers.  In tight-set language, its
-entire unproved content is: among the feasible colorings of `x`, one can eliminate every tight set
-that separates this particular opposite-color pair.  A plausible proof would choose a coloring
+failed content was the claim that among the feasible colorings of `x`, one can eliminate every tight set
+that separates this particular opposite-color pair.  A proposed proof would choose a coloring
 maximizing the minimum separator slack and use bisubmodular uncrossing to recolor across a minimal
-tight separator.  What is still missing is the Pascal-specific recoloring step that either raises
-that slack or turns the separator into a violated parent-rank inequality.
+tight separator.  The final edge of (K6-4) proves that such a recoloring step cannot always exist.
 
 An exact census now verifies this common-coloring statement for every full-mass state and every
 normalized donor-value/recipient-value transfer through `K=4`: all 141,690,676 `K=4` transfer
@@ -1405,7 +1420,7 @@ types pass.  For `K<=3`, exhaustive maximization gives best separator margin at 
 `K=4` every transfer also has a certificate of margin at least two.  Transfers without a
 same-color certificate have their opposite-color fiber exhaustively maximized; ordinary
 same-color successes stop at their first certificate, so maxima above two are not claimed.  This
-is strong finite evidence, not the missing recoloring proof.
+is an exact lower-level theorem, but the universal statement fails two levels later.
 
 The tempting stronger claim that donor and recipient can always share a color is false at `K=4`.
 For
@@ -1446,12 +1461,12 @@ with unit rows filling each child to mass `M`.  The mixed child fits under the c
 supports every intermediate transfer, and its separator margin is exactly `d-r`.
 
 This proves one genuine Pascal separator crossing with no cyclic reassignment: an identical pair
-at the first obstructing Pascal plateau absorbs the unit.  It also suggests a sharper remaining
-lemma.  Starting from a minimal opposite-color tight separator, descend through the dyadic/Pascal
+at the first obstructing Pascal plateau absorbs the unit.  It originally suggested a sharper
+lemma: starting from a minimal opposite-color tight separator, descend through the dyadic/Pascal
 capacity blocks until reaching the first plateau with an unused identical target, reroute the unit
-inside that plateau, and propagate the displacement back along the block chain.  A proof must show
-that failure at every plateau sums to a violated parent prefix.  The explicit family proves the
-local reroute, but the global termination/violation alternative is still open.
+inside that plateau, and propagate the displacement back along the block chain.  The explicit
+family proves the local reroute, but the `K=6` hole shows that global termination or a violated
+parent prefix cannot be guaranteed.
 
 Simple global scalar optimization is not a substitute for (F).  Requiring at least
 `2^(K-1)` rows of each color and then minimizing the final A/B mass difference passes every
@@ -1539,7 +1554,7 @@ Its conjugate is `G_K`, because equivalently
 Consequently the nested-chain partition of `P_K` has shape `G_K`, not merely the same extremal
 prefix sums.
 
-For full mass, the Singleton Majorization Converse is therefore exactly the following special
+For full mass, the Singleton Majorization Converse was therefore exactly the following special
 case of the generalized Griggs dominance assertion:
 
 > Every integer partition dominated by the nested-chain partition of the normalized-matching
@@ -1551,9 +1566,10 @@ Stanley's `nice`-graph language gives the equivalent incomparability-graph state
 assertion is a conjectural template, not a theorem that can be imported here; even the Boolean-
 lattice specialization is the long-standing Griggs dominance conjecture, still treated as such in
 [Li--Qiu--Yang--Zhang (2024)](https://arxiv.org/abs/2408.13127) and in the current
-[nice-graph literature](https://arxiv.org/abs/2608.16613).  Our `P_K` is a much
-more rigid, recursively series-parallel family, so this connection neither proves nor refutes the
-singleton converse.  It does explain why Greene--Kleitman extremality alone stops at necessity.
+[nice-graph literature](https://arxiv.org/abs/2608.16613).  The `K=6` state above shows that even
+the recursively series-parallel poset `P_6` fails this dominance assertion.  Thus the connection
+explains both why Greene--Kleitman extremality stops at necessity and how the counterexample fits
+the surrounding chain-partition language.
 
 #### The exact carry-compatible incidence target
 
@@ -1570,13 +1586,14 @@ rank-incidence problem completely.
 
 Call such a matrix **carry-compatible** if the one-entries in every rank can be bijected with the
 actual elements of that rank so that the elements assigned to each matrix row form a chain of
-`P_K`.  The full-mass converse is equivalent to:
+`P_K`.  The full-mass converse was equivalent to:
 
-> **Carry-Compatible Gale--Ryser Lemma (open).** For every `a<=_w G_K` of mass `3^K`, at least one
+> **Carry-Compatible Gale--Ryser Conjecture (false at `K=6`).** For every `a<=_w G_K` of mass `3^K`, at least one
 > matrix with margins (PR5) is carry-compatible.
 
-This is not an extra conjecture: a chain partition gives such a matrix by recording ranks, and a
-carry-compatible matrix lifts back to the chain partition.
+This was not an extra conjecture: a chain partition gives such a matrix by recording ranks, and a
+carry-compatible matrix lifts back to the chain partition.  The `K=6` hole has the required
+Gale--Ryser margins but admits no carry-compatible realization.
 
 The compatibility recursion is precisely Pascal deletion/contraction.  The lower-half columns
 form one `P_(K-1)` instance.  In the upper half, one row orientation must be used at every upper
@@ -1584,7 +1601,7 @@ rank occupied by that row, because the first outer symbol must remain `0` or rem
 upper column of size `2R_(K-1)(r)` must therefore be bisected by one common row coloring; after the
 bisection its two halves are independent `P_(K-1)` instances.  All lower elements lie below all
 upper elements, so the lifted lower and upper pieces in one row concatenate automatically.  This
-is exactly the Balanced Pascal Realization Lemma in rank order.
+is exactly the Balanced Pascal Realization conjecture in rank order.
 
 One must choose the matrix jointly with the lift.  It is false that every Gale--Ryser matrix with
 the correct margins is carry-compatible.  At `K=4`, use five rows `u,v,a,b,c`.  Give the four
@@ -1607,11 +1624,11 @@ itself is solvable: split one length-16 chain of the canonical `G_4` decompositi
 sizes `4,4,2,2,2,1,1`, and split every other canonical chain into singletons.  Thus (PR6) refutes
 only arbitrary-matrix lifting, not the converse.
 
-The remaining freedom is now exact: construct **some** rank-incidence realization whose dyadic
-carry hyperedges have the recursive common bisections.  Counting margins, sorting ranks, or lifting
-a canonical Gale--Ryser realization without switches all discard that choice.
+The former exact target was to construct **some** rank-incidence realization whose dyadic carry
+hyperedges have recursive common bisections.  The `K=6` state proves that even this joint choice may
+not exist; counting margins, sorting ranks, and arbitrary matrix lifting explain only necessity.
 
-### A canonical direct-transfer lemma and the remaining global schedule (2026-08-29)
+### A canonical direct-transfer lemma and the failed global schedule
 
 The nested decomposition has a stronger local property that is special to the Pascal construction.
 Index its chains by `C_j`, `0<=j<2^K`, and put
@@ -1691,9 +1708,9 @@ arbitrarily does not prove dominance closure.  The choice of the earlier recipie
 later moves remain available; this is exactly where a global schedule, rather than a local
 exchange rule, is needed.
 
-The resulting sufficient statement is clean.
+The resulting sufficient statement was clean but is false universally.
 
-> **Canonical Monotone-Transfer Conjecture.** Pad the canonical `G_K` coloring of `Q_K` by empty
+> **Canonical Monotone-Transfer Conjecture (false at `K=6`).** Pad the canonical `G_K` coloring of `Q_K` by empty
 > classes.  For every full-mass partition `a<=_w G_K`, there is a path from that coloring to one
 > of type `a` in which every step moves one vertex from a class of size at least two more than the
 > recipient, and that vertex is already nonadjacent to the entire recipient class.
@@ -1701,7 +1718,8 @@ The resulting sufficient statement is clean.
 This conjecture would prove the Singleton Majorization Converse and would realize the proposed
 “no cyclic reassignment” idea literally: the schedule is global, but each scheduled operation is
 a single direct move.  It is stronger than the required existence theorem, so it must not be used
-as an equivalent reformulation.
+as an equivalent reformulation.  The unreachable `K=6` target refutes it; the first-move lemma and
+the complete `K=3` reachability census remain valid local results.
 
 There is exact finite evidence for the new statement.  At `K=3`, all 1,206 full-mass dominated
 types are reachable by such monotone direct moves.  A forward pass retaining one coloring of each
@@ -1710,12 +1728,10 @@ paths reach the remaining five.  This is a constructive census, not an inference
 Row-Coloring census.  The source and exact output are in the
 [monotone-transfer census record](../../evidence/singleton_monotone_transfer_census_2026-08-29.md).
 
-The next proof obligation on this route is therefore sharply delimited: given a target `a` below
-the current type, prove that **some** admissible direct move preserves reachability to `a`.
-Requiring every admissible move to preserve a pairwise-transfer invariant is false by the displayed
-`K=3` example.  A viable invariant must remember the recursively duplicated recipient classes (or
-equivalently their Pascal chain codes), because choosing among equal-size recipients is what keeps
-later direct moves available.
+Before the counterexample, the proposed next obligation was to show that **some** admissible direct
+move preserves reachability to a target `a`.  The `K=6` hole shows that this cannot hold for every
+dominated target.  The duplicated-recipient structure still explains the successful lower-level
+paths but does not supply universal reachability.
 
 ### The solution-fiber DAG and a Pascal phase birth (2026-08-30)
 
@@ -1732,10 +1748,11 @@ edges and 1,063,464 normalized allocation orbits, every parent edge has a litera
 cut of `G_3` reaches 1,063,144 allocation orbits and, more importantly, at least one orbit above
 every parent.  Thus the following sufficient strengthening holds exactly at `K=3`.
 
-> **Canonical Allocation-Transport Conjecture.** For every full-mass `a<=_w G_K`, some legal cut
+> **Canonical Allocation-Transport Conjecture (false at `K=6`).** For every full-mass `a<=_w G_K`, some legal cut
 > above `a` is reachable from the canonical cut above `G_K` by literal allocation transports.
 
-The conjecture would prove the converse, but it is not equivalent to it.  Nor does edgewise
+The conjecture would prove the converse, but it is not equivalent to it and the `K=6` target has
+no cut to reach.  Nor does edgewise
 nonemptiness prove it: 916 of the `K=3` parent edges kill at least one source allocation orbit, so
 independently selected edge certificates need not compose.  The correct inductive object is the
 reachable subfiber `R(x)`, not one chosen cut.
@@ -1943,14 +1960,14 @@ every transfer nonempty and every parent reached by the canonical component.
 The reduction does not prove that every partition dominated by `G_K` is feasible.  It gives an
 exactly equivalent global target with no arbitrary starting assignment:
 
-> **Pascal-Shuffle Coverage Lemma (open).** The projections of the color-preserving downward
+> **Pascal-Shuffle Coverage Conjecture (false at `K=6`).** The projections of the color-preserving downward
 > exchange cones of all self-sorted Pascal greedy shuffles cover every full-mass partition
 > dominated by `G_K`.
 
 One direction is the explicit shuffle construction and preservation of (C); the other is the
 Greedy-Source Reduction.  This formulation completes the proposed phase-change analysis: the
 phase anchors are now explicit and recursively Pascal-shaped, while coverage of the gaps between
-their cones is the remaining content of singleton majorization.
+their cones was the remaining content of this route.  The `K=6` hole lies outside every such cone.
 
 #### Bidirectional exchanges collapse every coloring phase (2026-08-30)
 
@@ -2021,17 +2038,17 @@ majorized by `G_K`.  We know
     F_K subset B_K,                 conv(F_K)=conv(permutations of G_K).
 
 The convex-hull equality holds because `F_K` contains every permutation of `G_K`, while those
-permutations are exactly the vertices of the ambient permutahedron.  The Row-Coloring Lemma is
-precisely the missing lattice-saturation statement `F_K=B_K`; connectivity of `F_K` cannot rule
-out a missing interior lattice point.  The generic profile `h=(6,1)` demonstrates the distinction:
+permutations are exactly the vertices of the ambient permutahedron.  The Row-Coloring conjecture
+was precisely the lattice-saturation statement `F_K=B_K`; the `K=6` counterexample proves the
+inclusion strict.  Connectivity of `F_K` cannot rule out a missing interior lattice point.  The
+generic profile `h=(6,1)` already demonstrated the distinction:
 all of its existing colored bases have the same bidirectional connectivity, but the ambient point
 `(12,3,3,3)<=_w(12,7,1,1)` is not colorable.
 
 Thus allowing both directions gives a cleaner global picture: the normalized colored graph is
 connected, while the corresponding labelled union is vertex-spanning and has the right convex
-hull.  The missing assertion is that the labelled union has no lattice holes.  Proving `F_K`
-M-convex is an exact exchange form of that assertion: it is sufficient by hole-freeness, and if
-the Row-Coloring Lemma holds then `F_K=B_K`, which is already M-convex.
+hull.  It nevertheless has a lattice hole.  In particular, `F_6` is not M-convex.  Reverse moves
+connect existing feasible colorings; they cannot create a coloring over a point outside `F_6`.
 
 #### Real convexity fails even at exact support (2026-08-30)
 
@@ -2073,8 +2090,9 @@ side gives Hall excess at least
 
 This is positive for every `K>=3` and already exceeds one at `K=5`.  Multiplication by `m+1`
 gives an integer hole for the scaled profile `(m+1)G_(K-1)`, but not for the primitive profile.
-Consequently neither a real exact-support cover nor a universal real defect-below-one theorem can
-prove the integer Singleton Majorization Converse.  The primitive unit lattice is essential.
+Consequently neither a real exact-support cover nor a universal real defect-below-one theorem could
+have proved the integer Singleton Majorization Converse.  The later `K=6` example shows that the
+primitive unit lattice itself also has a hole.
 
 The primitive lattice repairs the entire final band on this tight face.  The last `m+1` rows of
 `G_K` are `(K+1,1^m)`, and `I(m-1)={m/2-1,m/2}`.  Hence the head-light side of every legal
@@ -2105,12 +2123,12 @@ concave function of `y(S)`.  For fixed `y`, `r_y` is submodular.  Hence active s
 `X intersection Z` to be tight as well.  The counterexamples (BG3)--(BG5) show that this
 uncrossing cannot force an integral `y` for real `a`.
 
-This does not immediately make `Y(a)` an integral generalized polymatroid.  For canonical `G_3`,
+This does not make `Y(a)` an integral generalized polymatroid.  For canonical `G_3`,
 the least allowed integral color count is one on rows `{8,7}`, zero on a unit row, and zero on
-`{8,7,1}`; the lower-bound function is therefore not supermodular.  The only surviving version is
-integer-aware: prove that `Y(a)` contains a zero--one point when the parent `a` itself is integral
-for the primitive Pascal profile.  This is the exact-support Row-Coloring Lemma, not a continuous
-shortcut to it.  Definitions, the all-level counterexample proof, the short `K=2` theorem, exact
+`{8,7,1}`; the lower-bound function is therefore not supermodular.  The proposed integer-aware
+version asked whether `Y(a)` contains a zero--one point when `a` is integral for the primitive
+Pascal profile.  The `K=6` counterexample answers no.  Definitions, the real counterexample proof,
+the short `K=2` theorem, exact
 commands and all grid counts are in the
 [exact-support real-cover record](../../evidence/singleton_exact_support_real_cover_2026-08-30.md).
 
@@ -2129,12 +2147,11 @@ component reaches 434,873, covers all 87,401 cuts missed canonically, and overla
 This is a complete theorem about the bounded ideal, not evidence that no further source occurs at
 larger `D`.
 
-The source-classification part of the earlier target is now resolved for Hall colorings by the
+The source-classification part of the earlier target is resolved for Hall colorings by the
 Greedy-Source Reduction: higher Pascal phases really do occur and are not all descendants of
-(PB).  The remaining target is coverage.  Prove the Pascal-Shuffle Coverage Lemma directly, or
-show that the downward cones of the explicit phase anchors merge before leaving a hole in the
-parent projection.  Edgewise nonemptiness through the surveyed ideals supports this statement but
-does not prove it.  The exact definitions, counts, all-level phase constructions, programs and
+(PB).  The proposed remaining target was coverage by the downward cones of the explicit phase
+anchors.  The `K=6` state is a hole in that projection and refutes Pascal-Shuffle Coverage, while
+the surveyed bounded ideals remain exact finite theorems.  The exact definitions, counts, all-level phase constructions, programs and
 reproduction commands are in the
 [solution-fiber DAG record](../../evidence/singleton_solution_fiber_dag_2026-08-30.md).
 
@@ -2180,7 +2197,7 @@ misses `(8,7,3,3,3,1,1,1)`, while the reverse convention misses
 
 This suggests another clean sufficient statement.
 
-> **Pascal Two-Interval Splicing Conjecture.** The displayed normal form exists for every `K` and
+> **Pascal Two-Interval Splicing Conjecture (false at `K=6`).** The displayed normal form exists for every `K` and
 > every full-mass `a<=_w G_K`.
 
 Unlike the Carry-Compatible Gale--Ryser Lemma, this is a strengthening rather than an equivalent
@@ -2189,7 +2206,8 @@ partition and supplies no direct-move history.  Its prospective proof is a coupl
 endpoint-matching theorem: choose interval endpoints in the canonical Pascal chains so that the
 resulting fragments of the requested lengths can be paired across distinct depths.  The strict
 depth orientation removes cyclic dependencies, while majorization should provide the Hall
-inequalities for the endpoint matching.  Establishing that last implication is the open step.
+inequalities for the endpoint matching.  Since the normal form would be a chain partition, the
+`K=6` counterexample proves that it cannot always exist.
 
 At `K=4` the normal form has 456 intervals and 20,542 candidates.  Five deliberately varied
 majorized targets have exact covers; among 100 seeded Robin--Hood-walk targets, 85 have covers and
@@ -2380,10 +2398,10 @@ is therefore a sum over count paths of products of local band multiplicities.  T
 **Pascal Tight-Skeleton Factorization Theorem**.  The dyadic product above occurs when `I(t)` is a
 singleton.
 
-The exact remaining local target must retain this count path.  The **Positive-Band Extension
-Conjecture** says that every exact parent band dominated by `G_K[u:v]` extends every incoming
-`p_u in I(u)` to some `p_v in I(v)`.  Its all-band form is stronger than the converse needs, but it
-is the natural induction statement.
+The count path is essential, but the proposed **Positive-Band Extension Conjecture is false**.
+At `K=6`, the band `[15,31)` has canonical profile `(22,7^15)`, while the dominated equal-mass
+refinement `(8^15,7)` extends none of its four endpoint transitions
+`7->15, 7->16, 8->15, 8->16`.  This is exactly the band inside the global counterexample.
 
 There is no longer a separate arbitrary-row tail conjecture.  The **Half-Unit Coalescence Lemma**
 says that if a capacity partition has at least as many unit parts as non-unit parts, merging the two
@@ -2393,11 +2411,12 @@ coalesced state, undo a merge by orienting both original rows alike and dividing
 amount between them.  This merely refines each child part, so child majorization is preserved.
 Hence:
 
-> **Minimum-Support Reduction Theorem.**  The Row-Coloring Lemma for all full parents at level `K`
+> **Minimum-Support Reduction Theorem.**  The Row-Coloring property for all full parents at level `K`
 > follows from its restriction to parents with exactly `2^K` positive rows.
 
-The terminal positive-band case similarly implies arbitrary suffix extension.  The full-band case
-`[0,2^K]` is exactly the minimum-support problem and by itself is sufficient for the full converse.
+The terminal positive-band case still implies arbitrary suffix extension when its head allocation
+exists.  The full-band case `[0,2^K]` is exactly the minimum-support problem; the `K=6`
+counterexample shows that this full-band statement is false.
 In that minimum-support case every row must send a positive pure part and the two orientations have
 exactly `2^(K-1)` rows each.  Removing one pure anchor coin from every row contracts the three
 child capacities to `(G_(K-1)-1),G_(K-1),(G_(K-1)-1)` and the parent capacity to `G_K-1`; this is
@@ -2409,7 +2428,7 @@ instances across 136 rank bands extend every incoming count.  The `K=4` full ban
 408,776 exact-support parents, versus 5,997,038 unrestricted parents; 63,329 of the exact-support
 states have no internal tight prefix.  The old direct tail census also passes all 1,422,304
 state--incoming-count instances across 37 cases, independently checking the now-proved reduction.
-These census results are finite theorems, not a general proof.
+These census results are finite lower-level theorems; the general statement fails at `K=6`.
 
 The path variable cannot be normalized away.  In the `K=4` band `[5,9)`, the state `(4^4)` fails
 the same-orientation transitions `2->4` and `3->5` but succeeds under the switching transitions
@@ -2418,8 +2437,8 @@ the same-orientation transitions `2->4` and `3->5` but succeeds under the switch
 child capacities.  Even exact-head strict alternation fails at `K=5` on
 `(32,31,26,26,16^3,11^2,6^7)`.  More strongly, strict alternation fails at `K=6` on the 64-row
 parent `(63^2,57^2,42^3,23^5,22^5,3^44,2^3)`, even though it is strictly below every internal
-prefix of `G_6`.  Thus the live target is the global Pascal count path, not a fixed alternation or
-an unrestricted collection of interval triples.
+prefix of `G_6`.  The new band hole goes further: even the fully adaptive global Pascal count path
+can have no outgoing transition.
 
 Exact proofs, counterexamples, census method and reproduction are in the
 [tight-skeleton record](../../evidence/singleton_pascal_tight_skeleton_2026-08-29.md); the original
@@ -2480,21 +2499,24 @@ Every row uses only its chosen pure side and the mixed side, so the lift is lega
 
 This isolates one smaller sufficient target.
 
-> **Balanced Residual Coloring Lemma (open).**  Every full-mass `b<=_w J` with at most `2n`
+> **Balanced Residual Coloring Conjecture (false at `K=6`).**  Every full-mass `b<=_w J` with at most `2n`
 > positive rows has a coloring satisfying (TA4), with at most `n` positive rows of each color.
 
-The lemma is a sufficient strengthening, not a proved equivalent: the top-half mixed anchors have
-not been normalized in an arbitrary legal cut.  If it holds at every level, however, the theorem,
-Minimum-Support Reduction and induction prove the full Singleton Majorization converse.  Pascal
-structure is now present at the start rather than postponed: `c'` consists of all nonempty Boolean
-subsets, and `J'` consists of every next-level subset except `empty` and `{*}`.
+The conjecture was a sufficient strengthening, not an equivalent reformulation.  It already fails
+on the two-anchor image of the `K=6` hole:
 
-The complete residual census supports the lemma through `K=4`: all 73 residual states at `K=3`
+    b=(62,61,55^2,40^4,20^7,6^15,5^2)
+      <=_w (62,61,55^2,40^4,20^8,5^16)=J.
+
+Its residual child profile is `c=(31,30,25^2,15^4,5^8)`, and no capped coloring satisfies (TA4).
+The finite residual censuses below remain correct.
+
+The complete residual census supports the conjecture through `K=4`: all 73 residual states at `K=3`
 and all 160,492 at `K=4` pass, with no coloring failures.  The deterministic two-anchor images of
 all 160 and 408,776 exact-support parents also pass.  A still stronger longest-half rule--exactly
 the largest `n` rows use the mixed child and all three children have exact support--passes all
 exact-support parents through `K=4` and the strict-interior `K=6` alternation counterexample, but
-remains conjectural.
+is also refuted by the same `K=6` state, since it would supply a legal first split.
 
 No scalar selection rule explains the result.  Greedy balance fails on 403 residual `K=4` states.
 Globally minimum mass difference, even after imposing both necessary color-row bounds, fails on
@@ -2544,7 +2566,7 @@ so this is a counterexample to the rule, not to the converse.  In the conjugate-
 the corresponding working row orientations are `L,R,L,L,R,L,R,R,R`: the pure orientation must be
 chosen globally and need not alternate.
 
-### Complete `K<=4` census and a sharper forward conjecture (2026-08-26)
+### Complete `K<=4` census and a refuted forward rule
 
 The full-mass reduction makes a complete small census practical.  The provenance-built utility
 `tools/singleton_pair_coloring_census.cpp` enumerates every integer partition of `3^K` weakly
@@ -2565,7 +2587,7 @@ One legal coloring is
 Thus the tail unit rows must sometimes be distributed unevenly; keeping them in the argument is
 essential, and splitting every adjacent pair is genuinely too restrictive.
 
-The census suggests a more flexible **Block-Extension Conjecture**.  Write the distinct row
+The census suggested a more flexible **Block-Extension rule**.  Write the distinct row
 values as `v_1>...>v_s`, with multiplicities `m_j`, and process these value blocks in descending
 order.  For each block choose, among the allocations that preserve all currently exposed
 inequalities (C) and permit at least one legal allocation of the next lower block, the allocation
@@ -2573,7 +2595,8 @@ that minimizes the current A/B total-mass difference.  Fix complementation by pu
 row in A and favor A on an exact tie.  This is a forward pass with one-block lookahead and no
 recoloring.  It succeeds on the complete `K<=4` census, on 10,000,000 uniformly sampled states
 from the exact 38,378,683,542,323-state full-mass `K=5` universe, and on a separate 100,000-state
-`K=6` dominance-transfer sample.
+`K=6` dominance-transfer sample.  The exact `K=6` hole has no coloring at all and therefore
+refutes the universal rule; the sampled successes remain only lower-level diagnostics.
 
 Those higher-level samples are not proofs.  Simpler variants already fail: plain balanced blocks
 miss 22 `K=4` states and 12 of the ten million `K=5` samples; reserving enough final rows for both
@@ -2584,9 +2607,8 @@ counterexamples, commands and proposed two-block proof obligation are in
 
 Grouping equal rows here is only the normalization of row colorings by permutations of
 indistinguishable rows.  It does not establish that equality has a special theorem unavailable to
-nearby widths.  A proof still has to show, using the full Pascal/dyadic structure of `G`, that a
-one-block-extendable balanced choice always exists and preserves the same property at the next
-step.  That statement remains open.
+nearby widths.  The formerly proposed one-block-extension theorem is false, since the `K=6` state
+has no coloring at all.
 
 Even “put the next row on any side that keeps all inequalities currently valid” is not an
 exchange-free algorithm.  For `K=3`, the partial coloring
@@ -2615,20 +2637,18 @@ induce a claw on `X union Y`.  They cannot be repartitioned into two stable sets
 Thus a unit transfer between a donor and recipient color may require a third color or a global
 recoloring.  Any proof by dominance-cover exchanges must include that extra mechanism.
 
-## Equivalent graph and symmetric-function targets
+## Equivalent graph and symmetric-function formulation
 
 The canonical recursive strategy colors all of `Q_K` with color-class partition `G_K`, while the
-necessity theorem shows that `G_K` dominates every other coloring type.  Therefore the converse is
+necessity theorem shows that `G_K` dominates every other coloring type.  Therefore the converse was
 equivalent to `Q_K` being **nice** in Stanley's sense: whenever a coloring type `lambda` occurs,
 every partition dominated by `lambda` also occurs.  Equivalently, the support of the chromatic
 symmetric function of `Q_K`, in sufficiently many variables, must contain every lattice point of
 the permutahedron of `G_K`.  The terminology and this support interpretation are summarized in
 [Matherne--Morales--Selover, Section 2.6](https://arxiv.org/html/2201.07333v4#S2.SS6).
 
-This reformulation is exact but does not by itself prove the claim.  `Q_K` is a cograph, but from
-`K>=3` it contains induced claws, so Stanley's theorem that a graph and all its induced subgraphs
-are nice exactly when it is claw-free does not settle this family.  The claw example above also
-explains why.
+The `K=6` counterexample is a dominated coloring type absent from `Q_6`, so `Q_6` is not nice.
+The reformulation remains useful terminology for the negative result.
 
 It is enough to prove the full-mass case.  If `a` has mass `M<3^K`, append `3^K-M` artificial unit
 rows.  The completed partition remains majorized by `G_K`: after the original rows, its prefixes
@@ -2640,8 +2660,9 @@ completed state restricts to one of the original state after deleting the artifi
 The state `G_K` itself has Aigner's explicit recursive strategy.  Therefore any singleton state
 whose rows form a sub-multiset of `G_K` is solvable by Subgraph Monotonicity.  More generally, the
 same is true when the sorted row widths fit coordinatewise into distinct `G_K` rows.  These
-`[canonical U_K]` and `[embedded G_K]` witness terminals remain unconditional and do not use the
-open converse.  Only arbitrary `[majorized G_K]` terminals are conditional.
+`[canonical U_K]` and `[embedded G_K]` witness terminals remain unconditional.  An arbitrary
+`[majorized G_K]` terminal is not a valid certificate: the universal rule that once justified it
+is false, though any particular terminal may still have a separate strategy.
 
 ---
 
@@ -2657,18 +2678,18 @@ G_k[block r] = sum_{i=0}^{k-r} C(k, i)
 
 So block 0 is `2^k`, block 1 is `2^k - 1`, block 2 is `2^k - 1 - k`, block 3 is
 `2^k - 1 - k(k+1)/2`, and so on. Verified against the recurrence for `k <= 12`. This is what
-`make_u_freq` computes in `radio_canon_search_generic.c:121`.  It makes both the proved necessary
-test and the conjectured sufficient test explicit; no recursion is needed to evaluate the prefix
-inequalities.
+`make_u_freq` computes in `radio_canon_search_generic.c:121`.  It makes the proved necessary test
+explicit; the `K=6` counterexample shows that the same prefix inequalities are not sufficient.
 
 ## Consequence used throughout this project
 
 If the parts of a singleton state form a **sub-multiset** of `G_k`, delete the unused star rows
 from Aigner's explicit strategy for `G_k`.  The state is therefore solvable by Subgraph
-Monotonicity, without using the open converse.  The same deletion argument works when the sorted
+Monotonicity, without using any converse.  The same deletion argument works when the sorted
 parts fit coordinatewise into distinct `G_k` rows.  A witness tree all of whose leaves have one of
 these two forms is a complete proof independent of the solver.  `tools/check_witness.py` checks
-these forms separately; it now marks an arbitrary weak-majorization terminal as conditional.
+these forms separately; it marks an arbitrary weak-majorization terminal as unsupported because
+weak majorization alone is now known not to be a certificate.
 
 ## Vertex-Splitting Pullback Lemma (2026-08-09)
 
@@ -2767,7 +2788,7 @@ direction is the necessary implication at `d=k`. ∎
 
 The formerly claimed nesting `R_{d+1} => R_d` is **not proved**.  Its proposed base step
 `R_1=>R_0` treated majorization of singleton children as sufficient for solving them, exactly the
-open converse isolated above.  The false Three-Way Decomposition Lemma also prevents replacing
+converse refuted above.  The false Three-Way Decomposition Lemma also prevents replacing
 that step by a generic coordinate-sum argument.  Consequently the predicates are sound necessary
 filters and the endpoint `R_k` is exact, but they should not presently be described as a nested
 hierarchy.

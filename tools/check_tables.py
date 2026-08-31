@@ -18,7 +18,7 @@ Checks performed:
   formulas        every closed form in conjectures.csv reproduces every known max value of
                   its row at or above its fits_from_k.
   m=5 theorem     the published piecewise formula matches every recorded maximum; its old/new
-                  Pareto-assembly splits and the conditional eventual singleton-majorization
+                  Pareto-assembly splits and the relaxed eventual singleton-majorization
                   template remain arithmetically consistent.
   singleton base  the recursive `G_k` has the claimed Pascal/dyadic conjugate columns, and
                   `G_k'` is one doubled plus one single copy of every `G_(k-1)'` column.

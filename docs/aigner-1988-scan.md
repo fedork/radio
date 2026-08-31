@@ -17,7 +17,7 @@ This independently matches the state-transition table in [problem.md](problem.md
 
 - **Subgraph monotonicity.** Equation (3.10), book p. 145 (PDF p. 27), states `H ⊆ G => M(H) <= M(G)`.  This is the published instance of the monotonicity principle proved in [theorems/subgraph-monotonicity.md](theorems/subgraph-monotonicity.md).
 - **The singleton base sequence.** Aigner's star-forest sequence `N(k)` has the same entries as this project's `G_k`: `(1)`, `(2,1)`, `(4,3,1,1)`, `(8,7,4,4,1,1,1,1)`, ... (book p. 147, PDF p. 29).  Proposition 3.24 proves `M(N(k)) = k` by a three-way recursive test (book p. 148, PDF p. 30).  This is the historical source of the unconditional canonical singleton construction.
-- **Majorization's historical boundary.** Proposition 3.25 proves only the necessary direction: a star forest solvable in `k` is weakly dominated by `N(k)` (book pp. 149--150, PDF pp. 31--32).  The next paragraph explicitly says the converse was then open.  The converse remains open in this repository; the former purported proof used a false decomposition lemma.
+- **Majorization's historical boundary.** Proposition 3.25 proves only the necessary direction: a star forest solvable in `k` is weakly dominated by `N(k)` (book pp. 149--150, PDF pp. 31--32).  The next paragraph explicitly says the converse was then open.  It is now refuted here by an exact-support `K=6` counterexample; the former purported proof also used a false decomposition lemma.
 - **Exact `m=2`.** Corollary 3.26 gives `M(K_{2,n}) = ceil(log_2(n+1))` (book p. 150, PDF p. 32), equivalent to `n(k,2) = 2^k - 1`.
 - **Exact `m=3`.** The answer to Exercise 3.3.1 proves `M(K_{3,2^k-k}) <= k` and `M(K_{3,2^k-k+1}) >= k+1` (book p. 345, PDF p. 75), equivalent to `n(k,3) = 2^k-k` for `k >= 2`.
 

@@ -1,6 +1,7 @@
 # atom-profile-v1
 # Combined all-depth losing-prefix and positive-tree certificate for the A--D eight-atom
-# height-6 hard branch.  Verify independently with:
+# height-6 hard branch.  The positive tree is only for the relaxed aligned-profile model:
+# its singleton-majorized leaves are not achievability certificates.  Verify independently with:
 #   tools/check_atom_profile_certificate.py evidence/atom_profile_height6_ad8.cert
 #   tools/check_atom_profile_tree.py evidence/atom_profile_height6_ad8.cert
 atom_lineage_certificate version=1 model=power_of_two_atom_aligned profile_atoms=8 normalization_levels=3 fixed_parts=AAAAABBC:1,AAABBBCC:2 candidate_height=3 candidate_rank_first=1 candidate_rank_last=81 candidate_d_max=1 root_height=6 root_d_lineages_max=1 terminal_reference_d=0,0,0,0,1,1 required_d_lineages=2 target_rank=59 target=ABBBBBCD next_rank=82 next=AAAAAADD closure_outcome=mixed verdict=ALL_DEPTH_NO

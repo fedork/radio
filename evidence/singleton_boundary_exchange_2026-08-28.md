@@ -1,5 +1,10 @@
 # Singleton boundary-exchange diagnostics (2026-08-28)
 
+**Superseded universal status (2026-08-30).**  The flip/swap calculus and finite censuses below
+remain valid, but Positive Pascal Crossing and Core--Blocker Escape are false universally.  The
+last unit transfer into the [exact `K=6` hole](singleton_k6_counterexample_2026-08-30.md) has no
+feasible target coloring.
+
 ## Exact flip and swap conditions
 
 For a fixed feasible coloring `A/B`, let
@@ -130,12 +135,12 @@ windows are exact on their stated ranges, not a complete `K=4` census.  A 1,000-
 3,000,000 timed out after 184 wall seconds and is an abort, not evidence; the completed 200-state
 replacement took 96 seconds.
 
-The weaker positive-gain statement is enough for a proof.  Repeatedly take any original-state
+The weaker positive-gain statement would have been enough for a proof.  Repeatedly take any original-state
 feasible crossing move that strictly increases the receiving side's mass.  A move of either marked
 endpoint finishes by putting donor and recipient together.  Every other nonterminal move preserves
 their orientation and strictly increases an integer mass bounded by the pure Hall inequality, so
-the process cannot cycle.  The exact remaining claim is therefore the **Positive Pascal Crossing
-Lemma**: such a positive feasible crossing move always exists.  It is still open.
+the process cannot cycle.  The proposed **Positive Pascal Crossing Conjecture** said that such a
+positive feasible crossing move always exists.  The `K=6` hole refutes it.
 
 ## Tight-set core removes the reverse blocker
 

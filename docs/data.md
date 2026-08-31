@@ -142,7 +142,7 @@ an all-depth exclusion.
 - `evidence/sa193_unsolvable_in_10.txt` — the 16 proof-safe cold root refutations, plus exact provenance and hashes
 - `evidence/sa193_run_comparison_2026-08-16.txt` — final run3/run8/run9 classification and measurements
 - `evidence/refuted_2023_negatives.txt` — the 31 verdicts that corpus got wrong
-- `witnesses/*.tree` — 18 structurally checked trees; the two `majorized_*` files are conditional
+- `witnesses/*.tree` — 18 structurally checked trees; the two `majorized_*` files are unsupported
 - `data/exhaustive_multipart.csv` — the 16 `full*` enumerations
 - `data/pareto_sb.csv` — 52 K=9 rows: six exact small-`m` maxima, 16 proof-safe upper bounds and retained legacy lower bounds
 

@@ -11,7 +11,8 @@
 #include <utility>
 #include <vector>
 
-// Exhaustive finite laboratory for the open Singleton Row-Coloring Lemma.
+// Exhaustive finite laboratory for the Singleton Row-Coloring conjecture, now
+// known to fail at K=6.  The lower-level census results remain exact.
 //
 // A full-mass partition a <=_w G_k represents every underfull case after appending unit rows.
 // The complete mode enumerates every such partition through k=4, finds an unrestricted normalized

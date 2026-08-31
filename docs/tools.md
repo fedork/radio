@@ -612,9 +612,11 @@ there is a venv at `.venv` for that.
 **Run `check_witness.py` before recording any new result.** A tree using only canonical or
 distinct-slot terminals is a proof that does not depend on the solver being correct; a solver log
 is not.  Recursive trees may
-stop either at `[canonical U_k]` atom sub-multisets or at `[majorized G_k]` arbitrary singleton
-sequences.  The checker verifies the former by multiplicity and the latter by every weak-
-majorization prefix, but reports the latter as conditional on the open converse.
+stop either at `[canonical U_k]` atom sub-multisets or, in older/diagnostic output, at
+`[majorized G_k]` arbitrary singleton sequences.  The checker verifies the former by multiplicity
+and the latter by every weak-majorization prefix, but reports the latter as **unsupported** because
+the universal converse is false.  A structurally valid tree containing such a terminal is not an
+achievability proof.
 
 ## Budget and root-reachability diagnostics
 
@@ -696,14 +698,14 @@ tools, not yet part of `radiobase.c`:
 | `tools/rb_suffix_profile_census.py` | force RB in cold small states and correlate reached rejections with slack and tail excess |
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization predicates and compare them with a complete pair table |
 | `tools/singleton_pair_coloring_census.cpp` | exhaust full-mass singleton partitions majorized by `G_K` through `K=4`; check Row-Coloring Hall inequalities, global Adjacent-Fiber transfers and coloring rules; inspect labelled fixed-boundary delta exchange, dangerous tight-set core/hull, exact flip-blocker intersections, and maximum/positive crossing-mass rules; probe fixed feasible colorings for positive common neighbors through sampled `K=5` transfers; sample the exact `K=5` universe; check the padded Pascal-prefix reduction and its compressed `K=19` strict-alternation counterexample |
-| `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce residual balance/product/coalescence counterexamples and the strict-interior `K=6` alternation counterexample |
+| `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce the exact-support `K=6` singleton-majorization counterexample, its 14-transfer phase boundary, residual hole, forced bands, and earlier rule counterexamples |
 | `tools/singleton_balanced_hh_census.cpp` | construct the canonical Pascal Havel--Hakimi incidence matrix; test exact canonical colorability and the deterministic row/incidence-switch descent; exhaust exact-support parents through `K=4`, enumerate `K=5` windows, run random/walk/hill probes through `K=6`, and reproduce the fixed-matrix and strict-descent counterexamples with `canonical-state` / `state` |
 | `tools/singleton_monotone_transfer_census.py` | construct actual ternary-word colorings showing that every full-mass `K=3` type dominated by `G_3` is reachable from the canonical coloring by monotone direct one-vertex recolorings; distinguish the unit-ready representative pass from five targeted paths |
 | `tools/singleton_solution_fiber_dag.py` | exhaust the normalized Fixed-Color Hall solution fibers and their color-preserving unit-transfer relations through `K=3`; propagate directed source cones and compute the bidirectional component projection; exhaust downward-closed Lorenz-area coloring ideals through `--area-ideal K D`; enumerate every self-sorted Pascal greedy shuffle and exactly classify all possible coloring sources through `--greedy-sources K` for `K<=8`; exhaust padded or exact-support rational Hall grids with `--rational-grid K D` and `--exact-rational-grid K D`, reporting minimum scaled defects and optionally every hole with `--list-rational-holes` |
 | `tools/singleton_allocation_fiber_dag.cpp` | exhaust all normalized legal first-cut allocations and literal same-child coin transports through `K=3`; classify births/deaths, source orbits and the two forward components; exhaust bounded Lorenz-area ideals with `--area`; inspect one higher-level fiber or edge with `--state` / `--edge` through `K=5` |
 | `tools/singleton_shape_survey.cpp` | reconstruct legal first cuts; test scalar/full-profile shape targets, atom-sized-piece restrictions, and feasible split-count fibers; exhausts the scalar rule through `K=4`, and gives `K=3` counterexamples to the full-profile and per-row atom restrictions |
 | `tools/singleton_strong_niceness.cpp` | recursively count monomial coefficients of the transcript graph's chromatic symmetric function and exhaust strong-niceness comparisons through `K=3` |
-| `tools/search_singletonization.cpp` | exact-negative small-m synchronized search with selectable conditional-majorized, distinct-slot embedded, or exact-atom terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
+| `tools/search_singletonization.cpp` | exact-negative small-m synchronized search with selectable relaxed-majorized, distinct-slot embedded, or exact-atom terminals; rank or exhaust all proven-Pareto four-segment assemblies, scan one chosen assembly/frontier, or solve a fixed-residual slice with memo reuse |
 | `tools/optimize_mixed_frontier.py` | combine a complete two-coordinate mixed-deficit frontier with the two pure-child thresholds and recover the maximum parent D-width |
 | `tools/singletonization_regression.sh` | lock complete assembly rankings/optima, corrected four-segment boundaries, the sharp m=5 leaf atomization depth, exact variable-width synchronization, and memo-exhaustion abort semantics |
 | `tools/search_atom_profiles.cpp` | symbolic aligned-profile recursion at 8, 16 or 32 atoms, with all-depth D-lineage, finite-depth mixed-supply pruning, and finite `(D,C+D)` coinductive obstructions |
@@ -894,7 +896,7 @@ with a small total narrow-side multiplicity.  Define `C_d(S,k)` to hold when `S`
 majorization and either is already a singleton state, or has a legal rectangle split whose three
 children satisfy `C_(d-1)`.  In the default mode, a singleton terminal is accepted by weak
 majorization; that is a relaxation, not a proved positive terminal.  Consequently a default-mode
-`NO` at `d=k` is an exact nonsolvability proof, while a `YES` is conditional.  The `embedded` and
+`NO` at `d=k` is an exact nonsolvability proof, while a `YES` is unsupported.  The `embedded` and
 `canonical-exact` modes give unconditional positive certificates.  At depth zero full-star
 majorization permits at most one edge.
 
@@ -942,7 +944,8 @@ depth two, while a committed exact tree succeeds at depth three.
 retains the exact memo between adjacent `n`, stops at the first positive, and prints its tree.  Cap
 frontier runs with `tools/capped_run.sh`; a memo-limit exception or external cap is an abort, never
 a negative verdict.
-The retained `k=10,m=6` replay proves the upper bound 973; the checked 973 tree is conditional:
+The retained `k=10,m=6` replay proves the upper bound 973; the checked 973 tree is an unsupported
+relaxed-terminal diagnostic:
 `evidence/sb_m6_k10_frontier.txt` and `witnesses/majorized_973_6_at10.tree`.
 
 `assembly` is the corrected diagram directly.  Write
@@ -1100,19 +1103,20 @@ immediately.  The two control modes reproduce the established height-4 and heigh
 `height6-max depth [first_rank [last_rank]]` orders every configured A--D profile from eventually
 widest to narrowest and retains both exact and abstract memos across the inclusive rank interval.
 At eight atoms, ranks 1--81 have all-depth D-lineage certificates and rank 82 `A^6D^2` has an
-independently checked depth-3 tree, so the first 82 scan proves the exact all-depth optimum of that
-slice.  At 16 atoms, ranks 1--289 are lineage-excluded and rank 290 is abstractly negative through
+independently checked depth-3 relaxed tree, so the first 82 scan proves the exact all-depth optimum
+of that relaxed slice.  At 16 atoms, ranks 1--289 are lineage-excluded and rank 290 is abstractly negative through
 all depths by the 242-core projected kernel.  Since ranks 290--304 share that projection, all are
 excluded.  The first checked rank-305 projected tree has no exact lift, but
 `check_dc_tree_lift.py` streams alternative winning projected splits and finds a different exact
-19-node tree.  Rank 305 is consequently the exact widest sixteen-atom D germ.  The retained kernel
-and first projected tree are `evidence/atom_profile_height6_dc16.cert`; the exact positive is
+19-node relaxed tree.  Rank 305 is consequently the exact widest sixteen-atom D germ in that model.
+The retained kernel and first projected tree are `evidence/atom_profile_height6_dc16.cert`; the relaxed positive is
 `evidence/atom_profile_height6_rank305.cert`.
 
 This does not maximize arbitrary excessive `q`: 165 is the number of A--D words of length eight,
 and 969 the number at sixteen, not the whole longer-profile universe.  At 32 atoms, D lineage and
 the 504-core certificate in `evidence/atom_profile_height6_dc32.cert` exclude ranks 1--1179 at all
-depths.  Pure refinement constructs rank 1181, leaving only rank 1180 open in that slice.  The
+depths.  Pure refinement makes rank 1181 feasible in the relaxed model, leaving only rank 1180 open
+in that slice.  The
 propagated-loss budget makes the C++ rank-1180 depth-three product exhaustive and negative.  Guided
 loss-sliced cover now also excludes rank 1180 through depth four; this is a bounded result and does
 not decide depth five or eventual constructibility.  The Python all-skeleton implementation

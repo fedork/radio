@@ -17,8 +17,9 @@
 // singleton rectangles.  The default terminal predicate is singleton
 // majorization.  The generic command also supports the stronger predicates
 // "embedded" (coordinatewise fit in distinct G_k slots) and "canonical-exact"
-// (an exact sub-multiset of G_k).  With depth == k the default mode is exact
-// solvability: an R_0 state at k == 0 has <= 1 edge.  The search is specialized
+// (an exact sub-multiset of G_k).  In default mode NO is sound because the terminal
+// predicate is a relaxation, but YES is not a solvability proof: singleton
+// majorization is necessary and not sufficient.  The search is specialized
 // to the fixed-small-m, near-2^k regime: full-star majorization bounds every
 // wide-side cut to a short interval.
 
@@ -224,8 +225,9 @@ bool terminal(const State &state, int k) {
     if (state.empty()) return true;
     switch (terminal_mode) {
         case TerminalMode::Majorized:
-            // construct() has already checked r0(), which is precisely the
-            // terminal theorem for a singleton state.
+            // construct() has already checked r0().  This is a deliberately
+            // permissive terminal predicate for sound negative searches, not a
+            // positive theorem.
             return singleton(state);
         case TerminalMode::Embedded:
             return embedded(state, k);

@@ -2,7 +2,7 @@
 
 A tree using only canonical or distinct-slot leaves is an explicit strategy proving that a state
 is solvable in `k` tests.  A tree using arbitrary majorized leaves is structurally checkable but
-conditional on the open singleton converse.
+is **not** an achievability proof: the singleton converse is false.
 
 Verify all of them:
 
@@ -18,10 +18,10 @@ tools/check_witness.py witnesses/*.tree
 | `canon_496_4_at9.tree` | `Sb(496:4)` solvable in 9 | proof |
 | `canon_480_5_at9.tree` | `Sb(480:5)` solvable in 9 | proof |
 | `canon_480_5_at9_twosided.tree` | `Sb(480:5)` solvable in 9 with two-sided splits | proof |
-| `majorized_481_5_at9.tree` | conditional `Sb(481:5)` construction | conditional |
+| `majorized_481_5_at9.tree` | relaxed majorization-terminal derivation for `Sb(481:5)` | unsupported diagnostic |
 | `canon_473_6_at9.tree` | `Sb(473:6)` solvable in 9 | proof |
 | `canon_473_6_at9_twosided.tree` | `Sb(473:6)` solvable in 9 with two-sided splits | proof |
-| `majorized_973_6_at10.tree` | conditional `Sb(973:6)` construction | conditional |
+| `majorized_973_6_at10.tree` | relaxed majorization-terminal derivation for `Sb(973:6)` | unsupported diagnostic |
 | `sa192_k10_a.tree` | `Sa(192)` solvable in 10 | proof |
 | `sa192_k10_b.tree` | `Sa(192)` solvable in 10, 149 nodes vs 154 | proof |
 
@@ -48,7 +48,7 @@ the header's `command` line accurate anyway, and note the date if the tool has m
 The three children of a split appear in the order both / mixed / neither. A leaf marked
 `[canonical U_k]` is a singleton state whose parts form a sub-multiset of `G_k`, hence
 solvable in `k` by Aigner's explicit strategy for `G_k` and Subgraph Monotonicity. **This is what
-makes the tree a self-contained proof**—no solver claim or open converse is used.
+makes the tree a self-contained proof**—no unsupported converse is used.
 
 The checker rebuilds these from preorder plus arity rather than from indentation, so a tree
 survives being pasted through a spreadsheet.
@@ -63,9 +63,9 @@ same indented preorder format, but a leaf is marked `[majorized G_k]`:
 ```
 
 Such a leaf need not be a literal sub-multiset of `G_k`; its sorted singleton widths need
-only be weakly majorized by `G_k`.  The checker verifies that prefix condition, but sufficiency is
-the open Singleton Majorization Converse.  Trees using this broader stopping rule—including the
-compact 481 and 973 files—are therefore conditional constructions, not self-contained proofs.
+only be weakly majorized by `G_k`.  The checker verifies that prefix condition, but weak
+majorization is not sufficient.  Trees using this broader stopping rule—including the compact 481
+and 973 files—are therefore unsupported diagnostic derivations, not self-contained proofs.
 
 **Numbered** - produced by `radio_print.c`. Each distinct state gets a line number and is
 proved once:

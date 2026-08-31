@@ -15,8 +15,8 @@ step is:
    the parent (a **Pareto upgrade**);
 3. take a solving split of that lower state and lift it into the parent;
 4. repeat on the three children, terminating at singleton states embedded in distinct rows of the
-   explicit `G_k` construction.  Arbitrary weak-majorization terminals would depend on the open
-   [Singleton Majorization Converse](singleton-majorization.md).
+   explicit `G_k` construction.  Arbitrary weak-majorization terminals are not valid certificates:
+   the [Singleton Majorization Converse](singleton-majorization.md) is false at `K=6`.
 
 The elementary part of this programme is step 3.  It turns an otherwise unconstrained long-state
 split into a box around a known lower split.

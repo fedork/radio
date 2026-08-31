@@ -167,7 +167,7 @@ circulate with the superseded values `182, 176, 170, 165, 159, 153, 148, 142`; t
 wrong. `data/pareto_sb.csv` is the only copy that should be consulted.
 
 The K=9 column has three kinds of entry. For `m=1..5`, published theorems give exact
-maxima; the new `m=5` boundary was also replayed independently with a conditional
+maxima; the new `m=5` boundary was also replayed independently with an unsupported
 majorized-terminal file at 481 and an exact rejection at 482.  At `m=6`, a retained exact replay
 rejects 474 and a canonical tree proves 473. Values at `m=65..80` remain legacy lower bounds recovered from the
 old cache. At `m=81..94`, those legacy lower bounds are paired with proof-safe run9 upper
@@ -179,7 +179,7 @@ At `k=10`, Li--Wu--Triesch's theorem gives the exact cell **`n(10,5)=985`**.  In
 the exhaustive rejection of `Sb(974:6)` proves **`n(10,6)<=973`**.  The checked 115-node file
 `witnesses/majorized_973_6_at10.tree` reaches 77 singleton terminals; 71 already fit in distinct
 `G_k` slots, but six require arbitrary weak majorization.  Because sufficiency of that condition is
-open, it is a conditional 973 construction rather than a lower proof.  Full provenance for the unconditional upper bound is in
+false in general, it is not a 973 lower proof; those six leaves need independent strategies.  Full provenance for the unconditional upper bound is in
 `evidence/sb_m6_k10_frontier.txt`.
 
 The generated grid above shows six exact K=9 maxima at `m=1..6`.  Their per-cell theorem,
@@ -188,7 +188,7 @@ copy is kept here.
 
 The canonical and distinct-slot trees are self-contained proofs: their leaves embed into the
 explicit solvable state `G_k`.  The 481 and 973 files instead use arbitrary weak-majorization
-terminals and are conditional on the open converse.  The exact 481 value remains established by
+terminals, which are not certificates because the universal converse is false.  The exact 481 value remains established by
 Li--Wu--Triesch's published theorem.  `tools/check_witness.py` now reports the distinction.
 
 Maximality at `k=9` is open in the unfilled band, not for `m=1..6`.
@@ -197,9 +197,9 @@ Maximality at `k=9` is open in the unfilled band, not for `m=1..6`.
 
 Three foundational facts are central here:
 
-- [Singleton Majorization Necessity and open converse](theorems/singleton-majorization.md) -
-  proves the obstruction, gives an exact graph/Hall reduction of sufficiency, and explains why
-  canonical distinct-slot terminals are unconditional while arbitrary majorized terminals are not.
+- [Singleton Majorization Necessity and the `K=6` counterexample](theorems/singleton-majorization.md) -
+  proves the obstruction, refutes sufficiency with an exact-support state, and explains why
+  canonical distinct-slot terminals are unconditional while arbitrary majorized terminals are not certificates.
 - [Unit-Group Elimination Theorem](theorems/unit-group-elimination.md) - `1:1` parts can be
   deleted from any state without affecting solvability, subject only to the mass bound.
 - [Subgraph Monotonicity Theorem](theorems/subgraph-monotonicity.md) - deleting candidate
@@ -217,17 +217,17 @@ The special-case constructions (lemmas 1-11) are in
 | `canon_496_4_at9.tree` | `Sb(496:4)` in 9 | 2 trees, 20 splits, 42 leaves |
 | `canon_480_5_at9.tree` | `Sb(480:5)` in 9 | 9 trees, 182 splits, 373 leaves |
 | `canon_480_5_at9_twosided.tree` | `Sb(480:5)` in 9 with two-sided roots | 5 trees |
-| `majorized_481_5_at9.tree` | conditional `Sb(481:5)` construction | 61 nodes, 20 splits, 41 singleton leaves (3 nonembedded) |
+| `majorized_481_5_at9.tree` | unsupported relaxed `Sb(481:5)` diagnostic | 61 nodes, 20 splits, 41 singleton leaves (3 nonembedded) |
 | `canon_473_6_at9.tree` | `Sb(473:6)` in 9 | 154 nodes, 51 splits, 103 leaves |
 | `canon_473_6_at9_twosided.tree` | `Sb(473:6)` in 9 with two-sided roots | 1 tree |
-| `majorized_973_6_at10.tree` | conditional `Sb(973:6)` construction | 115 nodes, 38 splits, 77 singleton leaves (6 nonembedded) |
+| `majorized_973_6_at10.tree` | unsupported relaxed `Sb(973:6)` diagnostic | 115 nodes, 38 splits, 77 singleton leaves (6 nonembedded) |
 | `sa38_k7.tree` | `Sa(38)` in 7 | 24 numbered nodes |
 | `sa65_k8_{a,b,c}.tree` | `Sa(65)` in 8 | 46 / 40 / 35 nodes |
 | `sa112_k9_{a,b,c}.tree` | `Sa(112)` in 9 | 78 / 72 / 74 nodes |
 | `sa192_k10_a.tree` | `Sa(192)` in 10 | 154 numbered nodes |
 | `sa192_k10_b.tree` | `Sa(192)` in 10 | 149 numbered nodes (tighter) |
 
-All files pass structural checking.  The checker marks the two `majorized_*` files conditional;
+All files pass structural checking.  The checker marks the two `majorized_*` files unsupported;
 the other listed trees are unconditional. The seven `Sa(38)` / `Sa(65)` / `Sa(112)` trees were
 recovered from `radio.zip` on 2026-08-02.
 

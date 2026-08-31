@@ -41,7 +41,7 @@ include both boundary verdicts and their artifact hashes in supplementary materi
 
 The value `n(9,6)=473` has a canonical achievability witness and retained rejection at 474.
 At the next level, exhaustive search proves `n(10,6)<=973`; the present 973 construction stops at
-arbitrary majorized singleton leaves and is conditional on the open converse.  See
+arbitrary majorized singleton leaves, which are not certificates because the converse is false.  See
 [pareto_sb.csv](../data/pareto_sb.csv) and
 [special-cases.md](theorems/special-cases.md#10-sb2k---kk-12---3-6---refuted). In particular,
 the former `m=6` continuation fits through nine tests but predicts 976 at ten, and is false.
@@ -50,23 +50,26 @@ Publication value: this is a compact, interpretable new finite theorem and a use
 against inferring global formulae from low-depth data. It belongs beside C1/C2.
 
 Before submission: package the `m=6` rejection logs and the canonical 473 witness; do not present
-973 as achievable unless the singleton converse or an unconditional 973 tree is supplied.
+973 as achievable unless an unconditional 973 tree is supplied.
 
 ## Theory suitable for a theorem section or a companion paper
 
-### T1 — Singleton Majorization Necessity and the open converse
+### T1 — Singleton Majorization Necessity and a `K=6` counterexample to sufficiency
 
 Every singleton state solvable in `K` tests is weakly majorized by the explicit base sequence
-`G_K`.  The converse remains open.  The transcript-conflict graph and Fixed-Color Hall Lemma reduce
-it to one precise Row-Coloring Lemma; see
+`G_K`.  The converse is false: the full-mass exact-support state
+`(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` but has no legal first split and is
+unsolvable in six tests.  The transcript-conflict graph and Fixed-Color Hall criterion give the
+short tight-rank proof; see
 [singleton-majorization.md](theorems/singleton-majorization.md).  Canonical and distinct-slot
 witness leaves remain independently checkable from the explicit strategy for `G_K`.
 
-Publication value: the necessity theorem gives a reusable obstruction, while the graph/Hall
-reduction is a clean formulation of the open sufficiency problem.
+Publication value: the necessity theorem gives a reusable obstruction, while the counterexample
+resolves Aigner's stated converse question negatively and gives an explicit non-nice transcript
+graph/chain-partition type.
 
-Before submission: do not state the converse as a theorem.  Cite Aigner for the historical
-necessity result and present the transcript/Hall reduction only after a focused novelty audit.
+Before submission: independently audit the short proof and perform a focused literature/novelty
+search before claiming priority.  Cite Aigner for the historical necessity result and question.
 
 ### T2 — Unit-Group Elimination Theorem
 
@@ -92,7 +95,7 @@ the width-two counterexample in the same note shows why no naive one-sequence ex
 ### T4 — synchronized-majorization predicates
 
 Every predicate `R_d` is necessary for solvability, and `R_K` is exact.  The previously claimed
-nesting `R_(d+1)=>R_d` is unproved because its base step used the open singleton converse.  The
+nesting `R_(d+1)=>R_d` is unproved because its base step used the false singleton converse.  The
 width-two counterexample to any one fixed base sequence remains valid. See
 [singleton-majorization.md](theorems/singleton-majorization.md#the-synchronized-majorization-predicates-corrected-2026-08-26).
 

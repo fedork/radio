@@ -12,8 +12,8 @@
 #include <utility>
 #include <vector>
 
-// Survey a global "same coalescence shape" proposal for the open Singleton
-// Row-Coloring Lemma.  A full-mass parent row either remains one child row or
+// Survey a global "same coalescence shape" proposal for the now-refuted Singleton
+// Row-Coloring conjecture.  A full-mass parent row either remains one child row or
 // splits into two nonempty rows in the mixed and one pure child.  If s rows
 // split, then r_0+r_1+r_2=r+s.
 //

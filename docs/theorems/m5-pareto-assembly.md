@@ -3,10 +3,10 @@
 Li--Wu--Triesch prove the exact piecewise frontier for `K_(5,n)`, equivalently `Sb(n:5)`.
 This note does not replace their proof.  It recomputes a proposed lower construction in the
 corrected A/B/C/D assembly coordinates and isolates a one-dimensional D problem.  **Correction
-2026-08-26:** the arbitrary singleton-majorization terminals used in that reconstruction are
-conditional on the open converse.  The published theorem remains unconditional, as do the local
+2026-08-30:** the arbitrary singleton-majorization terminals used in that reconstruction are not
+certificates because the universal converse is false.  The published theorem remains unconditional, as do the local
 upper-bound reduction and any branches explicitly exactified to canonical/distinct-slot leaves.
-The assembly is therefore a conditional calibration rather than an independent reconstruction.
+The assembly is therefore a diagnostic calibration rather than an independent reconstruction.
 See [the primary-source summary](../literature.md#li-wu-triesch-2018).
 
 Throughout, put
@@ -99,7 +99,7 @@ synchronized obligation after the two outer tests is
 
 This is exactly the proposed variable-D slice, with no A/B/C witness-tree alignment involved.
 
-### D-slice upper bound and conditional matching constructions
+### D-slice upper bound and unsupported relaxed matches
 
 The proposed matching value for the branch (7) is
 
@@ -109,12 +109,12 @@ The proposed matching value for the branch (7) is
 Equivalently, (8) covers parent levels `k=9,10` and `k>=11`.  At the transition base `k=8`
 (`t=6`), exact local assembly gives the tied value `d*=P-Q-1=57`.
 
-**Conditional achievability.**  The structurally checked `k=9` file contains the literal state
+**Relaxed-terminal derivation, not achievability.**  The structurally checked `k=9` file contains the literal state
 `Sb(118:3,121:1,114:1)@7`; see
-[`majorized_481_5_at9.tree`](../../witnesses/majorized_481_5_at9.tree).  The exact construction
-regression checks `d=241` at `t=8` and the tied `t=6` base.  For every `t>=9`, the uniform
-construction below reaches singleton states majorized by `G`; without the open converse this does
-not finish the lower bound.  Theorems 2 and 3 of Li--Wu--Triesch independently prove the parent
+[`majorized_481_5_at9.tree`](../../witnesses/majorized_481_5_at9.tree).  The relaxed regression
+checks `d=241` at `t=8` and the tied `t=6` base.  For every `t>=9`, the uniform
+derivation below reaches singleton states majorized by `G`; this does not finish the lower bound.
+Theorems 2 and 3 of Li--Wu--Triesch independently prove the parent
 frontier by their published construction, but this note has not established that their internal
 state is exactly (7).
 
@@ -128,7 +128,7 @@ solve `Sb(n(k,5)+1:5)@k`, contradicting the published exact upper bound.  Subgra
 excludes every larger `d`.  Thus the global theorem supplies the displayed upper bound for the
 local D slice.  Equality still needs an unconditional construction of `R_t(d*(t))`.
 
-### A conditional two-test template for `t>=9`
+### A majorization-terminal two-test template for `t>=9`
 
 The eventual `+1` is not only a consequence read backwards from the published answer.  Set
 
@@ -173,8 +173,8 @@ whereas the five reference deficits are
 
 Their total deficits agree.  For `t>=9`, `Q-t-2>=t`; the first four sorted deficit sums of the
 candidate are therefore at least the corresponding reference sums.  The three-entry leaf is also
-majorized because `Q>=2t+1`, and `U0` because `Q>=t+2`.  These inequalities all hold from `t=9`, so
-the open Singleton Majorization Converse would complete the construction.  Where the decisive
+majorized because `Q>=2t+1`, and `U0` because `Q>=t+2`.  These inequalities all hold from `t=9`,
+but weak majorization cannot complete the construction.  Where the decisive
 five-part leaf is subsequently replaced by an explicit canonical tree, that finite instance is
 unconditional.
 
@@ -318,7 +318,7 @@ The known exact `m=5` result supports the general assembly mechanism but changes
 2. Maximizing D for each outer triple remains the correct local problem.
 3. A global construction must retain competing outer triples and take their envelope; one repeated
    height choice is not enough.
-4. In the conditional terminal model, `d*` can change symbolic regime because a leaf-majorization
+4. In the relaxed terminal model, `d*` can change symbolic regime because a leaf-majorization
    inequality changes truth value; here that happens exactly between `t=8` and `t=9`.
 5. None of this proves that every height has an eventual aligned atom regime or that the assembly
    exhausts every unrestricted strategy.

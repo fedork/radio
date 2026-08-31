@@ -91,7 +91,7 @@ n(k,5) = F(k)       for 3 <= k <= 8,
 Thus the former formula was exact only through `k=8`: it predicts 480 at `k=9`, while the
 exact maximum is 481.  The old `BBBD` construction and its verified 480 tree remain valid
 lower bounds; they are not optimal from `k=9`.  The file
-`witnesses/majorized_481_5_at9.tree` is conditional on the open singleton converse; the published
+`witnesses/majorized_481_5_at9.tree` is not a proof because singleton-majorization sufficiency is false; the published
 theorem is the unconditional lower source.  An exact local rejection of 482 is retained in
 `evidence/sb_m5_k9_frontier.txt`.  See
 [../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).  The paper's construction
@@ -105,8 +105,8 @@ Exact for `k = 4..9`: gives 7, 19, 46, 104, 225, 473.  At `k=9` the verified tre
 `evidence/sb_m6_k9_frontier.txt` retains the exact rejection at 474.
 
 It fails at `k=10`: the formula predicts 976, while exhaustive synchronized search proves the
-upper bound `n(10,6)<=973`.  The file `witnesses/majorized_973_6_at10.tree` is a conditional lower
-construction, because its arbitrary majorized singleton terminals use the open converse; the
+upper bound `n(10,6)<=973`.  The file `witnesses/majorized_973_6_at10.tree` is an unsupported
+diagnostic derivation because its arbitrary majorized singleton terminals use the false converse; the
 unconditional 974 rejection is retained in `evidence/sb_m6_k10_frontier.txt`.  The upper bound
 alone refutes the proposed formula.
 

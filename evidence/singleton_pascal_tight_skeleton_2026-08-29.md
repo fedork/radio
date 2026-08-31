@@ -1,5 +1,10 @@
 # Pascal tight-skeleton factorization and interval census (2026-08-29)
 
+**Superseded status (2026-08-30).**  The factorization and minimum-support reduction below remain
+proved, but Positive-Band Extension is false.  The `K=6` band `[15,31)` with target `(8^15,7)`
+extends none of its four forced endpoint transitions; see
+[the counterexample](singleton_k6_counterexample_2026-08-30.md).
+
 ## Outcome
 
 The low-multiplicity shape is governed by all tight Pascal prefixes, not only the dyadic ones.
@@ -9,12 +14,12 @@ matrices.  The number of global oriented allocations is a transfer-matrix produc
 The earlier dyadic Cartesian product is the special case in which every intermediate matrix has
 one row and one column.
 
-This is a proved structural theorem, not yet the Singleton Majorization Converse.  A second proved
+This is a proved structural theorem, not the Singleton Majorization Converse.  A second proved
 reduction now removes the apparent arbitrary-support difficulty: because half the rows of `G_K`
 are units, repeatedly merging the two smallest parent rows preserves majorization until exactly
-`2^K` rows remain, and any split of the merged state lifts back.  Thus the full converse is
-equivalent to its minimum-support case.  Only one Pascal-band existence statement remains; the
-formerly separate tail statement follows from it.
+`2^K` rows remain, and any split of the merged state lifts back.  Thus any full counterexample
+reduces to minimum support; the `K=6` hole already has that support.  The formerly proposed
+Pascal-band existence statement is false.
 
 ## Tight-skeleton factorization theorem
 
@@ -119,8 +124,8 @@ dominance of `alpha` applies.  Thus the new conjugate still dominates `gamma`, p
 `(2,2,2)<=_w(3,3)`, but merging its two smallest parts gives `(4,2)`, which is not dominated by
 `(3,3)`.  Repeated application of the lemma gives:
 
-> **Minimum-Support Reduction Theorem.**  To prove the Row-Coloring Lemma at level `K`, it is
-> enough to prove it for full-mass parents having exactly `2^K` positive rows.
+> **Minimum-Support Reduction Theorem.**  Any failure of the Row-Coloring property at level `K`
+> has a failure among full-mass parents having exactly `2^K` positive rows.
 
 Indeed, a full-mass parent dominated by `G_K` cannot have fewer than `2^K` rows.  Merge its two
 smallest rows until exactly that many remain.  Given a legal split of a merged row `x+y`, orient

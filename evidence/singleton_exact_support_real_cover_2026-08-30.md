@@ -1,5 +1,10 @@
 # Real Hall-cover counterexamples and the primitive-lattice gap (2026-08-30)
 
+**Resolved status (2026-08-30).**  The real holes below remain correct, and the primitive integer
+lattice also has a hole: the exact-support `K=6` state in
+[the counterexample record](singleton_k6_counterexample_2026-08-30.md).  Thus the integer-aware
+rounding target discussed later in this note is false universally.
+
 ## Question separated into two genuinely different real problems
 
 For `h=G_(K-1)`, let `H` be its saturated prefix function and, for a padded
@@ -272,7 +277,7 @@ the raw interval endpoints paramodular.
 
 The remaining sharp question is the primitive integer one: when `a` itself
 is integral and majorized by `G_K`, must `Y(a)` contain a zero--one point?
-That is just the exact-support Row-Coloring Lemma in an integer-aware
+That was just the exact-support Row-Coloring conjecture in an integer-aware
 rounding form.  The real counterexamples show why a proof cannot discard the
 integrality of `a` while rounding `y`.  Active-set uncrossing identifies
 structure an integer argument may use, but it is not itself an escape lemma.

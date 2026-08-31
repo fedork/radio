@@ -244,8 +244,9 @@ Theorem-level result (**retracted 2026-08-26**)
 
 - The purported Three-Way Majorization Decomposition Lemma is false already at `k=2`.
 
-- The converse for `Sb(a1:1, a2:1, ..., an:1)` remains open and is now isolated as the
-  Row-Coloring Lemma in `docs/theorems/singleton-majorization.md`.
+- **Historical status at this entry; refuted 2026-08-30.** The converse for
+  `Sb(a1:1, a2:1, ..., an:1)` was isolated as the Row-Coloring Lemma here, but the exact-support
+  `K=6` counterexample now shows that lemma is false.
 
 Working structural hypotheses still under investigation
 
@@ -757,8 +758,9 @@ Full `radio_full` split enumerations of the frontier states, m=5 and m=6 at k=5,
 identities below matched the values recorded at the time.  **Superseded 2026-08-15:** the first is
 exact only for `k=5..8` and fails at `k=9` (480 versus exact 481); the second is exact through
 `k=9` but predicts `496+481=977` versus the unconditional upper bound 973 at `k=10`.
-The former equality claim at 973 was retracted on 2026-08-26 because its positive tree uses the
-open singleton-majorization converse.
+The former equality claim at 973 was retracted on 2026-08-26 because its positive tree uses what
+was then the open singleton-majorization converse; the `K=6` counterexample of 2026-08-30 now
+shows those terminals are unsupported, not merely conditional.
 
     n(k,5) = n(k-1,2) + n(k-1,6)      numerical identity only, not realised by a split
     n(k,6) = n(k-1,4) + n(k-1,5)      realised: b=2, a=n(k-1,5), outcome-0 saturated
@@ -928,8 +930,8 @@ part by part can prove (u1)**. This is the finding worth the session: it is the 
 anyone tries, and it cannot work.
 
 **Refuted: any mass-based move lemma.** `Sb(8:1, 2:1)` solvable in 3, `Sb(9:1)` not, and the
-second is obtained from the first by a single coin move that *strictly decreases* mass. This does
-not use the open converse: `(8,2)` embeds coordinatewise in the first two rows `(8,7)` of the
+second is obtained from the first by a single coin move that *strictly decreases* mass. This did
+not rely on the then-open (and now refuted) converse: `(8,2)` embeds coordinatewise in the first two rows `(8,7)` of the
 explicit solvable `G_3`, while `(9)` fails the proved necessary inequality `9 > 8`.
 
 **What is left.** Exactly two edits of a winning split survive the coin move, and they are the
@@ -4024,9 +4026,9 @@ backwards.
 
 ## 2026-08-10 — the deficit automaton gives the `k=10,m=6` upper break
 
-**Corrected 2026-08-26:** all negative conclusions in this entry remain exact, but arbitrary
-singleton-majorized positive terminals are conditional.  In particular the run proves
-`n(10,6)<=973`; it does not, without the open singleton converse, prove equality.
+**Corrected again 2026-08-30:** all negative conclusions in this entry remain exact, but arbitrary
+singleton-majorized positive terminals are unsupported because the converse is false.  In particular
+the run proves `n(10,6)<=973`; it does not prove equality.
 
 The requested large-`k`-first analysis changed the result, rather than merely explaining the old
 witness.  Write a near-top width as `n=2^k-d`.  Any first cut that can pass full-star majorization
@@ -4059,7 +4061,7 @@ levels and the former through all nine levels.  The neighboring centered total-9
 `tools/search_singletonization.cpp` implements `C_d(S,k)`: require full-star majorization, accept
 an arbitrary singleton-majorized state as a permissive terminal, otherwise choose one legal
 synchronized split whose children satisfy `C_(d-1)`.  At `d=k`, `NO` is an exact refutation because
-every real strategy lies inside this relaxation; `YES` is conditional unless all terminals are
+every real strategy lies inside this relaxation; `YES` is unsupported unless all terminals are
 canonical or distinct-slot embedded.  The wide-cut interval above is complete; while assembling
 several parent parts, rejection of a partial child is sound by subgraph monotonicity.  Along the
 present searches the total narrow-side multiplicity is at most six, so a normalized state has at
@@ -4071,10 +4073,10 @@ reproduced the `Sb(16:1,12:2)@4` negative and `Sb(16:1,11:2)@4` positive from `r
 accepted the known `Z_6` and rejected the independently `R_4`-refuted `Z_7`; and reproduced the
 width-two positive/negative pair in the synchronized-hierarchy theorem note.  Representative cases
 also passed AddressSanitizer and UndefinedBehaviorSanitizer.  `tools/check_witness.py` separately
-checks every `[majorized G_k]` prefix, but as corrected on 2026-08-26 those terminals are reported
-as conditional rather than as complete positive certificates.
+checks every `[majorized G_k]` prefix, but after the 2026-08-30 counterexample those terminals are
+reported as unsupported rather than as complete positive certificates.
 
-### Exact upper bound and the conditional corrected root
+### Exact upper bound and the unsupported relaxed root
 
 The final cold replay exhaustively rejected `Sb(974:6)@10` in 576.178 s, visiting 810,726 memo
 states and 3,712,815,870 partial split assignments.  With that memo retained, `Sb(973:6)@10` was
@@ -4083,13 +4085,13 @@ accepted by the relaxation in 54.4011 s.  The unconditional conclusion is
     n(10,6) <= 973.
 
 The retained negative evidence is `evidence/sb_m6_k10_frontier.txt`; the 115-node, 38-split,
-77-terminal conditional construction is `witnesses/majorized_973_6_at10.tree` (six terminals are
+77-terminal relaxed diagnostic is `witnesses/majorized_973_6_at10.tree` (six terminals are
 genuinely nonembedded).  It uses root
 `[477:2]`, producing
 
     Sb(477:2),        Sb(496:2,477:4),        Sb(496:4).
 
-The `m=4` pure child remains saturated in that conditional construction, but the other width is
+The `m=4` pure child remains saturated in that relaxed diagnostic, but the other width is
 477 rather than the fitted 480.
 This bypasses `Z_7`.  Consequently both `2^k-k(k-1)/2-3` and the `BBCD` profile are refuted: each
 predicts 976 at `k=10`.
@@ -5168,8 +5170,8 @@ with the intended near-zero overhead before the new guard actually fires.
 
 The new hypothesis was to make the observed one- and two-part constructive prefix explicit, then
 recurse on the corresponding four-part state one level down.  The lower long state may need a
-componentwise Pareto upgrade before its split is useful.  As corrected on 2026-08-26, arbitrary
-singleton-majorized leaves make such a construction conditional; canonical and distinct-slot
+componentwise Pareto upgrade before its split is useful.  As corrected again on 2026-08-30, arbitrary
+singleton-majorized leaves make such a construction unsupported; canonical and distinct-slot
 embedded leaves remain exact.  This suggested a construction, not merely another scalar score.
 
 The rigid-prefix preflight was encouraging.  Reading the complete k=7 frontier against its k=6
@@ -5741,13 +5743,13 @@ The first survivor is rank 82, `A^6D^2`.  Adding the sound two-coordinate over-a
 in 1.97468 solver seconds.  That first 19-node tree had root-base threshold 13; the alternative
 tree found on 2026-08-15 and retained in the same certificate improves the threshold to 12.  Since
 every wider germ has an all-depth certificate, this is the exact widest A--D eight-atom germ
-without a depth qualifier.  The working outer assembly then has parent profile
-`A^21B^6C^3D^2@G_(k-5)` and conditional width
+without a depth qualifier inside the relaxed aligned model.  The working outer assembly then has
+the unsupported diagnostic parent profile `A^21B^6C^3D^2@G_(k-5)` and width
 
     2^k - k^2 + 6k - 16,     k>=17.
 
-This is a construction within the `(alpha,beta,gamma)=(4,3,2)` aligned family, not a new Pareto
-maximum.  No CSV datum changed.
+This is not an achievability construction: its terminal rule uses the false singleton converse.
+No CSV datum changed.
 
 The proof is now mechanically split from discovery.  `search_atom_profiles.cpp` emits a closed
 D-lineage certificate and a machine-readable positive tree.  `check_atom_profile_certificate.py`
@@ -5875,11 +5877,13 @@ spreadsheet row `A^7B^7D^2@G_(k-4)` (`p6'`) and evaluates to
 
     2^k-k^2+7k-21.
 
-The checked hard-tree threshold proves the conditional aligned-family construction for `k>=12`.
-The same expression gives 473 at `k=9`, the proven maximum 973 at `k=10`, and 1983 at `k=11`; only
-the middle value is a proven maximum, and the symbolic threshold does not settle the `k=11` case.
+The checked hard-tree threshold establishes only the relaxed aligned-family diagnostic for `k>=12`;
+its arbitrary majorized terminals are not proof certificates.
+The same expression gives 473 at `k=9`, the proven upper ceiling 973 at `k=10`, and 1983 at
+`k=11`; only the first is a proven maximum, and neither the relaxed symbolic threshold nor the
+upper bound settles achievability at `k=10` or the `k=11` case.
 The new closed form and dyadic profile are therefore recorded as `conjecture`, sourced to the
-checked conditional construction, rather than promoted to global Pareto facts.  No
+checked relaxed construction, rather than promoted to global Pareto facts.  No
 `data/pareto_*.csv` row changed.
 
 This closes the eight- and sixteen-atom finite optimizers, not arbitrary excessive `q`.  The next
@@ -6069,9 +6073,10 @@ produce a certificate and should not be mistaken for an all-depth proof.
 The changed exact order also exposed a better positive that is independent of rank 1180.  The
 eight-atom rank-82 scan now finds an alternative 19-node tree in 0.0669238 solver seconds whose
 independently checked root-base threshold is 12, improving the previously retained threshold 13.
-`evidence/atom_profile_height6_ad8.cert` now contains this tree.  Equation (5)'s conditional
-`2^k-k^2+6k-16` construction therefore starts at `k>=17`, one level earlier than previously
-recorded; its profile and scope are unchanged.
+`evidence/atom_profile_height6_ad8.cert` now contains this tree.  In the relaxed model, equation
+(5)'s unsupported `2^k-k^2+6k-16` derivation therefore starts at `k>=17`, one level earlier than
+previously recorded; it is not an achievability construction because the singleton converse is
+false.
 
 The next useful search should enumerate A/B/C prefix pairs under the propagated-loss budget and
 retain the surviving D constraints, or construct a closed three-coordinate losing kernel.  Another
@@ -6252,8 +6257,8 @@ merely witness-backed there.
 
 The new 481 candidate strategy was extracted as `witnesses/majorized_481_5_at9.tree`.  Its 61
 nodes, 20 splits and 41 singleton leaves pass structural checking; 38 fit distinct `G_k` slots,
-but the other three leave the file conditional on the open singleton converse.  The exact value 481 instead rests on the published
-Li--Wu--Triesch theorem.  The conditional tree's root is `[239:1]`, equivalently its complement
+but the other three leave the file unsupported because the singleton converse is false.  The exact value 481 instead rests on the published
+Li--Wu--Triesch theorem.  The relaxed tree's root is `[239:1]`, equivalently its complement
 `[242:4]`.
 
 An exact-negative forced-root scan constrains the extra coin.  At `Sb(481:5)@9`, every capacity-feasible
@@ -6297,7 +6302,7 @@ The m5 correction also retracts two recurrence statements.  The numerical identi
 `n(k,5)=n(k-1,2)+n(k-1,6)` holds only for `k=5..8`; at `k=9` its right side is
 `255+225=480`, one below the exact 481.  The separate identity
 `n(k,6)=n(k-1,4)+n(k-1,5)` holds through `k=9`, but its first extrapolation now predicts
-`496+481=977`, not 976, against the unconditional upper bound `n(10,6)<=973`.  The conditional root backs the relevant
+`496+481=977`, not 976, against the unconditional upper bound `n(10,6)<=973`.  The relaxed root backs the relevant
 width down from 481 to 477, a loss of four.  The old `BBCD` closed form independently predicts 976
 and remains refuted by three.  These are distinct failed continuations and must not be conflated.
 
@@ -6345,8 +6350,8 @@ d*(t)=P-Q     for t=7,8,
        P-Q+1  for t>=9.
 ```
 
-**Correction 2026-08-26.**  The exclusion of `d*+1` below is an exact upper argument, but the
-matching local achievability construction is conditional wherever it terminates only by arbitrary
+**Corrected again 2026-08-30.**  The exclusion of `d*+1` below is an exact upper argument, but the
+purported matching local construction is unsupported wherever it terminates only by arbitrary
 weak majorization of singleton rows.  If `R_t(d*+1)` were solvable, the
 other branches would remain solvable (`d*+1<=P-1`, `b+d*+1<=2P`), and the two outer tests would
 construct `Sb(n(k,5)+1:5)`, contradicting the published upper bound.  Subgraph monotonicity excludes
@@ -6354,14 +6359,14 @@ all larger D.  The finite `k=8` tie separately has upper value `P-Q-1=57`.  The 
 independently establishes the parent `m=5` frontier; it does not, by itself, prove every displayed
 synchronized D state in this reconstruction.
 
-The eventual conditional lower construction was reduced to a symbolic template.  For
+The eventual relaxed derivation was reduced to a symbolic template.  For
 `d=P-Q+1`, one test of `R_t(d)` followed by one test in each non-singleton child leaves only
 singleton states.  Their decisive five-part deficit multiset relative to `P/4` is
 `{1,Q-t-2,t,t,2t-1}`, versus `{0,1,t-1,t-1,Q+t-1}` for the first five entries of `G_(t-2)`.
 The candidate is weakly majorized throughout the intended range `t>=9`; a three-part leaf already
 violates majorization at `t=7,8`.  Thus the `k=11` breakpoint arises inside the D strategy, not from
-fitting the published final values.  In the majorized-terminal model, the finite `t=7,8`
-constructions plus this template supply conditional achievability; the paper independently supplies
+fitting the published final values.  In the majorized-terminal relaxation, the finite `t=7,8`
+constructions plus this template supply only diagnostic feasibility; the paper independently supplies
 the sharp parent values and global upper bound.
 
 The conditional `assembly-enumerate` replay over proven Pareto inputs gives the crossing:
@@ -6369,7 +6374,7 @@ The conditional `assembly-enumerate` replay over proven Pareto inputs gives the 
 the sole winner for parent `k=4..7`, both `(3,2,2)` and `(4,3,1)` reach 231 at `k=8`, and only
 `(4,3,1)` reaches 481 at `k=9`.  Majorized-terminal construction checks of the latter hard branch give
 `d=241` at `k=10` and `d=492` at `k=11`, producing the published widths 985 and 2001; their emitted
-trees are structurally checked but inherit the open converse at arbitrary majorized leaves.  The
+trees are structurally checked but are unsupported at arbitrary majorized leaves.  The
 published theorem independently proves the parent widths.  The global upper bounds remain sourced
 to the paper, so no new solver artifact or Pareto row was created.
 
@@ -6404,15 +6409,15 @@ The durable findings are:
   scale-free object is nevertheless two-dimensional: the guarded antichain of mixed-child deficits.
   Full-star majorization supplies only a necessary bound and can overestimate D.
 - The known-answer `m=5` parent frontier is supplied by the published theorem, while this local
-  reconstruction is conditional at arbitrary majorized singleton leaves.  Its outer envelope changes
+  reconstruction is unsupported at arbitrary majorized singleton leaves.  Its outer envelope changes
   from `(3,2,2)` to `(4,3,1)`, and the winning family's displayed D formula changes.  The eventual
-  branch has a conditional singleton-majorization construction, so its algebra is a useful
+  branch has only a relaxed singleton-majorization construction, so its algebra is a useful
   calibration of the local mechanism but is not an independent proof of achievability.
 - Atom masses `BBBD`, `ABBD`, and `AABD` reproduce the three exact `m=5` values arithmetically, but
   `ABBD` and `AABD` have not been established as symmetric non-wasteful atom profiles.
 - At height 6, literal refinement of the finite successful split is exactly negative.  D-lineage
   and coinductive kernels then give real all-depth obstructions inside the restricted aligned model,
-  while checked trees give conditional lower constructions.  The unresolved rank 1180 is only a
+  while checked positive trees are only relaxed diagnostics.  The unresolved rank 1180 is only a
   question inside one 32-atom `(4,3,2)` slice; deciding it would not establish the unrestricted
   `m=6` frontier.
 - The finite assembly enumerator, guarded mixed-frontier optimizer, atom-profile certificates,
@@ -10105,8 +10110,9 @@ sequence is the repository's `G_k`, with Proposition 3.24 giving its recursive c
 The scan provides direct book-source checks for `n(k,2)=2^k-1` (Corollary 3.26, p. 150) and
 `n(k,3)=2^k-k` (answer to Exercise 3.3.1, p. 345). It also records an important historical limit:
 Proposition 3.25 proves only the necessary majorization direction and explicitly leaves the
-converse open, so the repository's later singleton-majorization iff result must not be credited to
-this source. Detailed page locators and scope are in [aigner-1988-scan.md](aigner-1988-scan.md).
+converse open.  The repository's former singleton-majorization iff claim was not in that source
+and is now refuted by the `K=6` counterexample. Detailed page locators and scope are in
+[aigner-1988-scan.md](aigner-1988-scan.md).
 
 No solver ran; OCR and rendered pages were temporary inspection artifacts. `check_tables.py`,
 `check_witness.py witnesses/*.tree`, and `check_docs.py` all passed after the documentation update.
@@ -10150,8 +10156,8 @@ recommended headline is the computer-assisted exact theorem `Sa(10)=192`, suppor
 positive witness and a solver-free-to-check compact `Sa(193)` certificate. The complete exact
 `Sb` frontier through k=8, the exact `m=6` boundary at k=9, and the upper boundary at k=10 form the
 finite-results package. Singleton-majorization necessity, unit-group elimination and full-star
-pullback are the strongest theory candidates; the converse remains open and must not be presented
-as a theorem. The aligned-profile D-lineage result is deliberately labelled restricted-model
+pullback were the strongest theory candidates; the converse was open at this entry and was refuted
+on 2026-08-30. The aligned-profile D-lineage result is deliberately labelled restricted-model
 only. No solver ran; documentation checks follow.
 
 ## 2026-08-24 -- publication scope tightened
@@ -10279,8 +10285,9 @@ the individually dominated vectors `(2,1,0,0)`, `(0,2,1,0)`, `(1,0,2,0)` sum to
 `(3,3,3,0)`, whose first three entries total 9 rather than at most 8 under
 `G_2=(4,3,1,1)`.  Independently, an unconstrained three-polymatroid decomposition does not impose
 the legal row condition that one singleton row may use left+mixed or mixed+right, but not both pure
-children.  Aigner's 1988 text proves necessity and explicitly leaves the converse open, so the
-repository had accidentally promoted the historical conjecture to a theorem.
+children.  Aigner's 1988 text proves necessity and explicitly left the converse open, so the
+repository had accidentally promoted the historical conjecture to a theorem.  The later `K=6`
+counterexample of 2026-08-30 refutes it outright.
 
 There is now an exact reduction.  Let `h=G_(K-1)`, with saturated prefix function `H`, and color
 each parent row `A` (left+mixed) or `B` (mixed+right).  If `A_p,B_q` are the sums of the `p,q`
@@ -10312,8 +10319,8 @@ is the parent prefix `H_K(t)`.  If `F_h` satisfies the discrete-polymatroid augm
 axiom, those rank inequalities characterize all its integer points and the converse follows.
 This makes the user's multiple-identical-target intuition precise: a transfer should be routed by
 a global augmenting path among the dyadic duplicate columns.  It also explains why a single-pass
-rule is not enough.  This exchange statement remains unproved; it would be a sufficiently strong
-route to the missing converse and is a substantially more local object to attack.
+rule is not enough.  At this entry the exchange statement remained unproved; the `K=6`
+counterexample later showed that it is false in the required universal form.
 
 The apparent intermediate generalization to every `2`-flat base is false.  The base
 `h=(6,5,1,1)` has `h_1=h_2+1`, paired remaining rows, and only one odd conjugate-column height.  Its
@@ -10348,22 +10355,22 @@ does not settle this family.
 
 The proof-status correction has concrete consequences.  Canonical sub-multiset and distinct-slot
 embedded singleton leaves remain unconditional by Aigner's explicit `G_k` strategy plus Subgraph
-Monotonicity; arbitrary `[majorized G_k]` leaves are now marked conditional.  The exact
+Monotonicity; arbitrary `[majorized G_k]` leaves are now marked unsupported.  The exact
 `n(9,5)=481` value remains supplied by Li--Wu--Triesch, and `n(9,6)=473` has a canonical tree.  At
 `k=10,m=6`, the exhaustive rejection of 974 remains an unconditional upper bound
-`n(10,6)<=973`, but the 973 majorized-terminal file is not presently a lower proof.  The old
+`n(10,6)<=973`, but the 973 majorized-terminal file is not a lower proof.  The old
 solver shortcut was also removed: a majorization violation still returns `FALSE`, a distinct-slot
 embedding may return `TRUE`, and every other singleton state continues through exact recursion.
 Positive dominance-trie hits are ignored for the latter states because parsed historical caches do
 not record whether the old shortcut created them; process-local L1 facts produced by the new exact
 recursion remain usable.
 
-The witness checker now reports conditional files without mistaking structural validity for a
-complete proof.  A separate audit of the older numbered `radio_print` format found that its leaves
+The witness checker now reports unsupported majorized-terminal files without mistaking structural
+validity for a complete proof.  A separate audit of the older numbered `radio_print` format found that its leaves
 are only unit/base cases and its references use safe same-multiplicity coordinatewise domination;
 those retained Sa trees do not invoke arbitrary singleton majorization.  The log-tree extractor now
 also distinguishes unconditional distinct-slot singleton embeddings from arbitrary majorized
-terminals and propagates a conditional warning to the rendered root.
+terminals and refuses to treat the latter as proof terminals.
 
 Measured work: the pre-edit table and witness checks were green.  Three bounded one-off Python
 searches took roughly 30--40 seconds each; they supplied the greedy/partial-coloring diagnostics but
@@ -10380,7 +10387,7 @@ Final validation passed: `tools/check_tables.py`, all witness files through
 `tools/check_witness.py`, `tools/check_docs.py`, Python byte-compilation of the modified utilities,
 the five-level bundled-majorization ladder control, and the provenance-built 535,328-case C
 regression.  The full frozen-refuter regression also passed after the solver change.  The witness
-pass reports exactly the 481 and 973 majorized-terminal files as conditional (three and six
+pass reports exactly the 481 and 973 majorized-terminal files as unsupported (three and six
 genuinely nonembedded leaves respectively); all canonical and numbered files verify
 unconditionally.
 
@@ -10439,8 +10446,9 @@ is bisubmodular.  Integer points `z` of its signed polyhedron encode a legal col
 signs of `z`, with row demands `|z|`.  If `M_h` is the set of such magnitude vectors, then
 `conv(M_h)` is exactly the parent majorization polymatroid: inclusion follows from the signed Hall
 inequality, and every polymatroid vertex is a permutation of an initial segment of `G_K`, hence is
-obtained by deleting rows from the canonical strategy.  The open converse is therefore precisely
-that the Pascal absolute-value fold has no lattice holes.  A sufficient local form says that every
+obtained by deleting rows from the canonical strategy.  At this entry the converse was reformulated
+as the claim that the Pascal absolute-value fold has no lattice holes; the `K=6` counterexample now
+exhibits such a hole.  A formerly proposed sufficient local form said that every
 unit Robin-Hood transfer of magnitudes can be routed, allowing a global signed augmenting path and
 whole-row recolorings.  Generic bisubmodularity does not prove this; the recorded non-Pascal bases
 have holes.  The missing cut argument must use the full dyadic capacities and Pascal
@@ -11465,8 +11473,9 @@ If `b` can be colored with at most `n` positive rows per side and satisfies Fixe
 child capacity `c`, residual allocation followed by restoring one pure anchor on every row and one
 mixed anchor on the original top `n` rows produces three `h`-majorized children.  The lift uses the
 identity `H(t)=C(t)+min(t,n)`; it is independent of which residual rows receive mixed mass.  This
-proves the Two-Anchor Reduction Theorem and leaves the Balanced Residual Coloring Lemma as a new
-sufficient target.  The lemma is still open, so Singleton Majorization remains open.
+proves the Two-Anchor Reduction Theorem and left the Balanced Residual Coloring Lemma as a new
+sufficient target.  This was the open status at that entry; the `K=6` residual counterexample of
+2026-08-30 refutes the Balanced Residual Coloring Lemma and Singleton Majorization itself.
 
 The extended `tools/singleton_pascal_interval_census.cpp` exhausts the target.  The complete capped
 residual universes contain 73 states at `K=3` and 160,492 at `K=4`; all pass, using 303 and
@@ -11622,8 +11631,9 @@ This route is the current noncircular conclusion.  Repeated halving is workable 
 complete state graph; the fixed realization, fixed coloring and irrevocable-rank versions are
 false.  The remaining proof obligation is one Pascal augmenting-cut theorem: if the canonical
 two-move walk stops at positive `Phi`, use the dyadic degrees and adjacent binomial quotas to turn
-its stopped switch cut into a violated prefix of the parent.  No such derivation is proved yet, so
-the Singleton Majorization Converse remains open.  Full definitions, traces, proofs, run table and
+its stopped switch cut into a violated prefix of the parent.  No such derivation was proved at this
+entry; the Singleton Majorization Converse was refuted later the same day by the exact-support
+`K=6` state.  Full definitions, traces, proofs, run table and
 commands are in `evidence/singleton_balanced_hh_switch_2026-08-29.md`.
 Final inventory found no `radio_canon`, `singleton_balanced_hh`, capped runner, `Python -` or
 `python3 -` process remaining.
@@ -11885,19 +11895,19 @@ respectively.  They counted 54,211, 75,100 and 8,687 internal links and left eve
 projection count unchanged.  The final Python source SHA-256 is
 `1b09af6c4c35e528346a673d2edf72ed2e881b8c53ddefa90d2fdc490c50d8c3`.
 
-This does not prove singleton majorization.  Let `F_K` be the union of all fixed-color integer
+This did not prove singleton majorization.  Let `F_K` be the union of all fixed-color integer
 base sets and `B_K` the full integer permutahedron majorized by `G_K`.  Then `F_K subset B_K`,
 `F_K` contains every permutation of `G_K`, and hence `conv(F_K)=conv(B_K)`.  Bidirectional exchange
-proves that the normalized colored graph is connected, but Row-Coloring is exactly the still-open
-assertion that the labelled `F_K` has no lattice holes.  The generic `h=(6,1)` counterexample, with
+proves that the normalized colored graph is connected.  At this stage Row-Coloring was exactly the
+assertion that the labelled `F_K` had no lattice holes.  The generic `h=(6,1)` counterexample, with
 missing ambient point `(12,3,3,3)`, shows that connectivity and vertex coverage alone are
 insufficient.
 
-The surviving global target is to prove that the primitive integer set `F_K` is M-convex.  The
-real fixed-color cover proposed at this stage was subsequently refuted, first in padded form at
-`K=2` and then at exact support at every `K>=3`; see the next entry.  Pascal-Shuffle Coverage
-remains the exact directed formulation, but reverse transfers make its source classification
-unnecessary rather than proving its coverage step.
+The proposed global target was to prove that the primitive integer set `F_K` is M-convex.  The
+real fixed-color cover was subsequently refuted, first in padded form at `K=2` and then at exact
+support at every `K>=3`; see the next entry.  The primitive target itself is refuted by the `K=6`
+integer hole in the following entry.  Reverse transfers simplify connectivity but do not prove
+coverage.
 
 ## 2026-08-30 -- real coverage fails at exact support; the lattice is essential
 
@@ -11951,8 +11961,8 @@ lattice of the primitive Pascal profile, not only its ratios, convex hull or sup
 
 The fractional-color set `Y(a)` remains convex, and its active Hall sets still uncross by
 submodularity.  The all-level family proves that these continuous facts cannot force a zero--one
-color vector.  The only live version is integer-aware: for primitive integral `a`, prove directly
-that `Y(a)` has a zero--one point, equivalently prove Row-Coloring/M-convex lattice saturation.
+color vector.  The candidate left at this stage was integer-aware: for primitive integral `a`, ask
+whether `Y(a)` has a zero--one point, equivalently Row-Coloring/M-convex lattice saturation.
 The raw integer lower endpoints are not supermodular even for canonical `G_3`, so ordinary
 generalized-polymatroid integrality does not supply that missing step.  Ordinary Lorentzianity of
 the full chromatic symmetric function is also unavailable because `Q_3` has an induced claw while
@@ -11980,10 +11990,90 @@ counts `m/2-1,m/2`.  The head-light side therefore has `m/2+1` tail slots.  Ever
 tail of the required mass has exactly `K` coins above its unit baseline and hence at most
 `K<=m/2+1` non-unit rows.  Put all of them on that side, concatenate the canonical tail band, and
 redistribute the excess by same-color Robin--Hood moves, which preserve every fixed-color Hall
-inequality.  Thus every legal head-band allocation extends; constructing such an allocation is
-the only remaining issue on this tight face.  This demonstrates rather than merely asserts how
-the primitive lattice destroys the fractional obstruction.  A multiplicity-based script confirmed
+inequality.  Thus every legal head-band allocation extends.  The later `K=6` hole shows that the
+head allocation itself may fail to exist; the primitive lattice repairs this final band only
+conditionally, not the whole problem.  A multiplicity-based script confirmed
 the constructed integer replacement through `K=6` in 28.61 seconds.  A preceding attempt also
 reached `K=6` but
 was interrupted at 30 seconds after it continued blindly into the much larger `K=7` coloring
 space; it left no process or artifact.
+
+## 2026-08-30 -- singleton majorization is false: an exact-support `K=6` hole
+
+The search for a universal proof ended in a counterexample.  The full-mass singleton state
+
+    a=(64,63,57^2,42^4,22^7,8^15,7^2,1^32)
+
+has mass 729 and exactly 64 positive rows, is weakly majorized by
+
+    G_6=(64,63,57^2,42^4,22^8,7^16,1^32),
+
+but has no first split whose three children are weakly majorized by `G_5`.  Hence it is not
+solvable in six tests: any genuine first-test children would be solvable in five tests and would
+therefore satisfy the proved Singleton Majorization Necessity theorem.
+
+The majorization check is one band calculation.  At ranks 16 through 31, replace
+`(22,7^15)` by `(8^15,7)`.  Both blocks have mass 127.  For the first `1<=r<=15` entries,
+`8r<=22+7(r-1)`, with equality at `r=15`; the full 16-entry sums are also equal.
+
+The nonsplitting proof is equally short and is driven entirely by the Pascal profile.  For the
+prefix function `H` of `G_5`,
+
+    H(7)=163, H(8)=179, H(15)=221,
+    H(16)=227, H(30)=241, H(31)=242.
+
+The parent is tight at ranks 15 and 31.  If `p` and `q` are the numbers of left-oriented rows in
+those prefixes, concavity forces `p in {7,8}` and `q in {15,16}`, and equality forces all three
+child prefix bounds to saturate.  The intervening 16 rows must therefore send exactly
+`H(31)-H(15)=21` coins to the mixed child.  Every one of those mixed pieces is positive: otherwise
+the other 15 band pieces plus the 15 head pieces would put mass 242 in at most 30 mixed rows,
+contradicting `H(30)=241`.  Each band row consequently retains at most seven coins for its pure
+child.  The four count transitions then require respectively 58 coins on eight rows, 64 on nine,
+64 on nine, or 58 on eight, against maxima 56, 63, 63 and 56.  All four are impossible.
+
+This is also the requested transfer phase change.  Along
+
+    b_j=(22-j,8^j,7^(15-j)),  0<=j<=14,
+
+the exact Hall search finds a majorized first cut for every `j<=13`; the last transfer, from
+`(9,8^13,7^2)` to `(8^15,7)`, empties the entire fiber.  At `j=13` one split has children
+
+    G_5,
+    (32,31,26^2,16^4,6^7,2^5,1^12),
+    (32,31,26^2,16^3,8,7^8,1^16).
+
+Allowing transfers in both directions therefore gives the right connectivity theorem only inside
+the feasible set.  A fixed-color base set is exchange-connected back to a colored permutation of
+`G_6`, but the state above lies in the ambient permutahedron and outside every fixed-color base.
+Reverse moves cannot create a fiber where none exists.
+
+The same example settles the derived universal targets.  It refutes Row-Coloring, Pascal orthant
+saturation/M-convexity, global Robin--Hood closure, Carry-Compatible Gale--Ryser, Balanced Pascal
+Realization, niceness and strong niceness of `Q_K`, canonical direct/allocation transport,
+Pascal-shuffle coverage, two-interval splicing, and all universal local escape/descent rules.  Its
+band `[15,31)` refutes Positive-Band Extension: none of the four endpoint transitions exists.  The
+proved Two-Anchor Reduction maps it to the residual hole
+
+    (62,61,55^2,40^4,20^7,6^15,5^2)
+      <=_w (62,61,55^2,40^4,20^8,5^16),
+
+so Balanced Residual Coloring is false as well.  Minimum-Support Reduction, tight-skeleton
+factorization, switch connectivity, fixed-color exchange connectivity, and all exact `K<=4`
+censuses remain valid.  This construction does not decide `K=5`; `K=6` is the smallest known
+failure level, not a proved minimum.
+
+`tools/singleton_pascal_interval_census.cpp` now has mode `singleton-k6-counterexample`.  A
+provenance build took 3.2 wall seconds and the regression run took 0.8 wall seconds.  It independently
+checked every parent prefix, exhausted normalized Hall colorings (7 search nodes), exhausted direct
+integer row splits (9,373 nodes), checked the residual hole (7 nodes), and exhausted the four
+forced bands (8,796 nodes).  A pre-existing `K=3` full-band regression still reports 160 states,
+one transition and zero incomplete relations.  These searches are regressions; the tight-prefix
+argument above is the proof.
+
+The research record and tools were corrected accordingly.  Historical `[majorized G_k]` leaves
+are now labelled unsupported rather than conditional: weak majorization is a necessary check, not
+a certificate.  `tools/extract_witness_tree.py` no longer stops at such a leaf and instead seeks
+logged recursive evidence.  A focused web search located the Aigner/Shahriari/Stanley adjacent
+questions and current nice-graph literature but did not establish publication priority; the
+publication inventory retains a required novelty audit.  No long-running process was started, and
+the counterexample/regression processes exited normally.

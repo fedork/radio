@@ -24,7 +24,7 @@ ceiling of
 `tools/singleton_shape_survey.cpp` reconstructs first cuts directly.  It checks
 that every row feeds either `{left,mixed}` or `{mixed,right}`, that every child
 has mass `3^(K-1)`, and that all three child partitions are weakly majorized by
-`G_(K-1)`.  Thus a reported success is not based on the open converse.
+`G_(K-1)`.  Thus a reported success does not assume the now-refuted converse.
 
 ## Build and exact scalar results
 

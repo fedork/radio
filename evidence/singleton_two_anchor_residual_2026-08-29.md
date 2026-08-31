@@ -1,9 +1,10 @@
 # Two-anchor Pascal residual reduction
 
-**Status.**  The reduction theorem in this note is proved.  The Balanced Residual Coloring Lemma
-that it exposes is open.  Complete exact censuses verify the residual lemma through `K=4`; sampled
-higher-level checks are diagnostics only.  Therefore this note does **not** prove the Singleton
-Majorization converse.
+**Superseded status (2026-08-30).**  The reduction theorem in this note is proved, but the
+Balanced Residual Coloring conjecture is false.  The `K=6` singleton counterexample maps to the
+explicit residual hole `(62,61,55^2,40^4,20^7,6^15,5^2)`; see
+[the counterexample](singleton_k6_counterexample_2026-08-30.md).  The exact `K<=4` censuses below
+remain finite theorems.
 
 ## The two forced Pascal columns
 
@@ -98,7 +99,7 @@ bottom `n` rows to avoid the mixed child.
 Together with the proved Minimum-Support Reduction, the full singleton converse would follow by
 induction from the following smaller statement.
 
-> **Balanced Residual Coloring Lemma (open).**  Every full-mass `b<=_w J` with at most `2n`
+> **Balanced Residual Coloring Conjecture (false at `K=6`).**  Every full-mass `b<=_w J` with at most `2n`
 > positive rows has a coloring satisfying (BR), with at most `n` positive rows of each color.
 
 This is a sufficient strengthening, not an established equivalent reformulation: the deterministic

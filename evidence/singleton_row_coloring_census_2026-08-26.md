@@ -1,5 +1,10 @@
 # Singleton Row-Coloring finite census (2026-08-26)
 
+**Superseded universal status (2026-08-30).**  The finite census below remains exact through
+`K=4`, but Row-Coloring is false at `K=6`; see
+[the counterexample](singleton_k6_counterexample_2026-08-30.md).  These counts are lower-level
+theorems, not evidence for a universal lemma.
+
 ## Question and exact test
 
 For `h=G_(K-1)` let `H` be its saturated prefix function.  A coloring of a sorted
@@ -27,7 +32,7 @@ The independent completion-count recursion used by `--uniform` returns the same
 | `K=3` | 1,206 | 1,206 | 1,206 |
 | `K=4` | 5,997,038 | 5,997,038 | 5,996,122 |
 
-Thus the Row-Coloring Lemma is computationally verified through `K=4`, but the
+Thus the Row-Coloring property is computationally verified through `K=4`, but the
 stronger rule that every adjacent pair can be split between the colors is false.
 Its first `K=4` counterexample is
 
@@ -181,10 +186,11 @@ mixed-child difficulty in another form.
 The block rule is now best treated as diagnostic rather than as the primary proof
 target.  A cleaner exact formulation folds the integral signed Hall polyhedron by
 absolute value.  Its convex hull is the parent majorization polymatroid, so the
-Row-Coloring Lemma asks precisely whether the Pascal fold has no lattice holes.
+Row-Coloring conjecture asked precisely whether the Pascal fold had no lattice holes.  The later
+`K=6` counterexample shows that it does.
 Equivalently, it is enough to route every unit Robin-Hood transfer by a global
 signed augmenting path.  The full derivation is in the
 [theorem note](../docs/theorems/singleton-majorization.md#global-signed-lifting-and-the-no-holes-target-2026-08-26).
 
 No general proof follows from this census.  The Singleton Majorization converse and
-the Row-Coloring Lemma remain open.
+the formerly proposed Row-Coloring conjecture were not settled by this census.

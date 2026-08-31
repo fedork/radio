@@ -1,286 +1,67 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-30**.  The central correction is that singleton
-majorization is proved only as a necessary condition: the former sufficiency proof used a false
-decomposition lemma.  A new exact census verifies the missing Row-Coloring Lemma for all 5,997,038
-full-mass states at `K=4`; an independent cut census also verifies the scalar equal-average
-coalescence rule on all of them, while refuting independent matching of the full hinge profile at
-`K=3`.  Exact coefficient recursion also shows that the transcript graph `Q_3` is strongly nice,
-a genuinely stronger finite statement.  Closure for the particular Pascal-seeded recursion is
-unproved, and the same operator does not preserve niceness for a generic recursively generated
-seed.  The proved Minimum-Support Reduction now combines with a proved Two-Anchor Reduction:
-after reaching exactly `2^K` rows, delete the universal pure column and one maximum mixed column.
-The remaining state is dominated by the Pascal profile obtained by removing Boolean columns
-`empty` and `{*}`.  The new open core is a Balanced Residual Coloring Lemma for `G_(K-1)-1`, with
-an explicit per-color row cap.  It passes all 160,492 residual states at `K=4`, but this is still a
-finite theorem, not the missing proof.  Exact arbitrary-precision `K=4` probes pass the first
-canonical transfer and one ten-transfer walk, but a longer request stalls at the next coefficient;
-this is diagnostic only.
-The bottom-up route is now reduced further: a fixed coloring survives a unit transfer
-unless an opposite-color tight Hall set separates recipient from donor, so a Pascal-specific
-Adjacent-Fiber/strict-separator elimination lemma would finish the induction.  That lemma is still
-unproved, but a new exact census verifies it, with separator margin at least two, for every one of
-141,690,676 normalized unit transfers from all 5,997,038 full-mass `K=4` states.  Exactly 889
-transfer types cannot be certified with donor and recipient on the same side, so the opposite-color
-separator case is real rather than a proof artifact.  Those 889 are now classified exactly as one
-four-row obstruction family, and the same obstruction has a proved `K-3`-member continuation at
-every `K>=4`.  Its crossing repair routes the unit beneath an identical Pascal pair with exact
-margin equal to the donor-recipient gap.  This proves the local duplicated-target mechanism, but
-not that every minimal separator reaches such a target.  A Pascal-first Boolean-column argument
-now proves more generally that every dangerous tight separator saturates the dyadic columns one
-by one and must cross a repeated internal Pascal rank.  A correction matters here: Hall tightness
-rules out completing the transfer while preserving that fixed coloring.  The proof must instead
-move globally among feasible colorings of the original state.  Exact landscape enumeration shows
-that every failed coloring through `K=3`, and in the first 10,000 `K=4` states, has a successful
-coloring within two row changes after quotienting equal rows and global side complementation;
-three further disjoint 1,000-state `K=4` windows after 1M, 3M and 5M states agree.  This
-is always a one-row flip or an opposite-color swap in the checked data.  It suggests a Two-Row
-Color-Exchange Lemma, but the `K=4` landscape census is finite and the theorem is unproved.  The
-ambient Hall polyhedron has standard support-two bisubmodular exchange; the missing step is showing
-that its Pascal fixed-absolute-value slice inherits a directed boundary exchange.  It does not
-inherit even the ordinary delta-matroid axiom: `(3,2^11,1,1)@3` has an explicit boundary-exchange
-failure.  Exact flip/swap formulas show that a general failed swap can expose blocker cuts of both
-imbalances and that every successful local repair must cross the original tight separator, where
-the Tight Pascal-Band Lemma gives at least two units of rank gain.  Plain strict dyadic-band descent
-is false: a `K=3` crossing swap has a blocker with exactly the original band.  For positive swaps,
-however, the replacement argument below eliminates the reverse blocker entirely.
-One tempting stronger local target is the Core--Blocker Escape Lemma.  Dangerous tight separators
-form a lattice; let `C` and `U` be their intersection and union.  For `v` in the opposite-color
-part of `C`, provisionally flip `v` and intersect all original-state blocker sets.  It is enough to
-prove that some flip has no blocker, or that this blocker intersection contains a smaller
-same-side row outside `U`.  Swapping that pair is feasible before and after the transfer.  The key
-replacement argument shows that a positive swap cannot have the formerly expected reverse
-blocker, so no alternating cut chain or cyclic reassignment is needed.  The common `A` part of the
-flip blockers is an upper set by row mass and grows monotonically as `v` descends through the
-dangerous `B` core.  Thus this local conjecture is a sorted prefix staircase: scan core rows and test only
-the largest outside-hull row still smaller than `v`, using (ST2).  Complete `K=3` and a 5,000-state
-`K=4` window support this statement indirectly; a targeted `K=5` boundary probe additionally finds
-positive common neighbors for all 3,220 failed colorings among 624,395 sampled transfer pairs.
-These are finite observations, not the missing existence proof.  Row-count slack and rules that
-preselect `v` from one separator have `K=4` counterexamples, so the exchanged identities cannot be
-fixed in advance.  Boolean labels alone do not imply the needed exchange, and laminar supports are
-false already at `K=3`.  Padding to `3^K` labelled slots gives an
-exact pure-first reformulation: allocate paired balanced supports for the two pure children, then
-Gale--Ryser fills the majorized mixed residual.
-Fixed alternating intervals for those supports are already too rigid at `K=3`, so the remaining
-candidate is an adaptive augmenting-path construction.  The equal-three-block version can now be
-reduced further: the mixed-only block may be chosen as the `3^(K-1)` smallest rows, which are all
-zero or one, and contraction leaves an exact two-color Hall problem.  The apparent high-support
-shortcut is now refuted: its one remaining Pascal prefix inequality passes through `K=12` but
-fails at `K=19`, and a compressed exact construction realizes the failure as a full-mass
-majorized parent with exactly `2*3^18` nonzero rows.  Adaptive orientation, rather than strict
-alternation, is still required.  These reductions expose useful geometry but supply no general
-proof.
-The logical hierarchy matters: Row-Coloring, Pascal orthant saturation and global Robin--Hood
-transfer closure are equivalent universal statements; Adjacent-Fiber asks in addition for one
-coloring common to both endpoints; Core--Blocker Escape asks every failed coloring for a common
-one-flip/one-swap neighbor.  The latter two are successively stronger and are not known to follow
-from the exact lemma.  They remain optional proof routes, not reductions of the only open claim.
-An exact global reformulation now puts Pascal first: Gale--Ryser realizes every parent-majorized
-degree sequence using one column of degree `2c` and one of degree `c` for each child conjugate
-capacity `c`; the task is to choose the realization so all doubled-column neighborhoods have one
-common exact row bisection.  This Balanced Pascal Realization Lemma is equivalent to Row-Coloring
-and avoids committing to a local repair path.  Equivalently, among the `binomial(K,ell)` parent
-columns of degree `2^(K-ell)`, only `binomial(K-1,ell)` must balance; the other
-`binomial(K-1,ell-1)` are mixed, and these labels may be chosen after the incidence realization.
-The unique top-degree column can always be balanced by Ryser reduction, and the bottom degree-one
-rank has no balance requirement, so any first quota obstruction is internal.
-These quotas are exactly Boolean coordinate deletion/contraction: rank-`ell` columns are labelled
-by `ell`-subsets, those omitting the exposed first-test coordinate must balance, and those
-containing it are mixed.  Maximizing away the color counts only reproduces the known parent rank
-and cannot detect lattice holes.  The labels may be permuted independently at every rank, so they
-do not by themselves induce Boolean shadow closure; any shadow proof would first have to construct
-a coupled labelling from the incidence exchange.  Freezing all recursive exposures into one global
-Boolean address on the rows is already false for `G_2`: the subcube model forces `(4,2,2,1)`
-rather than `(4,3,1,1)`.  Branch-dependent relabelling is essential.  The live equivalent route
-retains only the intrinsic data--dyadic degrees, adjacent Pascal quotas and doubled/single
-pairings--and must combine them with the global defect relations (BR0)--(BR4) to force a
-parent-prefix contradiction.
-A first global switch lemma now compresses any
-minimum-square obstruction: doubled columns of one capacity have imbalances differing by at most
-one and therefore one common sign; cross-capacity defects satisfy a Lipschitz bound, and a nonzero
-imbalance forces color nesting against every single column of the matching
-capacity.  Whole-row flips additionally bound each row's signed incident defect and give
-`2 sum delta^2<=sum c`.  The unresolved work is therefore cross-capacity Pascal/binomial
-accounting, not another
-row-selection rule.
-A new switch formulation makes “keep halving” precise without freezing earlier choices.  For fixed
-row and labelled Pascal-column margins, opposite-color row swaps and `2x2` incidence switches
-connect every realization-and-bisection pair.  Breadth-first search from the canonical
-Havel--Hakimi pair is therefore a proved complete finite algorithm for each parent: it finds a
-balanced realization if and only if one exists.  This does not prove that every majorized parent
-has one.  The faster Canonical Two-Move Pascal-Switch Conjecture decreases a quota energy by a
-strict move, or by one neutral setup move followed by a strict move.  It passes the complete
-408,776-state exact-support `K=4` corpus, the first 500,000 `K=5` parents and the recorded `K=5,6`
-probes.  Two restrictions are now exactly refuted: the fixed canonical matrix has no coloring for
-`(32,31,26,26,16^3,4^15,2^10)` but one incidence switch repairs it, and strict descent alone gets
-stuck on `(32,31,26,26,16^3,9,6^9,2^2,1^13)` before a neutral-plus-strict repair.  The open proof
-must show that the deterministic switch walk never encounters a positive-energy barrier; finite
-success is not that escape lemma.  See the
-[switch theorem and conjecture](theorems/singleton-majorization.md#a-complete-switch-graph-and-a-short-descent-conjecture-2026-08-29)
-and [survey record](../evidence/singleton_balanced_hh_switch_2026-08-29.md).
-The poset formulation is now exact rather than analogical.  The transcript graph `Q_K` is the
-incomparability graph of the lexicographic poset `P_K=V^K`; `P_K` is graded and normalized
-matching, its rank-`r` level has `2^popcount(r)` elements, and it has a nested chain decomposition
-of shape `G_K`.  Thus the full-mass converse is precisely the `P_K` instance of generalized
-Griggs chain-partition dominance.  Gale--Ryser already constructs a row-by-rank zero--one matrix
-for every `a<=_w G_K`; the remaining requirement is to choose one that lifts through the binary
-carry components to actual chains.  This Carry-Compatible Gale--Ryser Lemma is equivalent to the
-Balanced Pascal Realization Lemma.  An explicit `K=4` parity example shows that an arbitrary
-matrix with the correct margins need not lift, even though its row-degree state is solvable by a
-different matrix.  The open choice is therefore the incidence realization itself, not only its
-margins or a coloring applied afterward.
-A new direct-transfer route now captures the proposed “many identical targets” mechanism without
-assuming a fixed alternation.  In the canonical Pascal chain decomposition, every longer chain has
-a bottom cell comparable with every member of every shorter chain, so the first unit Robin--Hood
-transfer between any two canonical classes is a literal one-vertex recoloring.  More generally, a
-word's compatible receiver chains inside one equal-length block form an explicit dyadic cylinder
-in the binary chain-code tree.  This does not iterate automatically: a `K=3` legal first move can
-leave another size-gap pair with no direct move, and two words individually compatible with one
-receiver can conflict with each other.  The resulting Canonical Monotone-Transfer Conjecture asks
-for a globally scheduled path made only of direct moves.  A constructive census proves it for all
-1,206 full-mass dominated `K=3` types, but no general scheduling invariant is proved.  The live
-target on this route is a laminar dyadic receiver-list argument that also preserves compatibility
-among all words assigned to one receiver; see the
-[theorem note](theorems/singleton-majorization.md#a-canonical-direct-transfer-lemma-and-the-remaining-global-schedule-2026-08-29)
-and [census record](../evidence/singleton_monotone_transfer_census_2026-08-29.md).
-A whole-fiber version of that global schedule is now exact at `K=3`.  The normalized parent graph
-has 8,916 unit edges.  Above it, 1,063,464 complete first-cut allocation orbits have 26,135,976
-literal links that move only the marked coin in one fixed child.  Every parent edge lifts, and the
-component of the unique canonical `G_3` cut reaches 1,063,144 cut orbits and at least one cut above
-all 1,206 parents.  This proves the Canonical Allocation-Transport statement only at `K=3`, not in
-general; 916 edges kill some source cuts, so arbitrary edge certificates still do not compose.
-The full cut DAG has exactly one additional source, over `(8,6,5,4,1^4)`.  Its four-row cut has
-three exact `G_2` children, reaches all 320 cuts missed by the canonical source, and overlaps the
-canonical component almost completely.  This phase birth has a uniform proof for every `K>=3`:
-after moving the second canonical row toward the third, a four-row Pascal reassociation keeps all
-three children equal to `G_(K-1)` but changes a top-row orientation forbidden at `G_K`.  Therefore
-“generate every solution from `G_K`” is false, while “the canonical component projects onto every
-parent” remains a viable sufficient conjecture.  The whole first Lorenz shell is now classified
-for every `K>=3`: at dyadic boundary `2^e`, moving one color count off balance costs the exact
-Pascal jump `binomial(K-1,e-1)`.  One unit of parent slack can therefore create a new coloring only
-at `e=1`; the phase parent has three coloring orbits (two inherited plus the reassociation), while
-each deeper immediate cover has four, all inherited.  Complete cut enumeration through `K=5`
-gives the finer stable pattern `1 -> 4` at the top boundary and `1 -> 6` at every deeper boundary,
-with only the reassociation new.
+don't know it. Last refreshed **2026-08-30**.
 
-Accumulated slack does create higher phases.  A proved integral-polymatroid reduction now shows
-that every feasible coloring descends from a **self-sorted Pascal greedy shuffle**: a balanced
-binary word whose row sums are `h_i+h_(color occurrence)`.  Every possible coloring source is one
-of these rigid shuffles, has exactly `2^K` positive rows, and has an explicit cut with all three
-children `G_(K-1)`.  At boundary `e`, a deeper phase appears at the exact price
-`binomial(K-1,e-1)` once `K>=2e+1`; the first new pair is at `K=5`, Lorenz area four.  Exact global
-shuffle classification gives 6 source orbits at `K=5` (areas `0,1,4,4,5,19`), 6 at `K=6`, 25 at
-`K=7`, and 30 at `K=8`.  Thus the earlier hope that (PB) is the only all-level source is false.
+The central singleton question is now resolved negatively.  Necessity remains proved, but weak
+majorization by `G_K` is not sufficient.  The exact-support, full-mass state
 
-The bounded transport evidence remains positive.  The exact `K=4`, area-14 allocation ideal has
-2,852 parents, 26,067 edges and 871,752 cut orbits; every edge lifts and the canonical component
-hits every parent.  The independent `K=5` coloring ideal through area five has 267 parents, 866
-nonempty edges and 5,089 coloring orbits; its four noncanonical sources occur exactly at areas
-`1,4,4,5`, yet the canonical component again hits every parent.  Dominance-cover moves alone hit
-only 266 of them, so long one-coin moves matter.  The remaining equivalent target is the open
-**Pascal-Shuffle Coverage Lemma**: the parent projections of all shuffle exchange cones cover the
-whole dominance ideal.  See the
-[solution-fiber theorem section](theorems/singleton-majorization.md#the-solution-fiber-dag-and-a-pascal-phase-birth-2026-08-30)
-and [exact survey](../evidence/singleton_solution_fiber_dag_2026-08-30.md).
+    (64,63,57^2,42^4,22^7,8^15,7^2,1^32) <=_w G_6
 
-Allowing legal row-width transfers in both directions collapses this directed phase structure.
-For one fixed padded row coloring, Hall-feasible demands are the integer bases of an integral
-polymatroid; its exchange graph is connected and contains a colored permutation of `G_K`.
-Therefore every existing Hall coloring is bidirectionally connected to the canonical coloring,
-at every `K`.  Exact quotient graphs agree: all 31,498 `K=3` coloring orbits and all 60,486
-`K=4`, area-14 orbits form one component.  The `K=5`, area-five truncation has a 5,088-orbit
-canonical component plus one boundary-isolated source, but the canonical component still projects
-onto all 267 parents and the isolated orbit reconnects outside the truncation.  This theorem
-removes the need to manage Pascal sources if reverse moves are allowed, but it assumes a feasible
-coloring and hence does not prove existence.  The exact residual problem is again no lattice
-holes.  The normalized colored solution graph is connected; separately, the labelled union of
-fixed-color base sets contains every vertex of the `G_K` permutahedron and has that whole
-permutahedron as its convex hull.  Prove that the labelled union contains every integer point.
-M-convexity of that integer union is an exact exchange form of the gap.  Convexity of the **whole
-padded real** union is now refuted already at `K=2` by
-`(4,3,(2/3)^3)<=_w(4,3,1,1)`, which has no Hall coloring.  The obstruction has five positive
-rows.  Exact support does **not** repair the real statement.  At `K=3`,
-`(8,7,4,(8/5)^5)` is an eight-row hole; denominator-five enumeration finds the whole 56-state
-normalized face `(x,y,z,8^5)`, `x+y+z=95`.  More generally, with `m=2^(K-1)`, flattening the final
-`m+1` rows of `G_K` to `1+K/(m+1)` gives an exact-support real hole at every `K>=3`, with forced
-Hall excess `((K-2)m-2)/(2(m+1))`.  That excess already exceeds one at `K=5`, so even a universal
-real defect-below-one target is false.  The convex set `Y(a)` and its active-set uncrossing remain
-valid, but they can only support a rounding proof that explicitly uses integral parent demands.
-The new Integral Final-Band Extension Lemma shows exactly how the lattice repairs the tight
-`m-1` face: after any legal head-band allocation, the tail has only `K` coins above the unit
-baseline, all non-unit tail rows fit on the head-light side, and same-color transfers extend the
-cut.  Constructing the head-band allocation is still open.  The surviving global target is the
-primitive integer lattice-saturation/M-convex assertion itself.  See
-the [real-cover counterexample record](../evidence/singleton_exact_support_real_cover_2026-08-30.md).
+has no legal first split into three `G_5`-majorized children and is therefore unsolvable in six
+tests.  The short proof and independent direct-split/Hall regressions are in the
+[`K=6` counterexample record](../evidence/singleton_k6_counterexample_2026-08-30.md).
 
-A new low-level shape survey suggests an even simpler global route that discards the transfer
-history.  Through `K=3`, every target chain can be made from one contiguous interval of a canonical
-Pascal chain or by splicing two rank-separated intervals from source chains of different depths.
-This is exhaustive for all 1,206 targets.  Cuts alone cover only 591, so the splice is essential;
-adjacent depths and either fixed rank direction each have `K=3` counterexamples.  Strict depth
-orientation nevertheless makes the source graph acyclic.  The resulting Pascal Two-Interval
-Splicing Conjecture reduces the construction to choosing cuts and matching compatible endpoints.
-It is a sufficient strengthening, not an equivalent reformulation, and is proved only through
-`K=3`; five selected and 85 of 100 capped random `K=4` probes pass, while 15 probes are
-inconclusive.  See the
-[normal-form theorem note](theorems/singleton-majorization.md#a-low-level-cut-and-splice-normal-form-2026-08-29)
-and [survey record](../evidence/singleton_cut_splice_survey_2026-08-29.md).
-The stronger proposal that every parent has a valid split with two identical normalized children
-is now refuted at `K=3`.  Exactly 1,190 of 1,206 targets admit one; a short counterexample is
-`(8,3^6,1)`.  Its width-eight row forces the prospective equal pair to begin `4,4`, after which
-the remaining twos cannot all find legal mixed-child ones.  It does have the valid all-distinct
-split `(4,3,1,1)`, `(4,2,2,1)`, `(3,3,2,1)`.  The adjacent repair survives the complete `K=3`
-census: every target has a split with two children equal or one Robin--Hood transfer apart, and
-also one whose three child types form a dominance chain.  These are finite observations only; see
-the [counterexample proof and census](../evidence/singleton_identical_children_census_2026-08-29.md).
-The counterexample decomposition is not singular: it has four normalized child-type orbits and
-six normalized row-allocation orbits after the `L<->R` symmetry.
-The parent-first multiplicity census is now complete through `K=4`.  The exact child-orbit layers
-one, two, three and at least four have sizes `30,123,106,5,996,779`; the cut-orbit layers one, two
-and three have sizes `8,19,32`.  This refutes the apparent `K<=3` Rigidity-Heredity pattern.  The
-child-unique parent `(16,15,9^3,5^3,1^8)` has the forced all-distinct triple
-`(8,6,5,4,1^4)`, `(8,7,4,3,2,1^3)`, `G_3`; the first two children each have two child orbits.
-The failure is controlled: every forced child of all 30 child-unique `K=4` parents lies in the
-one- or two-orbit `K=3` layer, and every forced triple contains at least one rigid child.  Among
-the 30, exactly 5/15/10 have one/two/three rigid children and only 13 repeat a child.  This suggests
-a Multiplicity-Filtration Conjecture, not strict heredity.  Rigid children are not universal for
-arbitrary parents: `(3^9)@3` has none.  See the
-[multiplicity census](../evidence/singleton_split_multiplicity_census_2026-08-29.md) and original
-[unique-split survey](../evidence/singleton_unique_split_survey_2026-08-29.md).
-The full 259-state low-multiplicity relation now exposes an exact construction on saturated
-Pascal faces.  The proved Pascal Tight-Skeleton Factorization Theorem retains, at every tight rank
-`t`, the plateau of pure-row counts maximizing `H(p)+H(t-p)`.  Consecutive tight ranks give
-contracted child bands, and global allocations are transfer-matrix products along monotone count
-paths.  The old dyadic head--tail product is the one-path case; at `K=4,t=4` it still accounts for
-131 low parents with multiplicity layers `21,85,25`.  Allowing all tight ranks raises low-layer
-coverage from 228/259 to 253/259.  Exact `K=4` censuses show that all 1,722,516 positive-band
-instances extend every incoming count and all 1,422,304 suffix instances fill for every incoming
-count.  The proved Half-Unit Coalescence Lemma now removes arbitrary row refinement: merge the two
-smallest rows until exactly `2^K` remain, split that state, and undo the merges within one
-orientation.  Therefore the full converse is equivalent to its minimum-support case.  At `K=4`
-this reduces 5,997,038 parents to 408,776 exact-support states, only 63,329 of which have no internal
-tight prefix; the former suffix conjecture follows from terminal exact-band extension.  Positive-
-Band Extension remains open in general.  The full-band problem now has a smaller sufficient target:
-the Two-Anchor Reduction subtracts two from the longest half and one from the other half, yielding
-`b<=J` for the induced child capacity `c=G_(K-1)-1`.  A coloring of `b` with at most
-`2^(K-1)` positive rows per side lifts by restoring one pure anchor on every row and one mixed
-anchor on the original longest half.  The resulting Balanced Residual Coloring Lemma passes all
-73/160,492 residual states at `K=3/4` and all two-anchor images of the 160/408,776 exact-support
-parents.  A same-color predecessor exists for every noncanonical residual through `K=4`, but those
-one-step colorings have not been made compatible along a global path.  Greedy/global balance,
-residual coalescence and a fixed canonical-boundary product all fail.  See the
-[two-anchor residual record](../evidence/singleton_two_anchor_residual_2026-08-29.md).
-Fixed orientation is false: the band `[5,9)` state `(4^4)`
-requires switching the leading pure side, unrestricted prefix refinement fails, and even a 64-row
-state strictly inside every `G_6` prefix refutes sorted alternation.  See the
-[tight-skeleton record](../evidence/singleton_pascal_tight_skeleton_2026-08-29.md) and original
-[low-fiber factorization record](../evidence/singleton_low_multiplicity_factorization_2026-08-29.md).
-Canonical/distinct-slot witness leaves remain unconditional, arbitrary
-`[majorized G_k]` leaves are conditional, and the exact `n(10,6)=973` claim is reduced to the
-unconditional upper bound `n(10,6)<=973`.  The proof-safe `Sa(10)=192` result, the exact frontiers
-through `k=8`, the exact `k=9,m=1..6` cells, and the published `m=5` theorem are unaffected.
+The obstruction is exactly Pascal-shaped.  The parent is tight at ranks 15 and 31, forcing the four
+color-count transitions `7/8 -> 15/16`.  The 16 intervening rows `(8^15,7)` must send 21 coins
+to the mixed child.  Mixed-child saturation at ranks 15 and 31, together with the strict
+`H(30)=241<H(31)=242` step, forces every band mixed piece to be a positive integer.  One pure child then needs either 58 coins from eight rows that can retain at
+most 56, or 64 coins from nine rows that can retain at most 63.  Thus none of the four transitions
+exists.  This is a human proof; the executable checks are regressions, not the trust base.
+
+The counterexample has the minimum possible full-mass support `2^6=64`.  Complete censuses still
+prove the Row-Coloring property through `K=4`; whether a different `K=5` counterexample exists
+is undecided.  Hence `K=6` is the smallest known failure level, not a proved minimum.
+
+The bottom-up transfer idea locates the boundary exactly.  Replace the canonical band
+`(22,7^15)` successively by
+
+    (22-j,8^j,7^(15-j)),  0<=j<=14.
+
+Every state through `j=13` has a first cut whose children are majorized by `G_5`, while `j=14`
+is the hole; this statement concerns first-cut feasibility, not complete recursive strategies.
+The final one-coin Robin--Hood transfer destroys the whole cut fiber.  Allowing transfers in both
+directions still proves fixed-color fiber connectivity, but feasibility itself is not downward
+closed, so bidirectionality cannot recover the converse.
+
+All equivalent or sufficient universal proof targets must be read accordingly.  Row-Coloring,
+Pascal orthant saturation, global Robin--Hood closure, Carry-Compatible Gale--Ryser, Balanced
+Pascal Realization, canonical direct/allocation transport, Pascal-shuffle coverage and
+two-interval splicing are false universally.  `Q_6` is not nice and therefore not strongly nice.
+The Positive-Band Extension Conjecture fails on the band `[15,31)`, where none of the four endpoint
+transitions works.  The Two-Anchor Reduction remains proved, but its residual conjecture is false
+on
+
+    (62,61,55^2,40^4,20^7,6^15,5^2)
+      <=_w (62,61,55^2,40^4,20^8,5^16).
+
+The extensive `K<=4` censuses, switch connectivity theorem, fixed-color fiber connectivity,
+tight-skeleton factorization, Half-Unit Coalescence and Two-Anchor Reduction remain valid within
+their exact statements.  They now describe the boundary and anatomy of the hole rather than a route
+to universal sufficiency.  Historical survey records are retained as finite theorems and failed
+proof routes.
+
+Operationally, arbitrary `[majorized G_k]` witness leaves are not certificates.  The former
+universal justification is false; a particular such leaf needs an independent strategy.
+`[canonical U_k]` and `[embedded G_k]` leaves remain unconditional because they delete edges
+from Aigner's explicit `G_k` strategy.  The proof-safe `Sa(10)=192`, exact frontiers through
+`k=8`, exact `k=9,m=1..6` cells, and published `m=5` theorem are unaffected.  The unsupported
+973 tree remains only an upper-bound companion, not an achievability proof.
+
+The earlier real-cover holes remain correct, but the primitive integer question no longer needs a
+rounding proof: the state above is the missing primitive lattice hole.  The theorem note has been
+superseded in place at
+[singleton-majorization.md](theorems/singleton-majorization.md).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -291,12 +72,12 @@ Each of these has already caused, or was one step from causing, a wrong result.
 
 | trap | why it matters |
 |---|---|
-| **Do not use arbitrary weak majorization by `G_k` as a positive singleton theorem.** | Necessity is proved; sufficiency is the open Row-Coloring Lemma.  The former Three-Way Decomposition Lemma is false already at `k=2`.  `[canonical U_k]` and `[embedded G_k]` leaves are unconditional because they delete edges from Aigner's explicit `G_k` strategy; `[majorized G_k]` leaves are conditional.  `tools/check_witness.py` reports the distinction. Fresh solver builds continue nonembedded majorized singletons through exact recursion and ignore positive dominance-trie hits for them, because historical caches do not record whether the old shortcut created a fact. Retain a checked unconditional tree for every positive claim. |
-| **Do not replace primitive integer saturation by a real Hall-cover claim.** | The union of fixed-color real bases has the right vertices and convex hull but has holes.  Padded coverage fails at `K=2` on `(4,3,(2/3)^3)`.  Exact-support coverage fails at every `K>=3`: for `m=2^(K-1)`, flatten the last `m+1` rows of `G_K` to `1+K/(m+1)`.  Every balanced coloring then has Hall excess at least `((K-2)m-2)/(2(m+1))`, greater than one from `K=5` onward.  These points scale to integer holes for scaled Pascal profiles, not for primitive `G_(K-1)`.  Any successful proof must use the primitive unit lattice; real convexity, homogeneous scaling and a universal real defect-below-one bound are all false.  The Integral Final-Band Extension Lemma explains the distinction on the tight `m-1` face but still assumes a legal head-band allocation.  See the [counterexample record](../evidence/singleton_exact_support_real_cover_2026-08-30.md). |
-| **Do not promote the finite singleton-coloring census or a shape/counting rule to a theorem.** | Exhaustion proves the Row-Coloring Lemma only through `K=4`.  Balanced value blocks with one-block lookahead pass ten million uniform `K=5` samples, but `K=5` has 38,378,683,542,323 full-mass dominated states.  Padding and labelling do not make raw counting sufficient: child triples map many-to-one to parents with nonconstant fibers already at `K=1`, so counting triples gives coefficient mass rather than support size.  Padding does give exact pure-first and equal-block allocation problems, but the fixed alternating-interval implementation fails at `K=3` for `(8,7,4,1^8)`.  Even adaptive equality of two normalized children is false: `(8,3^6,1)` has no such split.  Its adjacent-child repair passes all `K=3` targets but is only finite evidence.  Canonical-tail alternation reduces the high-support case to one explicit prefix inequality, but the finite `K<=12` pattern is deceptive: the inequality fails at `K=19`, and an exact compressed full-mass parent realizes a Hall excess of 2,431.  The scalar equal-average coalescence rule also passes all 5,997,038 `K=4` states, and `Q_3` is exhaustively strongly nice on 463,886 comparable pairs, but both are finite observations, not certificates; that scalar shape rule is unrelated to the proved two-smallest-row coalescence reduction.  Independently matching the whole normalized hinge profile is false already at `K=3`, for `(8,5,5,5,1^4)`: the coordinates have coupled lattice constraints.  Requiring every row image to contain a piece whose width occurs in `G_(K-1)` is also false at `K=3`: `(8,7,4,2,2,2,1,1)` forces at least ten units into a mixed branch of mass nine.  Strict alternation already fails at `K=3` on `(8,7,4,2,2,1^4)`; it fails for an exact dyadic head at `K=5` on `(32,31,26,26,16^3,11^2,6^7)`, and even for the strict-prefix-interior exact-support `K=6` state `(63^2,57^2,42^3,23^5,22^5,3^44,2^3)`.  Tight-band factorization must retain its plateau-count path: `(4^4)` in the `K=4` band `[5,9)` forces an orientation switch, while `(16,15,11,11,4^5)` refutes arbitrary refinement of a prefix capacity.  Adjacent-pair orientation fails on 916 `K=4` states; weaker block rules have sampled `K=5` counterexamples; even globally minimizing total-mass difference subject to the necessary row counts fails at the 15,855th enumerated `K=4` state.  Sorting Pascal rank sizes does not finish the poset lift: the explicit rank-incidence matrix (PR6) has all correct margins and a majorized row-degree sequence but no carry-compatible labelling.  The clean exact target remains Pascal orthant saturation/no lattice holes, equivalently the Carry-Compatible Gale--Ryser Lemma, with special-operator strong niceness and adaptive augmenting paths as stronger routes.  The general converse is open; see [the theorem note](theorems/singleton-majorization.md#the-pascal-rank-poset-and-the-griggs-dominance-connection-2026-08-29), [tight-skeleton record](../evidence/singleton_pascal_tight_skeleton_2026-08-29.md), [identical-child counterexample](../evidence/singleton_identical_children_census_2026-08-29.md), [padded reduction](../evidence/singleton_padded_three_blocks_2026-08-27.md), [shape survey](../evidence/singleton_shape_survey_2026-08-27.md), [strong-niceness census](../evidence/singleton_strong_niceness_2026-08-27.md), and [coloring census](../evidence/singleton_row_coloring_census_2026-08-26.md). |
-| **Do not promote the Two-Anchor Reduction to a complete singleton proof.** | The reduction itself is proved: an exact-support parent maps to `b<=J` after deleting the universal pure column and one maximum mixed column, and any capped residual coloring lifts.  The Balanced Residual Coloring Lemma needed to supply that coloring is open.  Its 160,492-state `K=4` census, the stronger longest-half mixed census, and the fact that every noncanonical residual has a one-step endpoint-coherent predecessor through `K=4` are finite evidence only.  The predecessor colorings are not yet compatible along a whole path.  Fixed products below the canonical residual boundary already fail at `K=3`, and greedy, minimum-total-balance and two-smallest residual coalescence fail at `K=4`.  See the [two-anchor theorem section](theorems/singleton-majorization.md#two-anchor-pascal-residual-reduction-2026-08-29) and [evidence record](../evidence/singleton_two_anchor_residual_2026-08-29.md). |
-| **Do not promote canonical Havel--Hakimi or the two-move switch descent to the singleton theorem.** | The full row/incidence switch graph is connected, so exhaustive search is a complete per-state decision algorithm.  Connectivity does not imply that a balanced vertex exists.  A fixed canonical realization is uncolorable at `K=5` for `(32,31,26,26,16^3,4^15,2^10)`, although one incidence switch repairs it; another exact state needs a neutral move before any strict defect decrease.  The deterministic two-move rule is exhaustive only through exact-support `K=4` and sampled/window-tested above that.  Its Pascal escape lemma remains open.  See the [Pascal-switch record](../evidence/singleton_balanced_hh_switch_2026-08-29.md). |
-| **Do not mistake a local coloring-repair, direct-transfer, or cut-and-splice conjecture for the exact singleton lemma.** | Row-Coloring is equivalent to Pascal orthant saturation and global Robin--Hood transfer closure, where the coloring may be rebuilt completely.  Adjacent-Fiber is stronger because it requires a coloring common to both transfer endpoints.  Literal Allocation-Transport is stronger still because every other row allocation must stay fixed; Canonical Allocation-Transport asks for one globally compatible path in that relation.  Core--Blocker Escape instead asks every failed coloring for a common one-flip/one-swap neighbor.  Canonical Monotone-Transfer asks for a direct transcript-move path; Pascal Two-Interval Splicing asks for a final partition with at most one canonical-chain splice per target chain.  These sufficient strengthenings hold exhaustively at `K=3`, but arbitrary direct moves are not closed, 916 allocation edges kill some source cuts, adjacent-depth/fixed-direction splicing already fails there, and none has a general proof.  Generating the *entire* cut fiber from `G_K` is false at every `K>=3`: the proved four-row Pascal phase cut is a new literal-transport source.  The exact transfer census passes all 141,690,676 normalized `K=4` transfer types, and complete `K=3`, four `K=4` windows and a targeted `K=5` probe support the local repair, but no reverse implication from the exact global statement is proved.  Keep these as optional proof routes.  Within the fixed-color route, same-coloring, ordinary delta-matroid exchange, strict band descent and preselected crossing rows all have exact counterexamples; the positive replacement and prefix results remain valid conditional machinery.  The equivalent global target is the Balanced Pascal Realization Lemma: choose a Gale--Ryser realization whose doubled Pascal columns admit one common exact row bisection.  See the [balanced-column theorem note](theorems/singleton-majorization.md#an-equivalent-balanced-column-realization), [solution-fiber theorem note](theorems/singleton-majorization.md#the-solution-fiber-dag-and-a-pascal-phase-birth-2026-08-30), [direct-transfer theorem note](theorems/singleton-majorization.md#a-canonical-direct-transfer-lemma-and-the-remaining-global-schedule-2026-08-29), [cut-and-splice survey](../evidence/singleton_cut_splice_survey_2026-08-29.md), [exact census](../evidence/singleton_adjacent_fiber_census_2026-08-27.md), [coloring-landscape record](../evidence/singleton_coloring_landscape_2026-08-28.md), and [boundary-exchange record](../evidence/singleton_boundary_exchange_2026-08-28.md). |
+| **Do not use arbitrary weak majorization by `G_k` as a positive singleton theorem.** | Necessity is proved and sufficiency is false.  The explicit `K=6` hole is majorized by `G_6` but unsolvable.  `[canonical U_k]` and `[embedded G_k]` leaves remain unconditional because they delete edges from Aigner's explicit strategy; an arbitrary `[majorized G_k]` leaf needs an independent proof.  Fresh solver builds recurse exactly on nonembedded singleton leaves and ignore historical positive dominance hits whose origin is unknown. |
+| **The primitive integer lattice has a hole; do not restart a real-to-integer rounding proof.** | Earlier padded and exact-support real holes remain valid, but (K6-1) is already a primitive full-mass integer hole.  The Integral Final-Band Extension Lemma remains correct only after a legal head-band allocation; this counterexample shows that the head allocation itself may not exist. |
+| **Do not extrapolate a finite singleton census or sampled rule.** | Exact exhaustion proves Row-Coloring through `K=4`, not universally.  The `K=6` hole refutes Row-Coloring, orthant saturation, Carry-Compatible Gale--Ryser, niceness/strong niceness, one-block extension and every sufficient global construction.  `K=5` remains undecided.  Lower-level counts remain finite theorems, not evidence that can override the counterexample. |
+| **The Two-Anchor Reduction survives, but its residual conjecture does not.** | The reduction itself is proved.  Its `K=6` image `(62,61,55^2,40^4,20^7,6^15,5^2)` is dominated by `J=(62,61,55^2,40^4,20^8,5^16)` and has no capped residual coloring.  The `K<=4` residual censuses remain correct. |
+| **Switch connectivity is a decision method, not an existence theorem.** | Row and incidence switches connect the fixed-margin search graph, but the `K=6` hole has no balanced vertex anywhere in that graph.  Consequently the universal two-move escape/descent conjecture is false even though its complete `K=4` runs remain valid. |
+| **Do not continue a universal transfer, repair, shuffle or splice proof.** | The final transfer in `(22-j,8^j,7^(15-j))` takes a feasible first-cut fiber at `j=13` to the empty fiber at `j=14`.  Global Robin--Hood closure and the stronger Adjacent-Fiber, Core--Blocker, canonical transport, Pascal-shuffle and two-interval-splicing claims are therefore false.  Their lower-level lemmas and censuses may still describe local structure, but they cannot prove universal sufficiency. |
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
@@ -341,7 +122,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
-| **H4** | Structural theory | Active, but the excess-`q` Pareto-assembly avenue is parked — see below. |
+| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively at `K=6`; characterize the hole/minimal level only if publication needs it.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established
 
@@ -365,17 +146,12 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 - **Sharp asymptotic `Sa` rate** — Florin--Ho--Jiang (2022) determine the exact leading
   constant, while Jiang--Polyanskii--Vorobyev (2019) give an explicit near-optimal construction.
   These are asymptotic statements, not finite-cell evidence; see [literature.md](literature.md).
-- **Singleton necessity, two further theorems, plus the lift-box lemma** — Singleton Majorization
-  Necessity, Unit-Group Elimination and Subgraph Monotonicity are proved; the singleton converse is
-  open.  The Row-Coloring Lemma is now exhaustively verified through `K=4`, with a reproducible
-  block-coloring census and a sampled higher-level conjecture, but this does not change proof status.
-  Its clean global form is now isolated: the signed Hall rank is bisubmodular, folding its integral
-  polyhedron by absolute value has exactly the parent majorization polymatroid as convex hull, and
-  the missing theorem is that the Pascal fold has no lattice holes.  Equivalently, one must route a
-  unit Robin-Hood transfer by a global signed augmenting path.  Final-mass optimization cannot be
-  the rule; it has an explicit `K=4` counterexample.
-  So is the new geometric core of recursive Pareto lifting. The
-  latter is a search-region lemma, not yet a full construction. Subgraph Monotonicity is elementary
+- **Singleton necessity, a negative converse theorem, and two further theorems** — Singleton
+  Majorization Necessity, Unit-Group Elimination and Subgraph Monotonicity are proved.  The
+  full-mass exact-support `K=6` state in the opening section refutes the converse.  Row-Coloring is
+  nevertheless exhaustively true through `K=4`; `K=5` is undecided.  The signed Hall rank,
+  convex-hull identity, switch connectivity and tight-skeleton factorization remain useful exact
+  formulations of the hole, not missing steps toward a universal proof.  Subgraph Monotonicity is elementary
   but was load-bearing and unwritten: it is
   what the result cache's downward/upward closure and the whole `sbb_greater` relation rest
   on, and what lets a negative certificate store antichains instead of closures.
@@ -387,16 +163,17 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   [aigner-1988-scan.md](aigner-1988-scan.md).
 - **18 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
-  `Sb(473:6)@9`, their two-sided variants where available, and the conditional
-  singleton-majorized construction for `Sb(973:6)@10`, plus the exact three-level atomization of
+  `Sb(473:6)@9`, their two-sided variants where available, and the unsupported
+  singleton-majorized derivation for `Sb(973:6)@10`, plus the exact three-level atomization of
   the decisive `m=5` majorized leaf at `P_7`. All pass structural checking; the two
-  `majorized_*` files are explicitly reported as conditional.
+  `majorized_*` files are explicitly reported as unsupported terminals.
 - **16 exhaustive multi-part enumerations** — `data/exhaustive_multipart.csv`, including one
   proven negative.
 
 ## What is refuted
 
-Kept on record so it is not re-derived: the old `m=5` closed form and `BBBD` profile as
+Kept on record so it is not re-derived: the Singleton Majorization Converse and all equivalent
+universal no-hole/transfer/niceness formulations (counterexample (K6-1)); the old `m=5` closed form and `BBBD` profile as
 equalities (both predict 480 instead of exact 481 at `k=9`), the `m=6` closed form and `BBCD`
 profile (both predict `n(10,6)=976`, while the unconditional upper bound is 973), the `m=11` closed form
 (violates monotonicity in m), the hand-typed `409?` as a *derivation* (though see below — it is
@@ -419,20 +196,21 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   predictions are 457, 447 and 432 for `m=7,8,9`, then `414..416` for `m=10` (two fits),
   followed by 410, 395 and 388.
 - **The `m=5` transition is structural, not just +1.**  At `Sb(481:5)@9` all 23 feasible
-  `3+2` roots fail, while the conditional majorized-terminal search finds `4+1` roots of selected
+  `3+2` roots fail, while the relaxed majorized-terminal search finds `4+1` roots of selected
   width 240–242.  Its tree starts with the complementary `[239:1]`; Li--Wu--Triesch independently
   make the same root-type
   switch.  Atom masses read `BBBD=480`, `ABBD=481`, `AABD=482`, but the latter words are
   presently arithmetic interpretations, not per-coin profiles extracted from the compressed
   witness.  See [conjectures.md](conjectures.md#exact-m5-transition-and-the-structural-break-updated-2026-08-16).
-- **The published exact `m=5` result calibrates the A/B/C/D assembly, conditionally (corrected
+- **The published exact `m=5` result calibrates the A/B/C/D assembly diagnostically (corrected
   2026-08-26).**  Complete finite
   enumeration over proven lower frontiers chooses `(alpha,beta,gamma)=(3,2,2)` through parent
   `k=7`, ties it with `(4,3,1)` at `k=8`, and chooses `(4,3,1)` at `k=9`.  With `t=k-2`, the
   latter branch's only hard outcome is
   `Sb(d:3,(2^t-t):1,(2^t-2t):1)@t`.  Finite files and a uniform two-test reduction reach
   singleton-majorized leaves at `d*=2^t-binomial(t-2,2)` for `t=7,8`, then one larger for every
-  `t>=9`; these local positive claims depend on the open singleton converse.  The uniform
+  `t>=9`; these local positive claims used the now-refuted singleton converse and are not
+  unconditional constructions.  The uniform
   leaf inequality first succeeds at `t=9`, internally explaining the `k=11` breakpoint.
   The published theorem independently supplies the final 985 and 2001 values.  Thus this supports,
   but does not unconditionally validate,
@@ -502,8 +280,8 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   specialized to that terminal class; the resulting trees themselves are unconditional proofs.
 - **The apparent m=6 recursion is refuted at its first extrapolation.**
   `n(k,6) = n(k-1,4) + n(k-1,5)` is exact for `k=5..9` but, using the corrected
-  `n(9,5)=481`, predicts 977 at `k=10`; the unconditional upper bound is 973.  The conditional
-  construction file uses a `2+4` root and saturates the `m=4`
+  `n(9,5)=481`, predicts 977 at `k=10`; the unconditional upper bound is 973.  The unsupported
+  relaxed file uses a `2+4` root and saturates the `m=4`
   pure child, but backs the other width down from 481 to 477.  The separate old `BBCD`
   closed form predicts 976.  This is one datum, not a new
   constant-correction formula.  See
@@ -552,13 +330,14 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
   height-6 eventual leaf needs two unweighted D lineages.  This excludes eight-atom ranks 1--81 at
   every depth, including `ABBBBBCD` (rank 59): the finite 229 accounting cannot stabilize by pure
   refinement.  Rank 82, `A^6D^2`, has an independently checked 19-node, three-level tree with root
-  base threshold 12.  It is therefore the exact widest A--D eight-atom germ and gives the conditional
-  parent construction `2^k-k^2+6k-16` for `k>=17` inside this height triple.  At 16 atoms the
+  base threshold 12.  It is therefore the exact widest A--D eight-atom germ in the relaxed model
+  and gives only an unsupported parent derivation `2^k-k^2+6k-16` for `k>=17` inside this height
+  triple.  At 16 atoms the
   D-lineage theorem excludes ranks 1--289 (the refined 229 class is rank 191), and a separately
   checked 242-core `(D,C+D)` coinductive kernel excludes ranks 290--304 at every depth.  The first
   25-node projected tree for rank 305, `A^13CD^2`, does not lift exactly, but an all-skeleton product
-  search finds a different 19-node exact tree with root-base threshold 6.  Rank 305 is consequently
-  the exact sixteen-atom optimum.  Attaching the outer branches yields the conditional profile
+  search finds a different 19-node relaxed tree with root-base threshold 6.  Rank 305 is consequently
+  the exact sixteen-atom optimum in that model.  Attaching the outer branches yields the unsupported profile
   `A^49B^9C^4D^2@G_(k-6)`, equivalently `A^7B^7D^2@G_(k-4)`, and width
   `2^k-k^2+7k-21` for `k>=12`.  Its arithmetic reproduces 473 at `k=9` and 973 at `k=10`, but
   predicts the still-open 1983 at `k=11`; the symbolic threshold does not settle that finite case.
@@ -1398,25 +1177,27 @@ solvable state satisfies every `R_d`, both kernels are unsolvable. Reproduce wit
 `tools/bundled_majorization.py m6-kernel <t> 4` (21.2 and 57.5 CPU seconds in the recorded runs).
 
 The exact small-m synchronized search exhausts every strategy for `Sb(974:6)@10`, proving
-**`n(10,6)<=973`**.  The 115-node 973 file is conditional on the open singleton converse.  The old
-formula and `BBCD` profile both predict 976 and are therefore refuted.  In the conditional tree,
+**`n(10,6)<=973`**.  The 115-node 973 file uses the false universal singleton stopping rule
+and therefore does not prove 973 achievable; its six nonembedded leaves need separate
+strategies.  The old
+formula and `BBCD` profile both predict 976 and are therefore refuted.  In the diagnostic tree,
 the root `[477:2]` has children `Sb(477:2)`,
 `Sb(496:2,477:4)`, and `Sb(496:4)`: it keeps the saturated `m=4` side but avoids the dead
 `Z_7` continuation by giving up three units on the other width.  The centered `3+3` alternatives
 `Sb(488:3,488:3)@9` (total 976) and `Sb(487:3,486:3)@9` (total 973) are both exactly unsolvable;
 this does not classify every working root at 973.
 
-The unconditional upper source is `evidence/sb_m6_k10_frontier.txt`; the conditional lower file is
+The unconditional upper source is `evidence/sb_m6_k10_frontier.txt`; the unsupported diagnostic file is
 `witnesses/majorized_973_6_at10.tree`.  At full depth the default terminal mode of
 `tools/search_singletonization.cpp` is a permissive relaxation: a negative is an exact refutation,
-whereas a positive remains conditional unless embedded/canonical terminals are requested.
+whereas a positive is unsupported unless embedded/canonical terminals are requested.
 The finite `k=11` target remains open.  The candidate reduces to
 `Sb(503:1,495:2,478:3)@9`; its first five-minute exact run timed out, and the literal scaled split
 is dead because it produces the exactly unsolvable residual
-`Sb(247:1,247:1,240:2,231:2)@8` (277.622 s).  Separately, the aligned atom construction now finds
-the different structural continuation `2^k-k^2+7k-21` for `k>=12`, conditional on the outer
-assembly.  It predicts 1983 at `k=11` but its root threshold is one level too high to settle that
-case.  This formula comes from a checked 19-node symbolic tree, not from promoting the one-point
+`Sb(247:1,247:1,240:2,231:2)@8` (277.622 s).  Separately, the relaxed aligned atom model gives
+the different structural candidate `2^k-k^2+7k-21` for `k>=12`.  It is not an achievability
+construction; it predicts 1983 at `k=11` but its root threshold is one level too high even within
+that model to settle that case.  This formula comes from a checked 19-node relaxed symbolic tree, not from promoting the one-point
 `-3` correction.
 
 ## Immediate next steps

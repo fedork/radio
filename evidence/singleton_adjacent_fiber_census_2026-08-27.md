@@ -1,5 +1,10 @@
 # Singleton Adjacent-Fiber census (2026-08-27)
 
+**Superseded universal status (2026-08-30).**  The exact `K<=4` census below remains valid, but
+Adjacent-Fiber is false.  The final unit transfer into the
+[`K=6` counterexample](singleton_k6_counterexample_2026-08-30.md) takes a feasible first-cut fiber
+to an empty one.
+
 ## Exact predicate
 
 Let `x` be a full-mass partition majorized by `G_K`, and choose a normalized Robin--Hood
@@ -153,14 +158,14 @@ the largest two `B` rows has slack exactly
     H(1)+H(2)+H(3)-((2U-1)+2U+r)=d-r.
 
 So the margin is exactly the donor-recipient gap.  This is a concrete Pascal augmenting step: the
-two identical `U-K` targets absorb the transfer.  What remains open is proving that every minimal
-opposite-color separator at an arbitrary Pascal level can be eliminated by changing to a suitable
+two identical `U-K` targets absorb the transfer.  The formerly proposed next step was proving that
+every minimal opposite-color separator at an arbitrary Pascal level can be eliminated by changing to a suitable
 feasible coloring.  A fixed-color tight separator cannot itself be crossed while preserving row
 orientations--that is exactly what the Fixed-Color Hall Lemma forbids.  The later
 [coloring-landscape analysis](singleton_coloring_landscape_2026-08-28.md), after quotienting equal
 rows and global side complementation, instead supports a Two-Row Color-Exchange Lemma through all
-`K<=3` cases and four disjoint `K=4` windows totaling 13,000 states.  That stronger local statement
-remains unproved.
+`K<=3` cases and four disjoint `K=4` windows totaling 13,000 states.  The `K=6` hole refutes that
+stronger local statement universally.
 
 The complete `K=4` run visited 1,173,872,133 search nodes and 141,770,271 complete feasible
 colorings.  It completed in 353 wall seconds with reported peak RSS below 0.01 GB under

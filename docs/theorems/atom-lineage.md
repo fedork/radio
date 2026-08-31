@@ -3,6 +3,8 @@
 This note concerns the explicitly restricted, non-wasteful aligned profile model used by
 `tools/search_atom_profiles.cpp`.  It is not an unrestricted group-testing impossibility theorem.
 Within that model it replaces bounded-depth evidence by an all-depth symbolic obstruction.
+Its positive terminal rule is weak singleton majorization; after the `K=6` counterexample, its
+positive trees and attached parent profiles are relaxed diagnostics, not achievability proofs.
 
 ## Model
 
@@ -141,8 +143,8 @@ and the independently implemented checker verifies all 19 nodes.  The largest te
 is root base `r>=12`.  Consequently (4) is the widest D germ among all 165 A--D eight-atom profiles,
 with no synchronized-depth qualifier: every wider germ has the all-depth obstruction above.
 
-Attaching the already constructed outer A/B/C branches in the working four-segment assembly gives
-the conditional parent profile
+Attaching the outer A/B/C branches in the working four-segment assembly gives only the unsupported
+relaxed parent profile
 
     A^21 B^6 C^3 D^2 @ G_(k-5),
 
@@ -151,8 +153,9 @@ whose width is
     2^k - 2 binom(k-5,2) - 5(k-5) - 11
       = 2^k - k^2 + 6k - 16,                                      (5)
 
-valid from the symbolic hard-branch threshold `k>=17`.  Equation (5) is an aligned-family lower
-construction, not a global Pareto maximum over other height triples or normalization sizes.
+valid in the relaxed model from the symbolic hard-branch threshold `k>=17`.  Because the required
+singleton-majorization converse is false, equation (5) is not an aligned-family lower construction
+and says nothing by itself about the global Pareto maximum.
 
 ## Sixteen-atom two-coordinate kernel
 
@@ -228,7 +231,7 @@ At this normalization the already constructed outer quantities are
 
     c=A^15B,   a-c=A^9B^5C^2,   b=A^12B^3C,
 
-so attaching the new germ gives the conditional parent profile
+so attaching the new germ gives only the unsupported relaxed parent profile
 
     A^49B^9C^4D^2 @ G_(k-6)
       = R^2(A^7B^7D^2) @ G_(k-6).
@@ -238,14 +241,14 @@ Its width is
     2^k - 2 binom(k-6,2) - 6(k-6) - 15
       = 2^k - k^2 + 7k - 21,                                    (10)
 
-and the hard-tree threshold `r>=6` gives `k>=12`.  As in (5), this is conditional on the working
-outer assembly and is a lower construction inside the aligned height triple, not a global Pareto
+and the hard-tree threshold `r>=6` gives `k>=12`.  As in (5), this is an unsupported relaxed
+derivation inside the aligned height triple, not a lower construction or a global Pareto
 maximality theorem.
 
 So the symbolic result is sharp but scoped:
 
 - the one-D proposal is refuted at *all* depths and under every pure refinement;
-- the eight- and sixteen-atom A--D optima are proved exactly;
+- the eight- and sixteen-atom A--D optima are exact only in the relaxed aligned model;
 - the new 16-atom ranks 290--304 are also all-depth negative;
 - the 32-atom slice is reduced to one unresolved profile, but larger normalization sizes remain
   open.
