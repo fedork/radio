@@ -21,6 +21,7 @@
 //                                       finite budget could not decide -- never read as "not a
 //                                       winner"; raw-space cost, see the function's own comment)
 //   budget <seconds>                ->  OK budget=<seconds>   (0 means no deadline)
+//   report <all|exceptions>         ->  choose whether SOLVABLE lines are emitted
 //   load <path>                     ->  OK loaded <path>
 //   stats                           ->  OK queries=<n> solvable=<n> unsolvable=<n> maybe=<n> ...
 //   quit                            ->  OK bye
@@ -48,6 +49,7 @@
 static FILE *resp;
 static FILE *journal;
 static uint64_t query_budget_seconds = 60;
+static int report_all_verdicts = 1;
 static long n_query, n_true, n_false, n_maybe;
 static double total_ms;
 static long long n_loaded, n_skipped_wide, n_skipped_k, n_skipped_positive, n_malformed;
@@ -539,6 +541,16 @@ int main(int argc, char **argv) {
             respond("OK budget=%llu", (unsigned long long)query_budget_seconds);
             continue;
         }
+        if (!strcmp(line, "report all")) {
+            report_all_verdicts = 1;
+            respond("OK report=all");
+            continue;
+        }
+        if (!strcmp(line, "report exceptions")) {
+            report_all_verdicts = 0;
+            respond("OK report=exceptions");
+            continue;
+        }
         if (!strncmp(line, "load ", 5)) { load_cache(line + 5); continue; }
         if (!strncmp(line, "snapshot ", 9)) { snapshot_dump(line + 9); continue; }
         if (!strncmp(line, "restore ", 8)) { snapshot_load(line + 8, 0); continue; }
@@ -596,7 +608,7 @@ int main(int argc, char **argv) {
         total_ms += ms;
         if (r == TRUE) n_true++; else if (r == FALSE) n_false++; else n_maybe++;
         journal_fact(r, k, sb, size);
-        respond_verdict(r, k, ms, sb, size);
+        if (report_all_verdicts || r != TRUE) respond_verdict(r, k, ms, sb, size);
     }
     return 0;
 }

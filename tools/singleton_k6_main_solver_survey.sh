@@ -35,7 +35,9 @@ tools/build_radio.py -O3 -DMAX_K=6 -DMAX_N=793 -DMAX_PART_N=65 \
     -DRADIO_CACHE_DISABLED_LEVEL=6 radio_oracle.c \
     -o "$survey_tmp/oracle" >&2
 
-"$survey_tmp/shell-ranker" \
-    --transfer-shell-oracle-input 6 "$distance" "$skip" "$limit" "$budget" \
-    | tools/capped_run.sh --seconds "$wall_seconds" --rss-gb "$rss_gb" \
+{
+    printf 'report exceptions\n'
+    "$survey_tmp/shell-ranker" \
+        --transfer-shell-oracle-input 6 "$distance" "$skip" "$limit" "$budget"
+} | tools/capped_run.sh --seconds "$wall_seconds" --rss-gb "$rss_gb" \
         --label k6-main-solver-survey -- "$survey_tmp/oracle"
