@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
@@ -6,8 +7,11 @@
 #include <map>
 #include <random>
 #include <limits>
+#include <memory>
 #include <string>
+#include <thread>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -3087,6 +3091,354 @@ void sample_uniform_states(int k, std::uint64_t sample_count, std::uint64_t seed
                   << " exact_B=" << show(first_reserve_solution.b) << '\n';
 }
 
+std::uint64_t expected_transfer_shell_states(int k, int distance) {
+    static const std::uint64_t k3[] = {
+        1, 5, 18, 35, 42, 31, 17, 8, 3};
+    static const std::uint64_t k5[] = {
+        1ULL, 14ULL, 126ULL, 834ULL, 4477ULL, 20144ULL,
+        78781ULL, 273442ULL, 858985ULL, 2469117ULL, 6558361ULL, 16200491ULL,
+        37429391ULL, 81188327ULL, 165999532ULL, 320843757ULL, 587942811ULL,
+        1023918872ULL, 1699183407ULL, 2692985809ULL, 4086409432ULL,
+        5950391300ULL, 8334519115ULL, 11254380239ULL, 14684852257ULL,
+        18555352471ULL, 22756429686ULL, 27148398851ULL, 31574112080ULL,
+        35878570360ULL, 39916993000ULL, 43571583709ULL, 46744059429ULL,
+        49376636593ULL, 51420524194ULL, 52880748963ULL, 53745593203ULL,
+        54065429952ULL, 53857973018ULL, 53212218344ULL, 52140274911ULL,
+        50753203580ULL, 49060823731ULL, 47173259713ULL, 45078740371ULL,
+        42889858325ULL, 40578828821ULL, 38256071777ULL, 35874174720ULL,
+        33533057841ULL, 31188274095ULL, 28929327187ULL, 26693928498ULL,
+        24573785473ULL, 22500860510ULL, 20558994060ULL, 18677652606ULL,
+        16932741205ULL, 15255341716ULL, 13723756614ULL, 12253609502ULL,
+        10927611075ULL, 9670811959ULL, 8551563140ULL, 7494049217ULL,
+        6565123892ULL, 5695954825ULL, 4947174263ULL, 4242868822ULL,
+        3645857210ULL, 3095504680ULL, 2634223688ULL, 2208828512ULL,
+        1858871006ULL, 1540051309ULL, 1284845425ULL, 1046487650ULL,
+        860972887ULL, 693964335ULL, 564408359ULL, 447749401ULL,
+        359030917ULL, 280387849ULL, 223571957ULL, 169330196ULL,
+        132147376ULL, 99587258ULL, 76701609ULL, 56541455ULL, 42694910ULL,
+        30749769ULL, 23424567ULL, 15689003ULL, 11487092ULL, 7902102ULL,
+        5687419ULL, 3787493ULL, 2639954ULL, 1682468ULL, 1247487ULL,
+        637940ULL, 431663ULL, 262492ULL, 172914ULL, 100063ULL, 62130ULL,
+        32144ULL, 24989ULL, 5460ULL, 3300ULL, 1736ULL, 1005ULL, 492ULL,
+        262ULL, 105ULL, 82ULL};
+    static const std::uint64_t k6[] = {
+        1ULL, 20ULL, 240ULL, 2076ULL, 14449ULL, 84716ULL,
+        433710ULL, 1980479ULL, 8219313ULL, 31395729ULL,
+        111555624ULL, 371716237ULL, 1169629534ULL,
+        3494418291ULL, 9960648265ULL};
+    if (k == 3 && distance >= 0
+        && distance < static_cast<int>(sizeof(k3) / sizeof(k3[0]))) {
+        return k3[distance];
+    }
+    if (k == 5 && distance >= 0
+        && distance < static_cast<int>(sizeof(k5) / sizeof(k5[0]))) {
+        return k5[distance];
+    }
+    if (k == 6 && distance >= 0
+        && distance < static_cast<int>(sizeof(k6) / sizeof(k6[0]))) {
+        return k6[distance];
+    }
+    return 0;
+}
+
+struct TransferShellCensus {
+    int k;
+    int distance;
+    Sequence parent;
+    Hall hall;
+    Sequence parent_prefix{0};
+    Sequence parent_suffix;
+    int rows = 0;
+    int mass = 0;
+    int target_l1 = 0;
+    std::uint64_t limit = 0;
+    std::uint64_t skip = 0;
+    std::uint64_t remaining_skip = 0;
+    std::uint64_t seen = 0;
+    std::uint64_t tested = 0;
+    std::uint64_t lookahead_ok = 0;
+    std::uint64_t exact_fallbacks = 0;
+    std::uint64_t exact_nodes = 0;
+    std::uint64_t maximum_exact_nodes = 0;
+    Sequence first_lookahead_failure;
+    Sequence hole;
+    std::unordered_map<std::uint64_t, std::uint64_t> completion_memo;
+    bool emit_output = true;
+    std::chrono::steady_clock::time_point started =
+        std::chrono::steady_clock::now();
+
+    TransferShellCensus(
+        int level, int transfer_distance, std::uint64_t state_limit,
+        std::uint64_t state_skip)
+        : k(level), distance(transfer_distance), parent(singleton_base(level)),
+          hall(singleton_base(level - 1)), rows(static_cast<int>(parent.size())),
+          target_l1(2 * transfer_distance), limit(state_limit), skip(state_skip),
+          remaining_skip(state_skip) {
+        for (int value : parent) {
+            mass += value;
+            parent_prefix.push_back(mass);
+        }
+        parent_suffix.assign(rows + 1, 0);
+        for (int index = rows - 1; index >= 0; --index)
+            parent_suffix[index] = parent_suffix[index + 1] + parent[index];
+    }
+
+    bool done() const {
+        return !hole.empty() || (limit != 0 && tested >= limit);
+    }
+
+    std::uint64_t completion_key(
+        int position, int remaining, int maximum, int used_l1) const {
+        return static_cast<std::uint64_t>(position)
+            | (static_cast<std::uint64_t>(remaining) << 7)
+            | (static_cast<std::uint64_t>(maximum) << 17)
+            | (static_cast<std::uint64_t>(used_l1) << 24);
+    }
+
+    std::uint64_t count_completions(
+        int position, int remaining, int maximum, int used_l1) {
+        if (position == rows)
+            return remaining == 0 && used_l1 == target_l1 ? 1 : 0;
+        const int slots = rows - position;
+        if (remaining < slots || remaining > slots * maximum
+            || used_l1 > target_l1) return 0;
+        const int remaining_difference = remaining - parent_suffix[position];
+        const int available_l1 = target_l1 - used_l1;
+        if (remaining_difference < 0 || remaining_difference > available_l1
+            || ((available_l1 - remaining_difference) & 1) != 0) return 0;
+
+        const std::uint64_t key =
+            completion_key(position, remaining, maximum, used_l1);
+        if (const auto found = completion_memo.find(key);
+            found != completion_memo.end()) return found->second;
+
+        const int canonical_value = parent[position];
+        const int smallest = std::max(1, canonical_value - available_l1);
+        const int greatest = std::min(
+            {maximum, remaining - (slots - 1),
+             canonical_value + available_l1});
+        const int used_mass = mass - remaining;
+        std::uint64_t result = 0;
+        for (int value = greatest; value >= smallest; --value) {
+            if (used_mass + value > parent_prefix[position + 1]) continue;
+            const int new_l1 = used_l1 + std::abs(value - canonical_value);
+            if (new_l1 > target_l1) continue;
+            const std::uint64_t add = count_completions(
+                position + 1, remaining - value, value, new_l1);
+            if (add > std::numeric_limits<std::uint64_t>::max() - result) {
+                std::cerr << "TRANSFER_SHELL_COUNT_OVERFLOW K=" << k
+                          << " distance=" << distance << '\n';
+                std::exit(2);
+            }
+            result += add;
+        }
+        completion_memo.emplace(key, result);
+        return result;
+    }
+
+    void inspect(const Sequence &state) {
+        ++tested;
+        if (greedy_block_coloring(state, hall, true)) {
+            ++lookahead_ok;
+        } else {
+            ++exact_fallbacks;
+            if (first_lookahead_failure.empty()) first_lookahead_failure = state;
+            GeneralSearch exact(state, hall);
+            Coloring current;
+            const bool found = exact.dfs(0, current);
+            exact_nodes += exact.nodes;
+            maximum_exact_nodes = std::max(maximum_exact_nodes, exact.nodes);
+            if (!found) hole = state;
+        }
+        if (emit_output && tested % 1000000 == 0) {
+            const double seconds = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - started).count();
+            std::cout << "TRANSFER_SHELL_PROGRESS K=" << k
+                      << " distance=" << distance
+                      << " seen=" << seen
+                      << " tested=" << tested
+                      << " lookahead_failures=" << exact_fallbacks
+                      << " exact_nodes=" << exact_nodes
+                      << " seconds=" << seconds << '\n' << std::flush;
+        }
+    }
+
+    void enumerate(
+        int position, int remaining, int maximum, int used_l1,
+        Sequence &state) {
+        if (done()) return;
+        const std::uint64_t subtree =
+            count_completions(position, remaining, maximum, used_l1);
+        if (subtree == 0) return;
+        if (remaining_skip != 0) {
+            if (subtree <= remaining_skip) {
+                remaining_skip -= subtree;
+                seen += subtree;
+                return;
+            }
+        }
+        if (position == rows) {
+            if (remaining == 0 && used_l1 == target_l1) {
+                ++seen;
+                inspect(state);
+            }
+            return;
+        }
+        const int slots = rows - position;
+        if (remaining < slots || remaining > slots * maximum
+            || used_l1 > target_l1) return;
+        const int remaining_difference = remaining - parent_suffix[position];
+        const int available_l1 = target_l1 - used_l1;
+        if (remaining_difference < 0 || remaining_difference > available_l1
+            || ((available_l1 - remaining_difference) & 1) != 0) return;
+
+        const int canonical_value = parent[position];
+        const int smallest = std::max(1, canonical_value - available_l1);
+        const int greatest = std::min(
+            {maximum, remaining - (slots - 1),
+             canonical_value + available_l1});
+        const int used_mass = mass - remaining;
+        for (int value = greatest; value >= smallest; --value) {
+            if (used_mass + value > parent_prefix[position + 1]) continue;
+            const int new_l1 = used_l1 + std::abs(value - canonical_value);
+            if (new_l1 > target_l1) continue;
+            state.push_back(value);
+            enumerate(
+                position + 1, remaining - value, value, new_l1, state);
+            state.pop_back();
+            if (done()) return;
+        }
+    }
+
+    int run(bool emit = true) {
+        emit_output = emit;
+        const std::uint64_t counted =
+            count_completions(0, mass, parent.front(), 0);
+        Sequence state;
+        enumerate(0, mass, parent.front(), 0, state);
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        const std::uint64_t expected =
+            expected_transfer_shell_states(k, distance);
+        const bool complete = limit == 0 && skip == 0 && hole.empty();
+        const bool window_complete = remaining_skip == 0
+            && (limit == 0 || tested == limit || seen == expected);
+        const bool verified = hole.empty() && expected != 0
+            && counted == expected && window_complete
+            && (!complete || seen == expected);
+        if (emit_output)
+            std::cout << "TRANSFER_SHELL_COLORING_CENSUS K=" << k
+                      << " distance=" << distance
+                      << " complete=" << (complete ? "YES" : "NO")
+                      << " verified=" << (verified ? "YES" : "NO")
+                      << " expected_states=" << expected
+                      << " counted_states=" << counted
+                      << " count_memo_states=" << completion_memo.size()
+                      << " seen=" << seen
+                      << " skipped=" << skip
+                      << " tested=" << tested
+                      << " lookahead_ok=" << lookahead_ok
+                      << " exact_fallbacks=" << exact_fallbacks
+                      << " exact_nodes=" << exact_nodes
+                      << " max_exact_nodes=" << maximum_exact_nodes
+                      << " first_lookahead_failure="
+                      << show(first_lookahead_failure)
+                      << " hole=" << show(hole)
+                      << " seconds=" << seconds
+                      << " states_per_second="
+                      << (seconds == 0.0 ? 0.0 : tested / seconds) << '\n';
+        if (!verified) return 1;
+        return 0;
+    }
+};
+
+struct ParallelTransferShellResult {
+    bool verified = false;
+    std::uint64_t states = 0;
+    std::uint64_t lookahead_ok = 0;
+    std::uint64_t exact_fallbacks = 0;
+    std::uint64_t exact_nodes = 0;
+    std::uint64_t maximum_exact_nodes = 0;
+    Sequence first_lookahead_failure;
+    Sequence hole;
+    double seconds = 0.0;
+};
+
+ParallelTransferShellResult run_parallel_transfer_shell(
+    int k, int distance, int requested_workers, bool emit = true) {
+    ParallelTransferShellResult result;
+    const std::uint64_t expected =
+        expected_transfer_shell_states(k, distance);
+    if (expected == 0 || requested_workers <= 0) return result;
+    const int worker_count = static_cast<int>(std::min<std::uint64_t>(
+        static_cast<std::uint64_t>(requested_workers), expected));
+
+    std::vector<std::unique_ptr<TransferShellCensus>> workers;
+    std::vector<int> statuses(worker_count, 1);
+    workers.reserve(worker_count);
+    const std::uint64_t base = expected / worker_count;
+    const std::uint64_t remainder = expected % worker_count;
+    std::uint64_t offset = 0;
+    for (int index = 0; index < worker_count; ++index) {
+        const std::uint64_t length =
+            base + (static_cast<std::uint64_t>(index) < remainder ? 1 : 0);
+        workers.push_back(std::make_unique<TransferShellCensus>(
+            k, distance, length, offset));
+        offset += length;
+    }
+
+    const auto started = std::chrono::steady_clock::now();
+    std::vector<std::thread> threads;
+    threads.reserve(worker_count);
+    for (int index = 0; index < worker_count; ++index) {
+        threads.emplace_back([&, index] {
+            statuses[index] = workers[index]->run(false);
+        });
+    }
+    for (auto &thread : threads) thread.join();
+    result.seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - started).count();
+
+    result.verified = offset == expected;
+    for (int index = 0; index < worker_count; ++index) {
+        const TransferShellCensus &worker = *workers[index];
+        result.verified = result.verified && statuses[index] == 0;
+        result.states += worker.tested;
+        result.lookahead_ok += worker.lookahead_ok;
+        result.exact_fallbacks += worker.exact_fallbacks;
+        result.exact_nodes += worker.exact_nodes;
+        result.maximum_exact_nodes =
+            std::max(result.maximum_exact_nodes, worker.maximum_exact_nodes);
+        if (result.first_lookahead_failure.empty()
+            && !worker.first_lookahead_failure.empty())
+            result.first_lookahead_failure = worker.first_lookahead_failure;
+        if (result.hole.empty() && !worker.hole.empty())
+            result.hole = worker.hole;
+    }
+    result.verified = result.verified && result.states == expected
+        && result.hole.empty();
+    if (emit)
+        std::cout << "TRANSFER_SHELL_PARALLEL_COLORING_CENSUS K=" << k
+                  << " distance=" << distance
+                  << " workers=" << worker_count
+                  << " complete=YES"
+                  << " verified=" << (result.verified ? "YES" : "NO")
+                  << " expected_states=" << expected
+                  << " tested=" << result.states
+                  << " lookahead_ok=" << result.lookahead_ok
+                  << " exact_fallbacks=" << result.exact_fallbacks
+                  << " exact_nodes=" << result.exact_nodes
+                  << " max_exact_nodes=" << result.maximum_exact_nodes
+                  << " first_lookahead_failure="
+                  << show(result.first_lookahead_failure)
+                  << " hole=" << show(result.hole)
+                  << " seconds=" << result.seconds
+                  << " states_per_second="
+                  << (result.seconds == 0.0
+                          ? 0.0 : result.states / result.seconds) << '\n';
+    return result;
+}
+
 struct GlobalBalanceCensus {
     int k;
     Sequence parent;
@@ -3295,6 +3647,180 @@ int main(int argc, char **argv) {
         GlobalBalanceCensus census(k);
         census.run();
         return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--general-coloring-case") {
+        if (argc < 4) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --general-coloring-case k value...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        Sequence state;
+        for (int index = 3; index < argc; ++index)
+            state.push_back(std::atoi(argv[index]));
+        if (k < 2 || k > 6
+            || std::any_of(state.begin(), state.end(),
+                           [](int value) { return value <= 0; })) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --general-coloring-case k value...\n";
+            return 2;
+        }
+        std::sort(state.begin(), state.end(), std::greater<int>());
+        Hall hall(singleton_base(k - 1));
+        const bool lookahead = greedy_block_coloring(state, hall, true);
+        GeneralSearch exact(state, hall);
+        Coloring current;
+        const bool feasible = exact.dfs(0, current);
+        std::cout << "GENERAL_COLORING_CASE K=" << k
+                  << " state=" << show(state)
+                  << " lookahead=" << (lookahead ? "YES" : "NO")
+                  << " feasible=" << (feasible ? "YES" : "NO")
+                  << " exact_nodes=" << exact.nodes
+                  << " A=" << show(exact.solution.a)
+                  << " B=" << show(exact.solution.b) << '\n';
+        return 0;
+    }
+    if (argc >= 2
+        && std::string(argv[1]) == "--transfer-shell-parallel") {
+        if (argc != 5) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-parallel k distance workers\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int distance = std::atoi(argv[3]);
+        const int workers = std::atoi(argv[4]);
+        if (k < 2 || k > 6 || distance < 0 || workers < 1 || workers > 64
+            || expected_transfer_shell_states(k, distance) == 0) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-parallel k distance workers\n";
+            return 2;
+        }
+        return run_parallel_transfer_shell(k, distance, workers).verified ? 0 : 1;
+    }
+    if (argc >= 2
+        && std::string(argv[1]) == "--transfer-ball-parallel") {
+        if (argc != 5) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-ball-parallel k maximum-distance workers\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int maximum_distance = std::atoi(argv[3]);
+        const int workers = std::atoi(argv[4]);
+        if (k < 2 || k > 6 || maximum_distance < 0
+            || workers < 1 || workers > 64
+            || expected_transfer_shell_states(k, maximum_distance) == 0) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-ball-parallel k maximum-distance workers\n";
+            return 2;
+        }
+        const auto started = std::chrono::steady_clock::now();
+        ParallelTransferShellResult total;
+        total.verified = true;
+        for (int distance = 0; distance <= maximum_distance; ++distance) {
+            const ParallelTransferShellResult shell =
+                run_parallel_transfer_shell(k, distance, workers);
+            total.verified = total.verified && shell.verified;
+            total.states += shell.states;
+            total.lookahead_ok += shell.lookahead_ok;
+            total.exact_fallbacks += shell.exact_fallbacks;
+            total.exact_nodes += shell.exact_nodes;
+            total.maximum_exact_nodes = std::max(
+                total.maximum_exact_nodes, shell.maximum_exact_nodes);
+            if (total.first_lookahead_failure.empty()
+                && !shell.first_lookahead_failure.empty())
+                total.first_lookahead_failure = shell.first_lookahead_failure;
+            if (total.hole.empty() && !shell.hole.empty())
+                total.hole = shell.hole;
+            if (!shell.verified) break;
+        }
+        total.seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        std::cout << "TRANSFER_BALL_PARALLEL_COLORING_CENSUS K=" << k
+                  << " maximum_distance=" << maximum_distance
+                  << " workers=" << workers
+                  << " complete=" << (total.verified ? "YES" : "NO")
+                  << " verified=" << (total.verified ? "YES" : "NO")
+                  << " states=" << total.states
+                  << " lookahead_ok=" << total.lookahead_ok
+                  << " exact_fallbacks=" << total.exact_fallbacks
+                  << " exact_nodes=" << total.exact_nodes
+                  << " max_exact_nodes=" << total.maximum_exact_nodes
+                  << " first_lookahead_failure="
+                  << show(total.first_lookahead_failure)
+                  << " hole=" << show(total.hole)
+                  << " seconds=" << total.seconds
+                  << " states_per_second="
+                  << (total.seconds == 0.0
+                          ? 0.0 : total.states / total.seconds) << '\n';
+        return total.verified ? 0 : 1;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--transfer-ball") {
+        if (argc != 4) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-ball k maximum-distance\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int maximum_distance = std::atoi(argv[3]);
+        if (k < 2 || k > 6 || maximum_distance < 0
+            || expected_transfer_shell_states(k, maximum_distance) == 0) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-ball k maximum-distance\n";
+            return 2;
+        }
+        const auto started = std::chrono::steady_clock::now();
+        std::uint64_t states = 0;
+        std::uint64_t lookahead_ok = 0;
+        std::uint64_t exact_fallbacks = 0;
+        std::uint64_t exact_nodes = 0;
+        std::uint64_t maximum_exact_nodes = 0;
+        for (int distance = 0; distance <= maximum_distance; ++distance) {
+            TransferShellCensus census(k, distance, 0, 0);
+            if (census.run() != 0) return 1;
+            states += census.tested;
+            lookahead_ok += census.lookahead_ok;
+            exact_fallbacks += census.exact_fallbacks;
+            exact_nodes += census.exact_nodes;
+            maximum_exact_nodes =
+                std::max(maximum_exact_nodes, census.maximum_exact_nodes);
+        }
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        std::cout << "TRANSFER_BALL_COLORING_CENSUS K=" << k
+                  << " maximum_distance=" << maximum_distance
+                  << " complete=YES verified=YES"
+                  << " states=" << states
+                  << " lookahead_ok=" << lookahead_ok
+                  << " exact_fallbacks=" << exact_fallbacks
+                  << " exact_nodes=" << exact_nodes
+                  << " max_exact_nodes=" << maximum_exact_nodes
+                  << " seconds=" << seconds
+                  << " states_per_second="
+                  << (seconds == 0.0 ? 0.0 : states / seconds) << '\n';
+        return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--transfer-shell") {
+        if (argc < 4 || argc > 6) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell k distance [state-limit [state-skip]]\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int distance = std::atoi(argv[3]);
+        const std::uint64_t state_limit =
+            argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 0;
+        const std::uint64_t state_skip =
+            argc > 5 ? std::strtoull(argv[5], nullptr, 10) : 0;
+        if (k < 2 || k > 6 || distance < 0
+            || (state_limit == 0 && state_skip != 0)) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell k distance [state-limit [state-skip]]\n";
+            return 2;
+        }
+        TransferShellCensus census(k, distance, state_limit, state_skip);
+        return census.run();
     }
     if (argc >= 2 && std::string(argv[1]) == "--fixed-positive-sample") {
         const int k = argc > 2 ? std::atoi(argv[2]) : 5;
