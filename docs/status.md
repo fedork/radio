@@ -37,9 +37,10 @@ The analytic construction and induction are in the
 machine and independent `K=7` direct-search evidence in the
 [dyadic-family record](../evidence/singleton_dyadic_counterexample_family_2026-08-31.md).
 
-The counterexample has the minimum possible full-mass support `2^6=64`.  Complete censuses still
-prove the Row-Coloring property through `K=4`; whether a different `K=5` counterexample exists
-is undecided.  Hence `K=6` is the smallest known failure level, not a proved minimum.
+The counterexample has the minimum possible full-mass support `2^6=64`.  A complete
+prefix-cylinder census now proves the Row-Coloring property at `K=5` for all
+1,431,800,647,444 exact-support parents; Minimum-Support Reduction and the complete `K=4` converse
+make every one recursively solvable.  Hence `K=6` is the **proved smallest failure level**.
 
 The bottom-up transfer idea locates the boundary exactly.  Replace the canonical band
 `(22,7^15)` successively by
@@ -51,7 +52,8 @@ is the hole; this statement concerns first-cut feasibility, not complete recursi
 The final one-coin Robin--Hood transfer destroys the whole cut fiber.  A complete exact-support
 shell census strengthens the path observation: every one of the 5,189,450,419 parents through
 distance 13 has a first cut, so 14 is the global exact-support no-first-cut minimum.  This remains
-a first-cut result; it does not settle recursive-unsolvability minimality while `K=5` is open.
+also the recursive-unsolvability minimum: the complete `K=5` theorem makes every majorized child
+recursively solvable.
 Allowing transfers in both directions still proves fixed-color fiber connectivity, but feasibility
 itself is not downward closed, so bidirectionality cannot recover the converse.
 
@@ -66,7 +68,7 @@ on
     (62,61,55^2,40^4,20^7,6^15,5^2)
       <=_w (62,61,55^2,40^4,20^8,5^16).
 
-The extensive `K<=4` censuses, switch connectivity theorem, fixed-color fiber connectivity,
+The earlier `K<=4` censuses, switch connectivity theorem, fixed-color fiber connectivity,
 tight-skeleton factorization, Half-Unit Coalescence and Two-Anchor Reduction remain valid within
 their exact statements.  They now describe the boundary and anatomy of the hole rather than a route
 to universal sufficiency.  Historical survey records are retained as finite theorems and failed
@@ -112,15 +114,15 @@ the certificate class.  Counts and provenance are in the
 The dyadic constructor separately checks 91 canonical faces through `K=15` and emits 20 certified
 parents, while the analytic binomial-tail argument proves at least one for every higher level.
 
-The actual `K=5` boundary remains large after every proved reduction: there are exactly
-1,431,800,647,444 full-mass exact-support parents, including 147,422,086,892 with no internal tight
-prefix.  The first 311,082,023 of them, through transfer distance 14, are recursively solvable;
-this is only 0.0217% of the exact-support space, so a flat complete census is still not the next
-method.  The next singleton work is a symbolic or laminar/general-Hall attack on `K=5`.  At `K=6`,
-the remaining minimality questions are uniqueness within the distance-14 shell, smaller non-unit
-cores under other orders, and recursive unsolvability rather than first-cut emptiness.  A useful
-exact recursive support criterion remains the longer-term target.  The ordered programme is
-recorded under P6 in [research-plan.md](research-plan.md).
+The `K=5` boundary is now closed.  Exact alternating-tail prefix cylinders certify
+1,431,650,734,151 of its 1,431,800,647,444 exact-support parents; uncapped Fixed-Color Hall search
+checks the remaining 149,913,293 and finds no hole.  The 14-way ranked run reconciles every shard
+and completes in 74m49s at 1.31 GB peak RSS; see the
+[prefix-cylinder record](../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).  At `K=6`, the
+remaining questions are uniqueness within the distance-14 shell and smaller non-unit cores under
+other orders.  The structural target is now a compact laminar/Hall-dual law explaining why the
+majorization outer bound is exact through `K=5` and first acquires a thin balanced-band hole at
+`K=6`.  The ordered programme is recorded under P6 in [research-plan.md](research-plan.md).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -133,7 +135,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 |---|---|
 | **Do not use arbitrary weak majorization by `G_k` as a positive singleton theorem.** | Necessity is proved and sufficiency is false.  The explicit `K=6` hole is majorized by `G_6` but unsolvable.  `[canonical U_k]` and `[embedded G_k]` leaves remain unconditional because they delete edges from Aigner's explicit strategy; an arbitrary `[majorized G_k]` leaf needs an independent proof.  Fresh solver builds recurse exactly on nonembedded singleton leaves and ignore historical positive dominance hits whose origin is unknown. |
 | **The primitive integer lattice has a hole; do not restart a real-to-integer rounding proof.** | Earlier padded and exact-support real holes remain valid, but (K6-1) is already a primitive full-mass integer hole.  The Integral Final-Band Extension Lemma remains correct only after a legal head-band allocation; this counterexample shows that the head allocation itself may not exist. |
-| **Do not extrapolate a finite singleton census or sampled rule.** | Exact exhaustion proves Row-Coloring through `K=4`, not universally.  The `K=6` hole refutes Row-Coloring, orthant saturation, Carry-Compatible Gale--Ryser, niceness/strong niceness, one-block extension and every sufficient global construction.  `K=5` remains undecided.  Lower-level counts remain finite theorems, not evidence that can override the counterexample. |
+| **Do not extrapolate a finite singleton census or sampled rule.** | Exact exhaustion proves Row-Coloring through `K=5`, not universally.  The `K=6` hole refutes Row-Coloring, orthant saturation, Carry-Compatible Gale--Ryser, niceness/strong niceness, one-block extension and every sufficient global construction.  Lower-level counts remain finite theorems, not evidence that can override the counterexample. |
 | **The Two-Anchor Reduction survives, but its residual conjecture does not.** | The reduction itself is proved.  Its `K=6` image `(62,61,55^2,40^4,20^7,6^15,5^2)` is dominated by `J=(62,61,55^2,40^4,20^8,5^16)` and has no capped residual coloring.  The `K<=4` residual censuses remain correct. |
 | **Switch connectivity is a decision method, not an existence theorem.** | Row and incidence switches connect the fixed-margin search graph, but the `K=6` hole has no balanced vertex anywhere in that graph.  Consequently the universal two-move escape/descent conjecture is false even though its complete `K=4` runs remain valid. |
 | **Do not continue a universal transfer, repair, shuffle or splice proof.** | The final transfer in `(22-j,8^j,7^(15-j))` takes a feasible first-cut fiber at `j=13` to the empty fiber at `j=14`.  Global Robin--Hood closure and the stronger Adjacent-Fiber, Core--Blocker, canonical transport, Pascal-shuffle and two-interval-splicing claims are therefore false.  Their lower-level lemmas and censuses may still describe local structure, but they cannot prove universal sufficiency. |
@@ -184,7 +186,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
-| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively: a proved dyadic balanced-band family gives no-first-cut parents at every `K>=6`, and the independent direct-row verifier exhausts the first new `K=7` member.  The original `K=6` counterexample is the unique first-cut hole on its fixed rank-15/32 face, no eligible `K=5` band has this certificate, and exhaustive search makes distance 14 globally minimal among exact-support no-first-cut holes.  Settle the actual `K=5` problem; at `K=6`, keep first-cut minimality separate from recursive-unsolvability and core/uniqueness questions.  The excess-`q` Pareto-assembly avenue remains parked. |
+| **H4** | Structural theory | The Singleton Majorization Converse is exhaustively true through `K=5` and false for every `K>=6`; hence `K=6` is the proved first failure level.  Prefix cylinders plus exact Hall fallback close all 1,431,800,647,444 exact-support `K=5` parents.  The original `K=6` counterexample is the unique first-cut hole on its fixed rank-15/32 face, and exhaustive search makes distance 14 globally minimal for exact-support recursive unsolvability.  Next classify the distance-14 holes/non-unit cores and seek the laminar Hall-dual law behind the phase change.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established
 
@@ -211,7 +213,7 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
 - **Singleton necessity, a negative converse theorem, and two further theorems** — Singleton
   Majorization Necessity, Unit-Group Elimination and Subgraph Monotonicity are proved.  The
   full-mass exact-support `K=6` state in the opening section refutes the converse.  Row-Coloring is
-  nevertheless exhaustively true through `K=4`; `K=5` is undecided.  The signed Hall rank,
+  nevertheless exhaustively true through `K=5`, making `K=6` the proved first failure level.  The signed Hall rank,
   convex-hull identity, switch connectivity and tight-skeleton factorization remain useful exact
   formulations of the hole, not missing steps toward a universal proof.  Subgraph Monotonicity is elementary
   but was load-bearing and unwritten: it is

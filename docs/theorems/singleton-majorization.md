@@ -34,8 +34,10 @@ is
 An independent direct-row solver exhausts this `K=7` state as well.  The construction, infinite
 proof, 20-instance machine survey through `K=15`, and provenance are in the
 [dyadic-family record](../../evidence/singleton_dyadic_counterexample_family_2026-08-31.md).
-The failure level `K=5` remains open, so `K=6` is still the smallest known failure rather than a
-proved minimum.
+A complete prefix-cylinder census proves the converse for all 1,431,800,647,444 exact-support
+parents at `K=5`; Minimum-Support Reduction and the complete `K=4` result extend this to every
+`G_5`-majorized singleton state.  Hence `K=6` is the proved smallest failure level; see the
+[complete `K=5` record](../../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).
 
 The same proof involves only the first 32 rows, so the unit-free core
 
@@ -60,9 +62,10 @@ exact prefix-cap optimization proves that distance 14 is globally minimal among 
 certified by this obstruction.  A subsequent exact Fixed-Color Hall census exhausts all
 5,189,450,419 exact-support `K=6` parents through distance 13 and finds a first cut for every one.
 Thus 14 is globally minimal for an exact-support **no-first-cut** hole, not merely for this
-certificate class.  This still does not settle `K=5` or minimum distance among recursively
-unsolvable `K=6` parents; see the
-[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md).
+certificate class.  The complete `K=5` theorem upgrades this to minimum distance among recursively
+unsolvable exact-support `K=6` parents as well; see the
+[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md) and
+[complete `K=5` record](../../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).
 
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the
@@ -80,14 +83,15 @@ below `(62,61,55^2,40^4,20^8,5^16)`.  Hence the formerly proposed Balanced Resid
 Lemma is false as well.
 
 The prior finite searches remain correct within their stated ranges: the converse holds through
-`K=4`.  They did not cover the `K=6` hole.  The state is reached from `G_6` by fourteen unit
+`K=4`; the new prefix-cylinder census closes `K=5` as well.  They did not cover the `K=6` hole.
+The state is reached from `G_6` by fourteen unit
 Robin--Hood transfers; the first thirteen intermediate bands retain a majorized first cut, and the
 last transfer destroys the entire cut fiber.  Exact exhaustion now strengthens this path statement:
 no exact-support parent anywhere in the complete distance-13 ball lacks a majorized first cut.
 This supplies the phase change that the transfer surveys were seeking and shows why a global
-downward-closure proof cannot exist.  At `K=5`, the 311,082,023 exact-support parents through
-distance 14 are recursively solvable, but whether that level contains a farther counterexample
-remains undecided.
+downward-closure proof cannot exist.  At `K=5`, all 1,431,800,647,444 exact-support parents are
+recursively solvable: prefix cylinders cover 1,431,650,734,151, and exact Hall search closes the
+remaining 149,913,293.
 
 ## Definitions
 

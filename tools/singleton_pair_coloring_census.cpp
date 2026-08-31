@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -229,6 +230,144 @@ struct GeneralSearch {
             if (legal && dfs(block_index + 1, current)) return true;
             for (int i = 0; i < to_a; ++i) current.pop_a();
             for (int i = 0; i < to_b; ++i) current.pop_b();
+        }
+        return false;
+    }
+};
+
+// A fixed prefix of a sorted exact-support parent defines a cylinder of completions.  Color the
+// fixed rows, then color the unknown suffix alternately.  If r suffix rows of A and s suffix rows
+// of B occur in a Hall inequality, their union has r+s entries and hence weighs no more than the
+// first r+s rows of the parent suffix.  Dominance, positivity and sortedness give the uniform bound
+//
+//   U(j) = min(G_k(t+j)-prefix_mass, suffix_mass-(suffix_rows-j), j*maximum).
+//
+// Thus one finite set of inequalities can certify every completion of the prefix.  This search
+// enumerates only the multiplicities of equal fixed rows; the alternating suffix start is tried in
+// both colors, so A/B complementation remains a sound normalization of the first fixed block.
+struct PrefixCylinderSearch {
+    struct Block {
+        int value;
+        int count;
+    };
+
+    const Hall &hall;
+    const Sequence &parent_prefix;
+    int fixed_rows;
+    int fixed_mass;
+    int suffix_rows;
+    int suffix_mass;
+    int suffix_maximum;
+    const std::array<std::vector<std::vector<int>>, 2> *exact_tail_bounds;
+    std::uint64_t node_limit;
+    std::vector<Block> blocks;
+    std::uint64_t nodes = 0;
+    bool cutoff = false;
+    Coloring solution;
+    int solution_suffix_start = -1;
+
+    PrefixCylinderSearch(const Sequence &prefix, const Hall &child_hall,
+                         const Sequence &canonical_parent_prefix,
+                         int remaining_mass, int maximum,
+                         int total_parent_rows, std::uint64_t search_node_limit,
+                         const std::array<std::vector<std::vector<int>>, 2> *tail_bounds)
+        : hall(child_hall), parent_prefix(canonical_parent_prefix),
+          fixed_rows(static_cast<int>(prefix.size())),
+          fixed_mass(parent_prefix_mass(prefix)),
+          suffix_rows(total_parent_rows - fixed_rows), suffix_mass(remaining_mass),
+          suffix_maximum(maximum), exact_tail_bounds(tail_bounds),
+          node_limit(search_node_limit) {
+        for (int value : prefix) {
+            if (blocks.empty() || blocks.back().value != value)
+                blocks.push_back({value, 1});
+            else
+                ++blocks.back().count;
+        }
+    }
+
+    static int parent_prefix_mass(const Sequence &prefix) {
+        int result = 0;
+        for (int value : prefix) result += value;
+        return result;
+    }
+
+    int suffix_upper_bound(int count) const {
+        if (count == 0) return 0;
+        const int dominance =
+            parent_prefix[fixed_rows + count] - fixed_mass;
+        const int positivity = suffix_mass - (suffix_rows - count);
+        const int sortedness = count * suffix_maximum;
+        return std::min({dominance, positivity, sortedness});
+    }
+
+    bool certifies(const Coloring &current, int suffix_start) const {
+        const int suffix_a = (suffix_rows + (suffix_start == 0 ? 1 : 0)) / 2;
+        const int suffix_b = suffix_rows - suffix_a;
+        const int fixed_a = static_cast<int>(current.a.size());
+        const int fixed_b = static_cast<int>(current.b.size());
+        for (int p = 0; p <= fixed_a + suffix_a; ++p) {
+            const int tail_a = std::max(0, p - fixed_a);
+            const int demand_a = current.pa[std::min(p, fixed_a)];
+            for (int q = 0; q <= fixed_b + suffix_b; ++q) {
+                const int tail_b = std::max(0, q - fixed_b);
+                const int demand = demand_a
+                    + current.pb[std::min(q, fixed_b)]
+                    + (exact_tail_bounds == nullptr
+                        ? suffix_upper_bound(tail_a + tail_b)
+                        : (*exact_tail_bounds)[suffix_start][tail_a][tail_b]);
+                if (demand > hall.capacity(p, q)) return false;
+            }
+        }
+        return true;
+    }
+
+    bool dfs(std::size_t block_index, Coloring &current) {
+        if (node_limit != 0 && nodes >= node_limit) {
+            cutoff = true;
+            return false;
+        }
+        ++nodes;
+        if (block_index == blocks.size()) {
+            for (int suffix_start = 0; suffix_start < 2; ++suffix_start) {
+                if (certifies(current, suffix_start)) {
+                    solution = current;
+                    solution_suffix_start = suffix_start;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const auto [value, count] = blocks[block_index];
+        std::vector<int> choices;
+        for (int to_a = 0; to_a <= count; ++to_a) {
+            if (block_index == 0 && to_a * 2 < count) continue;
+            choices.push_back(to_a);
+        }
+        std::stable_sort(choices.begin(), choices.end(), [&](int lhs, int rhs) {
+            const auto score = [&](int to_a) {
+                const int to_b = count - to_a;
+                const int difference = (current.total_a + to_a * value)
+                    - (current.total_b + to_b * value);
+                return std::pair{std::abs(difference), difference < 0};
+            };
+            return score(lhs) < score(rhs);
+        });
+
+        for (int to_a : choices) {
+            const int to_b = count - to_a;
+            const int old_a = static_cast<int>(current.a.size());
+            const int old_b = static_cast<int>(current.b.size());
+            for (int i = 0; i < to_a; ++i) current.push_a(value);
+            for (int i = 0; i < to_b; ++i) current.push_b(value);
+            const bool legal = newest_inequalities_hold(hall, current, old_a, old_b);
+            if (legal && dfs(block_index + 1, current)) return true;
+            for (int i = 0; i < to_a; ++i) current.pop_a();
+            for (int i = 0; i < to_b; ++i) current.pop_b();
+            if (node_limit != 0 && nodes >= node_limit) {
+                cutoff = true;
+                return false;
+            }
         }
         return false;
     }
@@ -3095,6 +3234,435 @@ void sample_uniform_states(int k, std::uint64_t sample_count, std::uint64_t seed
                   << " exact_B=" << show(first_reserve_solution.b) << '\n';
 }
 
+std::uint64_t expected_exact_support_states(int k) {
+    static const std::uint64_t expected[] = {
+        0ULL, 1ULL, 4ULL, 160ULL, 408776ULL, 1431800647444ULL};
+    return k >= 1 && k < static_cast<int>(sizeof(expected) / sizeof(expected[0]))
+        ? expected[k] : 0;
+}
+
+struct PrefixCylinderCensus {
+    int k;
+    Sequence parent;
+    Hall hall;
+    Sequence parent_prefix{0};
+    int rows;
+    int mass = 0;
+    std::uint64_t generation_node_limit;
+    std::uint64_t certificate_node_limit;
+    int stride;
+    int minimum_prefix;
+    int maximum_prefix;
+    std::uint64_t requested_skip;
+    std::uint64_t remaining_skip;
+    std::uint64_t state_limit;
+    std::map<std::tuple<int, int, int>, std::uint64_t> completion_memo;
+    std::unordered_map<std::uint64_t, int> tail_maximum_memo;
+    std::uint64_t tail_maximum_calls = 0;
+    std::uint64_t total_states = 0;
+    std::uint64_t generation_nodes = 0;
+    std::uint64_t certificate_attempts = 0;
+    std::uint64_t certificate_nodes = 0;
+    std::uint64_t certificate_cutoffs = 0;
+    std::uint64_t cylinders = 0;
+    std::uint64_t covered_states = 0;
+    std::uint64_t tested_leaves = 0;
+    std::uint64_t leaf_search_nodes = 0;
+    std::uint64_t maximum_leaf_search_nodes = 0;
+    std::vector<std::uint64_t> cylinders_by_depth;
+    std::vector<std::uint64_t> covered_by_depth;
+    Sequence first_cylinder_prefix;
+    Coloring first_cylinder_coloring;
+    int first_cylinder_suffix_start = -1;
+    Sequence hole;
+    bool stopped = false;
+    bool emit_output = true;
+    std::chrono::steady_clock::time_point started =
+        std::chrono::steady_clock::now();
+
+    PrefixCylinderCensus(int level, std::uint64_t traversal_limit,
+                         std::uint64_t search_limit, int depth_stride,
+                         int first_depth, int last_depth, std::uint64_t state_skip,
+                         std::uint64_t requested_state_limit)
+        : k(level), parent(singleton_base(level)), hall(singleton_base(level - 1)),
+          rows(static_cast<int>(parent.size())),
+          generation_node_limit(traversal_limit),
+          certificate_node_limit(search_limit), stride(depth_stride),
+          minimum_prefix(first_depth), maximum_prefix(last_depth),
+          requested_skip(state_skip),
+          remaining_skip(state_skip), state_limit(requested_state_limit),
+          cylinders_by_depth(rows + 1, 0),
+          covered_by_depth(rows + 1, 0) {
+        for (int value : parent) {
+            mass += value;
+            parent_prefix.push_back(mass);
+        }
+    }
+
+    std::uint64_t count_completions(int position, int remaining, int maximum) {
+        if (position == rows) return remaining == 0 ? 1 : 0;
+        const int slots = rows - position;
+        if (remaining < slots || remaining > slots * maximum) return 0;
+        const auto key = std::tuple{position, remaining, maximum};
+        if (const auto found = completion_memo.find(key);
+            found != completion_memo.end()) return found->second;
+
+        const int used_mass = mass - remaining;
+        const int smallest = std::max(1, remaining - (slots - 1) * maximum);
+        const int greatest = std::min(maximum, remaining - (slots - 1));
+        std::uint64_t result = 0;
+        for (int value = greatest; value >= smallest; --value) {
+            if (used_mass + value > parent_prefix[position + 1]) continue;
+            const std::uint64_t add =
+                count_completions(position + 1, remaining - value, value);
+            if (add > std::numeric_limits<std::uint64_t>::max() - result) {
+                std::cerr << "PREFIX_CYLINDER_COUNT_OVERFLOW K=" << k << '\n';
+                std::exit(2);
+            }
+            result += add;
+        }
+        completion_memo.emplace(key, result);
+        return result;
+    }
+
+    static std::uint64_t tail_maximum_key(int position, int remaining, int maximum,
+                                          int start, int take_a, int take_b) {
+        return static_cast<std::uint64_t>(position)
+            | (static_cast<std::uint64_t>(remaining) << 6)
+            | (static_cast<std::uint64_t>(maximum) << 16)
+            | (static_cast<std::uint64_t>(start) << 23)
+            | (static_cast<std::uint64_t>(take_a) << 24)
+            | (static_cast<std::uint64_t>(take_b) << 30);
+    }
+
+    int maximum_selected_tail(int position, int remaining, int maximum,
+                              int start, int take_a, int take_b) {
+        ++tail_maximum_calls;
+        if (position == rows)
+            return remaining == 0 && take_a == 0 && take_b == 0
+                ? 0 : -1000000;
+        const int slots = rows - position;
+        if (remaining < slots || remaining > slots * maximum) return -1000000;
+        const std::uint64_t key = tail_maximum_key(
+            position, remaining, maximum, start, take_a, take_b);
+        if (const auto found = tail_maximum_memo.find(key);
+            found != tail_maximum_memo.end()) return found->second;
+
+        const int used_mass = mass - remaining;
+        const int smallest = std::max(1, remaining - (slots - 1) * maximum);
+        const int greatest = std::min(maximum, remaining - (slots - 1));
+        int best = -1000000;
+        for (int value = greatest; value >= smallest; --value) {
+            if (used_mass + value > parent_prefix[position + 1]) continue;
+            int next_a = take_a;
+            int next_b = take_b;
+            int selected = 0;
+            if (start == 0 && next_a > 0) {
+                selected = value;
+                --next_a;
+            } else if (start == 1 && next_b > 0) {
+                selected = value;
+                --next_b;
+            }
+            const int suffix = maximum_selected_tail(
+                position + 1, remaining - value, value,
+                1 - start, next_a, next_b);
+            if (suffix > -1000000) best = std::max(best, selected + suffix);
+        }
+        tail_maximum_memo.emplace(key, best);
+        return best;
+    }
+
+    std::array<std::vector<std::vector<int>>, 2> exact_tail_bounds(
+        int position, int remaining, int maximum) {
+        std::array<std::vector<std::vector<int>>, 2> result;
+        const int suffix_rows = rows - position;
+        for (int start = 0; start < 2; ++start) {
+            const int rows_a = (suffix_rows + (start == 0 ? 1 : 0)) / 2;
+            const int rows_b = suffix_rows - rows_a;
+            result[start].assign(rows_a + 1, std::vector<int>(rows_b + 1, 0));
+            for (int take_a = 0; take_a <= rows_a; ++take_a) {
+                for (int take_b = 0; take_b <= rows_b; ++take_b) {
+                    const int bound = maximum_selected_tail(
+                        position, remaining, maximum, start, take_a, take_b);
+                    if (bound < 0) {
+                        std::cerr << "PREFIX_CYLINDER_INVALID_TAIL_BOUND K=" << k
+                                  << " position=" << position
+                                  << " remaining=" << remaining
+                                  << " maximum=" << maximum
+                                  << " start=" << start
+                                  << " take_a=" << take_a
+                                  << " take_b=" << take_b << '\n';
+                        std::exit(2);
+                    }
+                    result[start][take_a][take_b] = bound;
+                }
+            }
+        }
+        return result;
+    }
+
+    bool should_attempt(int position) const {
+        return position >= minimum_prefix && position < rows
+            && position <= maximum_prefix
+            && (position - minimum_prefix) % stride == 0;
+    }
+
+    bool certify(const Sequence &state, int remaining, int maximum,
+                 std::uint64_t subtree) {
+        ++certificate_attempts;
+        const auto tail_bounds = exact_tail_bounds(
+            static_cast<int>(state.size()), remaining, maximum);
+        PrefixCylinderSearch search(
+            state, hall, parent_prefix, remaining, maximum, rows,
+            certificate_node_limit, &tail_bounds);
+        Coloring current;
+        const bool found = search.dfs(0, current);
+        certificate_nodes += search.nodes;
+        certificate_cutoffs += search.cutoff;
+        if (!found) return false;
+        const int depth = static_cast<int>(state.size());
+        ++cylinders;
+        ++cylinders_by_depth[depth];
+        covered_states += subtree;
+        covered_by_depth[depth] += subtree;
+        if (first_cylinder_prefix.empty()) {
+            first_cylinder_prefix = state;
+            first_cylinder_coloring = search.solution;
+            first_cylinder_suffix_start = search.solution_suffix_start;
+        }
+        return true;
+    }
+
+    void inspect_leaf(const Sequence &state) {
+        ++tested_leaves;
+        GeneralSearch exact(state, hall);
+        Coloring current;
+        const bool found = exact.dfs(0, current);
+        leaf_search_nodes += exact.nodes;
+        maximum_leaf_search_nodes = std::max(maximum_leaf_search_nodes, exact.nodes);
+        if (!found) hole = state;
+    }
+
+    void progress() const {
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        std::cout << "PREFIX_CYLINDER_PROGRESS K=" << k
+                  << " generation_nodes=" << generation_nodes
+                  << " cylinders=" << cylinders
+                  << " covered_states=" << covered_states
+                  << " tested_leaves=" << tested_leaves
+                  << " certificate_nodes=" << certificate_nodes
+                  << " seconds=" << seconds << '\n' << std::flush;
+    }
+
+    void enumerate(int position, int remaining, int maximum, Sequence &state) {
+        if (stopped || !hole.empty()) return;
+        if (generation_node_limit != 0
+            && generation_nodes >= generation_node_limit) {
+            stopped = true;
+            return;
+        }
+        const std::uint64_t subtree =
+            count_completions(position, remaining, maximum);
+        if (subtree == 0) return;
+        if (remaining_skip != 0 && subtree <= remaining_skip) {
+            remaining_skip -= subtree;
+            return;
+        }
+        ++generation_nodes;
+        if (emit_output && generation_nodes % 1000000 == 0) progress();
+
+        const std::uint64_t processed = covered_states + tested_leaves;
+        if (state_limit != 0 && processed >= state_limit) {
+            stopped = true;
+            return;
+        }
+
+        if (position == rows) {
+            inspect_leaf(state);
+            return;
+        }
+        if (should_attempt(position)
+            && (state_limit == 0 || subtree <= state_limit - processed)
+            && certify(state, remaining, maximum, subtree)) return;
+
+        const int slots = rows - position;
+        const int used_mass = mass - remaining;
+        const int smallest = std::max(1, remaining - (slots - 1) * maximum);
+        const int greatest = std::min(maximum, remaining - (slots - 1));
+        for (int value = greatest; value >= smallest; --value) {
+            if (used_mass + value > parent_prefix[position + 1]) continue;
+            state.push_back(value);
+            enumerate(position + 1, remaining - value, value, state);
+            state.pop_back();
+            if (stopped || !hole.empty()) return;
+        }
+    }
+
+    int run(bool emit = true) {
+        emit_output = emit;
+        total_states = count_completions(0, mass, parent.front());
+        if (requested_skip > total_states) {
+            if (emit_output)
+                std::cerr << "PREFIX_CYLINDER_SKIP_OUT_OF_RANGE K=" << k << '\n';
+            return 2;
+        }
+        Sequence state;
+        enumerate(0, mass, parent.front(), state);
+        const double seconds = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - started).count();
+        const std::uint64_t skipped_states = requested_skip - remaining_skip;
+        const std::uint64_t classified =
+            skipped_states + covered_states + tested_leaves;
+        const std::uint64_t requested_window = state_limit == 0
+            ? total_states - requested_skip
+            : std::min(state_limit, total_states - requested_skip);
+        const bool window_complete = remaining_skip == 0
+            && covered_states + tested_leaves == requested_window;
+        const bool complete = hole.empty() && classified == total_states;
+        const bool verified_count =
+            total_states == expected_exact_support_states(k);
+        if (emit_output) std::cout << "PREFIX_CYLINDER_CENSUS K=" << k
+                  << " complete=" << (complete ? "YES" : "NO")
+                  << " verified_count=" << (verified_count ? "YES" : "NO")
+                  << " total_states=" << total_states
+                  << " classified_states=" << classified
+                  << " unresolved_states=" << total_states - classified
+                  << " skipped_states=" << skipped_states
+                  << " generation_node_limit=" << generation_node_limit
+                  << " certificate_node_limit=" << certificate_node_limit
+                  << " stride=" << stride
+                  << " minimum_prefix=" << minimum_prefix
+                  << " maximum_prefix=" << maximum_prefix
+                  << " requested_skip=" << requested_skip
+                  << " remaining_skip=" << remaining_skip
+                  << " state_limit=" << state_limit
+                  << " generation_nodes=" << generation_nodes
+                  << " completion_memo_states=" << completion_memo.size()
+                  << " tail_maximum_memo_states=" << tail_maximum_memo.size()
+                  << " tail_maximum_calls=" << tail_maximum_calls
+                  << " certificate_attempts=" << certificate_attempts
+                  << " certificate_nodes=" << certificate_nodes
+                  << " certificate_cutoffs=" << certificate_cutoffs
+                  << " cylinders=" << cylinders
+                  << " covered_states=" << covered_states
+                  << " tested_leaves=" << tested_leaves
+                  << " leaf_search_nodes=" << leaf_search_nodes
+                  << " max_leaf_search_nodes=" << maximum_leaf_search_nodes
+                  << " first_cylinder_prefix=" << show(first_cylinder_prefix)
+                  << " first_cylinder_A=" << show(first_cylinder_coloring.a)
+                  << " first_cylinder_B=" << show(first_cylinder_coloring.b)
+                  << " first_cylinder_suffix_start="
+                  << (first_cylinder_suffix_start < 0 ? "NONE"
+                      : first_cylinder_suffix_start == 0 ? "A" : "B")
+                  << " hole=" << show(hole)
+                  << " seconds=" << seconds << '\n';
+        if (emit_output) for (int depth = 0; depth <= rows; ++depth) {
+            if (cylinders_by_depth[depth] == 0) continue;
+            std::cout << "PREFIX_CYLINDER_DEPTH K=" << k
+                      << " depth=" << depth
+                      << " cylinders=" << cylinders_by_depth[depth]
+                      << " covered_states=" << covered_by_depth[depth] << '\n';
+        }
+        return verified_count && window_complete && hole.empty() ? 0 : 1;
+    }
+};
+
+int run_parallel_prefix_cylinder(int k, int workers,
+                                 std::uint64_t certificate_node_limit,
+                                 int stride, int minimum_prefix,
+                                 int maximum_prefix) {
+    const std::uint64_t expected = expected_exact_support_states(k);
+    std::vector<std::unique_ptr<PrefixCylinderCensus>> censuses;
+    std::vector<int> codes(workers, 1);
+    censuses.reserve(workers);
+    for (int worker = 0; worker < workers; ++worker) {
+        const std::uint64_t begin = expected * worker / workers;
+        const std::uint64_t end = expected * (worker + 1) / workers;
+        censuses.push_back(std::make_unique<PrefixCylinderCensus>(
+            k, 0, certificate_node_limit, stride, minimum_prefix,
+            maximum_prefix, begin, end - begin));
+    }
+    const auto started = std::chrono::steady_clock::now();
+    std::vector<std::thread> threads;
+    for (int worker = 0; worker < workers; ++worker) {
+        threads.emplace_back([&, worker] {
+            codes[worker] = censuses[worker]->run(false);
+        });
+    }
+    for (auto &thread : threads) thread.join();
+
+    bool verified = true;
+    std::uint64_t covered = 0;
+    std::uint64_t leaves = 0;
+    std::uint64_t generation_nodes = 0;
+    std::uint64_t certificate_attempts = 0;
+    std::uint64_t certificate_nodes = 0;
+    std::uint64_t certificate_cutoffs = 0;
+    std::uint64_t cylinders = 0;
+    std::uint64_t leaf_search_nodes = 0;
+    std::uint64_t tail_memo_states = 0;
+    std::uint64_t tail_calls = 0;
+    std::vector<std::uint64_t> cylinders_by_depth((1 << k) + 1, 0);
+    std::vector<std::uint64_t> covered_by_depth((1 << k) + 1, 0);
+    Sequence hole;
+    for (int worker = 0; worker < workers; ++worker) {
+        const auto &census = *censuses[worker];
+        const std::uint64_t begin = expected * worker / workers;
+        const std::uint64_t end = expected * (worker + 1) / workers;
+        verified = verified && codes[worker] == 0
+            && census.covered_states + census.tested_leaves == end - begin;
+        covered += census.covered_states;
+        leaves += census.tested_leaves;
+        generation_nodes += census.generation_nodes;
+        certificate_attempts += census.certificate_attempts;
+        certificate_nodes += census.certificate_nodes;
+        certificate_cutoffs += census.certificate_cutoffs;
+        cylinders += census.cylinders;
+        leaf_search_nodes += census.leaf_search_nodes;
+        tail_memo_states += census.tail_maximum_memo.size();
+        tail_calls += census.tail_maximum_calls;
+        for (int depth = 0; depth <= (1 << k); ++depth) {
+            cylinders_by_depth[depth] += census.cylinders_by_depth[depth];
+            covered_by_depth[depth] += census.covered_by_depth[depth];
+        }
+        if (hole.empty() && !census.hole.empty()) hole = census.hole;
+    }
+    verified = verified && covered + leaves == expected && hole.empty();
+    const double seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - started).count();
+    std::cout << "PREFIX_CYLINDER_PARALLEL_CENSUS K=" << k
+              << " workers=" << workers
+              << " complete=" << (verified ? "YES" : "NO")
+              << " verified=" << (verified ? "YES" : "NO")
+              << " total_states=" << expected
+              << " covered_states=" << covered
+              << " tested_leaves=" << leaves
+              << " generation_nodes=" << generation_nodes
+              << " certificate_node_limit=" << certificate_node_limit
+              << " stride=" << stride
+              << " minimum_prefix=" << minimum_prefix
+              << " maximum_prefix=" << maximum_prefix
+              << " certificate_attempts=" << certificate_attempts
+              << " certificate_nodes=" << certificate_nodes
+              << " certificate_cutoffs=" << certificate_cutoffs
+              << " cylinders=" << cylinders
+              << " leaf_search_nodes=" << leaf_search_nodes
+              << " tail_maximum_memo_states=" << tail_memo_states
+              << " tail_maximum_calls=" << tail_calls
+              << " hole=" << show(hole)
+              << " seconds=" << seconds << '\n';
+    for (int depth = 0; depth <= (1 << k); ++depth) {
+        if (cylinders_by_depth[depth] == 0) continue;
+        std::cout << "PREFIX_CYLINDER_PARALLEL_DEPTH K=" << k
+                  << " depth=" << depth
+                  << " cylinders=" << cylinders_by_depth[depth]
+                  << " covered_states=" << covered_by_depth[depth] << '\n';
+    }
+    return verified ? 0 : 1;
+}
+
 // Exact-support shell d consists of the positive, sorted, full-mass parents
 // majorized by G_k whose l1 distance from G_k is 2d.  These constants come
 // from the independent TransferShellCounter in singleton_tight_band_certificate.cpp;
@@ -3693,6 +4261,55 @@ int main(int argc, char **argv) {
                   << " A=" << show(exact.solution.a)
                   << " B=" << show(exact.solution.b) << '\n';
         return 0;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--prefix-cylinder-parallel") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 5;
+        const int workers = argc > 3 ? std::atoi(argv[3]) : 12;
+        const std::uint64_t certificate_node_limit =
+            argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 256;
+        const int stride = argc > 5 ? std::atoi(argv[5]) : 1;
+        const int minimum_prefix = argc > 6 ? std::atoi(argv[6]) : 1;
+        const int maximum_prefix = argc > 7 ? std::atoi(argv[7]) : 16;
+        if (argc > 8 || k < 1 || k > 5 || workers < 1 || workers > 64
+            || stride < 1 || minimum_prefix < 0
+            || minimum_prefix >= (1 << k)
+            || maximum_prefix < minimum_prefix || maximum_prefix >= (1 << k)) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --prefix-cylinder-parallel k workers"
+                      << " [certificate-node-limit [stride [minimum-prefix"
+                      << " [maximum-prefix]]]]\n";
+            return 2;
+        }
+        return run_parallel_prefix_cylinder(
+            k, workers, certificate_node_limit, stride,
+            minimum_prefix, maximum_prefix);
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--prefix-cylinder-census") {
+        const int k = argc > 2 ? std::atoi(argv[2]) : 5;
+        const std::uint64_t generation_node_limit =
+            argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 0;
+        const std::uint64_t certificate_node_limit =
+            argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 256;
+        const int stride = argc > 5 ? std::atoi(argv[5]) : 2;
+        const int minimum_prefix = argc > 6 ? std::atoi(argv[6]) : 4;
+        const std::uint64_t state_skip =
+            argc > 7 ? std::strtoull(argv[7], nullptr, 10) : 0;
+        const std::uint64_t state_limit =
+            argc > 8 ? std::strtoull(argv[8], nullptr, 10) : 0;
+        const int maximum_prefix = argc > 9 ? std::atoi(argv[9]) : (1 << k) - 1;
+        if (argc > 10 || k < 1 || k > 5 || stride < 1
+            || minimum_prefix < 0 || minimum_prefix >= (1 << k)
+            || maximum_prefix < minimum_prefix || maximum_prefix >= (1 << k)) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --prefix-cylinder-census k [generation-node-limit"
+                      << " [certificate-node-limit [stride [minimum-prefix"
+                      << " [state-skip [state-limit [maximum-prefix]]]]]]]\n";
+            return 2;
+        }
+        PrefixCylinderCensus census(
+            k, generation_node_limit, certificate_node_limit,
+            stride, minimum_prefix, maximum_prefix, state_skip, state_limit);
+        return census.run();
     }
     if (argc >= 2 && std::string(argv[1]) == "--transfer-shell-counts") {
         if (argc != 4) {

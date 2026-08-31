@@ -213,16 +213,17 @@ optimization now proves that 14 is also globally minimal among all `K=6` parents
 Tight-Band Capacity certificate.  A later exact Fixed-Color Hall census checks all 5,189,450,419
 exact-support parents through distance 13 and excludes a closer uncertified no-first-cut hole as
 well.  Thus 14 is the global exact-support first-cut minimum.  The complete `K=5` certificate
-census is empty, and the separate positive census reaches only distance 14 there, so that level
-remains undecided.  See the [capacity record](singleton_tight_band_capacity_2026-08-31.md) and
-[transfer-shell record](singleton_transfer_shell_census_2026-08-31.md).
+census is empty, but a later prefix-cylinder census proves all 1,431,800,647,444 exact-support
+`K=5` parents recursively solvable.  Thus 14 is also the minimum exact-support recursive failure
+distance at `K=6`.  See the [capacity record](singleton_tight_band_capacity_2026-08-31.md),
+[transfer-shell record](singleton_transfer_shell_census_2026-08-31.md), and
+[complete `K=5` record](singleton_k5_prefix_cylinder_2026-08-31.md).
 
 All exhaustive runs are regression checks.  The short saturation-and-integrality argument above
 is the proof.
 
 ## Scope
 
-The complete normalized census already proved the converse through `K=4`.
-This construction first obstructs at `K=6`; it does not decide `K=5`.  Thus
-`K=6` is the smallest currently known counterexample level, not a proved
-minimum counterexample level.
+The complete normalized census proves the converse through `K=5`: the new `K=5` prefix-cylinder
+census extends the earlier `K<=4` exhaustion to the entire exact-support boundary.  This
+construction first obstructs at `K=6`, so `K=6` is the proved minimum counterexample level.

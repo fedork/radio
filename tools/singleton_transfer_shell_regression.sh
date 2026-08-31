@@ -36,6 +36,18 @@ rg -q \
     "$shell_tmp/k3-ball.log"
 
 tools/run_with_provenance.py "$shell_tmp/singleton-shell" \
+    --prefix-cylinder-parallel 3 3 16 1 1 6 > "$shell_tmp/k3-prefix.log"
+rg -q \
+    'PREFIX_CYLINDER_PARALLEL_CENSUS K=3 workers=3 complete=YES verified=YES total_states=160 covered_states=160 tested_leaves=0 ' \
+    "$shell_tmp/k3-prefix.log"
+
+tools/run_with_provenance.py "$shell_tmp/singleton-shell" \
+    --prefix-cylinder-parallel 4 12 16 2 4 12 > "$shell_tmp/k4-prefix.log"
+rg -q \
+    'PREFIX_CYLINDER_PARALLEL_CENSUS K=4 workers=12 complete=YES verified=YES total_states=408776 covered_states=408772 tested_leaves=4 ' \
+    "$shell_tmp/k4-prefix.log"
+
+tools/run_with_provenance.py "$shell_tmp/singleton-shell" \
     --transfer-shell-parallel 6 7 4 > "$shell_tmp/k6-shell7.log"
 rg -q \
     'TRANSFER_SHELL_PARALLEL_COLORING_CENSUS K=6 distance=7 .* complete=YES verified=YES expected_states=1980479 tested=1980479 .* exact_fallbacks=836 exact_nodes=12239 ' \
@@ -93,6 +105,8 @@ rg -q 'GENERAL_COLORING_CASE K=6 .* lookahead=NO feasible=NO exact_nodes=7 ' \
     "$shell_tmp/j14.log"
 
 rg '^TRANSFER_BALL_PARALLEL_COLORING_CENSUS' "$shell_tmp/k3-ball.log"
+rg '^PREFIX_CYLINDER_PARALLEL_CENSUS' \
+    "$shell_tmp/k3-prefix.log" "$shell_tmp/k4-prefix.log"
 rg '^TRANSFER_SHELL_COUNT_CHECK' \
     "$shell_tmp/k5-counts.log" "$shell_tmp/k6-counts.log"
 rg '^TRANSFER_SHELL_PARALLEL_COLORING_CENSUS' "$shell_tmp/k6-shell7.log"

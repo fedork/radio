@@ -190,6 +190,7 @@ SHA-256 is `7c5e03cb67138475ae64f2ef0a28902acb727e89fd5f30028003ff803796c1f1`.
 This establishes an independent exhaustive implementation check for both the full-mass hole and
 its underfull core.  It does not supersede the two-line analytic capacity contradiction, which
 remains shorter and stronger as a proof.  The extension completely classifies the fixed
-rank-15/32 face and independently confirms the first new `K=7` member, but it does not decide
-`K=5`, classify holes outside the surveyed faces, or prove that every minimal hole has a
-two-anchor certificate.
+rank-15/32 face and independently confirms the first new `K=7` member.  It does not classify holes
+outside the surveyed faces or prove that every minimal hole has a two-anchor certificate.  The
+separate [prefix-cylinder census](singleton_k5_prefix_cylinder_2026-08-31.md) subsequently settles
+`K=5` positively.

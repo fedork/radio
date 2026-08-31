@@ -31,8 +31,9 @@ it is optional follow-up rather than unfinished H3 work.
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
 singleton-majorization failure is now itself a proved family: a dyadic balanced-band construction
-gives a full-mass exact-support no-first-cut parent for every `K>=6`.  The unresolved singleton
-level is `K=5`; higher-level existence is closed, though minimality and classification are not.
+gives a full-mass exact-support no-first-cut parent for every `K>=6`.  A complete prefix-cylinder
+census proves the converse through `K=5`, so `K=6` is the proved first failure level; classification
+and a compact governing law remain open.
 The excess-`q` Pareto-assembly programme is **parked as of 2026-08-16**: retain its proved local
 reductions, exact trees and relaxed-terminal derivations, but do not treat further normalization/rank scans
 as a proximate goal.  The literature now settles `m=5`: the old formula/`BBBD` equality is refuted
@@ -200,24 +201,26 @@ is:
    21,489,353 nodes.  The cleanroom implementation was mechanically accelerated tenfold without
    changing its search tree.  See the
    [family record](../evidence/singleton_dyadic_counterexample_family_2026-08-31.md);
-4. **Exact-support first-cut distance delivered 2026-08-31; `K=5` remains open.**  A ranked,
+4. **`K=5` converse and exact-support failure level delivered 2026-08-31.**  A ranked,
    parallel Fixed-Color Hall census exhausts all 5,189,450,419 exact-support `K=6` parents through
    distance 13 and finds a majorized first cut for every one.  The known distance-14 parent is
    therefore globally minimum for exact-support no-first-cut holes.  The same tool proves all
    311,082,023 exact-support `K=5` parents through distance 14 recursively solvable.  See the
    [transfer-shell record](../evidence/singleton_transfer_shell_census_2026-08-31.md).
 
-   Now settle `K=5`, and minimize the **non-unit core** beyond the fixed face under level, support,
-   recursive solvability and a clearly specified dominance/normalization order.  Minimum-Support
-   Reduction leaves 1,431,800,647,444 exact-support `K=5` parents, of which 147,422,086,892 have no
-   internal tight prefix, so do not launch a flat parent census.  The complete zero-certificate
-   result rules out the current two-anchor theorem as the deciding method; next seek a symbolic
-   tight-skeleton automaton, a laminar/general Hall-dual search, or another exact quotient that
-   covers the strict interior.  At `K=6`, do not confuse the new first-cut minimum with recursive
-   unsolvability: a closer parent could cut only to an unknown `K=5` failure.  The distance-14 shell
-   may also contain other holes.  Deleting the harmless `1^32` padding already gives the 32-row
-   mass-697 core and does not count as a new smaller obstruction.  Feed every new hole through the
-   extractor; an uncertified hole is the concrete input for the laminar/general-Hall programme;
+   The new prefix-cylinder quotient finishes the full boundary: exact alternating-tail suffix DPs
+   certify 1,431,650,734,151 of all 1,431,800,647,444 exact-support `K=5` parents, and uncapped exact
+   Hall search closes the remaining 149,913,293 with no hole.  Minimum-Support Reduction and the
+   complete `K=4` converse prove every `G_5`-majorized singleton state recursively solvable.  See
+   the [prefix-cylinder record](../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).
+
+   Thus `K=6` is the proved first failure level, and distance 14 is minimum for exact-support
+   recursive unsolvability as well as no-first-cut failure.  Now minimize the **non-unit core**
+   beyond the fixed face under support and a clearly specified dominance/normalization order, and
+   classify other distance-14 holes.  Deleting the harmless `1^32` padding already gives the
+   32-row mass-697 core and does not count as a new smaller obstruction.  Feed every new hole
+   through the extractor; an uncertified hole is the concrete input for the laminar/general-Hall
+   programme;
 5. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color

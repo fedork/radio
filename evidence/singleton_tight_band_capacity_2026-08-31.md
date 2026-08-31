@@ -128,7 +128,9 @@ This is a complete negative result for this **certificate class**, not a positiv
 theorem.  It says that no pair of tight `K=5` anchors can obstruct every endpoint transition by
 the theorem's mixed-floor/pure-capacity inequalities.  A `K=5` hole could still exist without such
 a certificate, including in the 147-billion-state strict interior where there are no internal
-tight anchors at all.  Consequently `K=5` remains undecided.
+tight anchors at all.  The later
+[prefix-cylinder census](singleton_k5_prefix_cylinder_2026-08-31.md) closes the full `K=5` space
+positively; that theorem does not follow from this absent-certificate result.
 
 The exhaustive enumeration also cross-checks the separate optimization below.  At `K=3` and
 `K=4`, the analogous positive-floor corpora have 22 and 3,863 band instances and likewise contain

@@ -287,8 +287,10 @@ tail gives the same counterexample band `(8^15,7^2)`.  Therefore distance 14 is 
 within the Tight-Band Capacity certificate class.  A separate exact Fixed-Color Hall census has
 since checked all 5,189,450,419 exact-support parents through distance 13 and found no uncertified
 no-first-cut hole.  Hence the same distance is globally minimal for that first-cut problem, while
-`K=5` and recursive-unsolvability minimality remain undecided.  See the
-[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md); counts, the
+the later complete `K=5` theorem upgrades it to minimum exact-support recursive-unsolvability
+distance as well.  See the
+[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md) and
+[complete `K=5` record](../../evidence/singleton_k5_prefix_cylinder_2026-08-31.md); counts, the
 optimization argument and clean provenance for the inequality class remain in the
 [capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
 

@@ -28,13 +28,14 @@ This replaces the earlier certificate-only minimum: an uncertified no-first-cut 
 at most 13 is now excluded by direct exhaustive search.  It does **not** say that the displayed
 parent is the unique hole at distance 14, because the other 9,960,648,264 parents in that shell
 were not classified.  It also does not prove minimum distance among recursively unsolvable
-`K=6` parents: a closer parent could have a majorized first cut whose child is an as-yet-unknown
-`K=5` counterexample.
+`K=6` parents on its own.  The later complete `K=5` census removes that caveat: every majorized
+`K=5` child is solvable, so the distance-13 first cuts prove their parents recursively solvable.
 
 At `K=5`, every parent in the displayed ball is fully solvable, not merely first-cut feasible.
 Full mass forces all three children to have full `G_4` mass, and the Singleton Majorization
-Converse is exhaustively true at `K=4`.  This bounded result does not settle `K=5`: the full
-exact-support space contains 1,431,800,647,444 parents.
+Converse is exhaustively true at `K=4`.  This bounded result did not by itself settle `K=5`: the
+full exact-support space contains 1,431,800,647,444 parents.  That space was subsequently closed by
+the [prefix-cylinder census](singleton_k5_prefix_cylinder_2026-08-31.md).
 
 ## Exact search
 

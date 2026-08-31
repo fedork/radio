@@ -12299,6 +12299,70 @@ operational docs now mark both mixed snapshots unsafe for current work, retire t
 instructions, and preserve the old load/restore numbers only as historical performance data.
 The final table, witness and documentation checks, plus `git diff --check`, all passed.
 
+## 2026-08-31 -- complete `K=5` converse by exact prefix cylinders
+
+The proposed early-prefix exclusion works, and it settles the level.  A generated prefix of a
+sorted exact-support parent is colored once; its unknown suffix receives a fixed alternating rank
+coloring.  For every Fixed-Color Hall inequality, a memoized integer DP computes the exact maximum
+unknown demand over **all** dominated positive completions of that prefix.  If the fixed demand plus
+this maximum fits the Hall capacity, the entire completion cylinder is solvable and its exact size
+is skipped using an independent suffix-count DP.  Equal fixed rows are quotiented canonically.  A
+finite node cap affects only whether a cylinder is recognized: any miss descends farther, and an
+uncapped exact `GeneralSearch` decides complete leaves.
+
+The exact-tail maximum was decisive.  The initial analytic union bound was sound but weak: its first
+1,000,000-node `K=5` walk covered only 857,273 parents in 13.48 seconds.  Replacing it by the exact
+alternating-tail DP raised that to 47,361,627 under the same even-depth schedule in 5.18 seconds.
+Fixed raw-rank windows then showed that certificate attempts after depth 16 were wasted and that a
+16-node prefix-color cap retained essentially all useful cylinders.  On a 100,000,000-parent median
+window, lowering the cap from 256 to 16 changed only 27 cylinder classifications; those 27 went to
+the exact leaf fallback, while wall time fell from 4.14 to 2.50 seconds.  Cap 8 crossed a real cliff:
+one probe was terminated after 42 CPU seconds without finishing its 100,000,000-parent window.
+
+The complete low-level controls pass with the final cap.  At `K=3`, prefix cylinders cover all 160
+exact-support parents.  At `K=4`, they cover 408,772 of 408,776 and the uncapped exact fallback
+closes the remaining four.  The latter decomposition is now locked in
+`tools/singleton_transfer_shell_regression.sh`.
+
+The first full run used 12 broad static rank shards.  It timed out cleanly after 3,604 wall seconds
+(60m04s), peak RSS 1.19 GB, with five shards complete and no aggregate verdict.  This is an abort,
+not evidence.  The user had explicitly requested completion, so the identical proof parameters
+were restarted with 14 narrower shards under a two-hour bound.  That run completed:
+
+    PREFIX_CYLINDER_PARALLEL_CENSUS K=5 workers=14 complete=YES verified=YES
+      total_states=1431800647444 covered_states=1431650734151
+      tested_leaves=149913293 generation_nodes=11887816744
+      certificate_attempts=7392630195 certificate_nodes=85340765606
+      cylinders=6879849886 leaf_search_nodes=1874543168 hole=()
+
+It took 4,484.15 in-process seconds / 4,489 wrapper wall seconds (74m49s) and peaked at 1.31 GB
+RSS.  Prefix cylinders cover 99.989529737% of the space; exact Hall search handles the remaining
+0.010470263%, averaging 12.504 nodes per fallback parent.  Every shard's covered-plus-fallback
+count equals its assigned raw interval, and the aggregate equals the independently known
+1,431,800,647,444-parent total.
+
+Because the Singleton Majorization Converse is already exhaustive at `K=4`, every `K=5` first cut
+found here has recursively solvable children.  Minimum-Support Reduction and unit padding extend
+the result beyond the exact-support normalization.  Therefore the converse is true for every
+`K<=5`, false for every `K>=6`, and `K=6` is the proved first failure level.  The earlier distance-13
+`K=6` first-cut census now also proves recursive solvability there, making distance 14 minimum for
+exact-support recursive failure, not only no-first-cut failure.
+
+The structural interpretation suggested during the run is Horn-like.  Majorization is the outer
+Schur--Horn/Kostka layer; a fixed coloring is governed exactly by Hall/network-flow cuts; eliminating
+the coloring should introduce extra compatible-flag inequalities.  The rank-15/32 capacity
+contradiction is plausibly the first irredundant member of a laminar Hall-dual hierarchy.  This
+explains why failures are thin: they require simultaneous parent saturation, forced endpoint
+counts, mixed-support positivity and an integral pure-capacity deficit.  The next governing-law
+programme is therefore to extract minimum Hall/Farkas duals from holes, uncross them into laminar
+families, and prove a slack theorem reducing the interior to boundary automata—not to seek another
+scalar majorization statistic.
+
+Full method, counts and provenance are in
+`evidence/singleton_k5_prefix_cylinder_2026-08-31.md`.  The completion source SHA-256 is
+`beda97d34c08810bb24d0518c07f223d632f711e7ebb1b1235143c7cfbbbad34` and build ID is
+`5640d9ad463066aaf5b0f1530c959f0804185b74c2fc45e7585e4df87bce9c75`.
+
 ## 2026-08-31 -- distance 14 is globally minimal for exact-support no-first-cut holes
 
 Fedor challenged the previous decision to dismiss the 5,189,450,419-parent `K=6` distance-13 ball:
