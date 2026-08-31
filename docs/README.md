@@ -20,8 +20,9 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [theorems/m5-pareto-assembly.md](theorems/m5-pareto-assembly.md) | Exact `m=5` theorem translated into the competing `3+2` / `4+1` assembly branches and a sharp symbolic D slice |
 | [theorems/recursive-pareto-lift.md](theorems/recursive-pareto-lift.md) | Proved lift-box lemma and the open recursive Pareto-lift programme |
 | [theorems/atom-lineage.md](theorems/atom-lineage.md) | All-depth D-lineage/kernel obstructions, exact eight-/sixteen-atom height-6 optima, and the one-rank 32-atom gap |
-| [theorems/singleton-majorization.md](theorems/singleton-majorization.md) | Singleton-majorization theory, its exact low-level boundary, and the `K=6` counterexample to sufficiency |
-| [theorems/tight-band-capacity.md](theorems/tight-band-capacity.md) | Proved two-anchor capacity obstruction; fixed-face classification, complete `K=5` certificate census, and global `K=6` certificate-distance minimum |
+| [theorems/singleton-majorization.md](theorems/singleton-majorization.md) | Singleton-majorization theory, its exact low-level boundary, the `K=6` counterexample, and the global exact-support no-first-cut distance minimum |
+| [theorems/tight-band-capacity.md](theorems/tight-band-capacity.md) | Proved two-anchor capacity obstruction; fixed-face classification, complete `K=5` certificate census, and the certificate-distance minimum |
+| [transfer-shell census](../evidence/singleton_transfer_shell_census_2026-08-31.md) | Exhaustive 5,189,450,419-parent `K=6` distance-13 first-cut census and bounded positive `K=5` ball |
 
 ## How facts are recorded
 

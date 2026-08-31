@@ -185,20 +185,28 @@ is:
    classifies 175 as first-cut feasible, while both implementations identify `(8^15,7^2)` as the
    unique hole.  An extended complete census finds no capacity certificate among all 613,689,090
    eligible `K=5` bands, while exact prefix-cap optimization makes distance 14 globally minimal
-   within this certificate class at `K=6`.  This does not prove global hole minimality.  See the
+   within this certificate class at `K=6`.  A later direct shell census, recorded in the next item,
+   upgrades the distance statement beyond this certificate class.  See the
    [theorem](theorems/tight-band-capacity.md) and
    [verification record](../evidence/singleton_tight_band_capacity_2026-08-31.md);
-3. settle `K=5`, and minimize the **non-unit core** beyond the fixed face under level, support,
-   transfer distance and a clearly specified dominance/normalization order.  Minimum-Support
+3. **Exact-support first-cut distance delivered 2026-08-31; `K=5` remains open.**  A ranked,
+   parallel Fixed-Color Hall census exhausts all 5,189,450,419 exact-support `K=6` parents through
+   distance 13 and finds a majorized first cut for every one.  The known distance-14 parent is
+   therefore globally minimum for exact-support no-first-cut holes.  The same tool proves all
+   311,082,023 exact-support `K=5` parents through distance 14 recursively solvable.  See the
+   [transfer-shell record](../evidence/singleton_transfer_shell_census_2026-08-31.md).
+
+   Now settle `K=5`, and minimize the **non-unit core** beyond the fixed face under level, support,
+   recursive solvability and a clearly specified dominance/normalization order.  Minimum-Support
    Reduction leaves 1,431,800,647,444 exact-support `K=5` parents, of which 147,422,086,892 have no
    internal tight prefix, so do not launch a flat parent census.  The complete zero-certificate
    result rules out the current two-anchor theorem as the deciding method; next seek a symbolic
    tight-skeleton automaton, a laminar/general Hall-dual search, or another exact quotient that
-   covers the strict interior.  At `K=6`, the exact-support radius-13 ball already has
-   5,189,450,419 parents, so distance minimality likewise needs a symbolic certificate or a sharper
-   quotient.  Deleting the harmless `1^32` padding already gives the 32-row mass-697 core and does
-   not count as a new smaller obstruction.  Feed every new hole through the extractor; an
-   uncertified hole is the concrete input for the laminar/general-Hall programme;
+   covers the strict interior.  At `K=6`, do not confuse the new first-cut minimum with recursive
+   unsolvability: a closer parent could cut only to an unknown `K=5` failure.  The distance-14 shell
+   may also contain other holes.  Deleting the harmless `1^32` padding already gives the 32-row
+   mass-697 core and does not count as a new smaller obstruction.  Feed every new hole through the
+   extractor; an uncertified hole is the concrete input for the laminar/general-Hall programme;
 4. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color

@@ -87,7 +87,8 @@ finite first-cut classification:
 Here distance means half the `l1` distance between the sorted equal-mass band vectors.  The unique
 hole is therefore at distance 14, so the previously observed 14-step boundary is globally minimal
 **within this face**, not merely along its one transfer path.  No claim is made about other `K=6`
-faces or support sizes.
+faces or support sizes by this face calculation alone; the later transfer-shell census supplies
+the global exact-support distance statement.
 
 The direct face census used 141,216 DFS nodes in total.  Its largest search was the unique hole at
 9,345 nodes.  The 175 positive results are first-cut feasibility results only; their majorized
@@ -174,11 +175,13 @@ Putting the canonical head and tail back recovers exactly the known parent with 
 > Capacity certificate, and distance 14 is globally minimal among all parents certified by this
 > two-anchor theorem.
 
-This is **not** global hole minimality: an uncertified first-cut hole could lie closer.  A direct
-flat census of that remaining question is already large.  Exact shell counting gives 5,189,450,419
-exact-support parents through distance 13 and another 9,960,648,265 at distance 14.  The shell
-counter agrees with direct enumeration at `K<=4`; the `K=6` figures are from the memoized exact
-dynamic program and serve here as search-sizing data, not a first-cut verdict.
+This certificate calculation alone does **not** give global hole minimality: an uncertified
+first-cut hole could have lain closer.  A subsequent direct Fixed-Color Hall census nevertheless
+made the 5,189,450,419-parent distance-13 ball practical and found a majorized first cut for every
+state.  Thus distance 14 is now globally minimal for an exact-support no-first-cut hole.  The
+distance-14 shell contains 9,960,648,265 parents and was not otherwise classified, so global
+uniqueness at the minimum is not claimed.  See the
+[transfer-shell record](singleton_transfer_shell_census_2026-08-31.md).
 
 The standard regression wrapper reproduces the boundary counts, optimizer and complete `K=5`
 certificate enumeration.  To reproduce the transfer-shell sizing separately:
@@ -257,6 +260,7 @@ clean wrapper, not repeated under sanitizers.
 The Tight-Band Capacity Obstruction is a sound one-sided certificate.  The complete fixed-face
 survey shows that it catches the only hole on that face, while the complete `K=5` certificate
 census shows that this obstruction class is empty there.  Neither result proves that every hole
-has a two-anchor certificate.  The remaining questions are the actual `K=5` first-cut problem,
-global `K=6` hole minimality beyond this certificate class, and whether newly found uncertified
-holes require laminar multi-anchor or general Hall-dual certificates.
+has a two-anchor certificate.  The later transfer-shell census rules out all closer uncertified
+exact-support first-cut holes at `K=6`, but the remaining questions include the actual `K=5`
+problem, uniqueness within the distance-14 shell, recursive-unsolvability minimality, and whether
+future uncertified holes require laminar multi-anchor or general Hall-dual certificates.

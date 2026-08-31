@@ -35,9 +35,12 @@ The bottom-up transfer idea locates the boundary exactly.  Replace the canonical
 
 Every state through `j=13` has a first cut whose children are majorized by `G_5`, while `j=14`
 is the hole; this statement concerns first-cut feasibility, not complete recursive strategies.
-The final one-coin Robin--Hood transfer destroys the whole cut fiber.  Allowing transfers in both
-directions still proves fixed-color fiber connectivity, but feasibility itself is not downward
-closed, so bidirectionality cannot recover the converse.
+The final one-coin Robin--Hood transfer destroys the whole cut fiber.  A complete exact-support
+shell census strengthens the path observation: every one of the 5,189,450,419 parents through
+distance 13 has a first cut, so 14 is the global exact-support no-first-cut minimum.  This remains
+a first-cut result; it does not settle recursive-unsolvability minimality while `K=5` is open.
+Allowing transfers in both directions still proves fixed-color fiber connectivity, but feasibility
+itself is not downward closed, so bidirectionality cannot recover the converse.
 
 All equivalent or sufficient universal proof targets must be read accordingly.  Row-Coloring,
 Pascal orthant saturation, global Robin--Hood closure, Carry-Compatible Gale--Ryser, Balanced
@@ -84,16 +87,22 @@ capacity extractor certifies exactly that same unique band `(8^15,7^2)`.  Hence 
 transfer distance 14 is minimal on this face.  The extended inequality census now exhausts the
 entire two-anchor certificate class through `K=6`: none of the 613,689,090 eligible `K=5` band
 instances has a certificate, while exact prefix-cap optimization proves that 14 is globally
-minimal among `K=6` parents that do have one.  This is certificate minimality, not hole
-minimality.  Counts and provenance are in the
-[capacity record](../evidence/singleton_tight_band_capacity_2026-08-31.md).
+minimal among `K=6` parents that do have one.  A subsequent exact Fixed-Color Hall census checks
+all 5,189,450,419 exact-support parents through transfer distance 13 and finds a first cut for
+every one.  Hence 14 is globally minimal for an exact-support no-first-cut hole, not merely within
+the certificate class.  Counts and provenance are in the
+[capacity record](../evidence/singleton_tight_band_capacity_2026-08-31.md) and
+[transfer-shell record](../evidence/singleton_transfer_shell_census_2026-08-31.md).
 
 The actual `K=5` boundary remains large after every proved reduction: there are exactly
 1,431,800,647,444 full-mass exact-support parents, including 147,422,086,892 with no internal tight
-prefix.  A flat census is therefore not the next method.  The next singleton work is a symbolic or
-laminar/general-Hall attack on `K=5`, plus a search for uncertified `K=6` holes and genuine global
-minimality.  A useful exact recursive support criterion remains the longer-term target.  The
-ordered programme is recorded under P6 in [research-plan.md](research-plan.md).
+prefix.  The first 311,082,023 of them, through transfer distance 14, are recursively solvable;
+this is only 0.0217% of the exact-support space, so a flat complete census is still not the next
+method.  The next singleton work is a symbolic or laminar/general-Hall attack on `K=5`.  At `K=6`,
+the remaining minimality questions are uniqueness within the distance-14 shell, smaller non-unit
+cores under other orders, and recursive unsolvability rather than first-cut emptiness.  A useful
+exact recursive support criterion remains the longer-term target.  The ordered programme is
+recorded under P6 in [research-plan.md](research-plan.md).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -157,7 +166,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
-| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively at `K=6`; the independent direct-row verifier and proved tight-band capacity certificate are delivered.  The counterexample is the unique first-cut hole on its fixed rank-15/32 face, no eligible `K=5` band has this certificate, and distance 14 is globally minimal within the certificate class.  Settle the actual `K=5` problem and search uncertified `K=6` holes only if publication needs stronger minimality.  The excess-`q` Pareto-assembly avenue remains parked. |
+| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively at `K=6`; the independent direct-row verifier and proved tight-band capacity certificate are delivered.  The counterexample is the unique first-cut hole on its fixed rank-15/32 face, no eligible `K=5` band has this certificate, and exhaustive search makes distance 14 globally minimal among exact-support no-first-cut holes.  Settle the actual `K=5` problem; at `K=6`, keep first-cut minimality separate from recursive-unsolvability and core/uniqueness questions.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established
 

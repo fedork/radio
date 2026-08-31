@@ -42,7 +42,12 @@ independent direct-row enumeration also show that `(8^15,7^2)` is the unique fir
 all 176 dominated 17-row bands on this fixed face.  A complete inequality census finds no
 two-anchor capacity certificate on any of the 613,689,090 eligible `K=5` band instances, while an
 exact prefix-cap optimization proves that distance 14 is globally minimal among all `K=6` parents
-certified by this obstruction.  Neither result settles `K=5` or global `K=6` hole minimality.
+certified by this obstruction.  A subsequent exact Fixed-Color Hall census exhausts all
+5,189,450,419 exact-support `K=6` parents through distance 13 and finds a first cut for every one.
+Thus 14 is globally minimal for an exact-support **no-first-cut** hole, not merely for this
+certificate class.  This still does not settle `K=5` or minimum distance among recursively
+unsolvable `K=6` parents; see the
+[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md).
 
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the
@@ -62,9 +67,12 @@ Lemma is false as well.
 The prior finite searches remain correct within their stated ranges: the converse holds through
 `K=4`.  They did not cover the `K=6` hole.  The state is reached from `G_6` by fourteen unit
 Robin--Hood transfers; the first thirteen intermediate bands retain a majorized first cut, and the
-last transfer destroys the entire cut fiber.  This supplies the phase change that the transfer
-surveys were seeking and shows why a global downward-closure proof cannot exist.  Whether `K=5`
-already contains a different counterexample remains undecided.
+last transfer destroys the entire cut fiber.  Exact exhaustion now strengthens this path statement:
+no exact-support parent anywhere in the complete distance-13 ball lacks a majorized first cut.
+This supplies the phase change that the transfer surveys were seeking and shows why a global
+downward-closure proof cannot exist.  At `K=5`, the 311,082,023 exact-support parents through
+distance 14 are recursively solvable, but whether that level contains a farther counterexample
+remains undecided.
 
 ## Definitions
 
@@ -2625,9 +2633,18 @@ from the exact 38,378,683,542,323-state full-mass `K=5` universe, and on a separ
 `K=6` dominance-transfer sample.  The exact `K=6` hole has no coloring at all and therefore
 refutes the universal rule; the sampled successes remain only lower-level diagnostics.
 
-Those higher-level samples are not proofs.  Simpler variants already fail: plain balanced blocks
-miss 22 `K=4` states and 12 of the ten million `K=5` samples; reserving enough final rows for both
-colors fixes all `K=4` cases but misses six of those `K=5` samples.  The first such `K=5` failure
+A later shell mode makes one bounded higher-level statement exhaustive.  It enumerates every
+full-mass exact-support parent through transfer distance 14 at `K=5` and distance 13 at `K=6`,
+using one-block lookahead only as a sound positive filter and exact normalized Hall search on every
+failure.  All 311,082,023 `K=5` parents and all 5,189,450,419 `K=6` parents have a majorized first
+cut.  Together with the distance-14 hole, the second result proves global minimum transfer distance
+within the exact-support no-first-cut problem.  It remains a first-cut theorem at `K=6`, not a
+recursive solvability census; complete counts, sharding checks and provenance are in the
+[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md).
+
+The earlier higher-level samples are not proofs.  Simpler variants already fail: plain balanced
+blocks miss 22 `K=4` states and 12 of the ten million `K=5` samples; reserving enough final rows
+for both colors fixes all `K=4` cases but misses six of those `K=5` samples.  The first such `K=5` failure
 needs the width-6 choice to anticipate the following width-5 block.  The exact counts,
 counterexamples, commands and proposed two-block proof obligation are in
 [the census record](../../evidence/singleton_row_coloring_census_2026-08-26.md).

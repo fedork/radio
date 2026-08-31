@@ -12298,3 +12298,73 @@ untouched because instance termination did not authorize deletion of persistent 
 operational docs now mark both mixed snapshots unsafe for current work, retire the live-oracle
 instructions, and preserve the old load/restore numbers only as historical performance data.
 The final table, witness and documentation checks, plus `git diff --check`, all passed.
+
+## 2026-08-31 -- distance 14 is globally minimal for exact-support no-first-cut holes
+
+Fedor challenged the previous decision to dismiss the 5,189,450,419-parent `K=6` distance-13 ball:
+613,689,090 cheap capacity checks had taken only tens of seconds, so the raw state count alone was not
+a sufficient reason to stop.  That objection was correct.  Hall colorings are materially more
+expensive than capacity inequalities, but a constructive positive filter and parallel ranked
+streaming make the full bounded census practical.
+
+Extended `tools/singleton_pair_coloring_census.cpp` with an exact-support transfer-shell mode.  It
+enumerates sorted positive full-mass parents at fixed half-`l1` distance, enforcing every `G_K`
+prefix.  A memoized suffix DP counts each shell, prunes empty subtrees and permits exact DFS-rank
+skips.  One-block lookahead supplies only sound positive colorings; every failure goes to the exact
+equal-value-block `GeneralSearch`.  Twelve workers receive disjoint contiguous rank windows, and a
+run is accepted only when their tested counts sum to the independently derived shell size.
+
+The first 100,000-state benchmarks measured 472,804 parents/s at `K=5`, distance 14, with no
+fallbacks, and 213,562/s at `K=6`, distance 13, with 71 fallbacks and 1,138 exact nodes.  A complete
+four-worker distance-7 control agreed exactly with the prior sequential run on all 1,980,479
+parents: 836 fallbacks, 12,239 exact nodes and maximum 18, while scaling from 205,401/s to
+802,278/s.  The complete 160-parent exact-support `K=3` ball and canonical / transfer-13 /
+counterexample controls also passed; the last remains infeasible in seven exact nodes.
+
+The first distant-`K=5` probe exposed a generator bug rather than a hard Hall instance.  Distance-80
+and distance-115 processes each spent about 63 CPU seconds recursively walking branches whose
+memoized completion count was zero.  Both were terminated without a verdict after a one-second
+stack sample localized the time to `enumerate`.  Pruning a zero-count subtree reduced a
+100,000-parent distance-80 window to 0.198145 seconds and the complete 82-parent terminal shell to
+0.0233735 seconds.  This failed attempt and its measured cost are recorded so the unpruned stream
+is not retried.
+
+The clean bounded `K=5` result is:
+
+    TRANSFER_BALL_PARALLEL_COLORING_CENSUS K=5 maximum_distance=14 workers=12
+      complete=YES verified=YES states=311082023
+      lookahead_ok=311082023 exact_fallbacks=0 exact_nodes=0 hole=()
+
+It took 65 wall seconds and 0.01 GiB peak RSS.  Because the converse is exhaustive at `K=4`, these
+311,082,023 parents are recursively solvable, not merely first-cut feasible.  This does not settle
+the 1,431,800,647,444-parent exact-support `K=5` problem.
+
+The decisive complete `K=6` result is:
+
+    TRANSFER_BALL_PARALLEL_COLORING_CENSUS K=6 maximum_distance=13 workers=12
+      complete=YES verified=YES states=5189450419
+      lookahead_ok=5184706512 exact_fallbacks=4743907
+      exact_nodes=81692145 max_exact_nodes=22 hole=()
+
+It took 2,602 wall seconds (43m22s), 2,597.9 seconds inside the census, at 1,997,560 parents/s and
+0.02 GiB peak RSS.  All 5,189,450,419 exact-support parents through distance 13 therefore admit a
+first split into three `G_5`-majorized children.  The proved distance-14 counterexample has none.
+Thus 14 is globally minimal among exact-support **no-first-cut** holes, replacing the earlier
+certificate-only minimum.  The census does not establish uniqueness in the 9,960,648,265-parent
+distance-14 shell or minimum distance among recursively unsolvable parents: the latter could fail
+through an unknown `K=5` child despite possessing a majorized first cut.
+
+The raw `K=6` log passes `tools/check_provenance.py`.  Its exploratory build ID is
+`cc03f6ca05f9f451ccea2b74e7d76a45d187268b7939aac3ef9b087c2a3c3480`; the recorded source SHA-256
+`d3fd47be267dc5343f8e85e5898f68b7e86f3ed6bc4cca81fb69c06ef82b88aa` matches the file frozen in
+commit `41f3016` byte for byte.  The clean `K=5` run used commit `ce9aaf3`, source SHA-256
+`febd11a65f5cc718c3d58c0f6226f231415fb67a7fd9535df86ff0ef833cdaac`, and build ID
+`e16526cb27fb44729a94bdd2ac8dd893913b8afeea6b1d4368c4592f8d374e38`.  The clean regression passed;
+an ASan+UBSan build `cbc1ed8b2e44c15e02bf34e847a3263468b210cb942e7ba6a8bcb50718254579`
+repeated shell-count, parallel `K=3`, complete distance-7 `K=6`, and counterexample controls with no
+finding.  Full commands, sharding invariants and scope are in
+`evidence/singleton_transfer_shell_census_2026-08-31.md`.
+
+The final table and generated-block check, full witness check, documentation-link/goal check,
+transfer-shell regression and `git diff --check` all passed.  The two historical unsupported
+majorization witness files remain explicitly flagged as intended.  No process is left running.

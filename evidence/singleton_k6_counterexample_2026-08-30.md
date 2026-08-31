@@ -210,9 +210,12 @@ split search.  Together with a new clean-room face mode, it exhausts all 176 exa
 dominated by `(22,7^16)`: 175 have a majorized first cut and `(8^15,7^2)` is the unique hole.
 Consequently transfer distance 14 is minimal on this fixed face.  An extended prefix-cap
 optimization now proves that 14 is also globally minimal among all `K=6` parents carrying a
-Tight-Band Capacity certificate; it does not exclude a closer uncertified hole.  The complete
-`K=5` certificate census is empty and therefore does not decide that level.  See the
-[capacity record](singleton_tight_band_capacity_2026-08-31.md).
+Tight-Band Capacity certificate.  A later exact Fixed-Color Hall census checks all 5,189,450,419
+exact-support parents through distance 13 and excludes a closer uncertified no-first-cut hole as
+well.  Thus 14 is the global exact-support first-cut minimum.  The complete `K=5` certificate
+census is empty, and the separate positive census reaches only distance 14 there, so that level
+remains undecided.  See the [capacity record](singleton_tight_band_capacity_2026-08-31.md) and
+[transfer-shell record](singleton_transfer_shell_census_2026-08-31.md).
 
 All exhaustive runs are regression checks.  The short saturation-and-integrality argument above
 is the proof.

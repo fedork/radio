@@ -198,8 +198,9 @@ Maximality at `k=9` is open in the unfilled band, not for `m=1..6`.
 Three foundational facts are central here:
 
 - [Singleton Majorization Necessity and the `K=6` counterexample](theorems/singleton-majorization.md) -
-  proves the obstruction, refutes sufficiency with an exact-support state, and explains why
-  canonical distinct-slot terminals are unconditional while arbitrary majorized terminals are not certificates.
+  proves the obstruction, refutes sufficiency with an exact-support state, gives the exhaustive
+  no-first-cut transfer-distance minimum, and explains why canonical distinct-slot terminals are
+  unconditional while arbitrary majorized terminals are not certificates.
 - [Unit-Group Elimination Theorem](theorems/unit-group-elimination.md) - `1:1` parts can be
   deleted from any state without affecting solvability, subject only to the mass bound.
 - [Subgraph Monotonicity Theorem](theorems/subgraph-monotonicity.md) - deleting candidate

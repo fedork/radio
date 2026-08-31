@@ -164,8 +164,10 @@ d(b,c)=\tfrac12\sum_i |b_i-c_i|,
 \qquad c=(22,7^{16}),
 \]
 
-its distance is 14 and hence is minimal on this face.  This is not by itself a claim of global
-`K=6` hole minimality; the exhaustive boundary of the **certificate class** is sharpened below.
+its distance is 14 and hence is minimal on this face.  This face calculation is not by itself a
+claim of global `K=6` hole minimality; the exhaustive boundary of the **certificate class** is
+sharpened below, and a later direct transfer-shell census closes the global exact-support
+no-first-cut distance question.
 The enumeration, replay policy, node counts and provenance are in the
 [capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
 
@@ -193,9 +195,13 @@ the resulting 136 anchor faces finds no certificate.  Thus the two-anchor theore
 Across all 528 eligible `K=6` anchor faces, the exact optimization finds minimum transfer distance
 14.  The minimizer at anchors `(15,30)` replaces `(22,7^14)` by `(8^15)`; restoring the canonical
 tail gives the same counterexample band `(8^15,7^2)`.  Therefore distance 14 is globally minimal
-within the Tight-Band Capacity certificate class.  It is still unknown whether an uncertified
-`K=6` hole lies closer, and `K=5` remains undecided.  Counts, the optimization argument and clean
-provenance are in the [capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
+within the Tight-Band Capacity certificate class.  A separate exact Fixed-Color Hall census has
+since checked all 5,189,450,419 exact-support parents through distance 13 and found no uncertified
+no-first-cut hole.  Hence the same distance is globally minimal for that first-cut problem, while
+`K=5` and recursive-unsolvability minimality remain undecided.  See the
+[transfer-shell record](../../evidence/singleton_transfer_shell_census_2026-08-31.md); counts, the
+optimization argument and clean provenance for the inequality class remain in the
+[capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
 
 ## Machine checker
 

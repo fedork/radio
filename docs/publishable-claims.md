@@ -60,13 +60,16 @@ Every singleton state solvable in `K` tests is weakly majorized by the explicit 
 `G_K`.  The converse is false: the full-mass exact-support state
 `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` but has no legal first split and is
 unsolvable in six tests.  The transcript-conflict graph and Fixed-Color Hall criterion give the
-short tight-rank proof; see
-[singleton-majorization.md](theorems/singleton-majorization.md).  Canonical and distinct-slot
-witness leaves remain independently checkable from the explicit strategy for `G_K`.
+short tight-rank proof.  A complete 5,189,450,419-parent Hall census additionally proves that its
+transfer distance 14 is globally minimal among full-mass exact-support parents with no majorized
+first cut; this is not recursive-unsolvability minimality.  See
+[singleton-majorization.md](theorems/singleton-majorization.md) and the
+[transfer-shell record](../evidence/singleton_transfer_shell_census_2026-08-31.md).  Canonical and
+distinct-slot witness leaves remain independently checkable from the explicit strategy for `G_K`.
 
 Publication value: the necessity theorem gives a reusable obstruction, while the counterexample
 resolves Aigner's stated converse question negatively and gives an explicit non-nice transcript
-graph/chain-partition type.
+graph/chain-partition type.  The exact distance census supplies a sharp finite minimality statement.
 
 Before submission: independently audit the short proof and perform a focused literature/novelty
 search before claiming priority.  Cite Aigner for the historical necessity result and question.
