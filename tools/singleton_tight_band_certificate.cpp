@@ -10,7 +10,9 @@
 // transition exceeds one of those two pure capacities, no first cut exists.
 //
 // This implementation deliberately contains no row-split search, Hall code,
-// or cache.  It only evaluates the preceding integer inequalities.
+// or cache.  Besides checking a supplied state, it can enumerate all bands
+// where delta is positive, count exact-support boundary spaces, and minimize
+// transfer distance over the finite disjunction of capacity inequalities.
 
 #include <algorithm>
 #include <array>
@@ -24,12 +26,14 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace {
 
 using Value = std::int64_t;
+using Count = std::uint64_t;
 using Partition = std::vector<Value>;
 
 Partition singleton_profile(int level) {
@@ -406,6 +410,367 @@ void enumerate_dominated_exact_length(
     visit(total_mass, capacity.front());
 }
 
+Count checked_count_sum(Count first, Count second) {
+    if (std::numeric_limits<Count>::max() - first < second) {
+        throw std::overflow_error("dominated-partition count exceeds uint64_t");
+    }
+    return first + second;
+}
+
+struct DominatedExactLengthCounter {
+    PrefixFunction capacity;
+    int length = 0;
+    int total_mass = 0;
+    int largest = 0;
+    bool strict_internal = false;
+    std::vector<Count> memo;
+    std::vector<unsigned char> known;
+
+    explicit DominatedExactLengthCounter(
+        const Partition &values, bool require_strict_internal = false)
+        : capacity(values), length(static_cast<int>(values.size())),
+          total_mass(static_cast<int>(capacity.mass())),
+          largest(static_cast<int>(values.front())),
+          strict_internal(require_strict_internal),
+          memo(static_cast<std::size_t>(length + 1)
+                   * static_cast<std::size_t>(total_mass + 1)
+                   * static_cast<std::size_t>(largest + 1),
+               0),
+          known(memo.size(), 0) {}
+
+    std::size_t key(int position, int remaining, int maximum) const {
+        return (static_cast<std::size_t>(position)
+                    * static_cast<std::size_t>(total_mass + 1)
+                + static_cast<std::size_t>(remaining))
+                   * static_cast<std::size_t>(largest + 1)
+            + static_cast<std::size_t>(maximum);
+    }
+
+    Count visit(int position, int remaining, int maximum) {
+        if (position == length) {
+            return remaining == 0 ? 1 : 0;
+        }
+        const int slots = length - position;
+        if (remaining < slots || remaining > slots * maximum) {
+            return 0;
+        }
+        const std::size_t index = key(position, remaining, maximum);
+        if (known[index]) {
+            return memo[index];
+        }
+        known[index] = 1;
+        Count result = 0;
+        const int used = total_mass - remaining;
+        for (int value = std::min(maximum, remaining); value >= 1; --value) {
+            const int new_prefix = used + value;
+            if (new_prefix > capacity(position + 1)) {
+                continue;
+            }
+            if (strict_internal && position + 1 < length
+                && new_prefix == capacity(position + 1)) {
+                continue;
+            }
+            result = checked_count_sum(
+                result, visit(position + 1, remaining - value, value));
+        }
+        memo[index] = result;
+        return result;
+    }
+
+    Count run() { return visit(0, total_mass, largest); }
+};
+
+int transfer_distance(const Partition &from, const Partition &to);
+
+bool count_boundary_space(int level) {
+    if (level < 1 || level > 5) {
+        throw std::invalid_argument("boundary count level must lie in [1,5]");
+    }
+    const Partition parent = singleton_profile(level);
+    DominatedExactLengthCounter full_counter(parent);
+    DominatedExactLengthCounter strict_counter(parent, true);
+    const Count exact_support = full_counter.run();
+    const Count strict_interior = strict_counter.run();
+
+    Count band_instances = 0;
+    Count positive_floor_band_instances = 0;
+    Count bands = 0;
+    Count positive_floor_bands = 0;
+    Count largest_band_space = 0;
+    Count largest_positive_floor_band_space = 0;
+    int largest_begin = -1;
+    int largest_end = -1;
+    int largest_positive_floor_begin = -1;
+    int largest_positive_floor_end = -1;
+    const int child_support = 1 << (level - 1);
+    for (int begin = 0; begin < static_cast<int>(parent.size()); ++begin) {
+        for (int end = begin + 1; end <= static_cast<int>(parent.size()); ++end) {
+            const Partition band(parent.begin() + begin, parent.begin() + end);
+            DominatedExactLengthCounter band_counter(band);
+            const Count count = band_counter.run();
+            band_instances = checked_count_sum(band_instances, count);
+            ++bands;
+            if (end <= child_support) {
+                positive_floor_band_instances = checked_count_sum(
+                    positive_floor_band_instances, count);
+                ++positive_floor_bands;
+                if (count > largest_positive_floor_band_space) {
+                    largest_positive_floor_band_space = count;
+                    largest_positive_floor_begin = begin;
+                    largest_positive_floor_end = end;
+                }
+            }
+            if (count > largest_band_space) {
+                largest_band_space = count;
+                largest_begin = begin;
+                largest_end = end;
+            }
+        }
+    }
+
+    bool ok = true;
+    if (level == 3) {
+        ok = exact_support == 160 && strict_interior == 33
+            && bands == 36 && band_instances == 561
+            && largest_begin == 0 && largest_end == 8
+            && largest_band_space == 160
+            && positive_floor_bands == 10
+            && positive_floor_band_instances == 22
+            && largest_positive_floor_begin == 0
+            && largest_positive_floor_end == 4
+            && largest_positive_floor_band_space == 7;
+    } else if (level == 4) {
+        ok = exact_support == 408776 && strict_interior == 63329
+            && bands == 136 && band_instances == 1722516
+            && largest_begin == 0 && largest_end == 16
+            && largest_band_space == 408776
+            && positive_floor_bands == 36
+            && positive_floor_band_instances == 3863
+            && largest_positive_floor_begin == 0
+            && largest_positive_floor_end == 8
+            && largest_positive_floor_band_space == 1567;
+    } else if (level == 5) {
+        ok = exact_support == 1431800647444ULL
+            && strict_interior == 147422086892ULL
+            && bands == 528 && band_instances == 8973226867713ULL
+            && largest_begin == 0 && largest_end == 32
+            && largest_band_space == 1431800647444ULL
+            && positive_floor_bands == 136
+            && positive_floor_band_instances == 613689090
+            && largest_positive_floor_begin == 0
+            && largest_positive_floor_end == 16
+            && largest_positive_floor_band_space == 228246747;
+    }
+    std::cout << "TIGHT_BAND_BOUNDARY_SPACE K=" << level
+              << " verified=" << (ok ? "YES" : "NO")
+              << " exact_support=" << exact_support
+              << " strict_interior=" << strict_interior
+              << " tight_skeleton=" << exact_support - strict_interior
+              << " rank_bands=" << bands
+              << " band_state_instances=" << band_instances
+              << " largest_band=(" << largest_begin << ',' << largest_end << ')'
+              << " largest_band_states=" << largest_band_space
+              << " positive_floor_bands=" << positive_floor_bands
+              << " positive_floor_band_instances="
+              << positive_floor_band_instances
+              << " largest_positive_floor_band=("
+              << largest_positive_floor_begin << ','
+              << largest_positive_floor_end << ')'
+              << " largest_positive_floor_band_states="
+              << largest_positive_floor_band_space << '\n';
+    return ok;
+}
+
+struct CapacityBandSurvey {
+    int lower = 0;
+    int upper = 0;
+    Value mixed_floor = 0;
+    Partition canonical_band;
+    PrefixFunction capacity;
+    std::vector<TransitionCheck> transitions;
+    Partition current;
+    std::vector<Value> current_prefix{0};
+    Count states = 0;
+    Count certified_states = 0;
+    Partition first_certified;
+    int minimum_transfer_distance = std::numeric_limits<int>::max();
+
+    CapacityBandSurvey(
+        int lower_rank, int upper_rank, const Partition &parent_profile,
+        const PrefixFunction &parent, const PrefixFunction &child)
+        : lower(lower_rank), upper(upper_rank),
+          mixed_floor(child(upper_rank) - child(upper_rank - 1)),
+          canonical_band(parent_profile.begin() + lower_rank,
+                         parent_profile.begin() + upper_rank),
+          capacity(canonical_band) {
+        const std::vector<int> lower_counts =
+            endpoint_counts(lower, parent, child);
+        const std::vector<int> upper_counts =
+            endpoint_counts(upper, parent, child);
+        for (int from : lower_counts) {
+            for (int to : upper_counts) {
+                if (from > to || lower - from > upper - to) {
+                    continue;
+                }
+                TransitionCheck check;
+                check.from = from;
+                check.to = to;
+                check.left_rows = to - from;
+                check.right_rows = (upper - to) - (lower - from);
+                check.mixed_required = child(upper) - child(lower);
+                check.left_required = child(to) - child(from);
+                check.right_required =
+                    child(upper - to) - child(lower - from);
+                transitions.push_back(check);
+            }
+        }
+    }
+
+    bool certified() const {
+        if (current.back() < mixed_floor || transitions.empty()) {
+            return true;
+        }
+        for (const TransitionCheck &check : transitions) {
+            const Value left_capacity =
+                current_prefix[check.left_rows]
+                - check.left_rows * mixed_floor;
+            const Value right_capacity =
+                current_prefix[check.right_rows]
+                - check.right_rows * mixed_floor;
+            if (check.left_required <= left_capacity
+                && check.right_required <= right_capacity) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void inspect() {
+        ++states;
+        if (!certified()) {
+            return;
+        }
+        ++certified_states;
+        if (first_certified.empty()) {
+            first_certified = current;
+        }
+        minimum_transfer_distance = std::min(
+            minimum_transfer_distance,
+            transfer_distance(canonical_band, current));
+    }
+
+    void enumerate(Value remaining, Value maximum) {
+        const std::size_t position = current.size();
+        if (position == canonical_band.size()) {
+            if (remaining == 0) {
+                inspect();
+            }
+            return;
+        }
+        const Value remaining_slots = static_cast<Value>(
+            canonical_band.size() - position - 1);
+        const Value used_mass = capacity.mass() - remaining;
+        for (Value value = std::min(maximum, remaining);
+             value >= 1; --value) {
+            if (used_mass + value > capacity(static_cast<int>(position + 1))) {
+                continue;
+            }
+            const Value mass_after = remaining - value;
+            if (mass_after < remaining_slots
+                || mass_after > remaining_slots * value) {
+                continue;
+            }
+            current.push_back(value);
+            current_prefix.push_back(current_prefix.back() + value);
+            enumerate(mass_after, value);
+            current_prefix.pop_back();
+            current.pop_back();
+        }
+    }
+
+    void run() {
+        enumerate(capacity.mass(), canonical_band.front());
+    }
+};
+
+bool survey_capacity_bands(int level) {
+    if (level < 1 || level > 5) {
+        throw std::invalid_argument("capacity-band survey level must lie in [1,5]");
+    }
+    const Partition parent_profile = singleton_profile(level);
+    const PrefixFunction parent(parent_profile);
+    const PrefixFunction child(singleton_profile(level - 1));
+    const int positive_floor_support = 1 << (level - 1);
+    Count bands = 0;
+    Count states = 0;
+    Count certified_states = 0;
+    int certified_bands = 0;
+    int first_lower = -1;
+    int first_upper = -1;
+    Partition first_certified;
+    int minimum_distance = std::numeric_limits<int>::max();
+
+    for (int upper = 1; upper <= positive_floor_support; ++upper) {
+        for (int lower = 0; lower < upper; ++lower) {
+            CapacityBandSurvey survey(
+                lower, upper, parent_profile, parent, child);
+            survey.run();
+            states = checked_count_sum(states, survey.states);
+            certified_states = checked_count_sum(
+                certified_states, survey.certified_states);
+            ++bands;
+            if (survey.certified_states != 0) {
+                ++certified_bands;
+                if (first_certified.empty()) {
+                    first_lower = lower;
+                    first_upper = upper;
+                    first_certified = survey.first_certified;
+                }
+                minimum_distance = std::min(
+                    minimum_distance, survey.minimum_transfer_distance);
+            }
+            std::cout << "TIGHT_BAND_CAPACITY_FACE K=" << level
+                      << " anchors=(" << lower << ',' << upper << ')'
+                      << " transitions=" << survey.transitions.size()
+                      << " states=" << survey.states
+                      << " certified=" << survey.certified_states;
+            if (!survey.first_certified.empty()) {
+                std::cout << " first="
+                          << compact_partition(survey.first_certified)
+                          << " minimum_transfer_distance="
+                          << survey.minimum_transfer_distance;
+            }
+            std::cout << '\n' << std::flush;
+        }
+    }
+
+    bool ok = true;
+    if (level == 3) {
+        ok = bands == 10 && states == 22
+            && certified_states == 0;
+    } else if (level == 4) {
+        ok = bands == 36 && states == 3863
+            && certified_states == 0;
+    } else if (level == 5) {
+        ok = bands == 136 && states == 613689090
+            && certified_states == 0;
+    }
+    std::cout << "TIGHT_BAND_CAPACITY_SURVEY K=" << level
+              << " complete=YES"
+              << " verified=" << (ok ? "YES" : "NO")
+              << " bands=" << bands
+              << " states=" << states
+              << " certified_bands=" << certified_bands
+              << " certified_states=" << certified_states;
+    if (!first_certified.empty()) {
+        std::cout << " first_anchors=(" << first_lower << ',' << first_upper << ')'
+                  << " first_certified=" << compact_partition(first_certified)
+                  << " minimum_transfer_distance=" << minimum_distance;
+    }
+    std::cout << '\n';
+    return ok;
+}
+
 int transfer_distance(const Partition &from, const Partition &to) {
     if (from.size() != to.size()) {
         throw std::invalid_argument("transfer distance requires equal support");
@@ -419,6 +784,439 @@ int transfer_distance(const Partition &from, const Partition &to) {
         throw std::logic_error("invalid equal-mass transfer distance");
     }
     return static_cast<int>(l1_distance / 2);
+}
+
+struct TransferShellCounter {
+    const Partition &canonical;
+    PrefixFunction capacity;
+    int length = 0;
+    int total_mass = 0;
+    int largest = 0;
+    int target_l1 = 0;
+    std::vector<int> canonical_suffix;
+    std::unordered_map<std::uint64_t, Count> memo;
+
+    TransferShellCounter(const Partition &profile, int distance)
+        : canonical(profile), capacity(profile),
+          length(static_cast<int>(profile.size())),
+          total_mass(static_cast<int>(capacity.mass())),
+          largest(static_cast<int>(profile.front())),
+          target_l1(2 * distance), canonical_suffix(length + 1, 0) {
+        for (int index = length - 1; index >= 0; --index) {
+            canonical_suffix[index] =
+                canonical_suffix[index + 1] + static_cast<int>(canonical[index]);
+        }
+    }
+
+    std::uint64_t key(
+        int position, int remaining, int maximum, int used_l1) const {
+        std::uint64_t result = static_cast<std::uint64_t>(position);
+        result = result * static_cast<std::uint64_t>(total_mass + 1)
+            + static_cast<std::uint64_t>(remaining);
+        result = result * static_cast<std::uint64_t>(largest + 1)
+            + static_cast<std::uint64_t>(maximum);
+        result = result * static_cast<std::uint64_t>(target_l1 + 1)
+            + static_cast<std::uint64_t>(used_l1);
+        return result;
+    }
+
+    Count visit(int position, int remaining, int maximum, int used_l1) {
+        if (position == length) {
+            return remaining == 0 && used_l1 == target_l1 ? 1 : 0;
+        }
+        const int slots = length - position;
+        if (remaining < slots || remaining > slots * maximum
+            || used_l1 > target_l1) {
+            return 0;
+        }
+        const int remaining_difference =
+            remaining - canonical_suffix[position];
+        const int available_l1 = target_l1 - used_l1;
+        if (remaining_difference < 0
+            || remaining_difference > available_l1
+            || ((available_l1 - remaining_difference) & 1) != 0) {
+            return 0;
+        }
+
+        const std::uint64_t memo_key =
+            key(position, remaining, maximum, used_l1);
+        if (const auto found = memo.find(memo_key); found != memo.end()) {
+            return found->second;
+        }
+
+        Count result = 0;
+        const int used_mass = total_mass - remaining;
+        const int canonical_value = static_cast<int>(canonical[position]);
+        const int smallest = std::max(1, canonical_value - available_l1);
+        const int greatest = std::min(
+            {maximum, remaining, canonical_value + available_l1});
+        for (int value = greatest; value >= smallest; --value) {
+            if (used_mass + value > capacity(position + 1)) {
+                continue;
+            }
+            const int new_l1 = used_l1 + std::abs(value - canonical_value);
+            if (new_l1 > target_l1) {
+                continue;
+            }
+            result = checked_count_sum(
+                result,
+                visit(position + 1, remaining - value, value, new_l1));
+        }
+        memo.emplace(memo_key, result);
+        return result;
+    }
+
+    Count run() { return visit(0, total_mass, largest, 0); }
+};
+
+bool count_transfer_shells(int level, int maximum_distance) {
+    if (level < 1 || level > 6 || maximum_distance < 0) {
+        throw std::invalid_argument("invalid transfer-shell count request");
+    }
+    const Partition canonical = singleton_profile(level);
+    std::vector<Count> shell_counts;
+    Count ball = 0;
+    for (int distance = 0; distance <= maximum_distance; ++distance) {
+        TransferShellCounter counter(canonical, distance);
+        const Count count = counter.run();
+        shell_counts.push_back(count);
+        ball = checked_count_sum(ball, count);
+        std::cout << "TRANSFER_SHELL K=" << level
+                  << " distance=" << distance
+                  << " states=" << count
+                  << " memo_states=" << counter.memo.size() << '\n';
+    }
+
+    bool ok = !shell_counts.empty() && shell_counts.front() == 1;
+    const bool direct_cross_check_run = level <= 4;
+    if (direct_cross_check_run) {
+        std::vector<Count> direct(shell_counts.size(), 0);
+        enumerate_dominated_exact_length(canonical, [&](const Partition &state) {
+            const int distance = transfer_distance(canonical, state);
+            if (distance <= maximum_distance) {
+                ++direct[distance];
+            }
+        });
+        ok = ok && direct == shell_counts;
+    }
+    std::cout << "TRANSFER_BALL K=" << level
+              << " maximum_distance=" << maximum_distance
+              << " states=" << ball
+              << " internal_checks=" << (ok ? "YES" : "NO")
+              << " direct_cross_check="
+              << (direct_cross_check_run ? (ok ? "YES" : "NO") : "NOT_RUN")
+              << '\n';
+    return ok;
+}
+
+struct PrefixCapOptimizer {
+    static constexpr int impossible = std::numeric_limits<int>::max() / 4;
+
+    const Partition &canonical;
+    PrefixFunction capacity;
+    const std::vector<Value> &prefix_caps;
+    int minimum_value = 1;
+    int final_maximum = std::numeric_limits<int>::max();
+    int length = 0;
+    int total_mass = 0;
+    int largest = 0;
+    std::unordered_map<std::uint64_t, int> memo;
+    std::unordered_map<std::uint64_t, int> choices;
+
+    PrefixCapOptimizer(
+        const Partition &values, const std::vector<Value> &caps,
+        int row_minimum, int last_maximum)
+        : canonical(values), capacity(values), prefix_caps(caps),
+          minimum_value(row_minimum), final_maximum(last_maximum),
+          length(static_cast<int>(values.size())),
+          total_mass(static_cast<int>(capacity.mass())),
+          largest(static_cast<int>(values.front())) {}
+
+    std::uint64_t key(int position, int remaining, int maximum) const {
+        std::uint64_t result = static_cast<std::uint64_t>(position);
+        result = result * static_cast<std::uint64_t>(total_mass + 1)
+            + static_cast<std::uint64_t>(remaining);
+        result = result * static_cast<std::uint64_t>(largest + 1)
+            + static_cast<std::uint64_t>(maximum);
+        return result;
+    }
+
+    int visit(int position, int remaining, int maximum) {
+        if (position == length) {
+            return remaining == 0 ? 0 : impossible;
+        }
+        const int slots = length - position;
+        if (remaining < slots * minimum_value
+            || remaining > slots * maximum) {
+            return impossible;
+        }
+        const std::uint64_t memo_key = key(position, remaining, maximum);
+        if (const auto found = memo.find(memo_key); found != memo.end()) {
+            return found->second;
+        }
+
+        const int used_mass = total_mass - remaining;
+        int greatest = std::min(maximum, remaining);
+        if (position + 1 == length) {
+            greatest = std::min(greatest, final_maximum);
+        }
+        int best = impossible;
+        int best_value = -1;
+        for (int value = greatest; value >= minimum_value; --value) {
+            const int new_prefix = used_mass + value;
+            if (new_prefix > prefix_caps[position + 1]) {
+                continue;
+            }
+            const int tail = visit(position + 1, remaining - value, value);
+            if (tail == impossible) {
+                continue;
+            }
+            const int candidate =
+                std::abs(value - static_cast<int>(canonical[position])) + tail;
+            if (candidate < best) {
+                best = candidate;
+                best_value = value;
+            }
+        }
+        memo.emplace(memo_key, best);
+        if (best_value >= 0) {
+            choices.emplace(memo_key, best_value);
+        }
+        return best;
+    }
+
+    std::pair<int, Partition> run() {
+        const int objective = visit(0, total_mass, largest);
+        if (objective == impossible) {
+            return {impossible, {}};
+        }
+        Partition result;
+        int remaining = total_mass;
+        int maximum = largest;
+        for (int position = 0; position < length; ++position) {
+            const std::uint64_t state_key = key(position, remaining, maximum);
+            const int value = choices.at(state_key);
+            result.push_back(value);
+            remaining -= value;
+            maximum = value;
+        }
+        return {objective, result};
+    }
+};
+
+struct MinimumBandCertificate {
+    int lower = -1;
+    int upper = -1;
+    int distance = PrefixCapOptimizer::impossible;
+    Partition band;
+};
+
+bool cap_vector_dominates(
+    const std::vector<Value> &weaker,
+    const std::vector<Value> &stronger) {
+    if (weaker.size() != stronger.size()) {
+        throw std::logic_error("incomparable prefix-cap dimensions");
+    }
+    for (std::size_t index = 0; index < weaker.size(); ++index) {
+        if (weaker[index] < stronger[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<std::vector<Value>> maximal_blocking_cap_vectors(
+    const Partition &canonical_band, Value mixed_floor,
+    const std::vector<TransitionCheck> &transitions) {
+    const PrefixFunction capacity(canonical_band);
+    std::vector<Value> initial(canonical_band.size() + 1, 0);
+    for (std::size_t count = 0; count < initial.size(); ++count) {
+        initial[count] = capacity(static_cast<int>(count));
+    }
+    std::vector<std::vector<Value>> vectors{initial};
+    for (const TransitionCheck &transition : transitions) {
+        const int left_rank = transition.left_rows;
+        const int right_rank = transition.right_rows;
+        const Value left_cap =
+            transition.left_required + left_rank * mixed_floor - 1;
+        const Value right_cap =
+            transition.right_required + right_rank * mixed_floor - 1;
+        std::vector<std::vector<Value>> next;
+        for (const std::vector<Value> &caps : vectors) {
+            if (caps[left_rank] <= left_cap
+                || caps[right_rank] <= right_cap) {
+                next.push_back(caps);
+                continue;
+            }
+            std::vector<Value> left = caps;
+            left[left_rank] = left_cap;
+            next.push_back(std::move(left));
+            std::vector<Value> right = caps;
+            right[right_rank] = right_cap;
+            next.push_back(std::move(right));
+        }
+        std::sort(next.begin(), next.end());
+        next.erase(std::unique(next.begin(), next.end()), next.end());
+        std::vector<unsigned char> discard(next.size(), 0);
+        for (std::size_t first = 0; first < next.size(); ++first) {
+            if (discard[first]) {
+                continue;
+            }
+            for (std::size_t second = 0; second < next.size(); ++second) {
+                if (first == second || discard[second]) {
+                    continue;
+                }
+                if (cap_vector_dominates(next[first], next[second])) {
+                    discard[second] = 1;
+                }
+            }
+        }
+        vectors.clear();
+        for (std::size_t index = 0; index < next.size(); ++index) {
+            if (!discard[index]) {
+                vectors.push_back(std::move(next[index]));
+            }
+        }
+    }
+    return vectors;
+}
+
+MinimumBandCertificate optimize_capacity_certificates(int level, bool print) {
+    if (level < 1 || level > 6) {
+        throw std::invalid_argument("certificate optimization level must lie in [1,6]");
+    }
+    const Partition parent_profile = singleton_profile(level);
+    const PrefixFunction parent(parent_profile);
+    const PrefixFunction child(singleton_profile(level - 1));
+    const int positive_floor_support = 1 << (level - 1);
+    MinimumBandCertificate best;
+    int bands = 0;
+    int feasible_bands = 0;
+    Count cap_vectors = 0;
+
+    for (int upper = 1; upper <= positive_floor_support; ++upper) {
+        for (int lower = 0; lower < upper; ++lower) {
+            CapacityBandSurvey survey(
+                lower, upper, parent_profile, parent, child);
+            const std::vector<std::vector<Value>> blocking_caps =
+                maximal_blocking_cap_vectors(
+                    survey.canonical_band, survey.mixed_floor,
+                    survey.transitions);
+            cap_vectors = checked_count_sum(
+                cap_vectors, static_cast<Count>(blocking_caps.size()));
+            int face_best = PrefixCapOptimizer::impossible;
+            Partition face_band;
+
+            std::vector<Value> canonical_caps(
+                survey.canonical_band.size() + 1, 0);
+            for (std::size_t count = 0; count < canonical_caps.size(); ++count) {
+                canonical_caps[count] = survey.capacity(static_cast<int>(count));
+            }
+            PrefixCapOptimizer floor_optimizer(
+                survey.canonical_band, canonical_caps, 1,
+                static_cast<int>(survey.mixed_floor - 1));
+            auto [floor_objective, floor_band] = floor_optimizer.run();
+            if (floor_objective < face_best) {
+                face_best = floor_objective;
+                face_band = std::move(floor_band);
+            }
+
+            for (const std::vector<Value> &caps : blocking_caps) {
+                if (caps.front() < 0) {
+                    continue;
+                }
+                PrefixCapOptimizer optimizer(
+                    survey.canonical_band, caps,
+                    static_cast<int>(survey.mixed_floor),
+                    std::numeric_limits<int>::max());
+                auto [objective, band] = optimizer.run();
+                if (objective < face_best) {
+                    face_best = objective;
+                    face_band = std::move(band);
+                }
+            }
+            ++bands;
+            if (face_best != PrefixCapOptimizer::impossible) {
+                if ((face_best & 1) != 0) {
+                    throw std::logic_error("certificate objective is not even");
+                }
+                ++feasible_bands;
+                const int distance = face_best / 2;
+                if (distance < best.distance) {
+                    best.lower = lower;
+                    best.upper = upper;
+                    best.distance = distance;
+                    best.band = face_band;
+                }
+            }
+        }
+    }
+    if (print) {
+        bool verified = true;
+        if (level == 3) {
+            verified = bands == 10 && cap_vectors == 17
+                && feasible_bands == 0
+                && best.distance == PrefixCapOptimizer::impossible;
+        } else if (level == 4) {
+            verified = bands == 36 && cap_vectors == 74
+                && feasible_bands == 0
+                && best.distance == PrefixCapOptimizer::impossible;
+        } else if (level == 5) {
+            verified = bands == 136 && cap_vectors == 528
+                && feasible_bands == 0
+                && best.distance == PrefixCapOptimizer::impossible;
+        } else if (level == 6) {
+            verified = bands == 528 && cap_vectors == 38131
+                && feasible_bands == 3 && best.distance == 14
+                && best.lower == 15 && best.upper == 30
+                && best.band == repeated({{8, 15}});
+        }
+        if (best.distance != PrefixCapOptimizer::impossible) {
+            Partition state(
+                parent_profile.begin(), parent_profile.begin() + best.lower);
+            state.insert(state.end(), best.band.begin(), best.band.end());
+            state.insert(
+                state.end(), parent_profile.begin() + best.upper,
+                parent_profile.end());
+            const Analysis replay = analyze(level, state);
+            const bool matching_certificate = std::any_of(
+                replay.certificates.begin(), replay.certificates.end(),
+                [&](const Certificate &certificate) {
+                    return certificate.lower_rank == best.lower
+                        && certificate.upper_rank == best.upper;
+                });
+            verified = verified && replay.majorized && matching_certificate
+                && transfer_distance(parent_profile, state) == best.distance;
+        }
+        std::cout << "MINIMUM_TIGHT_BAND_CERTIFICATE K=" << level
+                  << " complete=YES"
+                  << " verified=" << (verified ? "YES" : "NO")
+                  << " bands=" << bands
+                  << " blocking_cap_vectors=" << cap_vectors
+                  << " feasible_bands=" << feasible_bands;
+        if (best.distance == PrefixCapOptimizer::impossible) {
+            std::cout << " minimum_transfer_distance=NONE";
+        } else {
+            std::cout << " minimum_transfer_distance=" << best.distance
+                      << " anchors=(" << best.lower << ',' << best.upper << ')'
+                      << " band=" << compact_partition(best.band);
+        }
+        std::cout << '\n';
+        if (!verified) {
+            throw std::logic_error("minimum certificate regression mismatch");
+        }
+    }
+    return best;
+}
+
+bool optimize_capacity_certificate_cli(int level) {
+    const MinimumBandCertificate best =
+        optimize_capacity_certificates(level, true);
+    if (level <= 5) {
+        return best.distance == PrefixCapOptimizer::impossible;
+    }
+    return best.distance == 14 && best.lower == 15 && best.upper == 30
+        && best.band == repeated({{8, 15}});
 }
 
 bool check_known_certificate(bool print) {
@@ -581,6 +1379,13 @@ int regression() {
     ok = check_known_certificate(true) && ok;
     ok = transfer_path_control() && ok;
     ok = low_level_control() && ok;
+    ok = count_boundary_space(3) && ok;
+    ok = count_boundary_space(4) && ok;
+    ok = count_boundary_space(5) && ok;
+    ok = optimize_capacity_certificate_cli(3) && ok;
+    ok = optimize_capacity_certificate_cli(4) && ok;
+    ok = optimize_capacity_certificate_cli(5) && ok;
+    ok = optimize_capacity_certificate_cli(6) && ok;
     ok = k6_band_face_certificate_survey() && ok;
     std::cout << "TIGHT_BAND_CAPACITY_REGRESSION verified="
               << (ok ? "YES" : "NO")
@@ -624,8 +1429,47 @@ int main(int argc, char **argv) {
         if (std::string(argv[1]) == "survey-k6-band15-32") {
             return k6_band_face_certificate_survey() ? 0 : 1;
         }
+        if (std::string(argv[1]) == "count-boundary-space") {
+            if (argc != 3) {
+                std::cerr << "usage: " << argv[0]
+                          << " count-boundary-space K\n";
+                return 64;
+            }
+            return count_boundary_space(std::stoi(argv[2])) ? 0 : 1;
+        }
+        if (std::string(argv[1]) == "survey-capacity-bands") {
+            if (argc != 3) {
+                std::cerr << "usage: " << argv[0]
+                          << " survey-capacity-bands K\n";
+                return 64;
+            }
+            return survey_capacity_bands(std::stoi(argv[2])) ? 0 : 1;
+        }
+        if (std::string(argv[1]) == "count-transfer-shells") {
+            if (argc != 4) {
+                std::cerr << "usage: " << argv[0]
+                          << " count-transfer-shells K MAX_DISTANCE\n";
+                return 64;
+            }
+            return count_transfer_shells(
+                       std::stoi(argv[2]), std::stoi(argv[3]))
+                ? 0 : 1;
+        }
+        if (std::string(argv[1]) == "optimize-capacity-certificate") {
+            if (argc != 3) {
+                std::cerr << "usage: " << argv[0]
+                          << " optimize-capacity-certificate K\n";
+                return 64;
+            }
+            return optimize_capacity_certificate_cli(std::stoi(argv[2]))
+                ? 0 : 1;
+        }
         std::cerr << "usage: " << argv[0]
-                  << " regression | survey-k6-band15-32 | check K ROW [ROW ...]\n";
+                  << " regression | survey-k6-band15-32"
+                  << " | count-boundary-space K | survey-capacity-bands K"
+                  << " | count-transfer-shells K MAX_DISTANCE"
+                  << " | optimize-capacity-certificate K"
+                  << " | check K ROW [ROW ...]\n";
         return 64;
     } catch (const std::exception &error) {
         std::cerr << "error: " << error.what() << '\n';

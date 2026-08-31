@@ -15,4 +15,7 @@ CC=clang++ tools/build_radio.py \
 tools/run_with_provenance.py \
     "$certificate_tmp/tight-band-certificate" regression
 
+tools/run_with_provenance.py \
+    "$certificate_tmp/tight-band-certificate" survey-capacity-bands 5
+
 tools/singleton_direct_split_regression.sh
