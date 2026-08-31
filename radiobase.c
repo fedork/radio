@@ -599,6 +599,13 @@ static uint32_t front_record_live;
 #ifndef RADIO_CACHE_INSERT_NODE_LIMIT
 #define RADIO_CACHE_INSERT_NODE_LIMIT UINT64_C(0)
 #endif
+/* A broad same-level survey may have essentially no reuse among its parent states while still
+   benefiting heavily from cached children.  This diagnostic option disables both lookup and
+   retention at one level.  It changes cache hit rate and memory use, never the search or a verdict.
+   The default 0 disables no level because searchable levels start at one. */
+#ifndef RADIO_CACHE_DISABLED_LEVEL
+#define RADIO_CACHE_DISABLED_LEVEL 0
+#endif
 struct cache_l1_entry {
     uint32_t hash;
     front_point part[CACHE_L1_MAX_PARTS];
@@ -1271,6 +1278,7 @@ int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, i
 }
 
 void cache(int *sb, int size, int canSolve, int k, int pairs) {
+    if (k == RADIO_CACHE_DISABLED_LEVEL) return;
     /* A positive replay without the current semantic marker is only a historical claim.  Before
        the K=6 refutation, an arbitrary majorized singleton could seed a false positive at every
        ancestor above it.  Screening only singleton queries is therefore insufficient: reject the
@@ -1321,6 +1329,7 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
 
 static inline __attribute__((always_inline)) int checkCacheTrie_ctx(
     radio_search_context *ctx, int *sb, int size, int k) {
+    if (k == RADIO_CACHE_DISABLED_LEVEL) return MAYBE;
     uint32_t node = sb_cache_root[k];
     for (int i = 0; i < size; i++) {
         uint32_t tag = node & NODE_TAG_MASK;
@@ -1374,6 +1383,11 @@ static inline __attribute__((always_inline)) uint32_t cache_l1_hash(const int *s
 static inline __attribute__((always_inline)) int cache_l1_probe(
     radio_search_context *ctx, const int *sb, int size, int k,
     cache_l1_entry **entry_out, uint32_t *hash_out) {
+    if (k == RADIO_CACHE_DISABLED_LEVEL) {
+        *entry_out = NULL;
+        *hash_out = 0;
+        return MAYBE;
+    }
 #ifdef RADIO_DISABLE_CACHE_L1
     (void)ctx;
     (void)sb;
@@ -1415,6 +1429,7 @@ static inline __attribute__((always_inline)) int cache_l1_probe(
 static inline __attribute__((always_inline)) void cache_l1_store(
     radio_search_context *ctx, cache_l1_entry *entry, uint32_t hash,
     const int *sb, int size, int k, int verdict) {
+    if (k == RADIO_CACHE_DISABLED_LEVEL) return;
 #ifdef RADIO_DISABLE_CACHE_L1
     (void)ctx;
     (void)entry;
@@ -3777,6 +3792,8 @@ static void radio_print_provenance(void) {
     radio_provenance_number("define.MAX_PART_N", MAX_PART_N);
     radio_provenance_number("define.RADIO_CACHE_INSERT_NODE_LIMIT",
                             RADIO_CACHE_INSERT_NODE_LIMIT);
+    radio_provenance_number("define.RADIO_CACHE_DISABLED_LEVEL",
+                            RADIO_CACHE_DISABLED_LEVEL);
 #ifdef RADIO_WORK_BUDGET
     radio_provenance_value("search_budget", "deterministic-accepted-prefixes");
     radio_provenance_number("search_work_units_per_nominal_second",

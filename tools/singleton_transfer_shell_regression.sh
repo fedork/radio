@@ -29,6 +29,12 @@ rg -q \
     'TRANSFER_SHELL_COUNT_CHECK K=6 maximum_distance=14 shells=15 states=15150098684 .* verified=YES' \
     "$shell_tmp/k6-counts.log"
 
+"$shell_tmp/singleton-shell" \
+    --transfer-shell-oracle-input 3 4 10 7 1 > "$shell_tmp/oracle-input.log"
+[[ "$(sed -n '1p' "$shell_tmp/oracle-input.log")" == "budget 1" ]]
+[[ "$(rg -c '^3( [0-9]+ 1){8}$' "$shell_tmp/oracle-input.log")" == 7 ]]
+[[ "$(tail -2 "$shell_tmp/oracle-input.log" | tr '\n' ' ')" == "stats quit " ]]
+
 tools/run_with_provenance.py "$shell_tmp/singleton-shell" \
     --transfer-ball-parallel 3 8 4 > "$shell_tmp/k3-ball.log"
 rg -q \

@@ -13,7 +13,7 @@
 set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 BUCKET=radio-sa193-393287594714
-INSTANCE=i-0005d74f985c52ae1
+LEGACY_INSTANCE=i-0005d74f985c52ae1
 # Concurrent runs share the instance from 2026-08-09, each under its own S3 prefix:
 #   run   original build (2026-08-05)
 #   run2  + A+B k=6 optimisations (efadab0)
@@ -24,14 +24,15 @@ INSTANCE=i-0005d74f985c52ae1
 #   run7  + restored depth-first progress and pass-2 NO_DEADLINE handoff (e648e83)
 #   run8  + compact cache and bounded long-state probes (current main at launch)
 #   run9  + rb-tainted implicit-contraction suppression
+#   run10 current-main cold rerun after singleton-majorization refutation (separate instance)
 # `--prefix runN` reads one; `--all` reads every prefix listed in render() below. The default live
 # comparison is run3 against run8; override either side for a newer matched comparison.
-PREFIX=run
+PREFIX=run10
 BOTH=0
 COMPARE=0
 WATCH=0
-BASELINE=run3
-CANDIDATE=run8
+BASELINE=run9
+CANDIDATE=run10
 while (( $# )); do
     case "$1" in
         --prefix) PREFIX="$2"; shift 2 ;;
@@ -48,6 +49,20 @@ done
 
 object_exists() {
     aws-vault exec --server default -- aws s3 ls "s3://$BUCKET/$1" >/dev/null 2>&1
+}
+
+instance_for_prefix() {
+    local p="$1" instance
+    instance=$(aws-vault exec --server default -- aws ec2 describe-instances \
+        --filters "Name=tag:RunPrefix,Values=$p" \
+                  "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+        --query 'sort_by(Reservations[].Instances[], &LaunchTime)[-1].InstanceId' \
+        --output text 2>/dev/null)
+    if [[ -z "$instance" || "$instance" == None ]]; then
+        printf '%s' "$LEGACY_INSTANCE"
+    else
+        printf '%s' "$instance"
+    fi
 }
 
 object_age_minutes() {
@@ -133,7 +148,7 @@ compact_row() {
 
 show() {
     local PREFIX="$1"
-    local mod age now snapshot age_note
+    local mod age now snapshot age_note instance
     mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" --key "$PREFIX/STATUS" \
             --query LastModified --output text 2>/dev/null)
     snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$PREFIX/STATUS" - 2>/dev/null)
@@ -151,8 +166,9 @@ show() {
         fi
         printf '\n  status written     %s  (%d min ago%s)\n' "$mod" $(( age / 60 )) "$age_note"
     fi
-    printf '  instance           %s\n' \
-        "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$INSTANCE" \
+    instance=$(instance_for_prefix "$PREFIX")
+    printf '  instance           %s  %s\n' "$instance" \
+        "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$instance" \
              --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null)"
 }
 
@@ -188,8 +204,10 @@ render() {
         else
             printf 'comparison pending first %s watchdog cycle\n' "$CANDIDATE"
         fi
-        printf '\ninstance %s  %s\n' "$INSTANCE" \
-            "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$INSTANCE" \
+        local instance
+        instance=$(instance_for_prefix "$CANDIDATE")
+        printf '\ninstance %s  %s\n' "$instance" \
+            "$(aws-vault exec --server default -- aws ec2 describe-instances --instance-ids "$instance" \
                  --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null)"
     elif (( BOTH )); then
         banner run  "original build"
@@ -201,6 +219,7 @@ render() {
         banner run7 "compact cache + exact L1 (stopped: obsolete deadlines)"
         banner run8 "compact cache + bounded probes"
         banner run9 "rb-safe implicit contraction"
+        banner run10 "post-refutation current-main cold rerun"
     else
         show "$PREFIX"
     fi

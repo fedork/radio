@@ -3740,6 +3740,7 @@ struct TransferShellCensus {
     Sequence hole;
     std::unordered_map<std::uint64_t, std::uint64_t> completion_memo;
     bool emit_output = true;
+    bool emit_oracle_queries = false;
     std::chrono::steady_clock::time_point started =
         std::chrono::steady_clock::now();
 
@@ -3816,6 +3817,12 @@ struct TransferShellCensus {
 
     void inspect(const Sequence &state) {
         ++tested;
+        if (emit_oracle_queries) {
+            std::cout << k;
+            for (int value : state) std::cout << ' ' << value << " 1";
+            std::cout << '\n';
+            return;
+        }
         if (greedy_block_coloring(state, hall, true)) {
             ++lookahead_ok;
         } else {
@@ -4349,6 +4356,32 @@ int main(int argc, char **argv) {
                   << " memo_states=" << memo_states
                   << " verified=" << (verified ? "YES" : "NO") << '\n';
         return verified ? 0 : 1;
+    }
+    if (argc >= 2
+        && std::string(argv[1]) == "--transfer-shell-oracle-input") {
+        if (argc != 7) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-oracle-input k distance skip limit budget\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int distance = std::atoi(argv[3]);
+        const std::uint64_t skip = std::strtoull(argv[4], nullptr, 10);
+        const std::uint64_t limit = std::strtoull(argv[5], nullptr, 10);
+        const std::uint64_t budget = std::strtoull(argv[6], nullptr, 10);
+        const std::uint64_t expected = expected_transfer_shell_states(k, distance);
+        if (k < 2 || k > 6 || distance < 0 || limit == 0 || expected == 0
+            || skip >= expected || limit > expected - skip) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-oracle-input k distance skip limit budget\n";
+            return 2;
+        }
+        std::cout << "budget " << budget << '\n';
+        TransferShellCensus census(k, distance, limit, skip);
+        census.emit_oracle_queries = true;
+        const int status = census.run(false);
+        std::cout << "stats\nquit\n";
+        return status;
     }
     if (argc >= 2
         && std::string(argv[1]) == "--transfer-shell-parallel") {
