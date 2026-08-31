@@ -12522,3 +12522,69 @@ ASan+UBSan builds then repeated both standard regressions, the dyadic survey and
 238,217,814-option `K=7` control with no finding.  Their build IDs were
 `753f173439099ac725fcb6db3d863370f42df9181600db508465726cfebda79a` (inequalities) and
 `fa93a5579885857cda37736a56b005b80a6f44ec5a11fffe699a33073429f646` (direct rows).
+
+## 2026-08-31 -- main solver corrected; the apparent K6 cost was cache insertion
+
+Fedor asked to fix the production solver after the singleton-majorization refutation, then
+questioned whether copying Fixed-Color Hall into the main engine was worth its proof burden.  The
+answer is no.  A profiled ordinary `MAX_K=6` run on the mass-697 core proved it negative in 0.006
+CPU seconds (24,795 split combinations, 36,551 deterministic work units).  The experimental Hall
+code was removed from `radiobase.c`; it remains an independent research checker.
+
+Two unrelated fixed costs had hidden that result.  First, `MAX_N=733` made the old engine build a
+component catalog of the same width even though the core's largest component is only `64:1`.  The
+new `MAX_PART_N` separately bounds one component; at `MAX_N=733,MAX_PART_N=65`, profiled init took
+0.015 seconds and each lazy top-level split table built below the 0.001-second display resolution.
+The first conflated build was interrupted after more than 100 seconds in init.
+
+Second, after exact search returned, `cacheCantSolve` tried to materialize the 32-part negative's
+permutation-expanded dominance closure.  A live one-second `sample` put all 848 samples below that
+function.  The uncapped diagnostic was still consuming a core at the last retained inventory after
+12:52 CPU and was stopped; this is a failed run worth not repeating.  Dominance insertion now has
+a default deterministic allowance of 1,000,000 recursive nodes per fact.  Every inserted prefix is
+sound, the exact path is visited first, and cutoff affects hit rate only.  The same core's bounded
+insertion took 0.016 seconds and reports `cache=partial:1000000/1000000`.
+
+The solver's theorem boundary is now explicit: singleton majorization rejects at every level,
+accepts only through the proved `K<=5` converse, and at `K>=6` accepts only distinct-slot embeddings
+before ordinary exact recursion.  Positive replay requires the new
+`# radio-cache-semantics=singleton-majorization-k5-v1` marker at ingestion, because unsupported
+singleton leaves may have tainted nonsingleton ancestors.  Old unmarked files replay negative-only.
+Oracle snapshots moved to exact v3 and include `MAX_PART_N`; v1/v2 are refused even by
+`restore-any`.
+
+New regressions cover the canonical `G_6` positive, the feasible `j=13` state, the core negative,
+positive/negative exact retention after truncated cache expansion, untrusted singleton and ancestor
+positives, and marked versus unmarked cache replay.  The refuter, work-budget, search-context,
+provenance and Pareto-prefix regressions passed.  ASan+UBSan repeated the main regression with no
+finding (leak detection is unsupported by the Apple runtime and was disabled).  Full commands and
+the performance attribution are in
+`evidence/main_solver_singleton_refutation_2026-08-31.md`.
+
+## 2026-08-31 -- the production contraction exposes a smaller 30-row obstruction
+
+The clean committed main-solver regression printed a sound contraction of the mass-697 query to
+
+    (64,63,57^2,42^4,22^7,8^15),
+
+of mass 683 and support 30.  This was not merely cache behavior.  The independent clean-room
+direct-row solver rejected it in the same 9,345 DFS nodes / 34,958 row options as the old forms,
+and the inequality-only checker found its sole certificate at anchors `(15,30)`.  The endpoint
+counts `{7,8}->{14,15,16}` give six transitions; their blocked capacities are respectively
+`52>49`, `58>56`, `64>63` on the left and the symmetric three on the right.  Thus the smaller
+state has no legal first cut and is unsolvable in six tests.
+
+Deleting one of the fifteen 8s is feasible: the clean-room solver found a cut in 1,245 nodes and
+7,514 options, with children
+
+    (32,31,26^2,16^4,6^5),
+    (32,31,26^2,16^4,6^7,2^5,1^8),
+    (32,31,26^2,16^3,8,7^8).
+
+So the 30-row state is prefix-minimal along this truncation, though no global minimum-support or
+minimum-mass claim follows.  The earlier rank-15/32 proof remains the cleaner two-case proof for
+the full-mass exact-support statement; rank 15/30 needs all six cases.  Both independent controls
+were added to their standard regressions, and the first-read status/theorem/evidence were
+superseded in place.  ASan+UBSan builds of the production regression, direct-row regression and
+rank-15/30 certificate check all passed (`detect_leaks=0` because Apple leak detection is
+unsupported).

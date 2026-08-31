@@ -316,10 +316,20 @@ static void load_exact_oracle(const char *path) {
     rewind(file);
 
     size_t lines = 0;
+    size_t skipped_untrusted_positive = 0;
+    int trusted_positive = 0;
     while (fgets(line, sizeof(line), file)) {
         lines++;
+        if (line[0] == '#') {
+            if (radio_cache_semantics_line_matches(line)) trusted_positive = 1;
+            continue;
+        }
         if (!((line[0] == '+' || line[0] == '-') && line[1] == ' ' && line[2] == 'b')) continue;
         int verdict = line[0] == '+' ? TRUE : FALSE;
+        if (verdict == TRUE && !trusted_positive) {
+            skipped_untrusted_positive++;
+            continue;
+        }
         char *save = NULL;
         char *token = strtok_r(line, " \t\r\n", &save); /* sign */
         token = strtok_r(NULL, " \t\r\n", &save);      /* b */
@@ -331,7 +341,8 @@ static void load_exact_oracle(const char *path) {
             token = strtok_r(NULL, " \t\r\n", &save);
             if (!token) { fprintf(stderr, "malformed exact cache line %zu\n", lines); exit(2); }
             int m = atoi(token);
-            if (size < EXACT_MAX_PARTS) sb[size++] = getSbb(n, m);
+            if (n + m > MAX_PART_N) overflow = 1;
+            else if (size < EXACT_MAX_PARTS) sb[size++] = getSbb(n, m);
             else overflow = 1;
         }
         if (!token) { fprintf(stderr, "malformed exact cache line %zu\n", lines); exit(2); }
@@ -346,8 +357,10 @@ static void load_exact_oracle(const char *path) {
     }
     fclose(file);
     fprintf(stderr,
-            "exact oracle loaded %zu unique facts (%zu candidates, %zu slots, %zu parts) from %s\n",
-            exact_slots_len, candidates, exact_slots_cap, exact_parts_len, path);
+            "exact oracle loaded %zu unique facts (%zu candidates, %zu slots, %zu parts, "
+            "%zu untrusted positives skipped) from %s\n",
+            exact_slots_len, candidates, exact_slots_cap, exact_parts_len,
+            skipped_untrusted_positive, path);
 }
 
 static uint32_t hash_words(int k, int size, const int *sb) {

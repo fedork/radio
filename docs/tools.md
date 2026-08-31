@@ -7,13 +7,15 @@ it, selected by `#include "radiobase.c"`. There is no build system; each driver 
 invocation made through the provenance builder.
 
 ```
-tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<n> <driver>.c -o <driver>
+tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<total-n> \
+    -DMAX_PART_N=<largest-component-n> <driver>.c -o <driver>
 ```
 
-`MAX_K` and `MAX_N` size static tables at compile time, so **they must be set for the
-problem you are running**. `MAX_N` is the largest total coin count `n1 + n2` any state will
-reach, not the largest single group. Two wrapper scripts compute both for you and are the
-preferred entry points.
+`MAX_K`, `MAX_N` and `MAX_PART_N` size static tables at compile time, so **they must be set for the
+problem you are running**. `MAX_N` is the largest sum of all component side-sums in a state;
+`MAX_PART_N` is the largest `n1+n2` of one component and sizes the quadratic component catalog.
+It defaults to `MAX_N` for compatibility. Set it explicitly for long states made of small
+components: the mass-683 singleton core needs `MAX_N=713` but only `MAX_PART_N=65`.
 
 ## Build and run provenance
 
@@ -297,7 +299,7 @@ within-level restart cursor, so the multi-hour k7 phase is intentionally not Spo
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, deterministic accepted-prefix budget, shared short-state allowance and geometric long-state probes | `canSolveB_ctx`; `canSolveB` is its default-context wrapper |
 | Joint suffix reachability; suppression of prefix contraction once it rejects | `rb_dead`, `rb_tainted_contraction` |
 | Unit-group stripping before search | start of `canSolveB` |
-| Singleton necessary-prefix test, unconditional distinct-slot shortcut, and full star-expansion obstruction | `singleton_majorization_can_solve`, `singleton_embedded_can_solve`, `star_expansion_majorization_can_solve` |
+| Singleton necessary-prefix test, proved `K<=5` shortcut, unconditional distinct-slot shortcut, and full star-expansion obstruction | `singleton_majorization_holds`, `singleton_embedded_can_solve`, `star_expansion_majorization_can_solve` |
 | `Sa` recursion | `canSolveA` |
 | Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` |
 | Warm the cache from a previous run's parsed output | `parse_file` |
@@ -507,8 +509,9 @@ Two behaviours to be aware of:
 ./run_radio_full.sh [cache_file] <k> <n1> <m> [<n1> <m> ...]
 ```
 
-Both derive `MAX_K` / `MAX_N` and compile before running. `run_radio_full.sh` will also scan
-a cache file to size the build. `target_k` in the canonical search is the depth at which the
+Both derive the required compile-time bounds and compile before running. `run_radio_full.sh`
+separately derives `MAX_N` and `MAX_PART_N`, and also scans a cache file to size the build.
+`target_k` in the canonical search is the depth at which the
 search stops and demands a canonical `U_k` state; 3 or 4 works well at `k = 9`.
 
 Example - smoke test the toolchain:
@@ -530,20 +533,22 @@ tools/check_witness.py /tmp/t.tree
 
 ## The warm oracle
 
-`radio_one` answers one question per process, and the process cost is not the solve. `init()` runs
-**before** the argument check and its static tables scale with `MAX_N`, so the same query costs
+`radio_one` answers one question per process, and the process cost is not always the solve. `init()` runs
+**before** the argument check; unless `MAX_PART_N` is set separately, its component catalog scales
+with `MAX_N`, so the same query costs
 205 s built at `-DMAX_N=400` and 0.2 s at `-DMAX_N=120`. Replaying the archived caches costs minutes
 more. Anything that wants thousands of verdicts — labelling a dataset, ranking splits, poking at a
 frontier — has to amortise that, which is what `radio_oracle.c` is for.
 
 ```
 ./run_radio_oracle.sh                 # build if needed, prime, then read queries on stdin
-python3 tools/oracle_client.py ./radio_oracle_k9_n300 .artifacts/oracle-cache/*.cache   # smoke test
+python3 tools/oracle_client.py ./radio_oracle_k9_n300_p300 .artifacts/oracle-cache/*.cache   # smoke test
 ```
 
-**Sizing is a one-time decision.** `MAX_N` need only cover the largest side-sum you will *ask*
-about: the loader skips facts too wide for the build and reports the count, so a narrow build stays
-usable against a wide cache. Default `MAX_K=9, MAX_N=300` covers the archived caches (widest fact
+**Sizing is a one-time decision.** `MAX_N` need only cover the largest total state size you will
+*ask* about, while `MAX_PART_N` covers its largest component. The oracle loader skips facts too
+wide for either bound and reports the count, so a narrow build stays usable against a wide cache.
+Default `MAX_K=9, MAX_N=300, MAX_PART_N=300` covers the archived caches (widest fact
 258) and Sa(193) states (193), and inits in 37 s at 0.64 GB. **Do not infer a scaling law** —
 `MAX_N=400/MAX_K=6` inits in 205 s while the larger `MAX_N=485/MAX_K=9` inits in 146 s. Cost tracks
 the work actually required, not the table dimensions, so measure the configuration you intend to use.
@@ -571,11 +576,15 @@ would hang the daemon. `budget 0` removes the deadline and accepts that some sta
 Never record a `MAYBE` as a negative — that is exactly how the 2023 corpus acquired 37 false ones.
 
 **It grows forever.** The result cache is never freed; that is the point, but wrap an unattended
-session in `tools/capped_run.sh`.
+session in `tools/capped_run.sh`. Population of one fact is nevertheless finite: the default
+`RADIO_CACHE_INSERT_NODE_LIMIT=1000000` bounds recursive dominance expansion. `cache=partial:N/N`
+means the solver proved the verdict and retained a sound partial closure; it is not `MAYBE`.
 
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
-reloads it linearly instead of re-deriving every dominance closure. Compatibility is keyed on the source commit plus
-`MAX_K`/`MAX_N`/`MAX_SBB`/`sizeof(front_point)` — what actually fixes the layout. A geometry mismatch
+reloads it linearly instead of re-deriving every dominance closure. Snapshot v3 begins the
+post-refutation semantic epoch; v1/v2 snapshots are rejected even by `restore-any`. Compatibility
+within v3 is keyed on the source commit plus
+`MAX_K`/`MAX_N`/`MAX_PART_N`/`MAX_SBB`/`sizeof(front_point)` — what actually fixes the layout. A geometry mismatch
 is refused outright; a foreign identity with matching geometry needs the explicit `restore-any`
 opt-in and warns. Keying on the *build id* was a bug: it made a Linux-built snapshot unusable on
 macOS for no semantic reason.
@@ -594,6 +603,19 @@ cat out_run.txt | ./parse_out.sh >> cache.txt
 ```
 
 A driver takes an optional leading cache-file argument, detected by argument-count parity.
+
+Current output emits `# radio-cache-semantics=singleton-majorization-k5-v1` before cache facts.
+`parse_file`, the oracle loader and the Pareto exact loader accept positive facts only after that
+marker; an unmarked historical file is replayed negative-only. This must happen at ingestion:
+pre-refutation singleton positives may already have tainted nonsingleton ancestors, so filtering
+only singleton queries is insufficient. Oracle journals write the marker before new facts.
+
+For phase attribution, compile with any of `RADIO_INIT_PROFILE`, `RADIO_SPLIT_PROFILE` and
+`RADIO_CACHE_PROFILE`. They time eager initialization, lazy split/FAST construction, and the
+search-versus-dominance-insertion boundary respectively. The K=6 mass-683 core showed why the
+separation matters: exact recursion took 0.004 seconds while the old unbounded dominance insertion
+continued beyond 12.9 CPU minutes. See the
+[main-solver correction record](../evidence/main_solver_singleton_refutation_2026-08-31.md).
 
 Note that `parse_out.sh` keeps only the verdict, **discarding the `with [...]` split
 witness**. It is enough to warm the cache but not to reconstruct a witness tree. If you may
@@ -705,8 +727,10 @@ tools, not yet part of `radiobase.c`:
 | `tools/singleton_pair_coloring_census.cpp` | exhaust full-mass singleton partitions majorized by `G_K` through `K=4`; count, rank, window and parallelize exact-support transfer shells through `K=6`, using one-block lookahead followed by exact Fixed-Color Hall search; check Row-Coloring inequalities, global Adjacent-Fiber transfers and coloring rules; inspect labelled fixed-boundary delta exchange, dangerous tight-set core/hull, exact flip-blocker intersections, and maximum/positive crossing-mass rules; probe fixed feasible colorings for positive common neighbors through sampled `K=5` transfers; sample the exact `K=5` universe; check the padded Pascal-prefix reduction and its compressed `K=19` strict-alternation counterexample |
 | `tools/singleton_transfer_shell_regression.sh` | provenance-build the transfer-shell census; cross-check shell totals, fast rank-window skipping, parallel/sequential aggregates, all 160 exact-support `K=3` parents, the final `K=5` shell, and canonical / transfer-13 / counterexample `K=6` controls |
 | `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce the exact-support `K=6` singleton-majorization counterexample, its 14-transfer phase boundary, residual hole, forced bands, and earlier rule counterexamples |
-| `tools/singleton_direct_split_cleanroom.cpp` | independently enumerate legal singleton row triples into three sorted child multisets, with no Hall code or shared cache; solve arbitrary first-cut queries, check the padded/core `K=6` hole with slack-correct residual bounds, and classify all 176 bands on the fixed rank-15/32 face |
-| `tools/singleton_direct_split_regression.sh` | provenance-build the clean-room direct-row solver and run its canonical `G_6`, `j=13`, padded/core `j=14`, fixed-face, naive-oracle and exhaustive `K<=3` controls |
+| `tools/singleton_direct_split_cleanroom.cpp` | independently enumerate legal singleton row triples into three sorted child multisets, with no Hall code or shared cache; solve arbitrary first-cut queries, check the padded/mass-697/mass-683 `K=6` holes and the feasible one-8 deletion with slack-correct residual bounds, and classify all 176 bands on the fixed rank-15/32 face |
+| `tools/singleton_direct_split_regression.sh` | provenance-build the clean-room direct-row solver and run its canonical `G_6`, `j=13`, three negative counterexample forms, feasible one-8 deletion, fixed-face, naive-oracle and exhaustive `K<=3` controls |
+| `tools/singleton_main_solver_regression.sh` | check the production engine's `K<=5` singleton theorem boundary, canonical / `j=13` / mass-683 exact negative and its upward consequences, cache-taint rejection, and bounded exact positive/negative dominance insertion |
+| `tools/cache_semantics_regression.sh` | check that unmarked cache input is negative-only while the current semantic marker admits positive Sb and Sa facts |
 | `tools/singleton_tight_band_certificate.cpp` | emit deterministic no-first-cut certificates from two tight anchors; count exact-support/band spaces, exhaust the positive-mixed-floor `K=5` faces, and minimize transfer distance over all capacity-certificate cap vectors; contains no split search or Hall code |
 | `tools/singleton_tight_band_regression.sh` | provenance-build and run the inequality-only regression, complete 613,689,090-instance `K=5` certificate census, and independent direct-row controls/fixed-face classification |
 | `tools/singleton_balanced_hh_census.cpp` | construct the canonical Pascal Havel--Hakimi incidence matrix; test exact canonical colorability and the deterministic row/incidence-switch descent; exhaust exact-support parents through `K=4`, enumerate `K=5` windows, run random/walk/hill probes through `K=6`, and reproduce the fixed-matrix and strict-descent counterexamples with `canonical-state` / `state` |

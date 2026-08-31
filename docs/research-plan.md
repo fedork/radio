@@ -176,8 +176,8 @@ is:
 
 1. **Delivered 2026-08-31:** the dependency-free clean-room solver enumerates legal row triples
    `(l,m,r)` directly, shares no Hall/coloring code or caches with the current census, reproduces
-   the canonical and `j=13` positive cuts, and independently rejects both the padded `K=6` state
-   and its underfull mass-697 core.  An unquotiented leaf-only oracle agrees on 201 small
+   the canonical and `j=13` positive cuts, and independently rejects the padded `K=6` state and
+   its underfull mass-697 and mass-683 cores.  An unquotiented leaf-only oracle agrees on 201 small
    partitions; the optimized solver closes all 1,223 full-mass majorized types at `K<=3`, including
    all 1,206 types at `K=3`.
    Reproduction and exact counts are in the
@@ -223,10 +223,11 @@ is:
    eliminating that existential choice remains item 5.
 
    Thus `K=6` is the proved first failure level, and distance 14 is minimum for exact-support
-   recursive unsolvability as well as no-first-cut failure.  Now minimize the **non-unit core**
-   beyond the fixed face under support and a clearly specified dominance/normalization order, and
-   classify other distance-14 holes.  Deleting the harmless `1^32` padding already gives the
-   32-row mass-697 core and does not count as a new smaller obstruction.  Feed every new hole
+   recursive unsolvability as well as no-first-cut failure.  The prefix
+   `(64,63,57^2,42^4,22^7,8^15)` improves the non-unit obstruction to support 30 and mass 683;
+   deleting one 8 makes that truncation feasible.  Now minimize beyond this state under support
+   and a clearly specified dominance/normalization order, and classify other distance-14 holes.
+   Feed every new hole
    through the extractor; an uncertified hole is the concrete input for the laminar/general-Hall
    programme;
 5. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
@@ -235,7 +236,16 @@ is:
    Hall base sets contains the requested integer point.  The exact prefix-cylinder lemma solves
    the universal-completion problem **inside one chosen coloring scheme**; the remaining step is
    a compact law for choosing among schemes, plausibly by eliminating them into a laminar Hall
-   dual rather than another scalar statistic.
+   dual rather than another scalar statistic;
+6. **Main solver hardening delivered 2026-08-31.** The production engine uses singleton
+   majorization positively only through the proved `K<=5` range and otherwise performs its
+   ordinary exact recursion; the research Hall search was deliberately not copied into the main
+   trust base. Positive cache replay now requires a post-refutation semantic marker, including
+   possibly tainted nonsingleton ancestors. Total-state and one-component compile bounds are
+   separated, and dominance-cache insertion has a deterministic finite allowance. The mass-683
+   core is now the exact production negative, with the mass-697 and padded forms checked as upward
+   consequences alongside canonical `G_6` and `j=13` controls. See the
+   [main-solver record](../evidence/main_solver_singleton_refutation_2026-08-31.md).
 
 Separately, replace each nonembedded majorized witness leaf by an individual exact/canonical
 strategy rather than a blanket lemma.  See the

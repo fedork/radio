@@ -39,14 +39,14 @@ parents at `K=5`; Minimum-Support Reduction and the complete `K=4` result extend
 `G_5`-majorized singleton state.  Hence `K=6` is the proved smallest failure level; see the
 [complete `K=5` record](../../evidence/singleton_k5_prefix_cylinder_2026-08-31.md).
 
-The same proof involves only the first 32 rows, so the unit-free core
+There is an even smaller counterexample:
 
-    (64,63,57^2,42^4,22^7,8^15,7^2)
+    (64,63,57^2,42^4,22^7,8^15).
 
-of mass 697 is already a counterexample.  The 32 trailing units in the displayed full-mass form
-are harmless padding under Unit-Group Elimination.  Thus “smaller counterexample” should mean a
-smaller non-unit core, a lower level, or a smaller transfer/dominance measure—not merely deleting
-those units.
+It has mass 683 and support 30.  Tight ranks 15 and 30 give six endpoint transitions, all blocked
+by the Tight-Band Capacity Obstruction.  Deleting one of its fifteen 8s makes the prefix first-cut
+feasible.  The mass-697 and full-mass forms remain useful because extending to rank 32 reduces the
+human proof to two symmetric cases.
 
 An independent clean-room direct-row solver now exhausts both forms with child slack handled
 generically, reproduces the last feasible transfer cut, and agrees with an unquotiented oracle on
@@ -73,8 +73,8 @@ legal row condition that a singleton row cannot feed both pure children.  The ex
 reformulation below is also false, now for the genuine Pascal profile at `K=6` rather than only for
 generic bases.
 
-The counterexample has exactly the minimum `2^6` positive rows, so the proved Minimum-Support
-Reduction is sharp but cannot prove sufficiency.  The proved Two-Anchor Reduction maps it to the
+The full-mass exact-support form has the minimum `2^6` positive rows required at mass `3^6`, so the
+proved Minimum-Support Reduction is sharp but cannot prove sufficiency.  The proved Two-Anchor Reduction maps it to the
 explicit residual hole
 
     (62,61,55^2,40^4,20^7,6^15,5^2)
@@ -495,8 +495,8 @@ which can retain at most 63.
 This contradiction proves:
 
 > **Singleton Majorization Counterexample Theorem.** Singleton majorization is necessary but not
-> sufficient.  The state `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` and is
-> unsolvable in six tests.
+> sufficient.  The state `(64,63,57^2,42^4,22^7,8^15)` is majorized by `G_6` and is unsolvable in
+> six tests.  Adding `(7^2,1^32)` gives the full-mass exact-support version displayed above.
 
 The full calculation, original direct/Hall enumerations, clean-room direct-row check and
 transfer-path boundary are in the

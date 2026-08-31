@@ -64,9 +64,20 @@ static const char *const radio_provenance_source_sha256[1] = {NULL};
 #define MAX_N 194
 #endif
 
-#define MAX_SBB MAX_N*MAX_N/4
-#define MAX_SPLITS (MAX_N/2) * (MAX_N/2 + 2)
-#define MAX_PROD (MAX_N/2)*(MAX_N - MAX_N/2)
+/* MAX_N bounds total vertices in a state and therefore the Sa/cache universe.  MAX_PART_N bounds
+   n1+n2 for one Sb component and sizes only the component catalog.  Historically they were
+   conflated, making a many-row singleton state initialize a quadratic-size component universe it
+   could never use. */
+#ifndef MAX_PART_N
+#define MAX_PART_N MAX_N
+#endif
+#if MAX_PART_N > MAX_N
+#error "MAX_PART_N must not exceed MAX_N"
+#endif
+
+#define MAX_SBB MAX_PART_N*MAX_PART_N/4
+#define MAX_SPLITS (MAX_PART_N/2) * (MAX_PART_N/2 + 2)
+#define MAX_PROD (MAX_PART_N/2)*(MAX_PART_N - MAX_PART_N/2)
 #define BY_MAGIC 0
 #define BY_MAX 1
 #define BY_SP0 2
@@ -370,10 +381,10 @@ static const signed char ORDER_MONO_P[INDEX_COUNT] = {
 } while (0)
 
 int power3[MAX_K+1];
-int n_to_sbb[MAX_N+1][MAX_N/2 + 1];
+int n_to_sbb[MAX_PART_N+1][MAX_PART_N/2 + 1];
 int sbb_to_n1[MAX_SBB+1];
 int sbb_to_n2[MAX_SBB+1];
-#if MAX_N < 32768
+#if MAX_PART_N < 32768
 uint32_t sbb_dominance_key[MAX_SBB+1];
 #endif
 char sbb_to_str[MAX_SBB+1][8];
@@ -385,6 +396,13 @@ int **sbb_greater;
 int max_sbb_for_pairs[MAX_PROD+1];
 int singleton_base_len[MAX_K+1];
 int singleton_base_prefix[MAX_K+1][1 << MAX_K];
+
+/* Positive cache facts emitted by a build with this semantic epoch are safe to replay.  Older
+   logs may contain parents proved only through the false unrestricted singleton-majorization
+   converse.  Keep this marker stable only while every positive terminal remains proof-safe. */
+#define RADIO_CACHE_SEMANTICS "singleton-majorization-k5-v1"
+#define RADIO_CACHE_SEMANTICS_PREFIX "# radio-cache-semantics="
+#define SINGLETON_MAJOR_SUFFICIENT_MAX_K 5
 
 split_levels **sbb_splits;
 
@@ -403,7 +421,7 @@ int minK_ctx(radio_search_context *ctx, int sbb);
 int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                   uint64_t parent_deadline);
 void init_singleton_majorization(void);
-int singleton_majorization_can_solve(int *sb, int size, int k);
+int singleton_majorization_holds(int *sb, int size, int k);
 int star_expansion_majorization_can_solve(int *sb, int size, int k);
 
 int min(int a,int b){
@@ -433,6 +451,10 @@ int max(int a,int b){
 int getSbb(int n1, int n2){
     if (n1<n2) return getSbb(n2,n1);
     if (n2==0) return 0;
+    if (n1 < 0 || n2 < 0 || n1 + n2 > MAX_PART_N) {
+        printf("\nSb component %d:%d exceeds MAX_PART_N=%d\n", n1, n2, MAX_PART_N);
+        exit(12);
+    }
     return n_to_sbb[n1][n2];
 }
 
@@ -567,7 +589,17 @@ static uint32_t front_record_live;
 #define CACHE_L1_BITS 16u
 #endif
 #define CACHE_L1_SIZE (1u << CACHE_L1_BITS)
+#ifndef CACHE_L1_MAX_PARTS
 #define CACHE_L1_MAX_PARTS 12u
+#endif
+
+/* Dominance insertion is an optimization, not part of a verdict.  Its permutation expansion can
+   be enormous for long states, so give every fact a deterministic recursive-node allowance.
+   Every prefix of an insertion contains only valid monotone consequences; truncation sacrifices
+   future hits but cannot change an answer.  Zero requests the historical unbounded behavior. */
+#ifndef RADIO_CACHE_INSERT_NODE_LIMIT
+#define RADIO_CACHE_INSERT_NODE_LIMIT UINT64_C(1000000)
+#endif
 struct cache_l1_entry {
     uint32_t hash;
     front_point part[CACHE_L1_MAX_PARTS];
@@ -606,6 +638,31 @@ static void print_cache_l1_stats(void) {
 #endif
 
 static int cache_replay_depth;
+static int cache_replay_accept_positive;
+long long ignored_positive_cache_replays = 0;
+long long truncated_cache_insertions = 0;
+static uint64_t cache_insert_nodes;
+static uint64_t cache_insert_nodes_remaining;
+static int cache_insert_truncated;
+
+static inline int cache_insert_enter(void) {
+    if (RADIO_CACHE_INSERT_NODE_LIMIT != 0 && cache_insert_nodes_remaining == 0) {
+        cache_insert_truncated = TRUE;
+        return FALSE;
+    }
+    if (RADIO_CACHE_INSERT_NODE_LIMIT != 0) cache_insert_nodes_remaining--;
+    cache_insert_nodes++;
+    return TRUE;
+}
+
+static int radio_cache_semantics_line_matches(const char *line) {
+    const size_t prefix = strlen(RADIO_CACHE_SEMANTICS_PREFIX);
+    const size_t value = strlen(RADIO_CACHE_SEMANTICS);
+    return strncmp(line, RADIO_CACHE_SEMANTICS_PREFIX, prefix) == 0
+        && strncmp(line + prefix, RADIO_CACHE_SEMANTICS, value) == 0
+        && (line[prefix + value] == '\0' || line[prefix + value] == '\n'
+            || line[prefix + value] == '\r');
+}
 
 static void *grow_handle_table(void *old, uint32_t oldcap, uint32_t newcap, size_t item_size,
                                const char *what) {
@@ -828,7 +885,7 @@ static void release_front_record(uint32_t descriptor) {
 }
 
 static inline int part_greater_equal(int a, int b) {
-#if MAX_N < 32768
+#if MAX_PART_N < 32768
     /* Put the two coordinates in independent 16-bit lanes.  Setting each lane's guard bit before
        subtraction prevents a borrow from crossing lanes; both guard bits survive exactly when
        both coordinates of a are at least those of b.  This replaces four scattered int loads and
@@ -1084,6 +1141,7 @@ static void fold_empty_branch(uint32_t *node) {
 
 int cacheCanSolve(uint32_t *node, int *sb, int size, int k, int max_sbb,
                   int pairs_remaining, int n_remaining) {
+    if (!cache_insert_enter()) return 0;
     if (size < 1) {
         printf("\nempty positive cache insertion\n");
         exit(3);
@@ -1099,6 +1157,7 @@ int cacheCanSolve(uint32_t *node, int *sb, int size, int k, int max_sbb,
         updated += cacheCanSolve(&b->slot[sbb2], sb + 1, size - 1, k, sbb2,
                                  pairs_remaining - sb_pairs[sbb2],
                                  n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2]);
+        if (cache_insert_truncated) break;
     }
     fold_empty_branch(node);
     return updated;
@@ -1106,6 +1165,7 @@ int cacheCanSolve(uint32_t *node, int *sb, int size, int k, int max_sbb,
 
 int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, int pairs,
                    int pairs_remaining, int n_remaining) {
+    if (!cache_insert_enter()) return 0;
     if (size < 1) {
         printf("\nempty negative cache insertion\n");
         exit(3);
@@ -1157,24 +1217,45 @@ int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, i
                 int next_n = n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2];
                 updated += cacheCantSolve(&b->slot[sbb2], sb + 1, size - 1, k, sbb2,
                                           pairs_without_this + pairs_new, next_pairs, next_n);
+                if (cache_insert_truncated) break;
             }
         }
+        if (cache_insert_truncated) break;
     }
     if (b != NULL) fold_empty_branch(node);
     return updated;
 }
 
 void cache(int *sb, int size, int canSolve, int k, int pairs) {
+    /* A positive replay without the current semantic marker is only a historical claim.  Before
+       the K=6 refutation, an arbitrary majorized singleton could seed a false positive at every
+       ancestor above it.  Screening only singleton queries is therefore insufficient: reject the
+       unproved fact at ingestion, before dominance closure loses its origin.  Negative replay is
+       unaffected by this particular proof-status correction. */
+    if (cache_replay_depth != 0 && canSolve && !cache_replay_accept_positive) {
+        ignored_positive_cache_replays++;
+        return;
+    }
     long long alloc_count_before = alloc_count;
     long long alloc_size_before = alloc_size;
+    cache_insert_nodes = 0;
+    cache_insert_nodes_remaining = RADIO_CACHE_INSERT_NODE_LIMIT;
+    cache_insert_truncated = FALSE;
     int updated = canSolve
         ? cacheCanSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, power3[k], MAX_N)
         : cacheCantSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, pairs, power3[k], MAX_N);
     debug_printf(" cache=%lld/%lld(%+lld/%+lld) fronts=%lld/%lld",
                  alloc_count, alloc_size, alloc_count - alloc_count_before,
                  alloc_size - alloc_size_before, front_alloc_count, front_alloc_size);
+    if (cache_insert_truncated) {
+        truncated_cache_insertions++;
+        if (cache_replay_depth == 0)
+            printf(" cache=partial:%llu/%llu",
+                   (unsigned long long)cache_insert_nodes,
+                   (unsigned long long)RADIO_CACHE_INSERT_NODE_LIMIT);
+    }
 #ifndef OPT_2
-    if (updated == 0 && cache_replay_depth == 0) {
+    if (updated == 0 && cache_replay_depth == 0 && !cache_insert_truncated) {
         printf("\nupdated == 0 when caching result sign=%d k=%d ", canSolve, k);
         printSb(sb, size);
         printf("\n");
@@ -1182,7 +1263,8 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
         exit(4);
     }
 #endif
-    if (updated == 0 && cache_replay_depth != 0) redundant_cache_replays++;
+    if (updated == 0 && cache_replay_depth != 0 && !cache_insert_truncated)
+        redundant_cache_replays++;
 }
 
 static inline __attribute__((always_inline)) int checkCacheTrie_ctx(
@@ -1385,7 +1467,7 @@ void init_singleton_majorization(void) {
     }
 }
 
-int singleton_majorization_can_solve(int *sb, int size, int k) {
+int singleton_majorization_holds(int *sb, int size, int k) {
     long long left_prefix = 0;
     int right_len = singleton_base_len[k];
     int i;
@@ -1400,10 +1482,10 @@ int singleton_majorization_can_solve(int *sb, int size, int k) {
     return TRUE;
 }
 
-/* Unconditional positive singleton terminal.  Aigner's explicit strategy solves the rows of
-   G_k.  If the requested sorted row widths fit coordinatewise in distinct G_k rows, delete the
-   unused leaves/edges from that construction.  Weak majorization alone is only a proved
-   necessary condition; its converse remains open. */
+/* Unconditional positive singleton terminal at every level.  Aigner's explicit strategy solves
+   the rows of G_k.  If the requested sorted row widths fit coordinatewise in distinct G_k rows,
+   delete the unused leaves/edges from that construction.  Weak majorization is sufficient only
+   through K=5 and is false from K=6 onward. */
 static int singleton_embedded_can_solve(int *sb, int size, int k) {
     int right_len = singleton_base_len[k];
     int widths[size];
@@ -1961,8 +2043,6 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     int shared_probe = size <= 2;
     if (size>1) sort1(tmp, size);
     int query_size = size;
-    int singleton_exact_required = FALSE;
-    int singleton_ignored_positive_cache = FALSE;
     cache_l1_entry *l1_entry = NULL;
     uint32_t l1_hash = 0;
     int ck = MAYBE;
@@ -1973,18 +2053,22 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         if (ck == TRUE || ck == FALSE) return ck;
     }
     if (singleton_size == size) {
-        // Majorization is necessary.  A distinct-slot embedding is an unconditional positive
-        // terminal; arbitrary majorized singleton states must continue through exact recursion.
-        ck = singleton_majorization_can_solve(tmp, size, k);
+        // Majorization is necessary at every level and sufficient exactly through K=5.  From K=6
+        // onward accept only a distinct-slot embedding; every other majorized singleton must
+        // continue through exact recursion.
+        ck = singleton_majorization_holds(tmp, size, k);
         if (!ck) {
             cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, FALSE);
             return FALSE;
+        }
+        if (k <= SINGLETON_MAJOR_SUFFICIENT_MAX_K) {
+            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, TRUE);
+            return TRUE;
         }
         if (singleton_embedded_can_solve(tmp, size, k)) {
             cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, TRUE);
             return TRUE;
         }
-        singleton_exact_required = TRUE;
     }
     // Apply Singleton Majorization Necessity to the full star expansion: (n:m) becomes m copies of (n:1).
     // This strictly dominates the old one-copy downgrade, because it contains that downgraded
@@ -2003,30 +2087,14 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     if (!frozen_refute) {
         ck = RADIO_EXTERNAL_EXACT_LOOKUP(tmp, size, k);
         if (ck == TRUE || ck == FALSE) {
-            /* An imported "exact" table may predate the proof-status correction and contain a
-               singleton positive produced solely by weak majorization.  Apply the same safety
-               boundary as for the dominance trie below. */
-            if (singleton_exact_required && ck == TRUE) {
-                ck = MAYBE;
-            } else {
-                cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
-                return ck;
-            }
+            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
+            return ck;
         }
     }
 #endif
     //check cache
     if (!frozen_refute) {
         ck = checkCacheTrie_ctx(ctx, tmp, size, k);
-        /* Parsed/historical tries do not record why a positive singleton fact was accepted.
-           Older builds inserted every majorized singleton through the now-open converse.  Ignore
-           such positive trie hits and derive the state by exact recursion.  The process-local L1
-           remains safe: this build never seeds it from an ignored hit, and the final store below
-           records the result of the real recursion.  Negative hits remain sound. */
-        if (singleton_exact_required && ck == TRUE) {
-            singleton_ignored_positive_cache = TRUE;
-            ck = MAYBE;
-        }
         cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, ck);
     }
     //	printf("got from cache %d\n", ck);
@@ -2647,10 +2715,27 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     fflush(stdout);
 #endif
     cache_l1_store(ctx, l1_entry, l1_hash, tmp, query_size, k, canSolve);
-    /* A stale positive dominance fact may already subsume this exact state.  Reinserting either
-       verdict would be redundant or contradictory in a trie that has no proof-provenance bit.
-       Keep the exact result in the process-local L1 and leave the persistent legacy trie alone. */
-    if (!singleton_ignored_positive_cache) cache(tmp, size, canSolve, k, pairs);
+#ifdef RADIO_CACHE_PROFILE
+    fprintf(stderr, "RADIO_CACHE_PROFILE phase=search-end k=%d size=%d singleton=%d verdict=%d "
+            "seconds=%.3f\n", k, query_size, singleton_size == query_size, canSolve,
+            (double)(clock() - cpu_start) / CLOCKS_PER_SEC);
+    fflush(stderr);
+#endif
+#ifdef RADIO_CACHE_PROFILE
+    clock_t cache_profile_started = clock();
+    fprintf(stderr, "RADIO_CACHE_PROFILE phase=dominance-begin k=%d query_size=%d "
+            "cache_size=%d verdict=%d\n", k, query_size, size, canSolve);
+    fflush(stderr);
+#endif
+    cache(tmp, size, canSolve, k, pairs);
+#ifdef RADIO_CACHE_PROFILE
+    fprintf(stderr, "RADIO_CACHE_PROFILE phase=dominance-end k=%d query_size=%d "
+            "cache_size=%d verdict=%d nodes=%llu truncated=%d seconds=%.3f\n",
+            k, query_size, size, canSolve,
+            (unsigned long long)cache_insert_nodes, cache_insert_truncated,
+            (double)(clock() - cache_profile_started) / CLOCKS_PER_SEC);
+    fflush(stderr);
+#endif
     //    fflush(stdout);
     printf("\n");
 #ifndef OPT_2
@@ -2693,6 +2778,12 @@ int minK(int sbb) {
 }
 
 void cache_a(int canSolve, int n, int k) {
+    /* Sa positives can also descend from an unsupported singleton leaf.  Apply the same replay
+       epoch as the Sb trie before their monotone closure erases the source. */
+    if (cache_replay_depth != 0 && canSolve && !cache_replay_accept_positive) {
+        ignored_positive_cache_replays++;
+        return;
+    }
     if(canSolve){
         int i;
         for (i = n; i > 0; i--) {
@@ -3013,6 +3104,9 @@ splits *ensure_splits(int sbb, int k) {
     size_t total_ints;
     size_t bytes;
     int *storage;
+#ifdef RADIO_SPLIT_PROFILE
+    clock_t split_profile_started;
+#endif
 
     if (sbb <= 0 || sbb > MAX_SBB || k <= 0 || k > MAX_K) {
         printf("\ninvalid split table key sbb=%d k=%d\n", sbb, k);
@@ -3033,6 +3127,12 @@ splits *ensure_splits(int sbb, int k) {
 
     n1 = sbb_to_n1[sbb];
     n2 = sbb_to_n2[sbb];
+#ifdef RADIO_SPLIT_PROFILE
+    split_profile_started = clock();
+    fprintf(stderr, "RADIO_SPLIT_PROFILE phase=table-begin k=%d part=%d:%d sbb=%d\n",
+            k, n1, n2, sbb);
+    fflush(stderr);
+#endif
     for (m1 = 0; m1 <= n1; m1++) {
         for (m2 = (n2 == n1 ? m1 : n2); m2 >= 0; m2--) {
             fill_split(sbb, m1, m2, candidate);
@@ -3113,6 +3213,13 @@ splits *ensure_splits(int sbb, int k) {
     split_table_candidates[k] += candidates;
     split_table_options[k] += s->size;
     split_table_bytes[k] += bytes;
+#ifdef RADIO_SPLIT_PROFILE
+    fprintf(stderr, "RADIO_SPLIT_PROFILE phase=table-end k=%d part=%d:%d sbb=%d "
+            "candidates=%d options=%d bytes=%zu seconds=%.3f\n",
+            k, n1, n2, sbb, candidates, s->size, bytes,
+            (double)(clock() - split_profile_started) / CLOCKS_PER_SEC);
+    fflush(stderr);
+#endif
     return s;
 }
 
@@ -3122,6 +3229,12 @@ splits *prepare_splits_ctx(radio_search_context *ctx, int sbb, int k, int need_f
         int n1 = sbb_to_n1[sbb];
         int n2 = sbb_to_n2[sbb];
         int c;
+#ifdef RADIO_SPLIT_PROFILE
+        clock_t fast_profile_started = clock();
+        fprintf(stderr, "RADIO_SPLIT_PROFILE phase=fast-begin k=%d part=%d:%d sbb=%d "
+                "options=%d\n", k, n1, n2, sbb, sp->size);
+        fflush(stderr);
+#endif
         debug_printf("initializing FAST for %s in k=%d\n", sbb_to_str[sbb], k);
         for (c = 0; c < sp->size; c++) {
             int m1 = sp->splitsl[c][6];
@@ -3146,6 +3259,12 @@ splits *prepare_splits_ctx(radio_search_context *ctx, int sbb, int k, int need_f
             if (fast) printf("FAST for %s -> [%d:%d]\n", sbb_to_str[sbb], m1, m2);
 #endif
         }
+#ifdef RADIO_SPLIT_PROFILE
+        fprintf(stderr, "RADIO_SPLIT_PROFILE phase=fast-end k=%d part=%d:%d sbb=%d "
+                "options=%d seconds=%.3f\n", k, n1, n2, sbb, sp->size,
+                (double)(clock() - fast_profile_started) / CLOCKS_PER_SEC);
+        fflush(stderr);
+#endif
     }
     return sp;
 }
@@ -3185,7 +3304,7 @@ void all_solutions(int sb[], int size, int k) {
     int n[size*2], m[size*2];
     int sb0[size*2], sb1[size*2], sb2[size*2];
     
-    int counts[size][MAX_N+1][MAX_N+1];
+    int counts[size][MAX_PART_N+1][MAX_PART_N+1];
     memset(counts, 0, sizeof(counts));
 
     
@@ -3308,7 +3427,11 @@ void parse_file(char *file_name) {
         printf("Failed to open file '%s'\n", file_name);
         exit(14);
     }
+    int saved_accept_positive = cache_replay_accept_positive;
+    long long ignored_before = ignored_positive_cache_replays;
+    long long truncated_before = truncated_cache_insertions;
     cache_replay_depth++;
+    cache_replay_accept_positive = FALSE;
     printf("\nreading file %s\n", file_name);
     char buff[BUFSIZE];
     int line_count=0;
@@ -3326,6 +3449,8 @@ void parse_file(char *file_name) {
         }
         debug_printf("\nINPUT: %s\n", buff);
         if (comment_continuation || buff[0] == '#') {
+            if (!comment_continuation && radio_cache_semantics_line_matches(buff))
+                cache_replay_accept_positive = TRUE;
             /* A provenance argument can legally be longer than BUFSIZE.  fgets then returns its
                continuation without a leading '#'; remember that state so an exact long argument
                cannot be mistaken for a cache fact on replay. */
@@ -3383,7 +3508,12 @@ void parse_file(char *file_name) {
     }
     fclose(fp);
     cache_replay_depth--;
-    printf("done\n");
+    printf("done positive_replay=%s ignored_untrusted_positive=%lld "
+           "truncated_cache_insertions=%lld\n",
+           cache_replay_accept_positive ? "trusted" : "negative-only",
+           ignored_positive_cache_replays - ignored_before,
+           truncated_cache_insertions - truncated_before);
+    cache_replay_accept_positive = saved_accept_positive;
     fflush(stdout);
 }
 
@@ -3544,9 +3674,13 @@ static void radio_provenance_rlimit(const char *name, int resource) {
 static void radio_print_provenance(void) {
     if (radio_provenance_printed) return;
     radio_provenance_printed = 1;
+    printf(RADIO_CACHE_SEMANTICS_PREFIX "%s\n", RADIO_CACHE_SEMANTICS);
     /* tools/run_with_provenance.py is the generic path for standalone utilities.  If somebody uses
        it for a radiobase driver too, it has already verified the binary and emitted the same block. */
-    if (getenv("RADIO_PROVENANCE_WRAPPER_EMITTED") != NULL) return;
+    if (getenv("RADIO_PROVENANCE_WRAPPER_EMITTED") != NULL) {
+        fflush(stdout);
+        return;
+    }
 
     printf("# radio-provenance-v1 begin\n");
     radio_provenance_value("artifact", "solver-output");
@@ -3589,6 +3723,9 @@ static void radio_print_provenance(void) {
     }
     radio_provenance_number("define.MAX_K", MAX_K);
     radio_provenance_number("define.MAX_N", MAX_N);
+    radio_provenance_number("define.MAX_PART_N", MAX_PART_N);
+    radio_provenance_number("define.RADIO_CACHE_INSERT_NODE_LIMIT",
+                            RADIO_CACHE_INSERT_NODE_LIMIT);
 #ifdef RADIO_WORK_BUDGET
     radio_provenance_value("search_budget", "deterministic-accepted-prefixes");
     radio_provenance_number("search_work_units_per_nominal_second",
@@ -3669,7 +3806,24 @@ static void radio_provenance_constructor(void) {
 #endif
 
 void init(){
+#ifdef RADIO_INIT_PROFILE
+    clock_t init_profile_started = clock();
+    clock_t init_profile_last = init_profile_started;
+#define RADIO_INIT_PHASE(label) do {                                                     \
+        clock_t _now = clock();                                                          \
+        fprintf(stderr, "RADIO_INIT_PROFILE phase=%s delta_s=%.3f total_s=%.3f "        \
+                "max_n=%d max_part_n=%d max_sbb=%d\n",                                 \
+                (label), (double)(_now - init_profile_last) / CLOCKS_PER_SEC,             \
+                (double)(_now - init_profile_started) / CLOCKS_PER_SEC,                   \
+                MAX_N, MAX_PART_N, MAX_SBB);                                              \
+        fflush(stderr);                                                                   \
+        init_profile_last = _now;                                                         \
+    } while (0)
+#else
+#define RADIO_INIT_PHASE(label) do { (void)sizeof(label); } while (0)
+#endif
     radio_print_provenance();
+    RADIO_INIT_PHASE("begin");
     radio_default_search_context.work_clock = RADIO_WORK_CLOCK_ORIGIN;
     radio_default_search_context.cache_l1 = radio_default_cache_l1;
     memset(radio_default_cache_l1, 0, sizeof(radio_default_cache_l1));
@@ -3694,6 +3848,7 @@ void init(){
         //      printf("can't solve %d in %d pairs = %d power3 = %d\n", i,k,saPairs(i),power3[k+1]);
     }
     memset(sb_cache_root, 0, sizeof(sb_cache_root));
+    RADIO_INIT_PHASE("scalar-tables");
     
     int n1, n2, sbb;
     sbb=0;
@@ -3718,12 +3873,12 @@ void init(){
     for (prod =1; prod<=MAX_PROD;prod++) {
         max_sbb_for_pairs[prod] = sbb;
         //      printf("prod=%d\n", prod);
-        for (n2 = MAX_N-1; n2 > prod/n2; n2--);
+        for (n2 = MAX_PART_N-1; n2 > prod/n2; n2--);
         for (; n2>0; n2--) {
 //        for (n1=min(prod,MAX_N-1), n2=1; n1>=n2; n1--) {
 //            if (n1>0) n2 = prod/n1;
             n1 = prod/n2;
-            if (n1>=n2 && n1+n2<=MAX_N && n1*n2 == prod) {
+            if (n1>=n2 && n1+n2<=MAX_PART_N && n1*n2 == prod) {
                 //           printf("n1=%d\n", n1);
                 //              printf("n2=%d\n", n2);
                 //  for (n1 = 1; n1 < MAX_N; n1++) {
@@ -3738,7 +3893,7 @@ void init(){
                 
                 sbb_to_n1[sbb]=n1;
                 sbb_to_n2[sbb]=n2;
-#if MAX_N < 32768
+#if MAX_PART_N < 32768
                 sbb_dominance_key[sbb]=((uint32_t)n1 << 16) | (uint32_t)n2;
 #endif
                 sb_pairs[sbb]=n1*n2;
@@ -3770,9 +3925,16 @@ void init(){
                 //!!! must be sorted!!!!
                 sort1(sbb_lesser[sbb], c);
                 sbb_lesser[sbb][c++]=0; //terminator
+#ifdef RADIO_INIT_PROFILE
+                if (sbb % 10000 == 0)
+                    fprintf(stderr, "RADIO_INIT_PROGRESS phase=component-catalog sbb=%d/%d "
+                            "total_s=%.3f\n", sbb, MAX_SBB,
+                            (double)(clock() - init_profile_started) / CLOCKS_PER_SEC);
+#endif
             }
         }
     }
+    RADIO_INIT_PHASE("component-catalog");
     
     if (sbb>MAX_SBB) {
         printf ("sbb=%d, MAX_SBB=%d\n", sbb, MAX_SBB);
@@ -3800,7 +3962,14 @@ void init(){
         }
         // terminator
         sbb_greater[i][k++]=MAX_SBB + 1;
+#ifdef RADIO_INIT_PROFILE
+        if (i % 10000 == 0)
+            fprintf(stderr, "RADIO_INIT_PROGRESS phase=greater-relations row=%d/%d "
+                    "total_s=%.3f\n", i, MAX_SBB,
+                    (double)(clock() - init_profile_started) / CLOCKS_PER_SEC);
+#endif
     }
+    RADIO_INIT_PHASE("greater-relations");
     printf("initializing split table index\n");
     {
         size_t splits_count = MAX_SBB + 1;
@@ -3816,5 +3985,7 @@ void init(){
     atexit(report_split_stats);
 #endif
     printf("\ninit done\n");
+    RADIO_INIT_PHASE("split-index");
+#undef RADIO_INIT_PHASE
     fflush(stdout);
 }

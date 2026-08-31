@@ -29,15 +29,24 @@ statements:
 The necessity direction remains true: every singleton state solvable in `K`
 tests is weakly majorized by `G_K`.
 
-The proof uses only the first 32 rows.  Consequently the smaller unit-free core
+The especially short two-case proof uses only the first 32 rows.  Consequently the unit-free core
 
     a_core=(64,63,57^2,42^4,22^7,8^15,7^2)                    (K6-1c)
 
 of mass 697 is already majorized by `G_6` and unsolvable in six tests.  The
 displayed full-mass state (K6-1) is its canonical padding by 32 unit rows; it is
 retained because it answers the stronger full-mass exact-support question with
-all unit rows left in place.  Searches for a “smaller” obstruction should
-therefore minimize the non-unit core, not merely delete this harmless padding.
+all unit rows left in place.
+
+A further truncation, noticed when the corrected production solver emitted its sound negative
+prefix, is already enough:
+
+    a_30=(64,63,57^2,42^4,22^7,8^15).                       (K6-1m)
+
+This state has mass 683 and support 30.  It is weakly majorized by `G_6` and has no legal first
+split.  Deleting one of its fifteen 8s does restore first-cut feasibility, with an explicit cut
+given below.  Thus (K6-1m) is prefix-minimal along this truncation, although no global minimum-mass
+or minimum-support claim is made.
 
 ## Majorization
 
@@ -54,6 +63,10 @@ and equality holds at `r=15`; at `r=16` both complete blocks have mass 127.
 Every prefix before and after the block therefore has the required inequality,
 and all later prefixes have equality.  This proves
 `a<=_w G_6`; no enumeration is involved.
+
+For (K6-1m), canonical ranks 16--30 are `(22,7^14)`, of mass 120, while the new
+band is `(8^15)`, also of mass 120.  The same inequality holds for `1<=r<=14`,
+and equality holds after all 15 band rows.  Hence (K6-1m) is majorized as well.
 
 ## No legal first split
 
@@ -106,6 +119,30 @@ Thus no transition is possible and no legal first split exists.  If the state
 were solvable in six tests, each child of its first test would be solvable in
 five and hence, by the proved necessity theorem, majorized by `G_5`.  The
 absence of such a first split therefore proves six-test unsolvability.
+
+### The smaller rank-15/30 obstruction
+
+For (K6-1m), the tight ranks are 15 and 30.  Besides the values above, use
+
+    H(14)=215, H(30)=241.
+
+The endpoint color counts are `{7,8}` at rank 15 and `{14,15,16}` at rank 30.  The fifteen
+intervening rows `(8^15)` send `H(30)-H(15)=20` coins to the mixed child.  Every mixed piece is
+positive, since otherwise mass 241 would occupy at most 29 mixed-child entries, contradicting
+`H(29)=240`.  Each row therefore retains at most 7 pure coins.  The six transitions are all
+impossible:
+
+| transition | blocked side | rows | required | capacity |
+|---|---|---:|---:|---:|
+| `7->14` | left | 7 | 52 | 49 |
+| `7->15` | left | 8 | 58 | 56 |
+| `7->16` | left | 9 | 64 | 63 |
+| `8->14` | right | 9 | 64 | 63 |
+| `8->15` | right | 8 | 58 | 56 |
+| `8->16` | right | 7 | 52 | 49 |
+
+This proves that (K6-1m) has no legal first cut.  Rank 32 remains the cleaner presentation for the
+full-mass state because it contracts these six cases to the two symmetric `64>63` violations.
 
 This proof is exactly the Pascal tight-skeleton mechanism.  The Pascal profile
 does not merely help choose a cut: its two tight ranks force the child prefix
@@ -196,8 +233,15 @@ tools/singleton_direct_split_regression.sh
 ```
 
 It finds the canonical `G_6` cut, reproduces the displayed `j=13` children, and independently
-rejects both the padded `j=14` state and its mass-697 core.  Each negative exhausts 9,345 DFS
-states and 34,958 row options.  Its naive unquotiented oracle agrees with the optimized search on
+rejects the padded `j=14` state, its mass-697 core, and the mass-683 prefix.  Each negative
+exhausts 9,345 DFS states and 34,958 row options.  Removing one 8 from the last state is feasible
+in 1,245 nodes and has the explicit children
+
+    L=(32,31,26^2,16^4,6^5),
+    M=(32,31,26^2,16^4,6^7,2^5,1^8),
+    R=(32,31,26^2,16^3,8,7^8).
+
+Its naive unquotiented oracle agrees with the optimized search on
 201 small partitions, and its full-mass census closes all 1,223 majorized types at `K<=3`,
 including all 1,206 at `K=3`.
 Exact provenance, branch/prune counts, the replayable `j=13` allocation and sanitizer commands are

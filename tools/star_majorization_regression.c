@@ -84,29 +84,38 @@ int main(void) {
         compare_one(sb, size, k, &checked);
     }
 
-    /* Historical tries can contain positives created solely by the former singleton-converse
-       shortcut.  A nonembedded majorized singleton must ignore such a hit and do real work. */
+    /* Unmarked historical positives are rejected at ingestion before dominance closure can hide
+       their origin.  Marked positives remain available, and the now-proved K<=5 converse makes a
+       nonembedded majorized K=2 singleton an immediate theorem terminal. */
     {
         int sb[4] = {getSbb(3, 1), getSbb(2, 1), getSbb(2, 1), getSbb(2, 1)};
         sort1(sb, 4);
-        cache(sb, 4, TRUE, 2, 9); /* Deliberately seed the untrusted historical fact. */
+        cache_replay_depth++;
+        cache_replay_accept_positive = FALSE;
+        cache(sb, 4, TRUE, 2, 9);
+        cache_a(TRUE, 3, 2);
+        cache_replay_depth--;
+        if (checkCacheTrie(sb, 4, 2) != MAYBE || sa_can[3] <= 2
+            || ignored_positive_cache_replays != 2) {
+            fprintf(stderr, "untrusted positive replay was not ignored\n");
+            return 1;
+        }
         uint64_t before = radio_budget_now_ctx(&radio_default_search_context);
         int verdict = canSolveB(sb, 4, 2, NO_DEADLINE);
         uint64_t work = radio_budget_now_ctx(&radio_default_search_context) - before;
-        if (verdict != TRUE || work == 0) {
+        if (verdict != TRUE || work != 0) {
             fprintf(stderr,
-                    "nonembedded singleton cache bypass failed: verdict=%d work=%llu\n",
+                    "K<=5 singleton theorem terminal failed: verdict=%d work=%llu\n",
                     verdict, (unsigned long long)work);
             return 1;
         }
-        /* The exact result was stored in the process-local L1 and may now be reused safely. */
-        before = radio_budget_now_ctx(&radio_default_search_context);
-        verdict = canSolveB(sb, 4, 2, NO_DEADLINE);
-        work = radio_budget_now_ctx(&radio_default_search_context) - before;
-        if (verdict != TRUE || work != 0) {
-            fprintf(stderr,
-                    "exact singleton L1 reuse failed: verdict=%d work=%llu\n",
-                    verdict, (unsigned long long)work);
+        cache_replay_depth++;
+        cache_replay_accept_positive = TRUE;
+        cache(sb, 4, TRUE, 2, 9);
+        cache_replay_depth--;
+        cache_replay_accept_positive = FALSE;
+        if (checkCacheTrie(sb, 4, 2) != TRUE) {
+            fprintf(stderr, "marked positive replay was not accepted\n");
             return 1;
         }
     }

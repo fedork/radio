@@ -52,6 +52,12 @@ The program asserts every displayed integer, including the complete three-pair a
 analytic proof does not depend on trusting this output: it is the direct evaluation of the theorem
 using the six `H` values already displayed in the counterexample record.
 
+Truncating after rank 30 leaves the smaller mass-683 state
+`(64,63,57^2,42^4,22^7,8^15)`.  The same extractor finds its sole anchor pair `(15,30)` and checks
+all six transitions: `7->14`, `7->15`, and `7->16` fail on the left by respectively
+`52>49`, `58>56`, and `64>63`; the three transitions from 8 fail symmetrically on the right.
+This is a complete analytic no-first-cut certificate for the smaller state.
+
 ## Complete fixed-face survey
 
 Fix the first 15 rows `(64,63,57^2,42^4,22^7)` and let the next 17 rows range over every partition
@@ -170,8 +176,10 @@ endpoint as
 
     anchors=(15,30), canonical band=(22,7^14), minimizing band=(8^15).
 
-Putting the canonical head and tail back recovers exactly the known parent with intervening rows
-`(8^15,7^2)`.  Its transfer distance is 14.  Therefore:
+Putting back only the canonical head gives the smaller no-first-cut state
+`(64,63,57^2,42^4,22^7,8^15)`, of mass 683 and support 30.  Restoring the canonical tail gives the
+previously recorded `(8^15,7^2)` parent.  Both are at transfer distance 14 in their respective
+fixed-prefix formulations.  Therefore:
 
 > No exact-support `K=6` parent at transfer distance at most 13 from `G_6` has a Tight-Band
 > Capacity certificate, and distance 14 is globally minimal among all parents certified by this

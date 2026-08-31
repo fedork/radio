@@ -61,7 +61,9 @@ Every singleton state solvable in `K` tests is weakly majorized by the explicit 
 `K>=6` the converse is false: an explicit infinite family gives a full-mass exact-support parent
 with no legal first cut.  Its first member,
 `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)`, is majorized by `G_6` but has no legal first split and is
-unsolvable in six tests.  Thus `K=6` is the exact first failure level.  The transcript-conflict
+unsolvable in six tests.  More sharply, its 30-row prefix
+`(64,63,57^2,42^4,22^7,8^15)` of mass 683 already has no legal first split; deleting one 8 restores
+first-cut feasibility.  Thus `K=6` is the exact first failure level.  The transcript-conflict
 graph and Fixed-Color Hall criterion give the short tight-rank proof.  The `K=5` direction is a
 computer-assisted theorem: exact prefix cylinders cover 1,431,650,734,151 of the
 1,431,800,647,444 normalized parents, and uncapped Hall search closes the rest.  A separate complete

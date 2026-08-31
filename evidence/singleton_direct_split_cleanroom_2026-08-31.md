@@ -47,17 +47,20 @@ normalization fixed it.
 
 ## `K=6` controls
 
-The original clean optimized build at commit `bc11b23c6407c27940ab906b0f545ed9041b8531` had source SHA-256
-`277b6ce9469980fe38ebbcb7956643666b6f8f2b7e6cb8d273ac53d7cb0fa691` and build ID
-`e5bd63dc7cc1fb7b9d036f73106b0bd482fdc8d594f24c03a82bb59c952d0427`.  Both
-`git_source_dirty` and `git_worktree_dirty` were `no`.  Its deterministic results were:
+The current deterministic regression results are:
 
 | case | verdict | DFS nodes | row options | maximum depth | child-prefix prunes | future-prefix prunes |
 |---|---:|---:|---:|---:|---:|---:|
-| canonical `G_6` | yes | 375 | 540 | 64 | 166 | 0 |
-| padded transfer state `j=13` | yes | 345 | 488 | 64 | 144 | 0 |
+| canonical `G_6` | yes | 375 | 1,049 | 64 | 669 | 0 |
+| padded transfer state `j=13` | yes | 345 | 1,014 | 64 | 575 | 0 |
 | padded transfer state `j=14` | no | 9,345 | 34,958 | 29 | 25,586 | 28 |
 | unit-free mass-697 core | no | 9,345 | 34,958 | 29 | 25,586 | 28 |
+| 30-row mass-683 core | no | 9,345 | 34,958 | 29 | 25,586 | 28 |
+| mass-675 core after deleting one 8 | yes | 70 | 687 | 29 | 523 | 0 |
+
+The last positive control supplies its expected children only to make the regression deterministic;
+the unrestricted `solve` command finds the same cut under its natural option order in 1,245 nodes
+and 7,514 row options.
 
 The canonical control returns three copies of `G_5`.  The `j=13` control reproduces the requested
 children exactly:
@@ -179,16 +182,16 @@ reimplement the Tight-Band Capacity Obstruction.  See the
 analytic proof and the full construction.
 
 The optional `k7-dyadic-family-control` mode now locks the exact negative verdict and all search
-counts.  A final ASan+UBSan build repeated both the standard regression and that full control with
-no finding.  Its final source SHA-256 is
+counts.  Before the two truncated controls were added, an ASan+UBSan build repeated both the
+standard regression and that full control with no finding.  That source SHA-256 was
 `2e66912b16059b543f789bd0612999967b0960e2dc7619efe132a9dcd825d7f1`, build ID is
 `fa93a5579885857cda37736a56b005b80a6f44ec5a11fffe699a33073429f646`, and the sanitizer binary
 SHA-256 is `7c5e03cb67138475ae64f2ef0a28902acb727e89fd5f30028003ff803796c1f1`.
 
 ## Scope
 
-This establishes an independent exhaustive implementation check for both the full-mass hole and
-its underfull core.  It does not supersede the two-line analytic capacity contradiction, which
+This establishes an independent exhaustive implementation check for the full-mass hole and both
+underfull cores, including the 30-row mass-683 form.  It does not supersede the analytic capacity contradiction, which
 remains shorter and stronger as a proof.  The extension completely classifies the fixed
 rank-15/32 face and independently confirms the first new `K=7` member.  It does not classify holes
 outside the surveyed faces or prove that every minimal hole has a two-anchor certificate.  The

@@ -38,21 +38,26 @@ fi
 
 max_k=$k
 max_n=0
+max_part_n=0
 input_total_n=0
 
-for (( i=offset+1; i<${#args[@]}; i++ )); do
-    n="${args[$i]}"
-    if [[ ! "$n" =~ ^[0-9]+$ ]]; then
-        echo "n values must be non-negative integers, got: $n" >&2
+for (( i=offset+1; i<${#args[@]}; i+=2 )); do
+    n1="${args[$i]}"
+    n2="${args[$((i+1))]}"
+    if [[ ! "$n1" =~ ^[0-9]+$ || ! "$n2" =~ ^[0-9]+$ ]]; then
+        echo "n values must be non-negative integers, got: $n1 $n2" >&2
         exit 1
     fi
-    input_total_n=$(( input_total_n + n ))
+    input_total_n=$(( input_total_n + n1 + n2 ))
+    if (( n1 + n2 > max_part_n )); then
+        max_part_n=$(( n1 + n2 ))
+    fi
 done
 max_n=$input_total_n
 
 if [[ -n "$cache_file" ]]; then
-    read -r file_max_n file_max_k < <(
-        awk -v max_n="$max_n" -v max_k="$max_k" '
+    read -r file_max_n file_max_part_n file_max_k < <(
+        awk -v max_n="$max_n" -v max_part_n="$max_part_n" -v max_k="$max_k" '
             {
                 if (NF < 4) next;
                 type = $2;
@@ -77,26 +82,36 @@ if [[ -n "$cache_file" ]]; then
                             }
                             break;
                         }
-                        line_n += $i + 0;
+                        n1 = $i + 0;
+                        i++;
+                        if (i > NF) break;
+                        n2 = $i + 0;
+                        line_n += n1 + n2;
+                        if (n1 + n2 > max_part_n) max_part_n = n1 + n2;
                     }
                     if (line_n > max_n) max_n = line_n;
                 }
             }
             END {
-                printf "%d %d\n", max_n, max_k;
+                printf "%d %d %d\n", max_n, max_part_n, max_k;
             }
         ' "$cache_file"
     )
     max_n=$file_max_n
+    max_part_n=$file_max_part_n
     max_k=$file_max_k
 fi
 
 if (( max_n < 2 )); then
     max_n=2
 fi
+if (( max_part_n < 2 )); then
+    max_part_n=2
+fi
 
-echo "Compiling radio_full with MAX_K=$max_k MAX_N=$max_n"
+echo "Compiling radio_full with MAX_K=$max_k MAX_N=$max_n MAX_PART_N=$max_part_n"
 python3 tools/build_radio.py -O3 -DMAX_K="$max_k" -DMAX_N="$max_n" \
+    -DMAX_PART_N="$max_part_n" \
     radio_full.c -o radio_full
 
 exec ./radio_full "$@"

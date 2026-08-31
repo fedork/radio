@@ -50,7 +50,7 @@ static FILE *journal;
 static uint64_t query_budget_seconds = 60;
 static long n_query, n_true, n_false, n_maybe;
 static double total_ms;
-static long long n_loaded, n_skipped_wide, n_skipped_k, n_malformed;
+static long long n_loaded, n_skipped_wide, n_skipped_k, n_skipped_positive, n_malformed;
 
 static void respond(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
@@ -65,18 +65,26 @@ static double now_ms(void) {
 static void load_cache(const char *path) {
     FILE *fp = fopen(path, "r");
     if (!fp) { respond("ERR cannot open %s", path); return; }
-    long long loaded = 0, wide = 0, badk = 0, bad = 0;
+    long long loaded = 0, wide = 0, badk = 0, positive = 0, bad = 0;
     double t0 = now_ms();
     char buf[1 << 16];
     int continuation = 0;
+    int saved_accept_positive = cache_replay_accept_positive;
     cache_replay_depth++;
+    cache_replay_accept_positive = FALSE;
     while (fgets(buf, sizeof buf, fp)) {
         if (continuation || buf[0] == '#') {
+            if (!continuation && radio_cache_semantics_line_matches(buf))
+                cache_replay_accept_positive = TRUE;
             continuation = strchr(buf, '\n') == NULL;
             continue;
         }
         if (buf[0] != '+' && buf[0] != '-') { if (buf[0] != '\n') bad++; continue; }
         int can = buf[0] == '+';
+        if (can && !cache_replay_accept_positive) {
+            positive++;
+            continue;
+        }
         char *tok = strtok(buf, " \t\n");
         tok = strtok(NULL, " \t\n");
         if (!tok) { bad++; continue; }
@@ -90,7 +98,7 @@ static void load_cache(const char *path) {
             loaded++;
             continue;
         }
-        int sb[64], size = 0; long sides = 0; int ok = 1;
+        int sb[64], size = 0; long sides = 0; int ok = 1, representable = 1;
         while (1) {
             char *a = strtok(NULL, " \t\n");
             if (!a) { ok = 0; break; }
@@ -99,7 +107,9 @@ static void load_cache(const char *path) {
             if (!b || size >= 64) { ok = 0; break; }
             int n1 = atoi(a), n2 = atoi(b);
             sides += n1 + n2;
-            if (sides <= MAX_N) sb[size] = getSbb(n1, n2);
+            if (n1 + n2 > MAX_PART_N) representable = 0;
+            if (sides <= MAX_N && n1 + n2 <= MAX_PART_N)
+                sb[size] = getSbb(n1, n2);
             size++;
         }
         char *sp = ok ? strtok(NULL, " \t\n") : NULL;
@@ -107,16 +117,20 @@ static void load_cache(const char *path) {
         char *sk = sn ? strtok(NULL, " \t\n") : NULL;
         if (!sk || !size) { bad++; continue; }
         if (atoi(sk) > MAX_K) { badk++; continue; }
-        if (sides > MAX_N) { wide++; continue; }
+        if (sides > MAX_N || !representable) { wide++; continue; }
         cache(sb, size, can, atoi(sk), atoi(sp));
         loaded++;
     }
     cache_replay_depth--;
+    cache_replay_accept_positive = saved_accept_positive;
     fclose(fp);
-    n_loaded += loaded; n_skipped_wide += wide; n_skipped_k += badk; n_malformed += bad;
+    n_loaded += loaded; n_skipped_wide += wide; n_skipped_k += badk;
+    n_skipped_positive += positive; n_malformed += bad;
     double ms = now_ms() - t0;
-    respond("OK loaded %s facts=%lld skipped_wide=%lld skipped_k=%lld malformed=%lld ms=%.0f rate=%.0f/s",
-            path, loaded, wide, badk, bad, ms, ms > 0 ? loaded * 1000.0 / ms : 0.0);
+    respond("OK loaded %s facts=%lld skipped_wide=%lld skipped_k=%lld "
+            "skipped_untrusted_positive=%lld malformed=%lld ms=%.0f rate=%.0f/s",
+            path, loaded, wide, badk, positive, bad, ms,
+            ms > 0 ? loaded * 1000.0 / ms : 0.0);
 }
 
 /* Append a computed verdict in the same format load_cache reads, so a session's work becomes the
@@ -272,14 +286,17 @@ done:
    Handles are made canonical by discovery order: a fresh process allocates 1,2,3,... so writing the
    structures in visit order and remapping every descriptor reproduces identical handles on load.
 
-   Compatibility is keyed on what actually determines the layout: the source commit plus MAX_K,
-   MAX_N, MAX_SBB and sizeof(front_point).  The sbb numbering is a function of the source and MAX_N,
-   not of the compiler, so keying on the *build id* was wrong -- it made a snapshot unusable on any
-   host with a different compiler, which is exactly what happened to the first 6.67 GB artifact
-   (built by Linux clang, refused by Apple clang for no semantic reason).  A semantic mismatch is
-   still refused outright; an identity mismatch needs the explicit `restore-any` opt-in. */
+   Version 3 begins the post-refutation cache epoch.  Older snapshots may contain positive
+   ancestors tainted by the false unrestricted singleton-majorization converse and are rejected
+   even by restore-any.  Within version 3, compatibility is keyed on what actually determines the
+   layout: the source commit plus MAX_K, MAX_N, MAX_PART_N, MAX_SBB and sizeof(front_point).  The sbb numbering
+   is a function of the source and MAX_PART_N, not of the compiler, so keying on the *build id* was
+   wrong -- it made a snapshot unusable on any host with a different compiler, which is exactly
+   what happened to the first 6.67 GB artifact (built by Linux clang, refused by Apple clang for no
+   semantic reason).  A geometry mismatch is still refused outright; an identity mismatch needs
+   the explicit `restore-any` opt-in. */
 
-#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v"
+#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v3"
 
 static uint32_t *snap_bmap, *snap_rmap, *snap_vmap;
 static uint32_t *snap_blist, *snap_rlist, *snap_vlist;
@@ -346,8 +363,8 @@ static void snapshot_dump(const char *path) {
     snap_bn = snap_rn = snap_vn = 0;
     for (int k = 0; k <= MAX_K; k++) snap_visit_node(sb_cache_root[k]);
 
-    fprintf(f, "%s2\n%s\n%d %d %d %zu\n", SNAP_MAGIC, RADIO_GIT_COMMIT,
-            MAX_K, MAX_N, MAX_SBB, sizeof(front_point));
+    fprintf(f, "%s\n%s\n%d %d %d %d %zu\n", SNAP_MAGIC, RADIO_GIT_COMMIT,
+            MAX_K, MAX_N, MAX_PART_N, MAX_SBB, sizeof(front_point));
     snap_put(f, snap_bn); snap_put(f, snap_rn); snap_put(f, snap_vn);
     for (uint32_t i = 1; i <= snap_bn; i++) snap_put(f, branch_handles[snap_blist[i]]->width);
     for (uint32_t i = 1; i <= snap_vn; i++) snap_put(f, front_handles[snap_vlist[i]]->len);
@@ -405,20 +422,26 @@ static void snapshot_load(const char *path, int allow_foreign) {
     if (!f) { respond("ERR cannot open %s", path); return; }
     double t0 = now_ms();
     char magic[64] = {0}, build[128] = {0};
-    int mk = 0, mn = 0, ms_ = 0; size_t fp = 0;
-    if (!fgets(magic, sizeof magic, f) || strncmp(magic, SNAP_MAGIC, strlen(SNAP_MAGIC))) {
+    int mk = 0, mn = 0, mpn = 0, ms_ = 0; size_t fp = 0;
+    if (!fgets(magic, sizeof magic, f)) {
+        respond("ERR %s is not a cache snapshot", path); fclose(f); return;
+    }
+    magic[strcspn(magic, "\n")] = 0;
+    if (strcmp(magic, SNAP_MAGIC) != 0) {
         respond("ERR %s is not a cache snapshot", path); fclose(f); return;
     }
     if (!fgets(build, sizeof build, f)) { respond("ERR truncated snapshot"); fclose(f); return; }
     build[strcspn(build, "\n")] = 0;
-    if (fscanf(f, "%d %d %d %zu\n", &mk, &mn, &ms_, &fp) != 4) {
+    if (fscanf(f, "%d %d %d %d %zu\n", &mk, &mn, &mpn, &ms_, &fp) != 5) {
         respond("ERR truncated snapshot header"); fclose(f); return;
     }
     /* Semantics are non-negotiable: a mismatch here means a different sbb numbering. */
-    if (mk != MAX_K || mn != MAX_N || ms_ != MAX_SBB || fp != sizeof(front_point)) {
-        respond("ERR snapshot geometry k=%d n=%d sbb=%d front=%zu does not match this build "
-                "(k=%d n=%d sbb=%d front=%zu); refusing", mk, mn, ms_, fp,
-                MAX_K, MAX_N, MAX_SBB, sizeof(front_point));
+    if (mk != MAX_K || mn != MAX_N || mpn != MAX_PART_N
+        || ms_ != MAX_SBB || fp != sizeof(front_point)) {
+        respond("ERR snapshot geometry k=%d n=%d part_n=%d sbb=%d front=%zu does not match "
+                "this build (k=%d n=%d part_n=%d sbb=%d front=%zu); refusing",
+                mk, mn, mpn, ms_, fp,
+                MAX_K, MAX_N, MAX_PART_N, MAX_SBB, sizeof(front_point));
         fclose(f); return;
     }
     int same = !strcmp(build, RADIO_GIT_COMMIT) || !strcmp(build, RADIO_BUILD_ID);
@@ -480,6 +503,8 @@ int main(int argc, char **argv) {
         if (!strncmp(argv[i], "--journal=", 10)) {
             journal = fopen(argv[i] + 10, "a");
             if (!journal) { respond("ERR cannot open journal %s", argv[i] + 10); return 21; }
+            fprintf(journal, RADIO_CACHE_SEMANTICS_PREFIX "%s\n", RADIO_CACHE_SEMANTICS);
+            fflush(journal);
             respond("OK journal %s", argv[i] + 10);
             continue;
         }
@@ -498,10 +523,12 @@ int main(int argc, char **argv) {
 
         if (!strncmp(line, "stats", 5)) {
             respond("OK queries=%ld solvable=%ld unsolvable=%ld maybe=%ld total_ms=%.0f "
-                    "loaded=%lld skipped_wide=%lld skipped_k=%lld malformed=%lld redundant=%lld",
+                    "loaded=%lld skipped_wide=%lld skipped_k=%lld "
+                    "skipped_untrusted_positive=%lld malformed=%lld redundant=%lld "
+                    "truncated_cache_insertions=%lld",
                     n_query, n_true, n_false, n_maybe, total_ms,
-                    n_loaded, n_skipped_wide, n_skipped_k, n_malformed,
-                    redundant_cache_replays);
+                    n_loaded, n_skipped_wide, n_skipped_k, n_skipped_positive, n_malformed,
+                    redundant_cache_replays, truncated_cache_insertions);
             continue;
         }
         if (!strncmp(line, "budget ", 7)) {
@@ -516,6 +543,10 @@ int main(int argc, char **argv) {
         if (!strncmp(line, "journal ", 8)) {
             if (journal) fclose(journal);
             journal = fopen(line + 8, "a");
+            if (journal) {
+                fprintf(journal, RADIO_CACHE_SEMANTICS_PREFIX "%s\n", RADIO_CACHE_SEMANTICS);
+                fflush(journal);
+            }
             respond(journal ? "OK journal %s" : "ERR cannot open journal %s", line + 8);
             continue;
         }

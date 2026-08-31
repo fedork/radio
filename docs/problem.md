@@ -102,8 +102,9 @@ leading atom of each successive dyadic block of `G_k`, so `A = 2^k`, `B = 2^k - 
 Weak majorization by `G_k` is a proved necessary condition for singleton solvability, but it is
 not sufficient.  The exact-support full-mass state
 `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` and unsolvable in six tests; see the
-[counterexample proof](../evidence/singleton_k6_counterexample_2026-08-30.md).  The important unconditional terminal
-is narrower: any state whose rows fit into distinct rows of the explicit solvable state `G_k` is
+[counterexample proof](../evidence/singleton_k6_counterexample_2026-08-30.md).  Its 30-row prefix
+`(64,63,57^2,42^4,22^7,8^15)` is already unsolvable.  The important unconditional terminal is
+narrower: any state whose rows fit into distinct rows of the explicit solvable state `G_k` is
 solvable by deleting edges.  This is what makes a canonical witness tree—one whose every leaf is a
 sub-multiset or distinct-slot substate of `G_k`—a self-contained proof rather than a solver
 transcript.  A leaf certified only by arbitrary weak majorization is not a proof and needs a

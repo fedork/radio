@@ -282,8 +282,9 @@ the resulting 136 anchor faces finds no certificate.  Thus the two-anchor theore
 `K=5`; absence is not a positive first-cut verdict.
 
 Across all 528 eligible `K=6` anchor faces, the exact optimization finds minimum transfer distance
-14.  The minimizer at anchors `(15,30)` replaces `(22,7^14)` by `(8^15)`; restoring the canonical
-tail gives the same counterexample band `(8^15,7^2)`.  Therefore distance 14 is globally minimal
+14.  The minimizer at anchors `(15,30)` replaces `(22,7^14)` by `(8^15)`, directly giving the
+mass-683, support-30 counterexample `(64,63,57^2,42^4,22^7,8^15)`.  Restoring the canonical tail
+gives the full-band form `(8^15,7^2)`.  Therefore distance 14 is globally minimal
 within the Tight-Band Capacity certificate class.  A separate exact Fixed-Color Hall census has
 since checked all 5,189,450,419 exact-support parents through distance 13 and found no uncertified
 no-first-cut hole.  Hence the same distance is globally minimal for that first-cut problem, while

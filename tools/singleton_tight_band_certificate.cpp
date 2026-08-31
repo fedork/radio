@@ -1488,11 +1488,17 @@ bool survey_dyadic_family(int maximum_level) {
 bool check_known_certificate(bool print) {
     const Analysis full = analyze(6, transfer_state(14, true));
     const Analysis core = analyze(6, transfer_state(14, false));
+    Partition truncated_state = transfer_state(14, false);
+    truncated_state.resize(30);
+    const Analysis truncated = analyze(6, truncated_state);
     const Certificate *full_primary = primary_certificate(full);
     const Certificate *core_primary = primary_certificate(core);
-    bool ok = full.majorized && core.majorized
+    const Certificate *truncated_primary = primary_certificate(truncated);
+    bool ok = full.majorized && core.majorized && truncated.majorized
         && full.certificates.size() == 3 && core.certificates.size() == 3
-        && full_primary != nullptr && core_primary != nullptr;
+        && truncated.certificates.size() == 1
+        && full_primary != nullptr && core_primary != nullptr
+        && truncated_primary != nullptr;
     if (!ok) {
         return false;
     }
@@ -1513,7 +1519,15 @@ bool check_known_certificate(bool print) {
         && full_primary->upper_counts == std::vector<int>({16})
         && full_primary->band == repeated({{8, 15}, {7, 2}})
         && full_primary->transitions.size() == 2
-        && core_primary->lower_rank == 15 && core_primary->upper_rank == 32;
+        && core_primary->lower_rank == 15 && core_primary->upper_rank == 32
+        && truncated_primary->lower_rank == 15 && truncated_primary->upper_rank == 30
+        && truncated_primary->band == repeated({{8, 15}})
+        && truncated_primary->transitions.size() == 6
+        && std::all_of(
+            truncated_primary->transitions.begin(), truncated_primary->transitions.end(),
+            [](const TransitionCheck &transition) {
+                return transition.left_blocked || transition.right_blocked;
+            });
     if (!ok) {
         return false;
     }
@@ -1535,8 +1549,10 @@ bool check_known_certificate(bool print) {
         std::cout << "K6_TIGHT_BAND_PRIMARY full_mass_certificates="
                   << full.certificates.size()
                   << " core_certificates=" << core.certificates.size()
+                  << " truncated_certificates=" << truncated.certificates.size()
                   << " all_anchors=((15,30),(15,31),(15,32))\n";
         print_certificate(*full_primary);
+        print_certificate(*truncated_primary);
     }
     return ok;
 }

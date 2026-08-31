@@ -612,6 +612,16 @@ Partition transfer_state(int step, bool padded) {
     return state;
 }
 
+Partition truncated_k6_core(int eights) {
+    if (eights < 0 || eights > 15) {
+        throw std::invalid_argument("truncated K6 core needs 0..15 rows of size 8");
+    }
+    Partition state = repeated({{64, 1}, {63, 1}, {57, 2}, {42, 4}, {22, 7}});
+    state.insert(state.end(), static_cast<std::size_t>(eights), 8);
+    std::sort(state.begin(), state.end(), std::greater<int>());
+    return state;
+}
+
 void enumerate_dominated_exact_length(
     const Partition &capacity,
     const std::function<void(const Partition &)> &accept) {
@@ -926,6 +936,12 @@ int regression() {
         {{32, 1}, {31, 1}, {26, 2}, {16, 4}, {6, 7}, {2, 5}, {1, 12}});
     const Partition j13_right = repeated(
         {{32, 1}, {31, 1}, {26, 2}, {16, 3}, {8, 1}, {7, 8}, {1, 16}});
+    const Partition truncated_left = repeated(
+        {{32, 1}, {31, 1}, {26, 2}, {16, 4}, {6, 5}});
+    const Partition truncated_mixed = repeated(
+        {{32, 1}, {31, 1}, {26, 2}, {16, 4}, {6, 7}, {2, 5}, {1, 8}});
+    const Partition truncated_right = repeated(
+        {{32, 1}, {31, 1}, {26, 2}, {16, 3}, {8, 1}, {7, 8}});
 
     ok &= run_named_case("canonical-G6", 6, g6, true,
                          std::array<Partition, 3>{g5, g5, g5});
@@ -933,6 +949,10 @@ int regression() {
                          std::array<Partition, 3>{g5, j13_mixed, j13_right});
     ok &= run_named_case("transfer-j14-padded", 6, transfer_state(14, true), false);
     ok &= run_named_case("transfer-j14-core", 6, transfer_state(14, false), false);
+    ok &= run_named_case("truncated-core-15-eights", 6, truncated_k6_core(15), false);
+    ok &= run_named_case(
+        "truncated-core-14-eights", 6, truncated_k6_core(14), true,
+        std::array<Partition, 3>{truncated_left, truncated_mixed, truncated_right});
     ok &= k6_tight_band_face_survey();
     ok &= tiny_comparisons();
 

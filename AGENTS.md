@@ -96,6 +96,13 @@ of the input even though hardware speed no longer chooses the finite stopping po
 2026-08-13); measured context is in `evidence/deadline_stall_2026-08-10.txt` and
 `evidence/work_budget_rb_root_2026-08-13.txt`.
 
+Dominance-cache population is likewise finite: each fact gets
+`RADIO_CACHE_INSERT_NODE_LIMIT=1000000` recursive insertion nodes. A `cache=partial:` annotation
+means the verdict is final but only a sound prefix of its monotone closure was retained. Set the
+limit to zero only for a controlled comparison; a 30-part singleton negative spent more than 12.9
+CPU minutes in the old unbounded insertion after its exact proof had taken milliseconds. See
+`evidence/main_solver_singleton_refutation_2026-08-31.md`.
+
 ## Be skeptical of what you read here
 
 Prior documents, spreadsheets and outputs are *claims*, including this file. In one session
@@ -106,11 +113,14 @@ picking whichever source is more convenient.
 
 ## Building and running
 
-No build system. Each driver is one compiler invocation; `MAX_K` and `MAX_N` size static tables at
-compile time and must match the problem. Always invoke the compiler through the provenance builder:
+No build system. Each driver is one compiler invocation. `MAX_N` bounds the total vertices across a
+state; `MAX_PART_N` bounds `n1+n2` for one component and sizes the expensive component catalog.
+It defaults to `MAX_N`, but long many-component states should set it separately. Always invoke the
+compiler through the provenance builder:
 
 ```
-tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<n1+n2> <driver>.c -o <driver>
+tools/build_radio.py -O3 -DMAX_K=<k> -DMAX_N=<sum of all n1+n2> \
+    -DMAX_PART_N=<largest one n1+n2> <driver>.c -o <driver>
 ```
 
 It embeds the commit, exact compiler arguments, compiler identity and source hashes in the binary;
