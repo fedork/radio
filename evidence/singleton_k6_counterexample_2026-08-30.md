@@ -1,7 +1,7 @@
 # An exact-support `K=6` counterexample to singleton-majorization sufficiency
 
-Status: **proved analytically and checked by two independent exhaustive formulations**
-(2026-08-30).
+Status: **proved analytically, checked by the original Hall/direct formulations, and independently
+rechecked by a clean-room direct-row implementation** (updated 2026-08-31).
 
 ## Statement
 
@@ -186,8 +186,25 @@ The final summary reports
       residual_coloring_found=NO residual_nodes=7
       first_failed_transfer=14 forced_transitions=2 band_nodes=4638
 
-The exhaustive runs are regression checks.  The short saturation-and-integrality
-argument above is the proof.
+The separate clean-room implementation is
+[`tools/singleton_direct_split_cleanroom.cpp`](../tools/singleton_direct_split_cleanroom.cpp).
+It shares no Hall code, cache, or search implementation with the census, handles underfull child
+slack, and directly enumerates sorted child row triples.  Reproduce all controls with
+
+```sh
+tools/singleton_direct_split_regression.sh
+```
+
+It finds the canonical `G_6` cut, reproduces the displayed `j=13` children, and independently
+rejects both the padded `j=14` state and its mass-697 core.  Each negative exhausts 9,345 DFS
+states and 34,958 row options.  Its naive unquotiented oracle agrees with the optimized search on
+201 small partitions, and its full-mass census closes all 1,223 majorized types at `K<=3`,
+including all 1,206 at `K=3`.
+Exact provenance, branch/prune counts, the replayable `j=13` allocation and sanitizer commands are
+in the [clean-room verification record](singleton_direct_split_cleanroom_2026-08-31.md).
+
+All exhaustive runs are regression checks.  The short saturation-and-integrality argument above
+is the proof.
 
 ## Scope
 

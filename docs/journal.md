@@ -12112,3 +12112,48 @@ deleting unit padding is not a substantive smaller obstruction.  The current dir
 regression was designed for full-mass exact-capacity inputs and must not be cited as an independent
 check of this underfull core without first implementing child slack correctly.  The analytic
 tight-prefix proof needs no such extension.
+
+## 2026-08-31 -- clean-room direct-row solver independently closes the padded hole and its core
+
+Added `tools/singleton_direct_split_cleanroom.cpp`, a standalone C++20 verifier which shares no
+Hall-coloring code, search implementation, or cache with the interval census.  It enumerates only
+the two legal integer row forms, keeps each child multiset sorted, and prunes on direct
+majorization-prefix violations plus elementary residual mass, support, orientation-count, and
+parent-prefix bounds.  Underfull inputs use the genuine slack bound
+`max(0, parent_mass - 2 H_K(2^{K-1}))`; in particular the mass-697 core has child lower bound 211,
+not an incorrectly forced mass 243.  The detailed method and replay output are in
+`evidence/singleton_direct_split_cleanroom_2026-08-31.md`.
+
+The first implementation combined quotienting of equal parent rows with an independent global
+left/right first-pure-side normalization.  Each reduction looked harmless alone, but their
+canonical orders conflict: the optimized search incorrectly rejected tiny states including
+`(1^3)` at K=1.  A deliberately naive, unquotiented leaf-only oracle exposed the error in the
+first 1.1-second regression.  Removing the side normalization fixed the discrepancy; equal rows
+are now quotiented only by nondecreasing static option index.  This interaction is recorded as an
+active trap in `docs/status.md` and as a solver-development rule in `AGENTS.md`.
+
+The final clean provenance build was made from commit
+`bc11b23c6407c27940ab906b0f545ed9041b8531`, with source SHA-256
+`277b6ce9469980fe38ebbcb7956643666b6f8f2b7e6cb8d273ac53d7cb0fa691` and build ID
+`e5bd63dc7cc1fb7b9d036f73106b0bd482fdc8d594f24c03a82bb59c952d0427`.  It produced the following
+deterministic results:
+
+- canonical G6: feasible, 375 nodes;
+- padded transfer state j=13: feasible, 345 nodes, reproducing the three published child profiles;
+- padded transfer state j=14: infeasible, 9,345 nodes;
+- mass-697 unit-free core: infeasible, 9,345 nodes.
+
+The identical last two counts are not an exact-capacity assumption: both searches close from the
+first 32 rows, before the padded units can matter.  Exhaustive optimized-versus-naive comparison
+agreed on all 201 tested states (17,066 naive leaf checks), and the full-mass census again closed
+all 2, 15, and 1,206 majorized partitions at K=1,2,3, including all 1, 4, and 160 exact-support
+states.  The provenance-wrapped optimized build and run took 2.6 seconds.  A separate
+AddressSanitizer/UndefinedBehaviorSanitizer build, build ID
+`ebe27e3473e450ad45619f4e630388c90c27b422b005df12f36f66bfd6992a29`, repeated the complete output
+in 4.1 seconds with no sanitizer finding; macOS rejected leak detection as unsupported, so that
+option was disabled rather than reported as tested.
+
+This independently verifies first-cut infeasibility, while the short two-anchor capacity argument
+remains the proof.  It does not provide a SAT/ILP certificate, settle K=5, establish global
+minimality at K=6, or classify other holes.  The next mathematical work remains the tight-band
+capacity survey and the K=5/minimal-hole search.  No background process was left running.

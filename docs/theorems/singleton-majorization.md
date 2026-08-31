@@ -31,6 +31,11 @@ are harmless padding under Unit-Group Elimination.  Thus “smaller counterexamp
 smaller non-unit core, a lower level, or a smaller transfer/dominance measure—not merely deleting
 those units.
 
+An independent clean-room direct-row solver now exhausts both forms with child slack handled
+generically, reproduces the last feasible transfer cut, and agrees with an unquotiented oracle on
+its tiny controls.  This is an implementation check, not a replacement for the analytic proof; see
+the [verification record](../../evidence/singleton_direct_split_cleanroom_2026-08-31.md).
+
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the
 legal row condition that a singleton row cannot feed both pure children.  The exact Row-Coloring
@@ -350,7 +355,8 @@ This contradiction proves:
 > sufficient.  The state `(64,63,57^2,42^4,22^7,8^15,7^2,1^32)` is majorized by `G_6` and is
 > unsolvable in six tests.
 
-The full calculation, direct split enumeration and transfer-path boundary are in the
+The full calculation, original direct/Hall enumerations, clean-room direct-row check and
+transfer-path boundary are in the
 [counterexample record](../../evidence/singleton_k6_counterexample_2026-08-30.md).
 
 The base has the elementary `2`-flat properties

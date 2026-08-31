@@ -63,6 +63,12 @@ Prefer, in order:
 Run `tools/check_witness.py` on any new tree **before** recording the result. Run
 `tools/check_tables.py` after touching anything in `data/` or the docs.
 
+When quotienting equal rows in an exhaustive split search, canonicalize the row-triple multiset
+only.  Do not add an independent left/right normalization unless compatibility with that ordering
+is proved: on 2026-08-31 the two individually sound reductions together deleted every canonical
+representative of an all-unit solution and caused false negatives already at `K=1`.  The naive
+oracle in `tools/singleton_direct_split_cleanroom.cpp` is the regression for this trap.
+
 Note that a missing `can't solve` line does **not** mean unsolvable. `canSolveB` returns a
 tri-state and gives up with `MAYBE` when it hits a deadline, printing nothing.
 

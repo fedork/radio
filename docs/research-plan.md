@@ -1,7 +1,7 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-30.
+entries. Last revised 2026-08-31.
 
 ## High-level goals
 
@@ -167,11 +167,17 @@ contains no number absent from `data/*.csv`.
 
 is majorized by `G_6` and has no legal first split.  Do not pursue a universal Row-Coloring,
 no-holes, transfer, switch, shuffle or chain-splicing proof; all such sufficient targets below are
-retained as historical structure and finite lower-level theorems.  The next singleton programme is:
+retained as historical structure and finite lower-level theorems.  The ordered singleton programme
+is:
 
-1. build a dependency-free clean-room solver that enumerates legal row triples `(l,m,r)` directly,
-   shares no Hall/coloring code with the current census, and reproduces the `K=6` rejection after
-   exhaustive small-`K` controls;
+1. **Delivered 2026-08-31:** the dependency-free clean-room solver enumerates legal row triples
+   `(l,m,r)` directly, shares no Hall/coloring code or caches with the current census, reproduces
+   the canonical and `j=13` positive cuts, and independently rejects both the padded `K=6` state
+   and its underfull mass-697 core.  An unquotiented leaf-only oracle agrees on 201 small
+   partitions; the optimized solver closes all 1,223 full-mass majorized types at `K<=3`, including
+   all 1,206 types at `K=3`.
+   Reproduction and exact counts are in the
+   [clean-room verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md);
 2. formulate the rank-15/32 argument as a general **Tight-Band Capacity Obstruction**, then survey
    whether it explains every low-level hole or only this one;
 3. settle `K=5`, and minimize the **non-unit core** under level, support, transfer distance and a

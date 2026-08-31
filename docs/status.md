@@ -68,11 +68,18 @@ rounding proof: the state above is the missing primitive lattice hole.  The theo
 superseded in place at
 [singleton-majorization.md](theorems/singleton-majorization.md).
 
-The next singleton work is deliberately verification-first: write an independent direct-row-split
-clean-room solver; extract a general Tight-Band Capacity Obstruction from the rank-15/32 proof;
-search `K=5` and minimize/classify `K=6` holes; then seek a useful exact recursive support
-criterion beyond the already exact but tautological transcript-poset chain-partition formulation.
-The ordered programme is recorded under P6 in [research-plan.md](research-plan.md).
+The verification-first item is delivered.  The standalone clean-room solver enumerates legal
+integer row triples without Hall code or shared caches, reproduces the canonical and `j=13`
+positive cuts, and independently exhausts both the padded hole and the mass-697 core in 9,345 DFS
+states / 34,958 row options each.  Its optimized and naive implementations agree on 201 small
+partitions, and it closes all 1,223 full-mass majorized types at `K<=3`, including all 1,206 at
+`K=3`; see the
+[clean-room verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md).
+The next singleton work is to extract a general Tight-Band Capacity Obstruction from the
+rank-15/32 proof, search `K=5` and minimize/classify `K=6` holes, then seek a useful exact recursive
+support criterion beyond the already exact but tautological transcript-poset chain-partition
+formulation.  The ordered programme is recorded under P6 in
+[research-plan.md](research-plan.md).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
@@ -89,6 +96,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **The Two-Anchor Reduction survives, but its residual conjecture does not.** | The reduction itself is proved.  Its `K=6` image `(62,61,55^2,40^4,20^7,6^15,5^2)` is dominated by `J=(62,61,55^2,40^4,20^8,5^16)` and has no capped residual coloring.  The `K<=4` residual censuses remain correct. |
 | **Switch connectivity is a decision method, not an existence theorem.** | Row and incidence switches connect the fixed-margin search graph, but the `K=6` hole has no balanced vertex anywhere in that graph.  Consequently the universal two-move escape/descent conjecture is false even though its complete `K=4` runs remain valid. |
 | **Do not continue a universal transfer, repair, shuffle or splice proof.** | The final transfer in `(22-j,8^j,7^(15-j))` takes a feasible first-cut fiber at `j=13` to the empty fiber at `j=14`.  Global Robin--Hood closure and the stronger Adjacent-Fiber, Core--Blocker, canonical transport, Pascal-shuffle and two-interval-splicing claims are therefore false.  Their lower-level lemmas and censuses may still describe local structure, but they cannot prove universal sufficiency. |
+| **Do not combine an equal-row quotient with a separate left/right normalization without proving the two canonical orders are compatible.** | The first clean-room direct-split draft sorted equal-row options and also forbade the first right-pure option.  Each rule alone was sound, but together they deleted the sole representative of all-unit solutions and produced false negatives already at `K=1`.  The unquotiented oracle caught it.  The final solver quotients only the row-triple multiset and applies no side normalization; see the [verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md). |
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
@@ -133,7 +141,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
-| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively at `K=6`; characterize the hole/minimal level only if publication needs it.  The excess-`q` Pareto-assembly avenue remains parked. |
+| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively at `K=6`; the independent slack-aware direct-row verifier is delivered.  Generalize the tight-band obstruction and characterize the hole/minimal level only if publication needs it.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established
 
@@ -414,6 +422,7 @@ For fixed m, `n(k,m)` appears to be a fixed multiset of atoms drawn from the bas
 Working and worth trusting: `tools/check_tables.py`, `tools/check_witness.py`,
 `tools/extract_evidence.py` (`certify` / `audit`), `tools/artifacts.sh`
 (`push`/`pull`/`verify`/`check-index`), `tools/check_docs.py`, `tools/refsolve.py`, and the
+independent `tools/singleton_direct_split_regression.sh`, plus the
 fixed-small-m exact recurrence and complete assembly rank/enumeration modes in
 `tools/search_singletonization.cpp`,
 including its exact-atom and distinct-slot embedded terminals, together with its guarded-piece
