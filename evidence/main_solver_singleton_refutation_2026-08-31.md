@@ -2,13 +2,13 @@
 
 ## Result
 
-The production engine no longer treats arbitrary `G_K`-majorized singleton states as positive at
-every level.  Its current boundary is:
+The production engine does not treat arbitrary `G_K`-majorized singleton states as positive.  Its
+current boundary is:
 
 - weak majorization is a necessary rejection at every `K`;
-- it is a positive terminal only for `K<=5`, where the converse is now proved;
 - a distinct-slot embedding in `G_K` remains a positive terminal at every `K`;
-- every other singleton at `K>=6` goes through the ordinary exact recursion.
+- every other majorized singleton goes through ordinary exact recursion, including at `K<=5`
+  where sufficiency is a separately proved theorem rather than a production certificate.
 
 No Fixed-Color Hall implementation is part of `radiobase.c`.  Hall remains an independent research
 solver and proof check; this avoids adding a second theorem-sensitive search to the production
@@ -66,17 +66,18 @@ mass-697 and padded forms are rejected as upward consequences of the smaller neg
 
 ## Cache trust epoch
 
-Pre-refutation positive cache facts are unsafe even when the queried state is not singleton: an
-ancestor may have been accepted only because a recursive singleton leaf used the false converse.
+Older positive cache facts are unsafe even when the queried state is not singleton: an ancestor
+may have been accepted because a recursive singleton leaf used either the false unrestricted
+converse or the now-retired production shortcut for the separately proved `K<=5` converse.
 Current solver output emits, and oracle journals begin with,
 
 ```text
-# radio-cache-semantics=singleton-majorization-k5-v1
+# radio-cache-semantics=singleton-majorization-necessity-only-v1
 ```
 
 `parse_file`, `radio_oracle.c`, and the Pareto census's exact loader replay positives only after
-that marker.  Unmarked input is negative-only.  Snapshot v3 begins the same semantic epoch and
-rejects v1/v2 snapshots even under `restore-any`; its geometry includes `MAX_PART_N`.
+that marker.  Unmarked or older-epoch input is negative-only.  Snapshot v4 begins the same semantic
+epoch and rejects v1--v3 snapshots even under `restore-any`; its geometry includes `MAX_PART_N`.
 
 ## Reproduction and checks
 
@@ -89,10 +90,11 @@ tools/singleton_main_solver_regression.sh
 Its optimized build reports:
 
 ```text
-SINGLETON_MAIN_SOLVER_REGRESSION verdict=FALSE work=36560 cache_nodes=1000000 ignored_untrusted_positive=2
+SINGLETON_MAIN_SOLVER_REGRESSION verdict=FALSE work=36560 cache_nodes=1000000 low_k_exact=YES ignored_untrusted_positive=2
 ```
 
-It checks canonical `G_6`, the feasible `j=13` transfer state, the exact mass-683 negative and its
+It checks that a nonembedded majorized `K=2` state consumes exact-recursion work, canonical `G_6`,
+the feasible `j=13` transfer state, the exact mass-683 negative and its
 mass-697/full-padded upward consequences, rejection of an unmarked singleton positive, rejection of an unmarked tainted
 nonsingleton ancestor, and exact positive/negative retention after bounded cache insertion.
 
@@ -106,5 +108,5 @@ Additional passing checks on the working tree were `tools/test_radio_refute.sh`,
 `tools/work_budget_regression.sh`, `tools/search_context_regression.sh`,
 `tools/provenance_regression.sh`, and `tools/test_pareto_prefix_census.sh`.  An ASan+UBSan build of
 the main regression (Apple leak detection disabled because that platform does not support it)
-completed with no sanitizer finding.  A small oracle v3 snapshot round trip restored identical
+completed with no sanitizer finding.  A small oracle v4 snapshot round trip restored identical
 cache structure statistics.

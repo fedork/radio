@@ -286,9 +286,11 @@ done:
    Handles are made canonical by discovery order: a fresh process allocates 1,2,3,... so writing the
    structures in visit order and remapping every descriptor reproduces identical handles on load.
 
-   Version 3 begins the post-refutation cache epoch.  Older snapshots may contain positive
-   ancestors tainted by the false unrestricted singleton-majorization converse and are rejected
-   even by restore-any.  Within version 3, compatibility is keyed on what actually determines the
+   Version 4 begins the necessity-only singleton-majorization cache epoch.  Older snapshots may
+   contain positive ancestors accepted through either the false unrestricted converse or the
+   separately proved K<=5 shortcut, neither of which is a production positive certificate under
+   the current policy.  They are rejected even by restore-any.  Within version 4, compatibility is
+   keyed on what actually determines the
    layout: the source commit plus MAX_K, MAX_N, MAX_PART_N, MAX_SBB and sizeof(front_point).  The sbb numbering
    is a function of the source and MAX_PART_N, not of the compiler, so keying on the *build id* was
    wrong -- it made a snapshot unusable on any host with a different compiler, which is exactly
@@ -296,7 +298,7 @@ done:
    semantic reason).  A geometry mismatch is still refused outright; an identity mismatch needs
    the explicit `restore-any` opt-in. */
 
-#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v3"
+#define SNAP_MAGIC "RADIO-CACHE-SNAPSHOT-v4"
 
 static uint32_t *snap_bmap, *snap_rmap, *snap_vmap;
 static uint32_t *snap_blist, *snap_rlist, *snap_vlist;

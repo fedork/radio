@@ -4,8 +4,8 @@
  * locks three safety boundaries:
  *   1. the 30-row mass-683 core is majorized but is not an embedded G_6 subprofile;
  *   2. an unmarked historical positive is rejected before entering the dominance trie;
- *   3. the ordinary recursive solver returns FALSE, using the proved K<=5 converse only on its
- *      children and never as a K=6 terminal.
+ *   3. a nonembedded majorized singleton uses exact recursion even at K=2, and the K=6 core
+ *      likewise reaches the ordinary recursive solver.
  *
  * Build through tools/build_radio.py with MAX_K=6, MAX_N>=793 and MAX_PART_N>=65.
  */
@@ -29,6 +29,22 @@ int main(void) {
     int core[30];
     int size = 0;
     init();
+
+    int low_k[4] = {
+        getSbb(3, 1), getSbb(2, 1), getSbb(2, 1), getSbb(2, 1),
+    };
+    sort1(low_k, 4);
+    if (!singleton_majorization_holds(low_k, 4, 2)
+        || singleton_embedded_can_solve(low_k, 4, 2)) {
+        fprintf(stderr, "K=2 nonembedded-majorized control has the wrong shape\n");
+        return 1;
+    }
+    uint64_t low_k_before = radio_budget_now_ctx(&radio_default_search_context);
+    if (canSolveB(low_k, 4, 2, NO_DEADLINE) != TRUE
+        || radio_budget_now_ctx(&radio_default_search_context) == low_k_before) {
+        fprintf(stderr, "K=2 nonembedded-majorized state bypassed exact recursion\n");
+        return 1;
+    }
 
     size = append_head(core, size);
     size = append(core, size, 8, 15);
@@ -139,7 +155,7 @@ int main(void) {
     }
 
     printf("SINGLETON_MAIN_SOLVER_REGRESSION verdict=FALSE work=%llu cache_nodes=%llu "
-           "ignored_untrusted_positive=%lld\n",
+           "low_k_exact=YES ignored_untrusted_positive=%lld\n",
            (unsigned long long)work, (unsigned long long)cache_insert_nodes,
            ignored_positive_cache_replays);
     return 0;

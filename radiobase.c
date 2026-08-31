@@ -400,9 +400,8 @@ int singleton_base_prefix[MAX_K+1][1 << MAX_K];
 /* Positive cache facts emitted by a build with this semantic epoch are safe to replay.  Older
    logs may contain parents proved only through the false unrestricted singleton-majorization
    converse.  Keep this marker stable only while every positive terminal remains proof-safe. */
-#define RADIO_CACHE_SEMANTICS "singleton-majorization-k5-v1"
+#define RADIO_CACHE_SEMANTICS "singleton-majorization-necessity-only-v1"
 #define RADIO_CACHE_SEMANTICS_PREFIX "# radio-cache-semantics="
-#define SINGLETON_MAJOR_SUFFICIENT_MAX_K 5
 
 split_levels **sbb_splits;
 
@@ -2053,17 +2052,12 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         if (ck == TRUE || ck == FALSE) return ck;
     }
     if (singleton_size == size) {
-        // Majorization is necessary at every level and sufficient exactly through K=5.  From K=6
-        // onward accept only a distinct-slot embedding; every other majorized singleton must
-        // continue through exact recursion.
+        // Majorization is a necessary rejection only.  Even where its converse has been proved
+        // separately, production positives require a distinct-slot embedding or exact recursion.
         ck = singleton_majorization_holds(tmp, size, k);
         if (!ck) {
             cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, FALSE);
             return FALSE;
-        }
-        if (k <= SINGLETON_MAJOR_SUFFICIENT_MAX_K) {
-            cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, TRUE);
-            return TRUE;
         }
         if (singleton_embedded_can_solve(tmp, size, k)) {
             cache_l1_store(ctx, l1_entry, l1_hash, tmp, size, k, TRUE);

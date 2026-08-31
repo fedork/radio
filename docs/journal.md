@@ -12588,3 +12588,20 @@ were added to their standard regressions, and the first-read status/theorem/evid
 superseded in place.  ASan+UBSan builds of the production regression, direct-row regression and
 rank-15/30 certificate check all passed (`detect_leaks=0` because Apple leak detection is
 unsupported).
+
+## 2026-08-31 -- production majorization becomes rejection-only at every level
+
+Fedor pointed out that even the proved `K<=5` converse is a separate certificate and therefore
+does not belong in the production solver's primitive positive trust boundary.  The low-level
+positive shortcut was removed.  `singleton_majorization_holds` now rejects violations only;
+every majorized singleton that is not a distinct-slot `G_K` embedding reaches ordinary exact
+recursion at every `K`.
+
+This policy change invalidates positives from the immediately preceding cache epoch too: a marked
+nonsingleton ancestor could depend on a recursive `K<=5` singleton shortcut.  The text marker is
+now `singleton-majorization-necessity-only-v1`, and oracle snapshots advance from v3 to v4; old
+positive files and v1--v3 snapshots are refused, while negative replay remains valid.  The main
+regression uses the nonembedded majorized `K=2` state `(3,2^3)` to prove the exact path is exercised
+(`work=10`) and returns a replayable exact positive.  The star-majorization/refuter regression and
+the old-marker/new-marker cache regression passed.  A small v4 oracle snapshot round trip restored
+the exact positive (5 branches, 312 bytes), while `restore-any` rejected a v3 header.

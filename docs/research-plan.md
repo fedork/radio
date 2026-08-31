@@ -238,9 +238,10 @@ is:
    a compact law for choosing among schemes, plausibly by eliminating them into a laminar Hall
    dual rather than another scalar statistic;
 6. **Main solver hardening delivered 2026-08-31.** The production engine uses singleton
-   majorization positively only through the proved `K<=5` range and otherwise performs its
-   ordinary exact recursion; the research Hall search was deliberately not copied into the main
-   trust base. Positive cache replay now requires a post-refutation semantic marker, including
+   majorization only as a necessary rejection at every level; even the separately proved `K<=5`
+   converse is not a production positive terminal. Nonembedded majorized states use ordinary exact
+   recursion, and the research Hall search was deliberately not copied into the main trust base.
+   Positive cache replay now requires the necessity-only semantic marker, including
    possibly tainted nonsingleton ancestors. Total-state and one-component compile bounds are
    separated, and dominance-cache insertion has a deterministic finite allowance. The mass-683
    core is now the exact production negative, with the mass-697 and padded forms checked as upward

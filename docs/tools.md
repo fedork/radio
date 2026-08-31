@@ -581,9 +581,9 @@ session in `tools/capped_run.sh`. Population of one fact is nevertheless finite:
 means the solver proved the verdict and retained a sound partial closure; it is not `MAYBE`.
 
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
-reloads it linearly instead of re-deriving every dominance closure. Snapshot v3 begins the
-post-refutation semantic epoch; v1/v2 snapshots are rejected even by `restore-any`. Compatibility
-within v3 is keyed on the source commit plus
+reloads it linearly instead of re-deriving every dominance closure. Snapshot v4 begins the
+necessity-only singleton-majorization epoch; v1--v3 snapshots are rejected even by `restore-any`.
+Compatibility within v4 is keyed on the source commit plus
 `MAX_K`/`MAX_N`/`MAX_PART_N`/`MAX_SBB`/`sizeof(front_point)` — what actually fixes the layout. A geometry mismatch
 is refused outright; a foreign identity with matching geometry needs the explicit `restore-any`
 opt-in and warns. Keying on the *build id* was a bug: it made a Linux-built snapshot unusable on
@@ -604,11 +604,12 @@ cat out_run.txt | ./parse_out.sh >> cache.txt
 
 A driver takes an optional leading cache-file argument, detected by argument-count parity.
 
-Current output emits `# radio-cache-semantics=singleton-majorization-k5-v1` before cache facts.
+Current output emits `# radio-cache-semantics=singleton-majorization-necessity-only-v1` before cache facts.
 `parse_file`, the oracle loader and the Pareto exact loader accept positive facts only after that
 marker; an unmarked historical file is replayed negative-only. This must happen at ingestion:
-pre-refutation singleton positives may already have tainted nonsingleton ancestors, so filtering
-only singleton queries is insufficient. Oracle journals write the marker before new facts.
+older singleton positives—including facts derived from the retired `K<=5` production shortcut—may
+already have tainted nonsingleton ancestors, so filtering only singleton queries is insufficient.
+Oracle journals write the marker before new facts.
 
 For phase attribution, compile with any of `RADIO_INIT_PROFILE`, `RADIO_SPLIT_PROFILE` and
 `RADIO_CACHE_PROFILE`. They time eager initialization, lazy split/FAST construction, and the
@@ -729,7 +730,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce the exact-support `K=6` singleton-majorization counterexample, its 14-transfer phase boundary, residual hole, forced bands, and earlier rule counterexamples |
 | `tools/singleton_direct_split_cleanroom.cpp` | independently enumerate legal singleton row triples into three sorted child multisets, with no Hall code or shared cache; solve arbitrary first-cut queries, check the padded/mass-697/mass-683 `K=6` holes and the feasible one-8 deletion with slack-correct residual bounds, and classify all 176 bands on the fixed rank-15/32 face |
 | `tools/singleton_direct_split_regression.sh` | provenance-build the clean-room direct-row solver and run its canonical `G_6`, `j=13`, three negative counterexample forms, feasible one-8 deletion, fixed-face, naive-oracle and exhaustive `K<=3` controls |
-| `tools/singleton_main_solver_regression.sh` | check the production engine's `K<=5` singleton theorem boundary, canonical / `j=13` / mass-683 exact negative and its upward consequences, cache-taint rejection, and bounded exact positive/negative dominance insertion |
+| `tools/singleton_main_solver_regression.sh` | check that a nonembedded majorized `K=2` singleton reaches exact recursion, plus canonical / `j=13` / mass-683 exact negative and its upward consequences, cache-taint rejection, and bounded exact positive/negative dominance insertion |
 | `tools/cache_semantics_regression.sh` | check that unmarked cache input is negative-only while the current semantic marker admits positive Sb and Sa facts |
 | `tools/singleton_tight_band_certificate.cpp` | emit deterministic no-first-cut certificates from two tight anchors; count exact-support/band spaces, exhaust the positive-mixed-floor `K=5` faces, and minimize transfer distance over all capacity-certificate cap vectors; contains no split search or Hall code |
 | `tools/singleton_tight_band_regression.sh` | provenance-build and run the inequality-only regression, complete 613,689,090-instance `K=5` certificate census, and independent direct-row controls/fixed-face classification |
