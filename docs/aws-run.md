@@ -2,11 +2,11 @@
 
 This page is the operational record for the completed cold runs, the solver-core verifier replays
 and the k=8 census that ran on the original shared instance; the findings go to
-[journal.md](journal.md) as usual. As of 2026-08-20 that compute is fully wound down and only S3
-and the release store hold state for it. **This is no longer true of the account as a whole**:
-2026-08-21 added a persistent `oracle-serve` instance with no planned end date — see
-[Persistent oracle-serve instance](#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date)
-below before assuming nothing is running.
+[journal.md](journal.md) as usual. As of 2026-08-31 all EC2 compute tagged
+`Project=radio-sa193` is wound down. The persistent `oracle-serve` instance added on 2026-08-21
+was terminated after the singleton-majorization refutation made its mixed warm cache unsafe; its
+encrypted EBS volume was deliberately retained. See
+[Persistent oracle-serve instance](#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date).
 
 ## What is left
 
@@ -14,9 +14,11 @@ below before assuming nothing is running.
 |---|---|
 | shared instance | **terminated** 2026-08-20 00:22:20 UTC: `i-0005d74f985c52ae1`, `r7iz.4xlarge`; volume `vol-045c828c1f0ab2c2e` confirmed deleted after a disk inventory |
 | dedicated verifier | terminated: `i-0cb3783e937115ff1`, run `20260818T074026Z`; complete frozen solver-core replay is release-verified |
-| uncolored level replay | **stopped, not terminated**: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived, needs a disk check then termination |
+| uncolored level replay | terminated: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived |
 | colored level replay | terminated: `i-0901e2b2c266f7db2`, volume `vol-0bdc1e36eea39386c` confirmed deleted |
-| active jobs | none — run3, run8 and run9 completed 16/16 roots; `pareto_k8_aws` exited 0 |
+| persistent oracle | **terminated** 2026-08-31 14:25:41 UTC: `i-002cabc654b2078ed`; encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and `available` |
+| active jobs | none — the post-termination AWS query returned no pending, running, stopping or stopped `Project=radio-sa193` instance |
+| retained oracle volumes | five unattached 50-GiB volumes, 250 GiB total: `vol-0053276ecc6d1adf4`, `vol-03a28c8c01ae591a1`, `vol-0621d09062d023bce`, `vol-0ef7c8664c6cab66e`, and the final instance's `vol-04260ae18b515e7f5`; not deleted because this request authorized instance termination, not data deletion |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` — unaffected by termination, and the only copy of the run3/run/run2/run4-7 raw logs |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
@@ -24,25 +26,40 @@ below before assuming nothing is running.
 
 ## Persistent oracle-serve instance (2026-08-21, no fixed end date)
 
-**Currently running and billing.** Different in kind from every run below: those loaded a fixed
-corpus and terminated; this one is a standing service meant to survive across sessions, at
-Fedor's explicit request (2026-08-21) — reachable without depending on a laptop that sleeps or
-loses connectivity, and explicitly warm-started (never cold) from the archived corpus plus the
-sa193 certificate of record. No planned end date; flag it at the start of any session that touches
-this thread, and check `tools/oracle_serve_status.sh` before assuming otherwise.
+**Retired 2026-08-31.** This was different in kind from every run below: those loaded a fixed
+corpus and terminated, while this was a standing service meant to survive across sessions. It was
+explicitly warm-started from the archived corpus plus the `Sa(193)` certificate of record. The
+build and mutable cache predate the refutation of singleton-majorization sufficiency, so positive
+cache entries cannot be treated as proof-safe. At Fedor's request the instance was terminated;
+future work must use a fresh current build and provenance-separated inputs rather than restoring
+either historical mixed snapshot.
 
 | | |
 |---|---|
 | instance | `i-002cabc654b2078ed`, `r7i.large` (2 vCPU, 16 GiB), run `20260821T202105Z` |
+| final state | `terminated` at 2026-08-31 14:25:41 UTC, confirmed by `describe-instances` after the EC2 waiter completed |
 | purpose tag | `Purpose=oracle-serve` (distinct from `Purpose=oracle-prime`) |
 | build | `MAX_K=9 MAX_N=300`, commit `d9e3f03` — includes the `enumerate` command; geometry matches the base snapshot for `restore-any` |
 | warm start | restored the validated 21.9M-fact base snapshot (35 s), then loaded the sa193 certificate of record on top (2,846,568 more facts, **560.6 s** — slower than the 414.5 s empty-cache local measurement, because inserting into an already-large warm trie costs more per fact; do not extrapolate one from the other). Total warm-start ~10 minutes, not a cold start and not the multi-hour raw-replay alternative |
 | memory after warm-start | ~10 GiB resident of 16 GiB total (5.3 GiB free) — real but not huge headroom for cache growth from here; watch `STATUS`'s `host_mem_available_gib` and re-provision if it tightens |
-| serving | `tools/oracle_server.py` on `127.0.0.1:7777` under systemd unit `radio-oracle-server`, snapshots to local disk every 1800s; a within-boot crash restarts from that local snapshot and skips re-fetching the external warm-start entirely |
-| reach it | `aws-vault exec --server default -- aws ssm start-session --target i-002cabc654b2078ed --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["7777"],"localPortNumber":["7777"]}'`, then talk to `127.0.0.1:7777` as a plain line-protocol socket (see `radio_oracle.c`'s header comment for the grammar, including `enumerate`). Needs `session-manager-plugin` locally (`brew install --cask session-manager-plugin`, requires sudo once) |
-| status | `tools/oracle_serve_status.sh 20260821T202105Z` |
-| stop (billing pauses, EBS persists) | `aws-vault exec --server default -- aws ec2 stop-instances --instance-ids i-002cabc654b2078ed` |
-| terminate (EBS persists too — `DeleteOnTermination=false`) | `aws-vault exec --server default -- aws ec2 terminate-instances --instance-ids i-002cabc654b2078ed` |
+| serving while live | `tools/oracle_server.py` on `127.0.0.1:7777` under transient systemd unit `radio-oracle-server`, with local snapshots every 1800s |
+| retained disk | `vol-04260ae18b515e7f5`, encrypted 50-GiB gp3, `DeleteOnTermination=false`; confirmed unattached and `available` after termination |
+
+The read-only pre-termination inventory was SSM commands
+`295e6ccb-fb83-4517-8859-7103df4ba20c` and
+`08f66a1f-98e9-41d6-aaaa-a30123671343`. At 2026-08-31 14:24 UTC no oracle process or systemd unit
+was active, so the instance had already stopped serving while it continued billing. The disk held
+the reproducible 6,672,100,991-byte base snapshot, the negative certificate cache, and a
+9,467,139,696-byte mutable `oracle.snap` last completed on 2026-08-24. The latter is derived,
+mixed-provenance state and is not an evidence artifact. Nothing was uploaded before termination:
+the persistent volume preserves the exact disk, while S3 retains the independent source inputs.
+Do not restore `base.snap` or `oracle.snap` into a current proof/search run.
+
+The post-termination account inventory also exposed four older unattached 50-GiB
+`Purpose=oracle-serve` volumes from superseded 2026-08-21 launches. Together with the final
+instance's disk they total 250 GiB and continue to incur EBS storage charges. They were not part of
+the instance-termination request and were therefore left untouched; their exact IDs are in the
+table above.
 
 **This superseded two earlier same-day launches, both terminated, each catching a real bug before
 it could corrupt anything:**

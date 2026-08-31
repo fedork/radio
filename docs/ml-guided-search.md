@@ -16,12 +16,18 @@ into `radiobase.c`'s own split loop is the remaining step.** Every number below 
 The goal is a *fast solver*: use a learned predictor to order the search so the exact solver reaches
 verdicts sooner. Nine things are already in place; wiring one of them into the solver is not.
 
+**2026-08-31 safety update:** the persistent AWS oracle is terminated, and its build plus both
+mixed cache snapshots predate the refutation of singleton-majorization sufficiency. Do not restore
+those snapshots or treat their cached positives as current ground truth. Historical measurements
+below remain measurements of the recorded experiments. Any renewed experiment must use current
+`main` cold or load only provenance-separated facts whose status survived the refutation.
+
 **Built and measured.**
 
 | what | where | measured |
 |---|---|---|
 | warm oracle, stdin protocol | `radio_oracle.c`, `tools/oracle_client.py` | 0.11 ms/query; verdicts identical to `radio_one` on 2,200 states |
-| full-corpus snapshot | `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst` | 21.9M facts, restores in **32.8 s** at 2.41 GB |
+| historical full-corpus snapshot | `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst` | 21.9M mixed-sign facts, restores in **32.8 s** at 2.41 GB; **unsafe as a current warm start** |
 | learned cut ranker | `tools/ml/cut_ranker.py` | median rank **76 of 54,014** with `R_0`; 428x better than blind |
 | level-transfer value model | `tools/ml/value_level_transfer.py`, extended by `tools/ml/recursive_value.py` | **AUC 0.99+** transfers train-k<=6/test-k=7, not just the original k=4->k=5 pair |
 | recursive cut scorer | `tools/ml/recursive_value.py` | scoring a split by `min(V(child))`, with **zero split-label supervision**, reaches **120x** selectivity vs a directly-supervised flat ranker's 130.5x, on the identical 153 real forced k7 endpoints |
@@ -52,8 +58,9 @@ the worst-case-first composition and the hard-case stratification that motivated
 the real-benchmark validation is in
 [../evidence/real_benchmark_residual_control_2026-08-21.txt](../evidence/real_benchmark_residual_control_2026-08-21.txt).
 
-**Start the oracle before anything else.** It removes the reason the earlier experiments were
-awkward — labels used to cost 200 ms and a process each:
+**Do not use the historical snapshot command below.** This is retained to identify the exact old
+setup whose measurements appear in this note; it must not be used for new labels after the
+singleton-majorization refutation:
 
 ```
 aws s3 cp s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst .
@@ -62,8 +69,9 @@ tools/build_radio.py -O3 -DMAX_K=9 -DMAX_N=300 radio_oracle.c -o radio_oracle_k9
 ./radio_oracle_k9_n300 --restore-any=cache.snap --journal=oracle-journal.txt
 ```
 
-`restore-any` is needed because that snapshot was built by Linux clang; the geometry is checked
-either way. Journal every session so the next one starts warmer.
+`restore-any` bypassed the old build-identity mismatch after checking geometry; it does not make
+the mixed cache semantically safe. For new work, build current `main` and start cold or load only
+provenance-separated surviving inputs. Journal every new session independently.
 
 ## What the measurements already rule in and out
 

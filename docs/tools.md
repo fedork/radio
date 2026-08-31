@@ -548,13 +548,18 @@ usable against a wide cache. Default `MAX_K=9, MAX_N=300` covers the archived ca
 `MAX_N=400/MAX_K=6` inits in 205 s while the larger `MAX_N=485/MAX_K=9` inits in 146 s. Cost tracks
 the work actually required, not the table dimensions, so measure the configuration you intend to use.
 
-**Priming.** The whole archived corpus — 21,866,180 facts — loads in **1.58 h** on a 32 GiB box
+**Priming.** Do **not** restore the historical full-corpus snapshot into a current proof/search
+run. It mixes positive and negative facts produced before singleton-majorization sufficiency was
+refuted, and individual positive origins cannot be separated. Start current `main` cold, or load
+only provenance-separated facts whose status survived the refutation, such as the negative
+`Sa(193)` certificate. The following is retained only as a performance measurement: the whole
+archived corpus — 21,866,180 facts — loaded in **1.58 h** on a 32 GiB box
 (measured, run `oracle-prime/20260820T165448Z`). The rate is hump-shaped, from 44,484/s down to
 431/s through an expensive band and back to over a million/s once everything is subsumed, so do not
-try to predict it from a prefix. `tools/sort_cache.py` reorders a cache for a further 2.25x. Better
-than repeating that: restore the snapshot the run produced —
+try to predict it from a prefix. `tools/sort_cache.py` reorders a cache for a further 2.25x. The
+historical snapshot the run produced is
 `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst`, 667 MiB — in **32.8 s
-at 2.41 GB resident**. Or skip priming and pass `--journal FILE` so each session primes the next.
+at 2.41 GB resident**. Keep it for forensic/performance context; do not use it to prime new work.
 
 **Stream separation.** `radiobase.c` and `canSolveB` print progress to stdout, which would corrupt a
 line protocol. The oracle keeps a duplicate of the original stdout for responses and points the C

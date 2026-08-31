@@ -677,9 +677,8 @@ components.  See [the theorem note](theorems/recursive-pareto-lift.md) and the f
 
 This is not ready for `radiobase.c`.  A literal second recursive step exhausted the complete lower
 split's lift box, and a greedy componentwise Pareto upgrade followed by its first solving split also
-failed.  The k=7 exhaustive choice corpus is complete; the k=8 remainder is running on the shared
-AWS host from 621 of 815 summary-closed prefix blocks.  Let that finish before adding another fitted
-heuristic, then analyze the retained antichain of fixed-dimension Pareto upgrades and inequivalent
+failed.  The k=7 and k=8 exhaustive choice corpora are complete and archived; no AWS remainder is
+running. Analyze the retained antichain of fixed-dimension Pareto upgrades and inequivalent
 solving splits for a lineage-preserving choice property.  Only after that corpus is understood
 should the minimal production form be tried: a transient lineage-aware hint, one or two templates,
 a bounded pass, and unchanged fallback.  Split hints must influence order only; they are not cache
@@ -864,7 +863,7 @@ Disposition and next design work:
    It uses the complete normalized certificate because the colored Sa(113) control is missing nine required supports.
    Architecture, controls and exact measurements are in
    [`../evidence/verifier_frozen_trie_2026-08-18.txt`](../evidence/verifier_frozen_trie_2026-08-18.txt);
-8. **Delivered; uncolored and top-down colored replays are active separately.** Readable text remains the durable envelope,
+8. **Delivered; both uncolored and top-down colored replays completed and were archived.** Readable text remains the durable envelope,
    now as one self-contained file per level. `radio-negative-level-certificate-v2` orders an
    explicit part dictionary, complete k-1 support, checked split-part hints and level-k claims;
    only support enters the trie. The run9 k7 file reduces cache construction locally from 263.457
@@ -893,8 +892,9 @@ Disposition and next design work:
    891.641 CPU seconds, projecting 13,434 wall / 213,994 CPU seconds for the full four-part band.
    Its first durable top-down checkpoint verified all sixteen k9 roots and selected 2,151/2,545 k8
    facts. K8 verified those 2,151 claims with zero gaps, selected 2,508,278/2,576,885 k7 facts and
-   checkpointed them before the sixteen-worker k7 phase began. Let both active runs finish and
-   verify their manifests before archival. A compact global exact hash remains deferred: neither the 34.7%
+   checkpointed them before the sixteen-worker k7 phase began. Both full chains later closed with
+   zero gaps, their manifests and release round trips were verified, and their hosts were
+   terminated. A compact global exact hash remains deferred: neither the 34.7%
    theorem profile nor solver order demonstrates enough first-touch exact hits to justify another
    lookup. Separately make the solver emit split-space coverage if an independently cheap verifier
    is required: compact ranges/subboxes annotated with the outcome and exact lower-fact/theorem

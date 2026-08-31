@@ -135,6 +135,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Never train solvable-vs-unsolvable on two different corpora.** | Certificate negatives and census positives occupy *disjoint* mass bands at k=6 (positives 0.742-0.875 of cap, negatives 0.827-0.959; the central-90% overlap is empty), so any classifier scores AUC 0.946 by learning which corpus a state came from. A permuted-label control does **not** catch this — it destroys the source signal too and returns a reassuring 0.516. What caught it was a matched-pair probe: single-part states differing by one coin scored 47%, chance. Draw both classes from one sampler and label with `radio_one`. Measured 2026-08-20; see [../evidence/value_level_transfer_2026-08-20.txt](../evidence/value_level_transfer_2026-08-20.txt). |
 | **A fixed mass-fraction-of-cap sampler does not transfer across `k`.** | `value_gen_states.py`'s original band, [0.70,1.02] of cap, sampled **0 of 300 solvable at k=7**: the per-part solo Pareto maximum grows almost as fast as the cap does, so "mass near cap" stops meaning "near the achievability frontier" by k=7. The band must be bisected per level against a warm oracle (30-state probes, target ~50% solved-of-decided) before drawing a training sample. Measured 2026-08-20; see [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). |
 | **A long-lived `radio_oracle` can crash outright on an ordinary query, silently.** | `alloc_front_record` in `radiobase.c` hard-caps total handles at `NODE_HANDLE_MASK` (~1.07e9, packed into a tagged 32-bit descriptor); a handful of multi-million-split sub-searches can burn through enough of that space to exit with `out of front-record handles`, closing the oracle's stdout pipe. Seen 6 times in 300 k=7 queries. No compile-time knob bounds this the way `MAX_TREE_NODES`/`MAX_MEMO` bound `radio_canon_search_generic`'s pool. A caller that keeps a warm oracle alive across many diverse queries must catch the closed pipe, log the offending state, and restart — losing that one query, not the accumulated warm state. Separately, the deterministic nominal-second budget does not tightly bound wall time: queries budgeted at 5 nominal seconds took up to 270 real seconds. Measured 2026-08-20; see [../evidence/recursive_value_2026-08-20.txt](../evidence/recursive_value_2026-08-20.txt). |
+| **`oracle-serve`'s uploaded `state=running` was only a host heartbeat.** | On 2026-08-31 its `STATUS` had been refreshed one minute earlier, but direct SSM inspection found no oracle process and no `radio-oracle-server` unit; `server.out` ended with the last complete snapshot on 2026-08-24. A future standing service needs `systemctl`/`pgrep` in its health report. Do not infer service availability from the old `STATUS` file. The historical host is now terminated. |
 | **A headline median/selectivity number can hide hard-case collapse — stratify by exact candidate-set size before trusting it.** | The recursive cut scorer's "120x median" looked uniform until stratified by exact stage-2 candidate-set size: the hardest third has median rank 331 (vs 146 for the middle third) and a worst case of 16,886 of up to 130,262 — barely better than blind. Literal winning-cut count is *not* a usable hardness proxy here — it is almost always exactly 2 or 4 (the trivial complementation pair), with no real spread. The fix was not more data: composing with the sound `R_0` filter first made the degradation disappear entirely (hardness/rank correlation 0.129 -> 0.001), because `R_0` shrinks the hardest tier *more*, not less (10.6x vs 4.7x). Measured 2026-08-21; see [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt). |
 | **A learned ranking can never certify "no solution exists" — only a sound filter can, and none has been composed into a small cutoff yet.** | `R_0` (`tools/bundled_majorization.r0`, proved in `theorems/singleton-majorization.md`) is the only sound worst-case bound measured against this thread's stage-2 candidate set so far: median 6,892 / worst 16,547 survivors, down from up to 130,262 — real, but still thousands, not the "exhaust a handful and stop" cutoff the ideal algorithm would have. Do not read the recursive scorer's rank-within-survivors (median 14) as any kind of stopping bound; it is ordering only. The cross-part pair condition and deeper `R_d` are the next sound filters to compose and have not been tested on this stratification. Measured 2026-08-21; see [../evidence/recursive_value_worst_case_2026-08-21.txt](../evidence/recursive_value_worst_case_2026-08-21.txt). |
 | **A solvability-rate-by-(k,parts) count from one run's log is not a neutral sample — check how it was obtained before drawing a structural conclusion.** | The 2026-08-08 journal figure "8-part k=6 states: 0 of 165 solvable" was read on 2026-08-21 as "8-part k=6 is structurally unsolvable, a pure refutation regime" and written into new evidence/docs that way. Wrong: those 165 states came from one specific solver run's log, whose own selection may have been biased toward negatives, and that was never checked before the count was treated as a fact about the state space. Retracted the same day. This is the same corpus-provenance discipline as the disjoint-corpora trap above, applied to a corpus nobody had scrutinized yet — any rate/count pulled from "a run's log" needs its selection process checked before it supports a positive-or-negative structural claim, not just before training a classifier on it. |
@@ -471,13 +472,28 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**Nothing is running.** The oracle-prime full-corpus load finished: run `20260820T165448Z` on
+**Nothing is running.** On 2026-08-31 the only live `Project=radio-sa193` EC2 instance,
+persistent oracle `i-002cabc654b2078ed`, was terminated at 14:25:41 UTC at the user's request.
+Its build and mixed cache predated the singleton-majorization refutation and must not be reused.
+The pre-termination SSM inventory found that the oracle process and transient systemd unit were
+already gone; the last complete mutable snapshot was from 2026-08-24. Because its root disk had
+`DeleteOnTermination=false`, encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and
+`available`; EC2 compute billing has ended, while EBS storage billing continues. No other pending,
+running, stopping or stopped radio-tagged instance remained after the termination query. Exact
+commands and disk disposition are in [aws-run.md](aws-run.md).
+
+Four more unattached 50-GiB `oracle-serve` volumes from the superseded 2026-08-21 launches were
+also still present. All five volumes, 250 GiB total, were inventoried and left untouched because
+the request authorized terminating the instance, not deleting persistent data.
+
+The oracle-prime full-corpus load finished earlier: run `20260820T165448Z` on
 `i-0957cf6024c13a1e3` loaded 21,866,180 facts in **1.58 h**, exit 0, and dumped a 6.67 GB snapshot
 (667 MiB compressed). Restore verified locally at **32.8 s / 2.41 GB resident**, with 2,200
 independently labelled states re-queried to exactly the expected verdicts. The snapshot is a derived
 artifact reproducible in 1.58 h from archived inputs, so it stays in S3 at
 `s3://radio-sa193-393287594714/oracle-prime/20260820T165448Z/cache.snap.zst` rather than the release
-store — see [data.md](data.md).
+store — see [data.md](data.md). Those historical performance measurements remain valid, but the
+mixed snapshot is not a safe warm start after the singleton-majorization refutation.
 
 No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
 reported UNSOLVABLE. **The k=8 Pareto-prefix census is finished, archived and its host is gone.** It
@@ -1290,15 +1306,21 @@ that model to settle that case.  This formula comes from a checked 19-node relax
    `check_witness.py` — never prune an OR-branch with a learned value; only a proven filter like
    `R_0` may ever certify a negative.
 
-1. **Use the warm oracle for everything that needs many verdicts.** `radio_oracle.c` is new: it
+1. **The historical warm oracle is retired; do not restore its mixed cache.** `radio_oracle.c`
+   still amortizes initialization when many verdicts are needed, but start a current build cold or
+   load only provenance-separated facts whose status survived the singleton-majorization
+   refutation. In particular, the `Sa(193)` negative certificate remains proof-safe, while the
+   opaque full-corpus and mutable service snapshots do not. Persistent instance
+   `i-002cabc654b2078ed` was terminated on 2026-08-31; see [aws-run.md](aws-run.md).
+   Historically, `radio_oracle.c`
    pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin. Measured at
    **MAX_K=9, MAX_N=300** (init 37 s, 0.64 GB): 2,200 k=5 states in 243 ms of query time, **0.11 ms
    each**, verdicts identical to per-process `radio_one` on all 2,200. Start with
    `./run_radio_oracle.sh`, drive with `tools/oracle_client.py`, details in
    [tools.md](tools.md) and [../evidence/warm_oracle_2026-08-20.txt](../evidence/warm_oracle_2026-08-20.txt).
-   **Start it cold and journal what you compute**; `snapshot`/`restore` a bounded subset if you
-   need a primer. **A fully primed snapshot now exists** — all 21,866,180 archived facts, loaded in
-   1.58 h, restoring in 32.8 s at 2.41 GB resident, 173x faster than replaying facts.
+   **Start it cold and journal what you compute.** The old 21,866,180-fact snapshot restored in
+   32.8 s at 2.41 GB resident, but that is now only a historical performance datum, not permission
+   to load it.
 
 2. **Take the value model to k=7 — done; now cost it against the solver, not AUC.** With matched
    oracle-labelled sampling (mass band bisected per level, not fixed — see the trap table), a
@@ -1396,8 +1418,9 @@ that model to settle that case.  This formula comes from a checked 19-node relax
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
-   loop. Test it on another corpus before using it. No AWS compute remains: both radio-tagged hosts
-   are terminated and their volumes deleted. Do not restart either retired independent-checker
+   loop. Test it on another corpus before using it. No AWS compute remains under
+   `Project=radio-sa193`; the retired oracle's persistent volume remains available, while the old
+   replay hosts are terminated. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
 5. **Finish P5 with the new exact Sa boundary.** The paper may now state `Sa(10)=192` as a proven

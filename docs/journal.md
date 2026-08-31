@@ -12257,3 +12257,44 @@ ASan+UBSan regression used build ID
 `98258f92cc9c1bfbc98bd0f166dff455e562de7dd8b637fa79ee4b0a82adcdf2`, took 28.8 seconds and found
 nothing.  The initial table/witness checks were green.  No long solver was launched, every bounded
 process exited normally, and no background process was left running.
+
+## 2026-08-31 -- terminated the pre-refutation persistent AWS oracle
+
+Fedor asked to shut down and terminate the long-running AWS solver because the refutation of
+singleton-majorization sufficiency leaves its historical cache partly tainted.  The initial
+`check_tables.py` and full witness check were green.  A read-only AWS inventory under account
+`393287594714` found exactly one pending/running/stopping/stopped instance with
+`Project=radio-sa193`: `i-002cabc654b2078ed`, the `r7i.large` persistent oracle run
+`20260821T202105Z`, still in `running` state.  Its build was old commit `d9e3f03`, and its opaque
+base plus mutable snapshots mix positive and negative facts from before the converse was refuted;
+individual positive origins cannot be recovered.  The proof-safe negative `Sa(193)` certificate
+remains a separate provenance-preserving input.
+
+Before termination, read-only SSM commands
+`295e6ccb-fb83-4517-8859-7103df4ba20c` and
+`08f66a1f-98e9-41d6-aaaa-a30123671343` inventoried the service and disk.  This caught a second
+operational issue: the uploaded `STATUS` said `state=running` and had refreshed at 14:23 UTC, but
+there was no oracle process and no `radio-oracle-server` unit at 14:24 UTC.  `server.out` stopped
+after snapshot 146; the last complete mutable snapshot was 9,467,139,696 bytes at
+2026-08-24 23:59:11 UTC, followed by a zero-byte temporary file at the next interval.  Thus the
+instance had already stopped serving while it continued to bill.  Future standing-service status
+must report direct process/unit health rather than only the host heartbeat.
+
+`terminate-instances` moved the exact instance from `running` to `shutting-down`; the EC2 waiter
+then observed `terminated`, with AWS recording `User initiated (2026-08-31 14:25:41 GMT)`.  A
+fresh account-wide query returned no pending, running, stopping or stopped radio-tagged instance.
+The root mapping intentionally had `DeleteOnTermination=false`, so encrypted 50-GiB gp3 volume
+`vol-04260ae18b515e7f5` is now unattached and `available`; no data was deleted.  The post-action
+inventory also found four older unattached 50-GiB `oracle-serve` volumes from the superseded
+same-day launches:
+
+- `vol-0053276ecc6d1adf4` (`20260821T182523Z`);
+- `vol-0621d09062d023bce` (`20260821T183014Z`);
+- `vol-0ef7c8664c6cab66e` (`20260821T184140Z`);
+- `vol-03a28c8c01ae591a1` (`20260821T201625Z`).
+
+All five retained volumes total 250 GiB and continue to incur EBS storage charges.  They were left
+untouched because instance termination did not authorize deletion of persistent data.  The
+operational docs now mark both mixed snapshots unsafe for current work, retire the live-oracle
+instructions, and preserve the old load/restore numbers only as historical performance data.
+The final table, witness and documentation checks, plus `git diff --check`, all passed.
