@@ -12540,21 +12540,21 @@ The first conflated build was interrupted after more than 100 seconds in init.
 Second, after exact search returned, `cacheCantSolve` tried to materialize the 32-part negative's
 permutation-expanded dominance closure.  A live one-second `sample` put all 848 samples below that
 function.  The uncapped diagnostic was still consuming a core at the last retained inventory after
-12:52 CPU and was stopped; this is a failed run worth not repeating.  Dominance insertion now has
-a default deterministic allowance of 1,000,000 recursive nodes per fact.  Every inserted prefix is
-sound, the exact path is visited first, and cutoff affects hit rate only.  The same core's bounded
-insertion took 0.016 seconds and reports `cache=partial:1000000/1000000`.
+12:52 CPU and was stopped; this is a failed run worth not repeating. A temporary deterministic
+one-million-node allowance proved that cache insertion, not exact search, was the cost. It was
+superseded later the same day by exact majorization-bounded, equal-part-quotiented closure; see the
+entry below.
 
 The solver's theorem boundary is now explicit: singleton majorization rejects at every level,
-accepts only through the proved `K<=5` converse, and at `K>=6` accepts only distinct-slot embeddings
-before ordinary exact recursion.  Positive replay requires the new
-`# radio-cache-semantics=singleton-majorization-k5-v1` marker at ingestion, because unsupported
+accepts only distinct-slot embeddings, and sends every other majorized state through ordinary exact
+recursion even at `K<=5`. Positive replay requires the
+`# radio-cache-semantics=singleton-majorization-necessity-only-v1` marker at ingestion, because unsupported
 singleton leaves may have tainted nonsingleton ancestors.  Old unmarked files replay negative-only.
-Oracle snapshots moved to exact v3 and include `MAX_PART_N`; v1/v2 are refused even by
+Oracle snapshots moved to exact v4 and include `MAX_PART_N`; v1--v3 are refused even by
 `restore-any`.
 
 New regressions cover the canonical `G_6` positive, the feasible `j=13` state, the core negative,
-positive/negative exact retention after truncated cache expansion, untrusted singleton and ancestor
+positive/negative exact retention after complete cache expansion, untrusted singleton and ancestor
 positives, and marked versus unmarked cache replay.  The refuter, work-budget, search-context,
 provenance and Pareto-prefix regressions passed.  ASan+UBSan repeated the main regression with no
 finding (leak detection is unsupported by the Apple runtime and was disabled).  Full commands and
@@ -12605,3 +12605,29 @@ regression uses the nonembedded majorized `K=2` state `(3,2^3)` to prove the exa
 (`work=10`) and returns a replayable exact positive.  The star-majorization/refuter regression and
 the old-marker/new-marker cache regression passed.  A small v4 oracle snapshot round trip restored
 the exact positive (5 branches, 312 bytes), while `restore-any` rejected a v3 header.
+
+## 2026-08-31 -- exact cache closure replaces the arbitrary insertion cutoff
+
+Fedor proposed stopping negative upward closure at the majorization bound instead of retaining the
+new one-million-node cutoff. The sound prefix test carries the star expansion of all chosen harder
+parts plus the untouched original remainder. That is the easiest completion: once it exceeds a
+`G_k` prefix, coordinatewise upward replacements cannot return to the admissible region.
+
+This condition alone did not make the K=6 core tractable. An unbounded diagnostic still reached its
+60-CPU-second limit, and the first million visited nodes all remained majorized. The separate cause
+was exact symmetry duplication: `cacheCantSolve` chose each occurrence of fifteen equal 8s and
+replayed the identical remaining-multiset subtree. Choosing one representative per equal part is
+canonical because the recursive suffix preserves the sorted multiset. With both changes, exact
+unbounded insertion of `(64,63,57^2,42^4,22^7,8^15)` takes 30 recursive nodes, prunes 203 branches
+at the majorization boundary, and finishes below 0.001 profiler seconds. The positive `j=13`
+closure also finishes unbounded: 2,602,239 nodes in 0.054 CPU seconds. The default insertion limit
+is therefore zero; a nonzero value remains only as a diagnostic override.
+
+An independent tiny-universe regression compares the negative cache with coordinatewise
+perfect-matching dominance for every normalized three-part in-bound `K=3` state. It passed all
+65,025 seed/query comparisons over 255 non-unit seeds, including repeated-part states. The
+production regression now requires no truncation and reports the 30-node/203-prune K=6 closure.
+The first harness draft incorrectly included `(1:1)`, which Unit Group Triviality removes before
+cache insertion; sanitizer then caught its collision with branch metadata slot 1. Restricting the
+census to the normalized cache domain removed the invalid input, and ASan+UBSan passed both this
+regression and the full K=6 production regression.

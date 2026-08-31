@@ -96,11 +96,11 @@ of the input even though hardware speed no longer chooses the finite stopping po
 2026-08-13); measured context is in `evidence/deadline_stall_2026-08-10.txt` and
 `evidence/work_budget_rb_root_2026-08-13.txt`.
 
-Dominance-cache population is likewise finite: each fact gets
-`RADIO_CACHE_INSERT_NODE_LIMIT=1000000` recursive insertion nodes. A `cache=partial:` annotation
-means the verdict is final but only a sound prefix of its monotone closure was retained. Set the
-limit to zero only for a controlled comparison; a 30-part singleton negative spent more than 12.9
-CPU minutes in the old unbounded insertion after its exact proof had taken milliseconds. See
+Dominance-cache population is exact by default. Negative upward closure carries the star expansion
+of its easiest completion and stops at the necessary `G_k` majorization boundary; equal choices are
+quotiented. The 30-part K=6 negative that spent more than 12.9 CPU minutes in the old unbounded
+permutation expansion now closes in 30 recursive nodes with 203 boundary prunes. A nonzero
+`RADIO_CACHE_INSERT_NODE_LIMIT` remains a diagnostic override, not the production default. See
 `evidence/main_solver_singleton_refutation_2026-08-31.md`.
 
 ## Be skeptical of what you read here

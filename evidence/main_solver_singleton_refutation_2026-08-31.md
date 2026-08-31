@@ -38,7 +38,7 @@ interrupted.  The 32-row query had soundly contracted to the 30-row state before
 neither exact search nor split initialization caused the apparent hang: it was the
 permutation-expanded monotone cache closure of that 30-part negative.
 
-`RADIO_CACHE_PROFILE` on the corrected build then separated the costs exactly:
+`RADIO_CACHE_PROFILE` on the temporary cutoff build first separated the costs exactly:
 
 ```text
 RADIO_CACHE_PROFILE phase=search-end k=6 size=30 singleton=1 verdict=0 seconds=0.004
@@ -49,20 +49,31 @@ The ordinary engine examined 24,795 top-level split combinations and used 36,560
 work units before returning `UNSOLVABLE`.  This is why the production Hall precheck was removed:
 once cache bookkeeping is finite, it provides no material speed benefit on the decisive state.
 
-## Bounded dominance insertion
+## Exact majorization-bounded dominance insertion
 
-Dominance insertion is an optimization after a verdict, not part of its proof.  Each recursive
-insertion step adds only a valid monotone consequence of the exact fact.  It is therefore sound to
-stop after any prefix: truncation can remove future hits but cannot manufacture a verdict.
+The arbitrary cutoff was a sound emergency fix but is no longer the default. Negative upward
+closure now tracks the star expansion of the chosen harder components together with every
+untouched original component. This is the easiest possible completion of that cache prefix. If it
+violates a `G_k` prefix, every coordinatewise-harder completion violates Singleton Majorization
+Necessity too, so the whole branch is irrelevant to production lookup and is skipped.
 
-`RADIO_CACHE_INSERT_NODE_LIMIT` now defaults to 1,000,000 recursive nodes per fact.  The exact
-queried path is visited first.  A truncated ordinary query prints
-`cache=partial:1000000/1000000`; cache replay and oracle statistics report aggregate truncations.
-Setting the limit to zero restores the historical unbounded behavior for a controlled comparison.
+That bound alone was insufficient: an unbounded diagnostic with the new prefix test still hit its
+60-CPU-second cap. The recursion was separately choosing each occurrence of an equal component,
+although those choices have the same cache edge and remaining multiset. Choosing one canonical
+representative per equal value removes this duplicate factorial expansion. With both corrections,
+the unbounded mass-683 negative insertion completes in 30 recursive nodes, rejects 203 branches at
+the majorization boundary, and takes below the profiler's 0.001-second resolution. The unbounded
+positive `j=13` closure also completes: 2,602,239 nodes in 0.054 CPU seconds.
 
-The production regression checks both directions: the feasible 32-part `j=13` fact and infeasible
-30-part mass-683 core remain exact trie hits after their dominance expansions truncate.  The older
-mass-697 and padded forms are rejected as upward consequences of the smaller negative.
+`RADIO_CACHE_INSERT_NODE_LIMIT` therefore defaults to zero. A nonzero value remains available for
+controlled diagnostics; if it truncates, every retained consequence is still sound and
+`cache=partial:N/N` remains an explicit annotation.
+
+The production regression checks both directions without truncation: the feasible 32-part `j=13`
+fact and infeasible 30-part mass-683 core remain exact trie hits. The older mass-697 and padded forms
+are rejected as upward consequences of the smaller negative. A separate exhaustive `K=3` regression
+compares the cache against an independent coordinatewise perfect-matching definition for 255
+normalized non-unit seeds and all 65,025 in-bound seed/query pairs; every relation agrees.
 
 ## Cache trust epoch
 
@@ -90,13 +101,21 @@ tools/singleton_main_solver_regression.sh
 Its optimized build reports:
 
 ```text
-SINGLETON_MAIN_SOLVER_REGRESSION verdict=FALSE work=36560 cache_nodes=1000000 low_k_exact=YES ignored_untrusted_positive=2
+SINGLETON_MAIN_SOLVER_REGRESSION verdict=FALSE work=36560 cache_nodes=30 cache_majorization_prunes=203 low_k_exact=YES ignored_untrusted_positive=2
 ```
 
 It checks that a nonembedded majorized `K=2` state consumes exact-recursion work, canonical `G_6`,
 the feasible `j=13` transfer state, the exact mass-683 negative and its
 mass-697/full-padded upward consequences, rejection of an unmarked singleton positive, rejection of an unmarked tainted
-nonsingleton ancestor, and exact positive/negative retention after bounded cache insertion.
+nonsingleton ancestor, and exact unbounded positive/negative cache insertion.
+
+The independent cache-closure regression is:
+
+```sh
+tools/cache_upward_closure_regression.sh
+```
+
+It reports `seeds=255 queries=65025 result=PASS`.
 
 The separate cache-epoch regression is:
 
@@ -107,6 +126,6 @@ tools/cache_semantics_regression.sh
 Additional passing checks on the working tree were `tools/test_radio_refute.sh`,
 `tools/work_budget_regression.sh`, `tools/search_context_regression.sh`,
 `tools/provenance_regression.sh`, and `tools/test_pareto_prefix_census.sh`.  An ASan+UBSan build of
-the main regression (Apple leak detection disabled because that platform does not support it)
-completed with no sanitizer finding.  A small oracle v4 snapshot round trip restored identical
-cache structure statistics.
+the main and normalized cache-closure regressions (Apple leak detection disabled because that
+platform does not support it) completed with no sanitizer finding. A small oracle v4 snapshot
+round trip restored identical cache structure statistics.

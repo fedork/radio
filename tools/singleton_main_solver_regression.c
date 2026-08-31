@@ -122,16 +122,19 @@ int main(void) {
         return 1;
     }
 
-    /* The general dominance trie explores component permutations.  Its deterministic insertion
-       allowance must retain the exact negative while stopping the otherwise factorial closure.
-       The ordinary canSolveB call above performs this insertion. */
+    /* The general dominance trie must retain the exact negative and exhaust its upward closure
+       inside the necessary majorization region.  Equal parts have one canonical choice, so the
+       fifteen equal 8s do not generate duplicate permutation subtrees. */
     if (checkCacheTrie(core, size, 6) != FALSE
-        || RADIO_CACHE_INSERT_NODE_LIMIT == 0
-        || !cache_insert_truncated
-        || cache_insert_nodes != RADIO_CACHE_INSERT_NODE_LIMIT
-        || truncated_cache_insertions != truncated_before + 1) {
-        fprintf(stderr, "bounded dominance insertion failed nodes=%llu truncated=%d\n",
-                (unsigned long long)cache_insert_nodes, cache_insert_truncated);
+        || RADIO_CACHE_INSERT_NODE_LIMIT != 0
+        || cache_insert_truncated
+        || cache_insert_nodes == 0
+        || cache_insert_majorization_prunes == 0
+        || truncated_cache_insertions != truncated_before) {
+        fprintf(stderr, "majorization-bounded dominance insertion failed "
+                "nodes=%llu prunes=%llu truncated=%d\n",
+                (unsigned long long)cache_insert_nodes,
+                (unsigned long long)cache_insert_majorization_prunes, cache_insert_truncated);
         return 1;
     }
 
@@ -155,8 +158,9 @@ int main(void) {
     }
 
     printf("SINGLETON_MAIN_SOLVER_REGRESSION verdict=FALSE work=%llu cache_nodes=%llu "
-           "low_k_exact=YES ignored_untrusted_positive=%lld\n",
+           "cache_majorization_prunes=%llu low_k_exact=YES ignored_untrusted_positive=%lld\n",
            (unsigned long long)work, (unsigned long long)cache_insert_nodes,
+           (unsigned long long)cache_insert_majorization_prunes,
            ignored_positive_cache_replays);
     return 0;
 }

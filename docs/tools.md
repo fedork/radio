@@ -575,10 +575,12 @@ library's stdout at stderr after the provenance banner, so the banner stays with
 would hang the daemon. `budget 0` removes the deadline and accepts that some states never return.
 Never record a `MAYBE` as a negative — that is exactly how the 2023 corpus acquired 37 false ones.
 
-**It grows forever.** The result cache is never freed; that is the point, but wrap an unattended
-session in `tools/capped_run.sh`. Population of one fact is nevertheless finite: the default
-`RADIO_CACHE_INSERT_NODE_LIMIT=1000000` bounds recursive dominance expansion. `cache=partial:N/N`
-means the solver proved the verdict and retained a sound partial closure; it is not `MAYBE`.
+**It grows forever.** The result cache is never freed; that is the point, so wrap an unattended
+session in `tools/capped_run.sh`. Per-fact dominance insertion is exact by default. Negative upward
+closure does not enter a branch whose easiest completion violates star-expansion majorization, and
+equal source parts have one canonical choice. A nonzero `RADIO_CACHE_INSERT_NODE_LIMIT` is retained
+only as a diagnostic override; if used, `cache=partial:N/N` means a final verdict with a sound
+partial closure, not `MAYBE`.
 
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
 reloads it linearly instead of re-deriving every dominance closure. Snapshot v4 begins the
@@ -615,7 +617,7 @@ For phase attribution, compile with any of `RADIO_INIT_PROFILE`, `RADIO_SPLIT_PR
 `RADIO_CACHE_PROFILE`. They time eager initialization, lazy split/FAST construction, and the
 search-versus-dominance-insertion boundary respectively. The K=6 mass-683 core showed why the
 separation matters: exact recursion took 0.004 seconds while the old unbounded dominance insertion
-continued beyond 12.9 CPU minutes. See the
+continued beyond 12.9 CPU minutes. The corrected exact insertion takes 30 nodes; see the
 [main-solver correction record](../evidence/main_solver_singleton_refutation_2026-08-31.md).
 
 Note that `parse_out.sh` keeps only the verdict, **discarding the `with [...]` split
@@ -730,7 +732,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce the exact-support `K=6` singleton-majorization counterexample, its 14-transfer phase boundary, residual hole, forced bands, and earlier rule counterexamples |
 | `tools/singleton_direct_split_cleanroom.cpp` | independently enumerate legal singleton row triples into three sorted child multisets, with no Hall code or shared cache; solve arbitrary first-cut queries, check the padded/mass-697/mass-683 `K=6` holes and the feasible one-8 deletion with slack-correct residual bounds, and classify all 176 bands on the fixed rank-15/32 face |
 | `tools/singleton_direct_split_regression.sh` | provenance-build the clean-room direct-row solver and run its canonical `G_6`, `j=13`, three negative counterexample forms, feasible one-8 deletion, fixed-face, naive-oracle and exhaustive `K<=3` controls |
-| `tools/singleton_main_solver_regression.sh` | check that a nonembedded majorized `K=2` singleton reaches exact recursion, plus canonical / `j=13` / mass-683 exact negative and its upward consequences, cache-taint rejection, and bounded exact positive/negative dominance insertion |
+| `tools/singleton_main_solver_regression.sh` | check that a nonembedded majorized `K=2` singleton reaches exact recursion, plus canonical / `j=13` / mass-683 exact negative and its upward consequences, cache-taint rejection, and exact positive/majorization-bounded-negative dominance insertion |
+| `tools/cache_upward_closure_regression.sh` | exhaust the normalized non-unit three-part `K=3` cache universe and compare every in-bound negative upward consequence with an independent coordinatewise perfect-matching test; locks equal-part quotienting and the majorization boundary |
 | `tools/cache_semantics_regression.sh` | check that unmarked cache input is negative-only while the current semantic marker admits positive Sb and Sa facts |
 | `tools/singleton_tight_band_certificate.cpp` | emit deterministic no-first-cut certificates from two tight anchors; count exact-support/band spaces, exhaust the positive-mixed-floor `K=5` faces, and minimize transfer distance over all capacity-certificate cap vectors; contains no split search or Hall code |
 | `tools/singleton_tight_band_regression.sh` | provenance-build and run the inequality-only regression, complete 613,689,090-instance `K=5` certificate census, and independent direct-row controls/fixed-face classification |

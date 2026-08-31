@@ -527,10 +527,11 @@ int main(int argc, char **argv) {
             respond("OK queries=%ld solvable=%ld unsolvable=%ld maybe=%ld total_ms=%.0f "
                     "loaded=%lld skipped_wide=%lld skipped_k=%lld "
                     "skipped_untrusted_positive=%lld malformed=%lld redundant=%lld "
-                    "truncated_cache_insertions=%lld",
+                    "truncated_cache_insertions=%lld majorization_pruned_cache_branches=%lld",
                     n_query, n_true, n_false, n_maybe, total_ms,
                     n_loaded, n_skipped_wide, n_skipped_k, n_skipped_positive, n_malformed,
-                    redundant_cache_replays, truncated_cache_insertions);
+                    redundant_cache_replays, truncated_cache_insertions,
+                    majorization_pruned_cache_branches);
             continue;
         }
         if (!strncmp(line, "budget ", 7)) {

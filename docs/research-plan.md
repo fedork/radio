@@ -243,9 +243,10 @@ is:
    recursion, and the research Hall search was deliberately not copied into the main trust base.
    Positive cache replay now requires the necessity-only semantic marker, including
    possibly tainted nonsingleton ancestors. Total-state and one-component compile bounds are
-   separated, and dominance-cache insertion has a deterministic finite allowance. The mass-683
-   core is now the exact production negative, with the mass-697 and padded forms checked as upward
-   consequences alongside canonical `G_6` and `j=13` controls. See the
+   separated. Negative dominance-cache closure is exact inside the necessary star-majorization
+   region and quotients equal-part choices; the arbitrary insertion allowance is disabled by
+   default. The mass-683 core is now the exact production negative, with the mass-697 and padded
+   forms checked as upward consequences alongside canonical `G_6` and `j=13` controls. See the
    [main-solver record](../evidence/main_solver_singleton_refutation_2026-08-31.md).
 
 Separately, replace each nonembedded majorized witness leaf by an individual exact/canonical

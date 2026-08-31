@@ -592,12 +592,12 @@ static uint32_t front_record_live;
 #define CACHE_L1_MAX_PARTS 12u
 #endif
 
-/* Dominance insertion is an optimization, not part of a verdict.  Its permutation expansion can
-   be enormous for long states, so give every fact a deterministic recursive-node allowance.
-   Every prefix of an insertion contains only valid monotone consequences; truncation sacrifices
-   future hits but cannot change an answer.  Zero requests the historical unbounded behavior. */
+/* Dominance insertion is exact by default.  Negative upward closure is restricted to the region
+   passing star-expansion majorization, and equal-part choices are quotiented below.  A nonzero
+   value remains available for controlled experiments; truncation sacrifices hits, never changes
+   a verdict. */
 #ifndef RADIO_CACHE_INSERT_NODE_LIMIT
-#define RADIO_CACHE_INSERT_NODE_LIMIT UINT64_C(1000000)
+#define RADIO_CACHE_INSERT_NODE_LIMIT UINT64_C(0)
 #endif
 struct cache_l1_entry {
     uint32_t hash;
@@ -640,8 +640,10 @@ static int cache_replay_depth;
 static int cache_replay_accept_positive;
 long long ignored_positive_cache_replays = 0;
 long long truncated_cache_insertions = 0;
+long long majorization_pruned_cache_branches = 0;
 static uint64_t cache_insert_nodes;
 static uint64_t cache_insert_nodes_remaining;
+static uint64_t cache_insert_majorization_prunes;
 static int cache_insert_truncated;
 
 static inline int cache_insert_enter(void) {
@@ -651,6 +653,35 @@ static inline int cache_insert_enter(void) {
     }
     if (RADIO_CACHE_INSERT_NODE_LIMIT != 0) cache_insert_nodes_remaining--;
     cache_insert_nodes++;
+    return TRUE;
+}
+
+/* Negative dominance closure replaces parts by coordinatewise larger parts.  Track the star
+   expansion of the already-chosen replacements plus the untouched (and therefore smallest)
+   remaining parts.  If that easiest completion exceeds a G_k prefix, every completion below the
+   cache edge does too, so the entire upward branch is outside the solver's necessary region.
+
+   Equal star widths need only be checked at the end of their run: relative to the non-increasing
+   G_k profile, the successive prefix differences have non-decreasing increments, hence their
+   maximum on the run is at an endpoint. */
+static inline void cache_star_counts_adjust(int *counts, int sbb, int direction) {
+    counts[sbb_to_n1[sbb]] += direction * sbb_to_n2[sbb];
+}
+
+static int cache_star_counts_majorized(const int *counts, int k) {
+    long long left_prefix = 0;
+    int rank = 0;
+    int right_len = singleton_base_len[k];
+    int right_total = singleton_base_prefix[k][right_len - 1];
+    for (int n = MAX_PART_N; n >= 1; n--) {
+        int copies = counts[n];
+        if (copies == 0) continue;
+        left_prefix += (long long)copies * n;
+        rank += copies;
+        int right_prefix = rank <= right_len
+            ? singleton_base_prefix[k][rank - 1] : right_total;
+        if (left_prefix > right_prefix) return FALSE;
+    }
     return TRUE;
 }
 
@@ -1163,7 +1194,7 @@ int cacheCanSolve(uint32_t *node, int *sb, int size, int k, int max_sbb,
 }
 
 int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, int pairs,
-                   int pairs_remaining, int n_remaining) {
+                   int pairs_remaining, int n_remaining, int *star_counts) {
     if (!cache_insert_enter()) return 0;
     if (size < 1) {
         printf("\nempty negative cache insertion\n");
@@ -1192,12 +1223,17 @@ int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, i
     int sb[size];
     memcpy(sb, sb_orig, (size_t)size * sizeof(int));
     for (int i = 0; i < size; i++) {
+        /* Choosing either occurrence of an equal part produces the same remaining multiset and
+           the same cache edge.  Replaying that subtree once per occurrence caused a factorial
+           blow-up on long singleton runs (notably the fifteen 8s in the K=6 core). */
+        if (i > 0 && sb_orig[i] == sb_orig[i - 1]) continue;
         if (i > 0) {
             int tmp = sb[i];
             sb[i] = sb[0];
             sb[0] = tmp;
         }
         int sbb = *sb;
+        cache_star_counts_adjust(star_counts, sbb, -1);
         int *greater = sbb_greater[sbb];
         int pairs_without_this = pairs - sb_pairs[sbb];
         int max_pairs = power3[k] - pairs_without_this;
@@ -1211,14 +1247,23 @@ int cacheCantSolve(uint32_t *node, int *sb_orig, int size, int k, int max_sbb, i
                    already refutes are unreachable, but other part permutations in this call may
                    still add information, so skip this edge rather than returning from the call. */
                 if (front_has_lesser_equal(negative_front, sbb2)) continue;
-                if (b == NULL) b = ensure_branch(node, (uint32_t)max_sbb + 1);
                 int next_pairs = pairs_remaining - pairs_new;
                 int next_n = n_remaining - sbb_to_n1[sbb2] - sbb_to_n2[sbb2];
-                updated += cacheCantSolve(&b->slot[sbb2], sb + 1, size - 1, k, sbb2,
-                                          pairs_without_this + pairs_new, next_pairs, next_n);
+                cache_star_counts_adjust(star_counts, sbb2, 1);
+                if (cache_star_counts_majorized(star_counts, k)) {
+                    if (b == NULL) b = ensure_branch(node, (uint32_t)max_sbb + 1);
+                    updated += cacheCantSolve(&b->slot[sbb2], sb + 1, size - 1, k, sbb2,
+                                              pairs_without_this + pairs_new, next_pairs, next_n,
+                                              star_counts);
+                } else {
+                    cache_insert_majorization_prunes++;
+                    majorization_pruned_cache_branches++;
+                }
+                cache_star_counts_adjust(star_counts, sbb2, -1);
                 if (cache_insert_truncated) break;
             }
         }
+        cache_star_counts_adjust(star_counts, sbb, 1);
         if (cache_insert_truncated) break;
     }
     if (b != NULL) fold_empty_branch(node);
@@ -1239,10 +1284,18 @@ void cache(int *sb, int size, int canSolve, int k, int pairs) {
     long long alloc_size_before = alloc_size;
     cache_insert_nodes = 0;
     cache_insert_nodes_remaining = RADIO_CACHE_INSERT_NODE_LIMIT;
+    cache_insert_majorization_prunes = 0;
     cache_insert_truncated = FALSE;
-    int updated = canSolve
-        ? cacheCanSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, power3[k], MAX_N)
-        : cacheCantSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, pairs, power3[k], MAX_N);
+    int updated;
+    if (canSolve) {
+        updated = cacheCanSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, power3[k], MAX_N);
+    } else {
+        int star_counts[MAX_PART_N + 1];
+        memset(star_counts, 0, sizeof(star_counts));
+        for (int i = 0; i < size; i++) cache_star_counts_adjust(star_counts, sb[i], 1);
+        updated = cacheCantSolve(&sb_cache_root[k], sb, size, k, MAX_SBB, pairs, power3[k],
+                                 MAX_N, star_counts);
+    }
     debug_printf(" cache=%lld/%lld(%+lld/%+lld) fronts=%lld/%lld",
                  alloc_count, alloc_size, alloc_count - alloc_count_before,
                  alloc_size - alloc_size_before, front_alloc_count, front_alloc_size);
@@ -2724,9 +2777,11 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     cache(tmp, size, canSolve, k, pairs);
 #ifdef RADIO_CACHE_PROFILE
     fprintf(stderr, "RADIO_CACHE_PROFILE phase=dominance-end k=%d query_size=%d "
-            "cache_size=%d verdict=%d nodes=%llu truncated=%d seconds=%.3f\n",
+            "cache_size=%d verdict=%d nodes=%llu majorization_prunes=%llu truncated=%d "
+            "seconds=%.3f\n",
             k, query_size, size, canSolve,
-            (unsigned long long)cache_insert_nodes, cache_insert_truncated,
+            (unsigned long long)cache_insert_nodes,
+            (unsigned long long)cache_insert_majorization_prunes, cache_insert_truncated,
             (double)(clock() - cache_profile_started) / CLOCKS_PER_SEC);
     fflush(stderr);
 #endif
@@ -3424,6 +3479,7 @@ void parse_file(char *file_name) {
     int saved_accept_positive = cache_replay_accept_positive;
     long long ignored_before = ignored_positive_cache_replays;
     long long truncated_before = truncated_cache_insertions;
+    long long majorization_pruned_before = majorization_pruned_cache_branches;
     cache_replay_depth++;
     cache_replay_accept_positive = FALSE;
     printf("\nreading file %s\n", file_name);
@@ -3503,10 +3559,11 @@ void parse_file(char *file_name) {
     fclose(fp);
     cache_replay_depth--;
     printf("done positive_replay=%s ignored_untrusted_positive=%lld "
-           "truncated_cache_insertions=%lld\n",
+           "truncated_cache_insertions=%lld majorization_pruned_cache_branches=%lld\n",
            cache_replay_accept_positive ? "trusted" : "negative-only",
            ignored_positive_cache_replays - ignored_before,
-           truncated_cache_insertions - truncated_before);
+           truncated_cache_insertions - truncated_before,
+           majorization_pruned_cache_branches - majorization_pruned_before);
     cache_replay_accept_positive = saved_accept_positive;
     fflush(stdout);
 }
