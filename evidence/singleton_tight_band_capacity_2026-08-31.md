@@ -1,7 +1,8 @@
-# Tight-Band Capacity Obstruction and the complete `K=6` rank-15/32 face
+# Tight-Band Capacity Obstruction: fixed face, `K=5` boundary, and certificate distance
 
-Status: **analytic obstruction proved; certificate extractor and fixed-face classification
-complete, provenance-built, and sanitizer-checked** (2026-08-31).
+Status: **analytic obstruction proved; fixed-face classification, complete `K=5` certificate
+census, and global minimum-distance optimization within this obstruction class are
+provenance-built and sanitizer-checked** (2026-08-31).
 
 The theorem and proof are in
 [`docs/theorems/tight-band-capacity.md`](../docs/theorems/tight-band-capacity.md).  This record
@@ -13,7 +14,9 @@ classification of the surrounding finite face.
 [`tools/singleton_tight_band_certificate.cpp`](../tools/singleton_tight_band_certificate.cpp)
 recomputes `G_K`, its prefix functions, every tight rank and every monotone endpoint transition.
 It applies only the proved mixed-floor and pure-capacity inequalities.  It contains no row-split
-search, Hall test, result cache or code from `singleton_pascal_interval_census.cpp`.
+search, Hall test, result cache or code from `singleton_pascal_interval_census.cpp`.  Its extended
+modes count dominated exact-length bands, enumerate every band on which the mixed floor is
+positive, and minimize transfer distance over the finite disjunction of capacity inequalities.
 
 [`tools/singleton_direct_split_cleanroom.cpp`](../tools/singleton_direct_split_cleanroom.cpp)
 independently enumerates the legal integer row triples and verifies the three sorted child
@@ -90,6 +93,104 @@ The direct face census used 141,216 DFS nodes in total.  Its largest search was 
 9,345 nodes.  The 175 positive results are first-cut feasibility results only; their majorized
 children are not thereby proved recursively solvable.
 
+## Exact `K=5` boundary size
+
+Minimum-Support Reduction leaves the full-mass `K=5` problem on exactly 32 positive rows.  A
+memoized exact-partition count, independently checked against the known `K=3,4` counts, gives
+
+    exact-support parents        1,431,800,647,444
+    strict internal-prefix states  147,422,086,892
+    states with a tight skeleton 1,284,378,560,552.
+
+Here “strict” means strictly below the `G_5` prefix at every rank 1 through 31.  Thus even the
+proved support reduction leaves 1.43 trillion parents, and literal tight-skeleton factorization
+still leaves 147 billion strict states.  A flat `K=5` first-cut census is not a plausible next
+step.
+
+Across all 528 canonical rank bands, the corresponding exact dominated-band count is
+8,973,226,867,713 state--band instances.  The Tight-Band Capacity Obstruction can fire only when
+`delta_v=H(v)-H(v-1)>0`.  Since `G_4` has support 16, this restricts `K=5` to the 136 anchor pairs
+
+    0 <= u < v <= 16.
+
+Those faces contain 613,689,090 dominated exact-length bands in total; the largest is `[0,16)`
+with 228,246,747 bands.
+
+## Complete `K=5` capacity-certificate census
+
+The inequality-only enumerator checked all 613,689,090 relevant `K=5` band instances:
+
+    TIGHT_BAND_CAPACITY_SURVEY K=5 complete=YES verified=YES
+      bands=136 states=613689090 certified_bands=0 certified_states=0
+
+This is a complete negative result for this **certificate class**, not a positive first-cut
+theorem.  It says that no pair of tight `K=5` anchors can obstruct every endpoint transition by
+the theorem's mixed-floor/pure-capacity inequalities.  A `K=5` hole could still exist without such
+a certificate, including in the 147-billion-state strict interior where there are no internal
+tight anchors at all.  Consequently `K=5` remains undecided.
+
+The exhaustive enumeration also cross-checks the separate optimization below.  At `K=3` and
+`K=4`, the analogous positive-floor corpora have 22 and 3,863 band instances and likewise contain
+no certificate, as soundness requires from the known positive first-cut censuses.
+
+## Global minimum distance within the obstruction class
+
+For a fixed anchor pair, every endpoint transition supplies the integer disjunction
+
+    B(s_L) <= L + s_L delta - 1
+      or
+    B(s_R) <= R + s_R delta - 1,
+
+where `B(s)` is the sum of the `s` largest band rows.  The optimizer processes these clauses,
+retains the componentwise maximal prefix-cap vectors, and uses an exact dynamic program over
+`(rank, remaining mass, previous row)` to minimize
+
+    sum_i |b_i-c_i|
+
+under each vector.  A row below the mixed floor is optimized as a separate disjunct.  Discarding a
+stronger cap vector is sound because every partition satisfying it also satisfies a weaker vector;
+every capacity certificate selects at least one blocked side of every transition and is therefore
+represented.  The reconstructed minimizer is replayed through the ordinary analyzer.
+
+The complete results are
+
+| level | eligible anchor pairs | maximal blocking-cap vectors | faces admitting a certificate | minimum distance |
+|---:|---:|---:|---:|---:|
+| 3 | 10 | 17 | 0 | none |
+| 4 | 36 | 74 | 0 | none |
+| 5 | 136 | 528 | 0 | none |
+| 6 | 528 | 38,131 | 3 | 14 |
+
+At `K=6`, the only three anchor faces admitting any certificate are the already known
+`(15,30)`, `(15,31)` and `(15,32)` faces.  The global minimizer is displayed at the shortest
+endpoint as
+
+    anchors=(15,30), canonical band=(22,7^14), minimizing band=(8^15).
+
+Putting the canonical head and tail back recovers exactly the known parent with intervening rows
+`(8^15,7^2)`.  Its transfer distance is 14.  Therefore:
+
+> No exact-support `K=6` parent at transfer distance at most 13 from `G_6` has a Tight-Band
+> Capacity certificate, and distance 14 is globally minimal among all parents certified by this
+> two-anchor theorem.
+
+This is **not** global hole minimality: an uncertified first-cut hole could lie closer.  A direct
+flat census of that remaining question is already large.  Exact shell counting gives 5,189,450,419
+exact-support parents through distance 13 and another 9,960,648,265 at distance 14.  The shell
+counter agrees with direct enumeration at `K<=4`; the `K=6` figures are from the memoized exact
+dynamic program and serve here as search-sizing data, not a first-cut verdict.
+
+The standard regression wrapper reproduces the boundary counts, optimizer and complete `K=5`
+certificate enumeration.  To reproduce the transfer-shell sizing separately:
+
+```sh
+tmp_bin=/tmp/singleton-tight-band-certificate
+CC=clang++ tools/build_radio.py -std=c++20 -O3 -Wall -Wextra -pedantic \
+  tools/singleton_tight_band_certificate.cpp -o "$tmp_bin"
+tools/run_with_provenance.py "$tmp_bin" count-transfer-shells 4 14
+tools/run_with_provenance.py "$tmp_bin" count-transfer-shells 6 14
+```
+
 ## Controls
 
 The inequality-only extractor reports no certificate on transfer steps `j=0,...,13` and all three
@@ -105,8 +206,9 @@ As a false-obstruction control, it scans every full-mass majorized partition at 
 | 3 | 1,206 | 0 |
 
 The total is 1,223 states.  The separate direct solver already finds a first cut for every one.
-The previously completed `K=4` first-cut census has no holes, so certificate coverage there is
-vacuous; it was not rerun inside this small extractor.
+The band enumerator additionally scans all 22, 3,863 and 613,689,090 positive-floor band instances
+at `K=3,4,5`, respectively, and finds no certificate.  The first two results agree with the known
+complete positive first-cut censuses.  At `K=5`, absence remains `UNKNOWN`, not `FEASIBLE`.
 
 ## Clean provenance and cost
 
@@ -135,10 +237,26 @@ An initial exploratory provenance build accidentally omitted `CC=clang++`; the C
 the linker without the C++ runtime and failed after 1.85 seconds.  It executed no survey and
 produced no research verdict.  The checked regression wrapper sets `CC=clang++` explicitly.
 
+The extended count/enumeration/optimization modes were frozen at clean commit
+`9cc58b93e4403a7412e609bf30d5806e5b67a65a`.  The optimized capacity build has source SHA-256
+`af07e6ce1313a441bb766ac6196a92839ef60daa9901ba97beced9ebcaf83c21` and build ID
+`5bd50b81bb5bbe20eff11b23b595f68e8c1b13a87e03122e37ebacbc5f2c0c55`.  The standard wrapper now
+runs the complete 613,689,090-instance `K=5` capacity census as well as the optimizer and the
+independent direct-row controls; the clean capped invocation completed in 30 wall seconds.  Both
+source and worktree dirty flags were `no`.
+
+A clean AddressSanitizer plus UndefinedBehaviorSanitizer build repeated the count and optimization
+regression with no finding.  It used the same source hash and commit, build ID
+`98258f92cc9c1bfbc98bd0f166dff455e562de7dd8b637fa79ee4b0a82adcdf2`, and
+`ASAN_OPTIONS=detect_leaks=0` for the macOS LeakSanitizer limitation.  The build plus run took
+28.8 wall seconds.  The 613-million-instance enumeration itself was exercised by the optimized
+clean wrapper, not repeated under sanitizers.
+
 ## Scope and next boundary
 
 The Tight-Band Capacity Obstruction is a sound one-sided certificate.  The complete fixed-face
-survey shows that it catches the only hole on this face, but that is not evidence that every hole
-on every face has a two-anchor certificate.  The remaining next questions are `K=5`, broader
-`K=6` support/face minimality, and whether newly found holes require laminar multi-anchor or general
-Hall-dual certificates.
+survey shows that it catches the only hole on that face, while the complete `K=5` certificate
+census shows that this obstruction class is empty there.  Neither result proves that every hole
+has a two-anchor certificate.  The remaining questions are the actual `K=5` first-cut problem,
+global `K=6` hole minimality beyond this certificate class, and whether newly found uncertified
+holes require laminar multi-anchor or general Hall-dual certificates.

@@ -39,7 +39,10 @@ the [verification record](../../evidence/singleton_direct_split_cleanroom_2026-0
 The rank-15/32 argument is now an instance of the proved
 [Tight-Band Capacity Obstruction](tight-band-capacity.md).  Its inequality-only extractor and an
 independent direct-row enumeration also show that `(8^15,7^2)` is the unique first-cut hole among
-all 176 dominated 17-row bands on this fixed face; this does not claim global `K=6` minimality.
+all 176 dominated 17-row bands on this fixed face.  A complete inequality census finds no
+two-anchor capacity certificate on any of the 613,689,090 eligible `K=5` band instances, while an
+exact prefix-cap optimization proves that distance 14 is globally minimal among all `K=6` parents
+certified by this obstruction.  Neither result settles `K=5` or global `K=6` hole minimality.
 
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the

@@ -164,10 +164,38 @@ d(b,c)=\tfrac12\sum_i |b_i-c_i|,
 \qquad c=(22,7^{16}),
 \]
 
-its distance is 14 and hence is minimal on this face.  This is not a claim of global `K=6`
-minimality: rows outside `[15,32)`, other tight skeletons, other support sizes, and `K=5` remain to
-be surveyed.  The enumeration, replay policy, node counts and provenance are in the
+its distance is 14 and hence is minimal on this face.  This is not by itself a claim of global
+`K=6` hole minimality; the exhaustive boundary of the **certificate class** is sharpened below.
+The enumeration, replay policy, node counts and provenance are in the
 [capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
+
+## Exhaustive boundary of this certificate class
+
+The obstruction can be surveyed without searching row allocations.  For each anchor pair, every
+transition gives the disjunction
+
+\[
+B(s_L)\le L_{p,q}+s_L\delta_v-1
+\quad\hbox{or}\quad
+B(s_R)\le R_{p,q}+s_R\delta_v-1,                              \tag{TB4}
+\]
+
+where `B(s)` is the band prefix sum.  Selecting one side of each disjunction gives finitely many
+additional prefix caps.  Componentwise stronger cap vectors may be discarded, and a dynamic
+program over sorted partitions minimizes half the `l1` distance to the canonical band under every
+remaining vector.  Rows below `delta_v` form one additional disjunct.  This exhausts precisely the
+certificates allowed by the theorem, not all possible first-cut obstructions.
+
+At `K=5`, `delta_v>0` forces `v<=16`.  Complete enumeration of all 613,689,090 dominated bands on
+the resulting 136 anchor faces finds no certificate.  Thus the two-anchor theorem cannot settle
+`K=5`; absence is not a positive first-cut verdict.
+
+Across all 528 eligible `K=6` anchor faces, the exact optimization finds minimum transfer distance
+14.  The minimizer at anchors `(15,30)` replaces `(22,7^14)` by `(8^15)`; restoring the canonical
+tail gives the same counterexample band `(8^15,7^2)`.  Therefore distance 14 is globally minimal
+within the Tight-Band Capacity certificate class.  It is still unknown whether an uncertified
+`K=6` hole lies closer, and `K=5` remains undecided.  Counts, the optimization argument and clean
+provenance are in the [capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
 
 ## Machine checker
 

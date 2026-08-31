@@ -183,14 +183,22 @@ is:
    An inequality-only checker reproduces the two-case rank-15/32 proof.  On the complete fixed
    `[15,32)` face, independent enumeration finds 176 dominated 17-row bands: the direct solver
    classifies 175 as first-cut feasible, while both implementations identify `(8^15,7^2)` as the
-   unique hole.  Thus transfer distance 14 is minimal on this face, not globally.  See the
+   unique hole.  An extended complete census finds no capacity certificate among all 613,689,090
+   eligible `K=5` bands, while exact prefix-cap optimization makes distance 14 globally minimal
+   within this certificate class at `K=6`.  This does not prove global hole minimality.  See the
    [theorem](theorems/tight-band-capacity.md) and
    [verification record](../evidence/singleton_tight_band_capacity_2026-08-31.md);
 3. settle `K=5`, and minimize the **non-unit core** beyond the fixed face under level, support,
-   transfer distance and a clearly specified dominance/normalization order.  Deleting the harmless
-   `1^32` padding already gives the 32-row mass-697 core, so that does not count as a new smaller
-   obstruction.  Run the tight-band extractor on every new hole; if it misses one, retain that
-   state and seek a laminar multi-anchor or general Hall-dual certificate;
+   transfer distance and a clearly specified dominance/normalization order.  Minimum-Support
+   Reduction leaves 1,431,800,647,444 exact-support `K=5` parents, of which 147,422,086,892 have no
+   internal tight prefix, so do not launch a flat parent census.  The complete zero-certificate
+   result rules out the current two-anchor theorem as the deciding method; next seek a symbolic
+   tight-skeleton automaton, a laminar/general Hall-dual search, or another exact quotient that
+   covers the strict interior.  At `K=6`, the exact-support radius-13 ball already has
+   5,189,450,419 parents, so distance minimality likewise needs a symbolic certificate or a sharper
+   quotient.  Deleting the harmless `1^32` padding already gives the 32-row mass-697 core and does
+   not count as a new smaller obstruction.  Feed every new hole through the extractor; an
+   uncertified hole is the concrete input for the laminar/general-Hall programme;
 4. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color

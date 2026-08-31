@@ -208,8 +208,11 @@ The analytic argument has also been generalized to the proved
 inequality-only extractor finds the preferred `(15,32)` certificate above without performing a
 split search.  Together with a new clean-room face mode, it exhausts all 176 exact 17-row bands
 dominated by `(22,7^16)`: 175 have a majorized first cut and `(8^15,7^2)` is the unique hole.
-Consequently transfer distance 14 is minimal on this fixed face, though not proved globally at
-`K=6`.  See the [capacity record](singleton_tight_band_capacity_2026-08-31.md).
+Consequently transfer distance 14 is minimal on this fixed face.  An extended prefix-cap
+optimization now proves that 14 is also globally minimal among all `K=6` parents carrying a
+Tight-Band Capacity certificate; it does not exclude a closer uncertified hole.  The complete
+`K=5` certificate census is empty and therefore does not decide that level.  See the
+[capacity record](singleton_tight_band_capacity_2026-08-31.md).
 
 All exhaustive runs are regression checks.  The short saturation-and-integrality argument above
 is the proof.

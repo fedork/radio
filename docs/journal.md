@@ -12209,3 +12209,51 @@ This closes P6's general-obstruction item and the first bounded hole survey.  It
 `K=5` or global `K=6` minimality.  The next search should range beyond the fixed face/support and
 feed every new hole through the extractor; a miss is the evidence needed to justify laminar
 multi-anchor or general Hall-dual certificates.  No background process was left running.
+
+## 2026-08-31 -- `K=5` has no tight-band capacity certificate; distance 14 is certificate-minimal
+
+The next requested step started with the actual size of the reduced search space rather than a
+flat census.  A memoized exact-length partition DP independently reproduced the known
+`K=3,4` exact-support counts and gives, at `K=5`, 1,431,800,647,444 exact-support parents.  Of
+these, 147,422,086,892 are strictly below every internal `G_5` prefix and 1,284,378,560,552 have
+some tight skeleton.  Counting all 528 canonical rank faces gives 8,973,226,867,713 band-state
+instances.  Thus Minimum-Support Reduction is mathematically decisive but does not make literal
+`K=5` enumeration practical.
+
+The Tight-Band Capacity theorem can fire only where `delta_v>0`; at `K=5` this means
+`0<=u<v<=16`.  The resulting 136 faces contain 613,689,090 dominated exact-length bands, with
+228,246,747 on `[0,16)`.  A complete optimized enumeration found zero capacity certificates:
+
+    TIGHT_BAND_CAPACITY_SURVEY K=5 complete=YES verified=YES
+      bands=136 states=613689090 certified_bands=0 certified_states=0
+
+This is not a positive first-cut result.  It exhausts only the proved two-anchor inequality class,
+and the strict 147-billion-state interior has no internal anchors to which that class could apply.
+The decision is therefore to stop forcing the `K=6` proof pattern onto `K=5`; the next exact method
+must be symbolic/laminar, use a general Hall dual, or find another quotient of the strict interior.
+
+To sharpen `K=6` minimality without enumerating parents, every endpoint transition was written as
+a disjunction of two integer band-prefix caps.  The program retains only componentwise maximal cap
+vectors and exactly minimizes sorted-band `l1` distance under each vector by DP.  Stronger vectors
+are safely discarded, every capacity certificate chooses one true side of every disjunction, and
+the reconstructed optimum is replayed through the original analyzer.  Complete results are no
+certificate at `K=3,4,5`; at `K=6`, exactly three of 528 anchor faces admit one, and the global
+minimum within the class is distance 14 at `(15,30)`, replacing `(22,7^14)` by `(8^15)`.  Restoring
+the canonical tail gives the known `(8^15,7^2)` parent.  The exhaustive 613-million-state `K=5`
+enumeration independently agrees with the optimizer's empty result there.
+
+This proves certificate minimality, not hole minimality.  Exact transfer-shell DP counts
+5,189,450,419 exact-support `K=6` parents through distance 13 and 9,960,648,265 more at distance
+14, so a flat distance census is also the wrong next method.  The shell DP agrees with direct
+enumeration through `K=4`; the `K=6` numbers are search-sizing counts, not first-cut verdicts.
+
+The extended capacity implementation was committed as `9cc58b93e4403a7412e609bf30d5806e5b67a65a`.
+Its clean optimized source hash/build ID are
+`af07e6ce1313a441bb766ac6196a92839ef60daa9901ba97beced9ebcaf83c21` /
+`5bd50b81bb5bbe20eff11b23b595f68e8c1b13a87e03122e37ebacbc5f2c0c55`.
+The standard clean wrapper now includes the complete `K=5` inequality census, the global
+certificate optimizer and the independent direct-row controls; it took 30 wall seconds.  A clean
+ASan+UBSan regression used build ID
+`98258f92cc9c1bfbc98bd0f166dff455e562de7dd8b637fa79ee4b0a82adcdf2`, took 28.8 seconds and found
+nothing.  The initial table/witness checks were green.  No long solver was launched, every bounded
+process exited normally, and no background process was left running.
