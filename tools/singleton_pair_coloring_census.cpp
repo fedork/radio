@@ -3815,6 +3815,43 @@ struct TransferShellCensus {
         return result;
     }
 
+    bool rank_state(const Sequence &target, std::uint64_t &rank) {
+        if (static_cast<int>(target.size()) != rows) return false;
+        rank = 0;
+        int remaining = mass;
+        int maximum = parent.front();
+        int used_l1 = 0;
+        for (int position = 0; position < rows; ++position) {
+            const int slots = rows - position;
+            const int remaining_difference = remaining - parent_suffix[position];
+            const int available_l1 = target_l1 - used_l1;
+            if (remaining < slots || remaining > slots * maximum
+                || available_l1 < 0 || remaining_difference < 0
+                || remaining_difference > available_l1
+                || ((available_l1 - remaining_difference) & 1) != 0) return false;
+            const int canonical_value = parent[position];
+            const int smallest = std::max(1, canonical_value - available_l1);
+            const int greatest = std::min(
+                {maximum, remaining - (slots - 1),
+                 canonical_value + available_l1});
+            const int used_mass = mass - remaining;
+            const int chosen = target[position];
+            if (chosen < smallest || chosen > greatest
+                || used_mass + chosen > parent_prefix[position + 1]) return false;
+            for (int value = greatest; value > chosen; --value) {
+                if (used_mass + value > parent_prefix[position + 1]) continue;
+                const int new_l1 = used_l1 + std::abs(value - canonical_value);
+                if (new_l1 > target_l1) continue;
+                rank += count_completions(
+                    position + 1, remaining - value, value, new_l1);
+            }
+            used_l1 += std::abs(chosen - canonical_value);
+            remaining -= chosen;
+            maximum = chosen;
+        }
+        return remaining == 0 && used_l1 == target_l1;
+    }
+
     void inspect(const Sequence &state) {
         ++tested;
         if (emit_oracle_queries) {
@@ -4382,6 +4419,38 @@ int main(int argc, char **argv) {
         const int status = census.run(false);
         std::cout << "stats\nquit\n";
         return status;
+    }
+    if (argc >= 2 && std::string(argv[1]) == "--transfer-shell-rank") {
+        if (argc < 5) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-rank k distance values...\n";
+            return 2;
+        }
+        const int k = std::atoi(argv[2]);
+        const int distance = std::atoi(argv[3]);
+        if (k < 2 || k > 6 || distance < 0
+            || expected_transfer_shell_states(k, distance) == 0
+            || argc != 4 + (1 << k)) {
+            std::cerr << "usage: singleton_pair_coloring_census"
+                      << " --transfer-shell-rank k distance values...\n";
+            return 2;
+        }
+        Sequence state;
+        for (int index = 4; index < argc; ++index)
+            state.push_back(std::atoi(argv[index]));
+        TransferShellCensus census(k, distance, 0, 0);
+        std::uint64_t rank = 0;
+        if (!census.rank_state(state, rank)) {
+            std::cerr << "state is not in the requested transfer shell\n";
+            return 1;
+        }
+        std::cout << "TRANSFER_SHELL_RANK K=" << k
+                  << " distance=" << distance
+                  << " rank=" << rank
+                  << " expected_states="
+                  << expected_transfer_shell_states(k, distance)
+                  << " state=" << show(state) << '\n';
+        return 0;
     }
     if (argc >= 2
         && std::string(argv[1]) == "--transfer-shell-parallel") {

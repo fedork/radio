@@ -95,6 +95,16 @@ j14=(
     1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
 )
 
+"$shell_tmp/singleton-shell" \
+    --transfer-shell-rank 6 14 "${j14[@]}" > "$shell_tmp/j14-rank.log"
+j14_rank=$(sed -n 's/.* rank=\([0-9][0-9]*\) .*/\1/p' "$shell_tmp/j14-rank.log")
+[[ -n "$j14_rank" ]]
+"$shell_tmp/singleton-shell" \
+    --transfer-shell-oracle-input 6 14 "$j14_rank" 1 1 > "$shell_tmp/j14-ranked-query.log"
+j14_query=6
+for value in "${j14[@]}"; do j14_query+=" $value 1"; done
+[[ "$(sed -n '2p' "$shell_tmp/j14-ranked-query.log")" == "$j14_query" ]]
+
 tools/run_with_provenance.py "$shell_tmp/singleton-shell" \
     --general-coloring-case 6 "${canonical[@]}" > "$shell_tmp/canonical.log"
 rg -q 'GENERAL_COLORING_CASE K=6 .* lookahead=YES feasible=YES ' \
