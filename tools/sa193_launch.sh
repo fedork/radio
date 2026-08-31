@@ -4,7 +4,8 @@
 # 2023 run's later states were affordable at all. Sixteen parallel cold jobs would each pay the
 # shared low-k cost from scratch.
 #
-#   tools/sa193_launch.sh [--days 60] [--type r7iz.4xlarge] [--resume] [--dry-run]
+#   tools/sa193_launch.sh [--days 14] [--type r7iz.xlarge] [--rss-gb 24]
+#       [--prefix run10] [--resume] [--dry-run]
 #
 # **Cold by default.** A checkpoint in S3 is NOT picked up unless --resume is passed. That default is
 # the whole point of this run: a cold single session produces a log that is closed under SPLITS, and
@@ -12,31 +13,43 @@
 # hides work rather than doing it, so a resumed run cannot answer "was 2023 right" on its own.
 # Reserve --resume for catastrophic failure, where the alternative is starting over.
 #
-# --days is a BACKSTOP, not a schedule. It defaults to 60 because the point of this run is a single
-# cold session: an interruption makes the log multi-segment, which is only closed if every segment
-# survives, so stopping and resuming is a cost to avoid rather than a checkpoint strategy. Shutdown
+# --days is a BACKSTOP, not a schedule. It defaults to 14 because the compact proof-safe run took
+# 4.85 days; this leaves nearly 3x wall-clock headroom while bounding an unexpectedly slow current
+# run. The point is still a single cold session: an interruption makes the log multi-segment, which
+# is only closed if every segment survives, so stopping and resuming is a cost to avoid rather than
+# a checkpoint strategy. Shutdown
 # behaviour is `stop`, not `terminate`, so if the backstop or the memory cap does trip, the EBS volume
 # and the full uncompressed log survive and the instance can simply be started again.
 #
-# The memory cap is the guard that matters. 2023 reached ~90 GB and this run was at 5.28 GB after one
-# hour, so exhaustion is the expected first failure; --rss-gb 110 stops it before the OOM killer,
-# which preserves the checkpoint instead of losing it.
+# The compact proof-safe run peaked at 1.32 GB. The current exact low-level recursion may retain more
+# facts, so the default uses a 32-GiB instance with a conservative 24-GiB solver guard rather than
+# copying either the obsolete 90-GiB pre-compaction risk or the old 128-GiB instance choice.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DAYS=60 TYPE=r7iz.4xlarge DRY=0 RESUME=0
+DAYS=14 TYPE=r7iz.xlarge RSS_GB=24 PREFIX=run10 DRY=0 RESUME=0
 while (( $# )); do
     case "$1" in
         --days) DAYS="$2"; shift 2 ;;
         --type) TYPE="$2"; shift 2 ;;
+        --rss-gb) RSS_GB="$2"; shift 2 ;;
+        --prefix) PREFIX="$2"; shift 2 ;;
         --dry-run) DRY=1; shift ;;
         --resume) RESUME=1; shift ;;
         *) echo "unknown arg $1" >&2; exit 2 ;;
     esac
 done
 
+[[ "$DAYS" =~ ^[1-9][0-9]*$ ]] || { echo "--days must be a positive integer" >&2; exit 64; }
+[[ "$RSS_GB" =~ ^[1-9][0-9]*$ ]] || { echo "--rss-gb must be a positive integer" >&2; exit 64; }
+[[ "$PREFIX" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+    echo "--prefix must be a simple nonempty S3 path component" >&2
+    exit 64
+}
+
 BUCKET=radio-sa193-393287594714
 TOPIC=arn:aws:sns:us-west-2:393287594714:radio-sa193-progress
+REGION=us-west-2
 SECS=$(( DAYS * 86400 ))
 FULL_SHA=$(git rev-parse HEAD)
 SHA=$(git rev-parse --short HEAD)
@@ -62,15 +75,17 @@ cat > /tmp/sa193_userdata.sh <<EOF
 #!/bin/bash
 exec > >(tee -a /var/log/sa193.log) 2>&1
 set -x
+export AWS_DEFAULT_REGION=$REGION
 dnf install -y clang python3 zstd tar gzip
 cd /root
 aws s3 cp s3://$BUCKET/src/sa193_src_$SHA.tgz src.tgz
 mkdir -p run && tar xzf src.tgz -C run && cd run
 chmod +x tools/*.sh parse_out.sh
 
-# MAX_N is the coin count of the largest state the run will touch: 193. MAX_K is 10.
+# MAX_N is the coin count of the largest state the run will touch: 193. A first-test component can
+# also have total side width 193, so MAX_PART_N cannot be reduced independently for this workload.
 RADIO_SOURCE_COMMIT=$FULL_SHA python3 tools/build_radio.py \
-    -O3 -DMAX_K=10 -DMAX_N=193 radio_sa193.c -o radio_sa193
+    -O3 -DMAX_K=10 -DMAX_N=193 -DMAX_PART_N=193 radio_sa193.c -o radio_sa193
 python3 tools/check_provenance.py radio_sa193.provenance
 
 # The control runs first inside radio_sa193 and aborts the whole run if Sa(192) does not come back
@@ -78,7 +93,7 @@ python3 tools/check_provenance.py radio_sa193.provenance
 # output is sound, unlike cache-2025:parsed_260.txt.
 CACHE=""
 if [ "$RESUME" = "1" ]; then
-    if aws s3 cp s3://$BUCKET/run/sa193.checkpoint /root/run/resume.txt 2>/dev/null; then
+    if aws s3 cp s3://$BUCKET/$PREFIX/sa193.checkpoint /root/run/resume.txt 2>/dev/null; then
         CACHE=/root/run/resume.txt
         echo "RESUMING from checkpoint (\$(wc -l < \$CACHE) facts) - this run is NOT cold"
     else
@@ -89,33 +104,45 @@ else
 fi
 
 ( RADIO_RUN_CONTEXT="sa193_launch; cache=\${CACHE:-none}" \\
-  tools/capped_run.sh --seconds $SECS --rss-gb 110 --label sa193 -- \\
+  tools/capped_run.sh --seconds $SECS --rss-gb $RSS_GB --label sa193 -- \\
       ./radio_sa193 \$CACHE > /root/run/out_sa193.txt 2>/root/run/sa193.err ) &
 SOLVER_WRAPPER=\$!
 sleep 20
 SOLVER=\$(pgrep -x radio_sa193 | head -1)
 
-tools/sa193_watchdog.sh --log /root/run/out_sa193.txt --pid "\$SOLVER" \\
-    --bucket $BUCKET --topic $TOPIC --interval 600 --heartbeat 21600
+PROFILE=/root/run/memprofile.csv tools/sa193_watchdog.sh \\
+    --log /root/run/out_sa193.txt --pid "\$SOLVER" \\
+    --bucket $BUCKET --prefix $PREFIX --topic $TOPIC --interval 600 --heartbeat 21600
 
 wait \$SOLVER_WRAPPER || true
-aws s3 cp /root/run/sa193.err s3://$BUCKET/run/sa193.err || true
-aws s3 cp /var/log/sa193.log s3://$BUCKET/run/instance.log || true
+aws s3 cp /root/run/sa193.err s3://$BUCKET/$PREFIX/sa193.err || true
+aws s3 cp /var/log/sa193.log s3://$BUCKET/$PREFIX/instance.log || true
 shutdown -h now
 EOF
 
 if (( DRY )); then echo "--- user-data ---"; cat /tmp/sa193_userdata.sh; exit 0; fi
 
-aws s3 cp /tmp/sa193_src.tgz "s3://$BUCKET/src/sa193_src_$SHA.tgz"
+if [[ "$RESUME" == 0 ]]; then
+    EXISTING=$(aws s3api list-objects-v2 --region "$REGION" --bucket "$BUCKET" \
+        --prefix "$PREFIX/" --max-keys 1 --query KeyCount --output text)
+    [[ "$EXISTING" == 0 ]] || {
+        echo "refusing to overwrite existing cold-run prefix s3://$BUCKET/$PREFIX/" >&2
+        exit 65
+    }
+fi
+
+aws s3 cp --region "$REGION" /tmp/sa193_src.tgz "s3://$BUCKET/src/sa193_src_$SHA.tgz"
 AMI=$(aws ssm get-parameter \
+    --region "$REGION" \
     --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
     --query Parameter.Value --output text)
 
 aws ec2 run-instances \
+  --region "$REGION" \
   --image-id "$AMI" --instance-type "$TYPE" \
   --iam-instance-profile Name=radio-sa193-ec2 \
   --instance-initiated-shutdown-behavior stop \
-  --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=200,VolumeType=gp3,DeleteOnTermination=true}' \
+  --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=50,VolumeType=gp3,DeleteOnTermination=true}' \
   --user-data "file:///tmp/sa193_userdata.sh" \
-  --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=radio-sa193},{Key=Name,Value=sa193-cold-$SHA}]" \
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=radio-sa193},{Key=Name,Value=sa193-cold-$SHA},{Key=RunPrefix,Value=$PREFIX}]" \
   --query 'Instances[0].[InstanceId,InstanceType,Placement.AvailabilityZone]' --output text

@@ -299,7 +299,7 @@ within-level restart cursor, so the multi-hour k7 phase is intentionally not Spo
 | Main search: tri-state `TRUE`/`FALSE`/`MAYBE`, FAST/exhaustive passes, deterministic accepted-prefix budget, shared short-state allowance and geometric long-state probes | `canSolveB_ctx`; `canSolveB` is its default-context wrapper |
 | Joint suffix reachability; suppression of prefix contraction once it rejects | `rb_dead`, `rb_tainted_contraction` |
 | Unit-group stripping before search | start of `canSolveB` |
-| Singleton necessary-prefix test, proved `K<=5` shortcut, unconditional distinct-slot shortcut, and full star-expansion obstruction | `singleton_majorization_holds`, `singleton_embedded_can_solve`, `star_expansion_majorization_can_solve` |
+| Singleton necessary-prefix test, unconditional distinct-slot shortcut, and full star-expansion obstruction; every other majorized singleton uses exact recursion, including at `K<=5` | `singleton_majorization_holds`, `singleton_embedded_can_solve`, `star_expansion_majorization_can_solve` |
 | `Sa` recursion | `canSolveA` |
 | Enumerate *all* top-level splits plus a solvability matrix | `all_solutions` |
 | Warm the cache from a previous run's parsed output | `parse_file` |

@@ -432,6 +432,14 @@ not part of the established Sa(10) proof.
 
 ## Why these numbers were chosen, and what changes next time
 
+The post-refutation cold re-derivation launcher now defaults to `r7iz.xlarge` (32 GiB), a 24-GiB
+solver RSS guard, a 50-GiB root volume and a fourteen-day stop backstop. This is the same 3.9-GHz
+Sapphire Rapids family used by the earlier run, but it no longer pays for idle cores and obsolete
+pre-compaction memory risk. The 2026-08-31 AWS price API reported $0.372/hour in Oregon, versus
+$1.488/hour for `r7iz.4xlarge`; at the proof-safe run9 duration that is approximately $43 versus
+$173 before storage. A unique S3 prefix is mandatory so a new cold run cannot overwrite an earlier
+proof segment or checkpoint.
+
 - **r7iz.4xlarge.** At launch, the Graviton alternative was estimated at roughly half the price
   for the same 128 GB but was unavailable because the account's ARM vCPU quota was 0. The recorded
   x86 quota snapshot was 5000 with about 1372 in use. Those are historical launch inputs, not
