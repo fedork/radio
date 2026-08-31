@@ -432,7 +432,18 @@ bool check_known_certificate(bool print) {
     if (!ok) {
         return false;
     }
-    ok = full_primary->lower_rank == 15 && full_primary->upper_rank == 32
+    std::vector<std::pair<int, int>> full_anchors;
+    std::vector<std::pair<int, int>> core_anchors;
+    for (const Certificate &certificate : full.certificates) {
+        full_anchors.emplace_back(certificate.lower_rank, certificate.upper_rank);
+    }
+    for (const Certificate &certificate : core.certificates) {
+        core_anchors.emplace_back(certificate.lower_rank, certificate.upper_rank);
+    }
+    const std::vector<std::pair<int, int>> expected_anchors{
+        {15, 30}, {15, 31}, {15, 32}};
+    ok = full_anchors == expected_anchors && core_anchors == expected_anchors
+        && full_primary->lower_rank == 15 && full_primary->upper_rank == 32
         && full_primary->mixed_floor == 1
         && full_primary->lower_counts == std::vector<int>({7, 8})
         && full_primary->upper_counts == std::vector<int>({16})
@@ -459,7 +470,8 @@ bool check_known_certificate(bool print) {
     if (print && ok) {
         std::cout << "K6_TIGHT_BAND_PRIMARY full_mass_certificates="
                   << full.certificates.size()
-                  << " core_certificates=" << core.certificates.size() << '\n';
+                  << " core_certificates=" << core.certificates.size()
+                  << " all_anchors=((15,30),(15,31),(15,32))\n";
         print_certificate(*full_primary);
     }
     return ok;

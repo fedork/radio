@@ -1,0 +1,186 @@
+# Tight-Band Capacity Obstruction
+
+Status: **proved** (2026-08-31).  The theorem is a sufficient certificate of first-cut
+infeasibility, not a necessary-and-sufficient characterization.
+
+## Setting
+
+Fix `K>=1`.  Let `h=G_(K-1)`, let `H(t)` be its saturated prefix function, and let `P(t)` be the
+saturated prefix function of `G_K`.  Pascal recursion gives
+
+\[
+P(t)=H(t)+\max_{0\le p\le t}\bigl(H(p)+H(t-p)\bigr).
+\]
+
+Let `a=(a_1>=...>=a_n>0)` be weakly majorized by `G_K`, and write
+
+\[
+A(t)=\sum_{i=1}^t a_i,
+\qquad
+I(t)=\{p:P(t)=H(t)+H(p)+H(t-p)\}.
+\]
+
+A rank `t` is **tight** when `A(t)=P(t)`.  A legal first cut assigns each parent row one of
+
+\[
+(l_i,m_i,0),\quad l_i+m_i=a_i,
+\qquad\hbox{or}\qquad
+(0,m_i,r_i),\quad m_i+r_i=a_i,
+\]
+
+and requires each of the three sorted child multisets to be weakly majorized by `h`.
+
+For two tight ranks `u<v`, an **endpoint transition** is a pair `(p,q)` with
+
+\[
+p\in I(u),\qquad q\in I(v),\qquad
+p\le q,\qquad u-p\le v-q.                                      \tag{TB1}
+\]
+
+The last two inequalities say that the numbers of left and non-left rows cannot decrease across
+the band.  Put
+
+\[
+\begin{aligned}
+s_L&=q-p, & L_{p,q}&=H(q)-H(p),\\
+s_R&=(v-q)-(u-p), & R_{p,q}&=H(v-q)-H(u-p),\\
+&&M_{u,v}&=H(v)-H(u).
+\end{aligned}                                                    \tag{TB2}
+\]
+
+Let `b=(a_(u+1),...,a_v)` be the band and
+
+\[
+\delta_v=H(v)-H(v-1).
+\]
+
+When `delta_v>0`, define `C_delta(b,s)` as the sum of the `s` largest numbers among
+`b_i-delta_v`, with `C_delta(b,0)=0`.
+
+## The obstruction
+
+> **Tight-Band Capacity Obstruction.**  Suppose `u<v` are tight and `delta_v>0`.  Every legal
+> first cut induces an endpoint transition `(p,q)` satisfying (TB1), contributes exactly the three
+> band masses in (TB2), and sends at least `delta_v` coins from every band row to the mixed child.
+> Consequently no legal first cut exists if either some `b_i<delta_v`, there is no endpoint
+> transition, or every endpoint transition satisfies
+>
+> \[
+> L_{p,q}>C_\delta(b,s_L)
+> \quad\hbox{or}\quad
+> R_{p,q}>C_\delta(b,s_R).                                      \tag{TB3}
+> \]
+
+*Proof.*  At a tight rank `t`, let `p_t` be the number of the first `t` rows whose left piece is
+positive.  At most `t-p_t` of those rows have a positive right piece, because no row can feed both
+pure children.  The contributions from these `t` parent rows therefore obey
+
+\[
+P(t)=A(t)
+ \le H(p_t)+H(t)+H(t-p_t)
+ \le P(t).
+\]
+
+Both inequalities are equalities.  Hence `p_t` lies in `I(t)`, and the left, mixed and right
+contributions from the first `t` rows have masses exactly `H(p_t)`, `H(t)` and `H(t-p_t)`.
+Taking `p=p_u` and `q=p_v` gives (TB1); subtracting the two saturated endpoint equalities gives
+(TB2).
+
+Now remove the mixed piece of any one band row from the `v` mixed contributions.  The remaining
+`v-1` pieces are a child submultiset and have mass at most `H(v-1)`.  Since all `v` pieces have
+mass `H(v)`, the removed piece has size at least
+
+\[
+H(v)-H(v-1)=\delta_v.
+\]
+
+Thus every band row retains at most `b_i-delta_v` coins for its one possible pure child.  The left
+band mass uses exactly `s_L` positive left rows, while the right band mass uses at most `s_R`
+positive right rows.  Their respective capacities are therefore at most
+`C_delta(b,s_L)` and `C_delta(b,s_R)`.  If every possible transition violates one of these bounds,
+none can come from a legal cut.  This proves (TB3).  The same argument immediately rules out a row
+with `b_i<delta_v`.  QED.
+
+This proof deliberately defines `p_t` by **positive left pieces**.  Rows sent wholly to the mixed
+child need no arbitrary left/right orientation, so no compatibility assumption about two
+independent endpoint colorings is hidden in the transition.
+
+## The `K=6` certificate
+
+For the counterexample, take `u=15`, `v=32` and
+
+\[
+b=(8^{15},7^2).
+\]
+
+For `h=G_5`,
+
+\[
+I(15)=\{7,8\},\qquad I(32)=\{16\},\qquad
+\delta_{32}=H(32)-H(31)=1.
+\]
+
+The mixed band mass is `H(32)-H(15)=22`.  The two endpoint transitions are:
+
+| transition | left rows | left required / capacity | right rows | right required / capacity | obstruction |
+|---|---:|---:|---:|---:|---|
+| `7->16` | 9 | `64 / 63` | 8 | `48 / 56` | left |
+| `8->16` | 8 | `48 / 56` | 9 | `64 / 63` | right |
+
+Thus both transitions fail.  The same state also has valid but longer certificates at anchor pairs
+`(15,30)` and `(15,31)`, with six and four transitions respectively.  Rank 32 is the preferred
+human certificate because it leaves only the two cases above.  Exact machine output is in the
+[capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
+
+## Complete fixed-face classification
+
+Keep the first 15 rows
+
+\[
+(64,63,57^2,42^4,22^7)
+\]
+
+and, optionally, the final `1^32` fixed.  Let the intervening band `b` range over every 17-part
+partition of mass 134 weakly majorized by `(22,7^16)`.  This is the exact tight
+`[15,32)` face considered here; it contains 176 bands.
+
+Two independent computations give a complete **first-cut** classification of this face:
+
+- the direct-row clean-room solver finds a legal majorized-child cut for 175 bands and exhausts
+  the remaining one;
+- the inequality-only extractor certifies exactly one band, using three possible anchor pairs.
+
+The two unique states agree:
+
+\[
+b=(8^{15},7^2).
+\]
+
+Therefore the counterexample is the unique first-cut hole on this fixed face.  If transfer distance
+on the face is defined by
+
+\[
+d(b,c)=\tfrac12\sum_i |b_i-c_i|,
+\qquad c=(22,7^{16}),
+\]
+
+its distance is 14 and hence is minimal on this face.  This is not a claim of global `K=6`
+minimality: rows outside `[15,32)`, other tight skeletons, other support sizes, and `K=5` remain to
+be surveyed.  The enumeration, replay policy, node counts and provenance are in the
+[capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
+
+## Machine checker
+
+[`tools/singleton_tight_band_certificate.cpp`](../../tools/singleton_tight_band_certificate.cpp)
+recomputes the Pascal profiles and evaluates only the tight-prefix, transition and capacity
+inequalities above.  It contains no split search, Hall test, result cache or dependency on the
+existing interval census.  The companion clean-room solver independently classifies the same 176
+bands by direct legal row triples.  Reproduce both with
+
+```sh
+tools/singleton_tight_band_regression.sh
+```
+
+The extractor is one-sided: absence of a certificate does not imply a first cut exists.  The 175
+positive face verdicts come from the separate direct solver, which replays every returned row
+allocation and rechecks all three child majorizations.
