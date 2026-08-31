@@ -149,10 +149,47 @@ same as above.  LeakSanitizer is unsupported on this macOS toolchain; an initial
 `detect_leaks=1` invocation stopped before executing the tests, so the recorded sanitizer pass
 uses `detect_leaks=0` and covers AddressSanitizer plus UndefinedBehaviorSanitizer.
 
+## `K=7` family control and mechanical speedup
+
+After the dyadic family was found, the solver independently exhausted its first new member
+
+    (128,127,120^2,99^4,64^7,32,31^16,8^32,1^64).
+
+The initial cleanroom code returned
+
+```text
+RESULT K=7 ... feasible=NO nodes=21489353 options=238217814 max_depth=31
+  prunes(child=216728462,mass=0,support=0,prefix=0)
+```
+
+in about five minutes under a 300-CPU-second cap.  Profiling by inspection exposed a purely
+mechanical cost: the option-sort comparator reconstructed and rechecked both candidate child
+states every time it compared two options.  The solver now constructs each candidate once, stores
+its exact score and next state, and sorts those records.  This changes no option order, prune,
+cache, node or mathematical condition.  All pre-existing regression node counts remain unchanged.
+
+The provenance-clean rerun traversed the identical 21,489,353 nodes and 238,217,814 row options in
+30.41 wall / 29.76 user seconds.  Its source SHA-256 is
+`2a5a6535303569ded90eda9cc40265a5d705c99b574db2ddd8574fa2b8b9fce9`, build ID is
+`15a5b75c637c505ad16735c173b0eff70e972bfb306313d8762c66f65bc83d7d`, and binary SHA-256 is
+`942963f03a42eeeb3897f6daa1e502f62a2ac59be5e0c315fda4129929c7dcd5`.  The log passes
+`tools/check_provenance.py`.  This remains a direct row-triple exhaustion: it does not call or
+reimplement the Tight-Band Capacity Obstruction.  See the
+[dyadic-family record](singleton_dyadic_counterexample_family_2026-08-31.md) for the independent
+analytic proof and the full construction.
+
+The optional `k7-dyadic-family-control` mode now locks the exact negative verdict and all search
+counts.  A final ASan+UBSan build repeated both the standard regression and that full control with
+no finding.  Its final source SHA-256 is
+`2e66912b16059b543f789bd0612999967b0960e2dc7619efe132a9dcd825d7f1`, build ID is
+`fa93a5579885857cda37736a56b005b80a6f44ec5a11fffe699a33073429f646`, and the sanitizer binary
+SHA-256 is `7c5e03cb67138475ae64f2ef0a28902acb727e89fd5f30028003ff803796c1f1`.
+
 ## Scope
 
 This establishes an independent exhaustive implementation check for both the full-mass hole and
 its underfull core.  It does not supersede the two-line analytic capacity contradiction, which
 remains shorter and stronger as a proof.  The extension completely classifies the fixed
-rank-15/32 face, but it does not decide `K=5`, classify `K=6` holes outside that face/support, or
-prove that every minimal hole has a two-anchor certificate.
+rank-15/32 face and independently confirms the first new `K=7` member, but it does not decide
+`K=5`, classify holes outside the surveyed faces, or prove that every minimal hole has a
+two-anchor certificate.

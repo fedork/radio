@@ -30,7 +30,10 @@ fix. An independent full-DAG `radio_verify` replay would strengthen the trust-ba
 it is optional follow-up rather than unfinished H3 work.
 
 **H4 - Structural theory.** Prove or refute fixed-`m` families rather than fitting them.  The
-excess-`q` Pareto-assembly programme is **parked as of 2026-08-16**: retain its proved local
+singleton-majorization failure is now itself a proved family: a dyadic balanced-band construction
+gives a full-mass exact-support no-first-cut parent for every `K>=6`.  The unresolved singleton
+level is `K=5`; higher-level existence is closed, though minimality and classification are not.
+The excess-`q` Pareto-assembly programme is **parked as of 2026-08-16**: retain its proved local
 reductions, exact trees and relaxed-terminal derivations, but do not treat further normalization/rank scans
 as a proximate goal.  The literature now settles `m=5`: the old formula/`BBBD` equality is refuted
 at `k=9`, and the exact
@@ -189,7 +192,15 @@ is:
    upgrades the distance statement beyond this certificate class.  See the
    [theorem](theorems/tight-band-capacity.md) and
    [verification record](../evidence/singleton_tight_band_capacity_2026-08-31.md);
-3. **Exact-support first-cut distance delivered 2026-08-31; `K=5` remains open.**  A ranked,
+3. **Delivered 2026-08-31:** the **Dyadic Balanced-Band Family** applies the obstruction at anchors
+   `(2^d-1,2^(d+1))`.  For `K=2m` or `2m+1`, choosing `d=m+1` and balancing the canonical
+   `(X,Y^(2^d))` band gives a majorized no-first-cut parent for every `K>=6`.  The binomial-tail
+   capacity margin is proved inductively; a machine survey finds 20 certified dyadic parents
+   through `K=15`, and an independent direct-row exhaustion rejects the first new `K=7` member in
+   21,489,353 nodes.  The cleanroom implementation was mechanically accelerated tenfold without
+   changing its search tree.  See the
+   [family record](../evidence/singleton_dyadic_counterexample_family_2026-08-31.md);
+4. **Exact-support first-cut distance delivered 2026-08-31; `K=5` remains open.**  A ranked,
    parallel Fixed-Color Hall census exhausts all 5,189,450,419 exact-support `K=6` parents through
    distance 13 and finds a majorized first cut for every one.  The known distance-14 parent is
    therefore globally minimum for exact-support no-first-cut holes.  The same tool proves all
@@ -207,7 +218,7 @@ is:
    may also contain other holes.  Deleting the harmless `1^32` padding already gives the 32-row
    mass-697 core and does not count as a new smaller obstruction.  Feed every new hole through the
    extractor; an uncertified hole is the concrete input for the laminar/general-Hall programme;
-4. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
+5. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color
    Hall base sets contains the requested integer point.

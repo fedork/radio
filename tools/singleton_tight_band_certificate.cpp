@@ -13,6 +13,8 @@
 // or cache.  Besides checking a supplied state, it can enumerate all bands
 // where delta is positive, count exact-support boundary spaces, and minimize
 // transfer distance over the finite disjunction of capacity inequalities.
+// The dyadic-family mode balances one canonical Pascal band and checks the
+// resulting explicit no-first-cut construction through K=15.
 
 #include <algorithm>
 #include <array>
@@ -1011,6 +1013,12 @@ struct MinimumBandCertificate {
     Partition band;
 };
 
+struct FaceOptimization {
+    int objective = PrefixCapOptimizer::impossible;
+    Partition band;
+    Count blocking_cap_vectors = 0;
+};
+
 bool cap_vector_dominates(
     const std::vector<Value> &weaker,
     const std::vector<Value> &stronger) {
@@ -1081,6 +1089,47 @@ std::vector<std::vector<Value>> maximal_blocking_cap_vectors(
     return vectors;
 }
 
+FaceOptimization optimize_capacity_face(const CapacityBandSurvey &survey) {
+    const std::vector<std::vector<Value>> blocking_caps =
+        maximal_blocking_cap_vectors(
+            survey.canonical_band, survey.mixed_floor, survey.transitions);
+    FaceOptimization result;
+    result.blocking_cap_vectors = static_cast<Count>(blocking_caps.size());
+
+    std::vector<Value> canonical_caps(
+        survey.canonical_band.size() + 1, 0);
+    for (std::size_t count = 0; count < canonical_caps.size(); ++count) {
+        canonical_caps[count] = survey.capacity(static_cast<int>(count));
+    }
+    PrefixCapOptimizer floor_optimizer(
+        survey.canonical_band, canonical_caps, 1,
+        static_cast<int>(survey.mixed_floor - 1));
+    auto [floor_objective, floor_band] = floor_optimizer.run();
+    if (floor_objective < result.objective) {
+        result.objective = floor_objective;
+        result.band = std::move(floor_band);
+    }
+
+    for (const std::vector<Value> &caps : blocking_caps) {
+        // A rank-zero blocking inequality is 0 <= -1 and therefore
+        // impossible; the cap vector records it at index zero only so the
+        // disjunctive simplifier can retain a uniform representation.
+        if (caps.front() < 0) {
+            continue;
+        }
+        PrefixCapOptimizer optimizer(
+            survey.canonical_band, caps,
+            static_cast<int>(survey.mixed_floor),
+            std::numeric_limits<int>::max());
+        auto [objective, band] = optimizer.run();
+        if (objective < result.objective) {
+            result.objective = objective;
+            result.band = std::move(band);
+        }
+    }
+    return result;
+}
+
 MinimumBandCertificate optimize_capacity_certificates(int level, bool print) {
     if (level < 1 || level > 6) {
         throw std::invalid_argument("certificate optimization level must lie in [1,6]");
@@ -1098,55 +1147,21 @@ MinimumBandCertificate optimize_capacity_certificates(int level, bool print) {
         for (int lower = 0; lower < upper; ++lower) {
             CapacityBandSurvey survey(
                 lower, upper, parent_profile, parent, child);
-            const std::vector<std::vector<Value>> blocking_caps =
-                maximal_blocking_cap_vectors(
-                    survey.canonical_band, survey.mixed_floor,
-                    survey.transitions);
+            FaceOptimization face = optimize_capacity_face(survey);
             cap_vectors = checked_count_sum(
-                cap_vectors, static_cast<Count>(blocking_caps.size()));
-            int face_best = PrefixCapOptimizer::impossible;
-            Partition face_band;
-
-            std::vector<Value> canonical_caps(
-                survey.canonical_band.size() + 1, 0);
-            for (std::size_t count = 0; count < canonical_caps.size(); ++count) {
-                canonical_caps[count] = survey.capacity(static_cast<int>(count));
-            }
-            PrefixCapOptimizer floor_optimizer(
-                survey.canonical_band, canonical_caps, 1,
-                static_cast<int>(survey.mixed_floor - 1));
-            auto [floor_objective, floor_band] = floor_optimizer.run();
-            if (floor_objective < face_best) {
-                face_best = floor_objective;
-                face_band = std::move(floor_band);
-            }
-
-            for (const std::vector<Value> &caps : blocking_caps) {
-                if (caps.front() < 0) {
-                    continue;
-                }
-                PrefixCapOptimizer optimizer(
-                    survey.canonical_band, caps,
-                    static_cast<int>(survey.mixed_floor),
-                    std::numeric_limits<int>::max());
-                auto [objective, band] = optimizer.run();
-                if (objective < face_best) {
-                    face_best = objective;
-                    face_band = std::move(band);
-                }
-            }
+                cap_vectors, face.blocking_cap_vectors);
             ++bands;
-            if (face_best != PrefixCapOptimizer::impossible) {
-                if ((face_best & 1) != 0) {
+            if (face.objective != PrefixCapOptimizer::impossible) {
+                if ((face.objective & 1) != 0) {
                     throw std::logic_error("certificate objective is not even");
                 }
                 ++feasible_bands;
-                const int distance = face_best / 2;
+                const int distance = face.objective / 2;
                 if (distance < best.distance) {
                     best.lower = lower;
                     best.upper = upper;
                     best.distance = distance;
-                    best.band = face_band;
+                    best.band = std::move(face.band);
                 }
             }
         }
@@ -1215,8 +1230,259 @@ bool optimize_capacity_certificate_cli(int level) {
     if (level <= 5) {
         return best.distance == PrefixCapOptimizer::impossible;
     }
-    return best.distance == 14 && best.lower == 15 && best.upper == 30
-        && best.band == repeated({{8, 15}});
+    if (level == 6) {
+        return best.distance == 14 && best.lower == 15 && best.upper == 30
+            && best.band == repeated({{8, 15}});
+    }
+    return true;
+}
+
+bool optimize_capacity_face_cli(int level, int lower, int upper) {
+    if (level < 1 || level > 15) {
+        throw std::invalid_argument("certificate face level must lie in [1,15]");
+    }
+    const Partition parent_profile = singleton_profile(level);
+    const int positive_floor_support = 1 << (level - 1);
+    if (lower < 0 || upper <= lower || upper > positive_floor_support) {
+        throw std::invalid_argument("invalid positive-floor anchor pair");
+    }
+    const PrefixFunction parent(parent_profile);
+    const PrefixFunction child(singleton_profile(level - 1));
+    CapacityBandSurvey survey(lower, upper, parent_profile, parent, child);
+    FaceOptimization result = optimize_capacity_face(survey);
+    bool verified = true;
+    Partition state;
+    int distance = -1;
+    if (result.objective != PrefixCapOptimizer::impossible) {
+        if ((result.objective & 1) != 0) {
+            throw std::logic_error("certificate objective is not even");
+        }
+        distance = result.objective / 2;
+        state.assign(parent_profile.begin(), parent_profile.begin() + lower);
+        state.insert(state.end(), result.band.begin(), result.band.end());
+        state.insert(
+            state.end(), parent_profile.begin() + upper,
+            parent_profile.end());
+        const Analysis replay = analyze(level, state);
+        verified = replay.majorized
+            && transfer_distance(parent_profile, state) == distance
+            && std::any_of(
+                replay.certificates.begin(), replay.certificates.end(),
+                [&](const Certificate &certificate) {
+                    return certificate.lower_rank == lower
+                        && certificate.upper_rank == upper;
+                });
+    }
+    std::cout << "MINIMUM_TIGHT_BAND_CERTIFICATE_FACE K=" << level
+              << " anchors=(" << lower << ',' << upper << ')'
+              << " complete=YES verified=" << (verified ? "YES" : "NO")
+              << " transitions=" << survey.transitions.size()
+              << " blocking_cap_vectors=" << result.blocking_cap_vectors
+              << " canonical_band="
+              << compact_partition(survey.canonical_band);
+    if (result.objective == PrefixCapOptimizer::impossible) {
+        std::cout << " minimum_transfer_distance=NONE";
+    } else {
+        std::cout << " minimum_transfer_distance=" << distance
+                  << " band=" << compact_partition(result.band)
+                  << " parent=" << compact_partition(state);
+    }
+    std::cout << '\n';
+    return verified;
+}
+
+bool scan_capacity_faces_cli(int level, int maximum_transitions) {
+    if (level < 1 || level > 15 || maximum_transitions < 0) {
+        throw std::invalid_argument("invalid certificate face scan request");
+    }
+    const Partition parent_profile = singleton_profile(level);
+    const PrefixFunction parent(parent_profile);
+    const PrefixFunction child(singleton_profile(level - 1));
+    const int positive_floor_support = 1 << (level - 1);
+    int examined = 0;
+    int skipped = 0;
+    int feasible = 0;
+    Count cap_vectors = 0;
+    MinimumBandCertificate best;
+    bool verified = true;
+    for (int upper = 1; upper <= positive_floor_support; ++upper) {
+        for (int lower = 0; lower < upper; ++lower) {
+            CapacityBandSurvey survey(
+                lower, upper, parent_profile, parent, child);
+            if (static_cast<int>(survey.transitions.size())
+                > maximum_transitions) {
+                ++skipped;
+                continue;
+            }
+            ++examined;
+            FaceOptimization result = optimize_capacity_face(survey);
+            cap_vectors = checked_count_sum(
+                cap_vectors, result.blocking_cap_vectors);
+            if (result.objective == PrefixCapOptimizer::impossible) {
+                continue;
+            }
+            if ((result.objective & 1) != 0) {
+                throw std::logic_error("certificate objective is not even");
+            }
+            ++feasible;
+            const int distance = result.objective / 2;
+            Partition state(
+                parent_profile.begin(), parent_profile.begin() + lower);
+            state.insert(state.end(), result.band.begin(), result.band.end());
+            state.insert(
+                state.end(), parent_profile.begin() + upper,
+                parent_profile.end());
+            const Analysis replay = analyze(level, state);
+            const bool face_verified = replay.majorized
+                && transfer_distance(parent_profile, state) == distance
+                && std::any_of(
+                    replay.certificates.begin(), replay.certificates.end(),
+                    [&](const Certificate &certificate) {
+                        return certificate.lower_rank == lower
+                            && certificate.upper_rank == upper;
+                    });
+            verified = verified && face_verified;
+            std::cout << "TIGHT_BAND_CERTIFICATE_FACE_HIT K=" << level
+                      << " anchors=(" << lower << ',' << upper << ')'
+                      << " transitions=" << survey.transitions.size()
+                      << " blocking_cap_vectors="
+                      << result.blocking_cap_vectors
+                      << " distance=" << distance
+                      << " band=" << compact_partition(result.band)
+                      << " parent=" << compact_partition(state)
+                      << " verified="
+                      << (face_verified ? "YES" : "NO") << '\n';
+            if (distance < best.distance) {
+                best.lower = lower;
+                best.upper = upper;
+                best.distance = distance;
+                best.band = std::move(result.band);
+            }
+        }
+    }
+    std::cout << "TIGHT_BAND_CERTIFICATE_FACE_SCAN K=" << level
+              << " maximum_transitions=" << maximum_transitions
+              << " complete_within_filter=YES"
+              << " verified=" << (verified ? "YES" : "NO")
+              << " examined_faces=" << examined
+              << " skipped_faces=" << skipped
+              << " blocking_cap_vectors=" << cap_vectors
+              << " feasible_faces=" << feasible;
+    if (best.distance == PrefixCapOptimizer::impossible) {
+        std::cout << " minimum_transfer_distance=NONE";
+    } else {
+        std::cout << " minimum_transfer_distance=" << best.distance
+                  << " first_minimizing_anchors=(" << best.lower << ','
+                  << best.upper << ')'
+                  << " first_minimizing_band="
+                  << compact_partition(best.band);
+    }
+    std::cout << '\n';
+    return verified;
+}
+
+bool survey_dyadic_family(int maximum_level) {
+    if (maximum_level < 3 || maximum_level > 15) {
+        throw std::invalid_argument("dyadic family maximum K must lie in [3,15]");
+    }
+    int total_faces = 0;
+    int total_hits = 0;
+    bool verified = true;
+    for (int level = 3; level <= maximum_level; ++level) {
+        const Partition parent_profile = singleton_profile(level);
+        const PrefixFunction parent(parent_profile);
+        const PrefixFunction child(singleton_profile(level - 1));
+        int level_hits = 0;
+        for (int exponent = 1; exponent <= level - 2; ++exponent) {
+            const int half = 1 << exponent;
+            const int lower = half - 1;
+            const int upper = 2 * half;
+            ++total_faces;
+            CapacityBandSurvey survey(
+                lower, upper, parent_profile, parent, child);
+            const Value mass = survey.capacity.mass();
+            const Value length = static_cast<Value>(survey.canonical_band.size());
+            const Value quotient = mass / length;
+            const int remainder = static_cast<int>(mass % length);
+            Partition balanced(
+                static_cast<std::size_t>(remainder), quotient + 1);
+            balanced.insert(
+                balanced.end(),
+                static_cast<std::size_t>(length - remainder), quotient);
+
+            survey.current = balanced;
+            survey.current_prefix.assign(1, 0);
+            for (Value value : balanced) {
+                survey.current_prefix.push_back(
+                    survey.current_prefix.back() + value);
+            }
+            const bool majorized =
+                weakly_majorized(balanced, survey.capacity);
+            bool every_transition_blocked = !survey.transitions.empty();
+            Value minimum_margin = std::numeric_limits<Value>::max();
+            for (const TransitionCheck &transition : survey.transitions) {
+                const Value left_capacity =
+                    survey.current_prefix[transition.left_rows]
+                    - transition.left_rows * survey.mixed_floor;
+                const Value right_capacity =
+                    survey.current_prefix[transition.right_rows]
+                    - transition.right_rows * survey.mixed_floor;
+                const Value left_margin =
+                    transition.left_required - left_capacity;
+                const Value right_margin =
+                    transition.right_required - right_capacity;
+                every_transition_blocked = every_transition_blocked
+                    && (left_margin > 0 || right_margin > 0);
+                if (left_margin > 0) {
+                    minimum_margin = std::min(minimum_margin, left_margin);
+                }
+                if (right_margin > 0) {
+                    minimum_margin = std::min(minimum_margin, right_margin);
+                }
+            }
+            const bool hit = balanced.back() >= survey.mixed_floor
+                && every_transition_blocked;
+            verified = verified && majorized
+                && survey.transitions.size() == 2
+                && hit == survey.certified();
+            if (!hit) {
+                continue;
+            }
+            ++level_hits;
+            ++total_hits;
+            Partition state(
+                parent_profile.begin(), parent_profile.begin() + lower);
+            state.insert(state.end(), balanced.begin(), balanced.end());
+            state.insert(
+                state.end(), parent_profile.begin() + upper,
+                parent_profile.end());
+            std::cout << "DYADIC_TIGHT_BAND_COUNTEREXAMPLE K=" << level
+                      << " exponent=" << exponent
+                      << " anchors=(" << lower << ',' << upper << ')'
+                      << " canonical_band="
+                      << compact_partition(survey.canonical_band)
+                      << " balanced_band=" << compact_partition(balanced)
+                      << " mixed_floor=" << survey.mixed_floor
+                      << " blocking_margin=" << minimum_margin
+                      << " transfer_distance="
+                      << transfer_distance(survey.canonical_band, balanced)
+                      << " parent=" << compact_partition(state) << '\n';
+        }
+        const int expected = level <= 5 ? 0
+            : (level <= 8 ? 1 : (level <= 12 ? 2 : 3));
+        if (level <= 15) {
+            verified = verified && level_hits == expected;
+        }
+        std::cout << "DYADIC_TIGHT_BAND_LEVEL K=" << level
+                  << " faces=" << level - 2
+                  << " counterexamples=" << level_hits << '\n';
+    }
+    std::cout << "DYADIC_TIGHT_BAND_FAMILY maximum_K=" << maximum_level
+              << " complete_within_family=YES"
+              << " verified=" << (verified ? "YES" : "NO")
+              << " faces=" << total_faces
+              << " counterexamples=" << total_hits << '\n';
+    return verified;
 }
 
 bool check_known_certificate(bool print) {
@@ -1464,11 +1730,43 @@ int main(int argc, char **argv) {
             return optimize_capacity_certificate_cli(std::stoi(argv[2]))
                 ? 0 : 1;
         }
+        if (std::string(argv[1]) == "optimize-capacity-face") {
+            if (argc != 5) {
+                std::cerr << "usage: " << argv[0]
+                          << " optimize-capacity-face K LOWER UPPER\n";
+                return 64;
+            }
+            return optimize_capacity_face_cli(
+                       std::stoi(argv[2]), std::stoi(argv[3]),
+                       std::stoi(argv[4]))
+                ? 0 : 1;
+        }
+        if (std::string(argv[1]) == "scan-capacity-faces") {
+            if (argc != 4) {
+                std::cerr << "usage: " << argv[0]
+                          << " scan-capacity-faces K MAX_TRANSITIONS\n";
+                return 64;
+            }
+            return scan_capacity_faces_cli(
+                       std::stoi(argv[2]), std::stoi(argv[3]))
+                ? 0 : 1;
+        }
+        if (std::string(argv[1]) == "survey-dyadic-family") {
+            if (argc != 3) {
+                std::cerr << "usage: " << argv[0]
+                          << " survey-dyadic-family MAX_K\n";
+                return 64;
+            }
+            return survey_dyadic_family(std::stoi(argv[2])) ? 0 : 1;
+        }
         std::cerr << "usage: " << argv[0]
                   << " regression | survey-k6-band15-32"
                   << " | count-boundary-space K | survey-capacity-bands K"
                   << " | count-transfer-shells K MAX_DISTANCE"
                   << " | optimize-capacity-certificate K"
+                  << " | optimize-capacity-face K LOWER UPPER"
+                  << " | scan-capacity-faces K MAX_TRANSITIONS"
+                  << " | survey-dyadic-family MAX_K"
                   << " | check K ROW [ROW ...]\n";
         return 64;
     } catch (const std::exception &error) {

@@ -12368,3 +12368,67 @@ finding.  Full commands, sharding invariants and scope are in
 The final table and generated-block check, full witness check, documentation-link/goal check,
 transfer-shell regression and `git diff --check` all passed.  The two historical unsupported
 majorization witness files remain explicitly flagged as intended.  No process is left running.
+
+## 2026-08-31 -- dyadic counterexamples exist at every level `K>=6`
+
+Fedor asked what makes the `K=6` singleton-majorization counterexample special and whether it can
+be turned into more examples.  The decisive feature is not its literal `(8,7)` band, but a dyadic
+face with two endpoint transitions.  At anchors `(2^d-1,2^(d+1))`, the canonical band consists of
+one large Pascal-tail row followed by `2^d` equal rows.  Replacing that band by its balanced
+equal-mass partition minimizes every fixed-cardinality pure prefix.  For `K=2m` or `2m+1`, the
+choice `d=m+1` makes both endpoint transitions exceed this balanced pure capacity.
+
+The resulting construction is an analytic infinite family.  If `n=2^(m+1)`, the forced large
+pure side uses `s=n/2+1` rows.  With adjacent child tail values `A,B,C`, its band-prefix threshold
+is `T=A+(n/2)B+sC-1`.  The difference from the proportional balanced prefix is
+`F/(n+1)-1`, where
+
+    F=(n/2) binom(K-1,d-1)-s binom(K-1,d).
+
+For the even and odd parities this reduces to
+
+    binom(2m-1,m+1)(n/(m-1)-1)
+    binom(2m,m+1)(n/(2m)-1).
+
+At `m=5` both dominate the worst integer-balancing error.  Each grows by more than four when `m`
+increments, while that error threshold grows by less than four.  The four smaller bases
+`K=6,7,8,9` check exactly.  Thus a full-mass exact-support `G_K`-majorized no-first-cut parent
+exists for every `K>=6`.  The first new state is
+
+    (128,127,120^2,99^4,64^7,32,31^16,8^32,1^64) @ K=7.
+
+Extended `tools/singleton_tight_band_certificate.cpp` with face-specific optimization, filtered
+face scans and `survey-dyadic-family`.  The last mode checks all 91 dyadic faces through `K=15`
+and emits 20 certified parents: none at `K=3,4,5`, and at least one at every `K=6,...,15`.
+The clean log passes provenance with source SHA-256
+`f13eb75cea4199595eecf9f28e131968bad84edcceb3452f2d10c482cb544e40` and build ID
+`fc207120e3f0fcc1bd5614abeb3c12fca2e0b701163111d3cf956d1543c59491`.
+
+The exact face optimizer also found closer, non-balanced representatives on several faces; for
+example `K=8,(31,64)` has distance 54, and `K=9,(63,128)` has distance 61.  These optimize within
+their fixed certificate faces only.  A broad exploratory `K=12,(127,256)` dynamic program was
+terminated without a verdict after about 14 CPU minutes once the closed-form balanced proof made
+it unnecessary; it remained healthy at about 23 MB RSS.  Do not rerun that large value-space DP
+to establish existence—the direct dyadic formula is exact and instantaneous.
+
+The independent cleanroom row solver initially exhausted the `K=7` state in about five minutes:
+21,489,353 nodes, 238,217,814 row options, and no first cut.  Its sort comparator had been rebuilding
+both candidate child states on every comparison.  Hoisting each exact next state and score out of
+the comparator changes no option order, prune, cache or node, but reduced the identical exhaustion
+to 30.41 wall / 29.76 user seconds.  All old K6 and tiny-oracle regression node counts remain
+unchanged.  The optimized source SHA-256 is
+`2a5a6535303569ded90eda9cc40265a5d705c99b574db2ddd8574fa2b8b9fce9`, with build ID
+`15a5b75c637c505ad16735c173b0eff70e972bfb306313d8762c66f65bc83d7d`.
+
+The theorem and full computation record are in
+`docs/theorems/tight-band-capacity.md` and
+`evidence/singleton_dyadic_counterexample_family_2026-08-31.md`.  Higher-level existence is now
+closed; the live singleton questions are `K=5`, minimality/classification of the higher-level
+families, recursive-unsolvability versus first-cut emptiness, and a useful exact support criterion.
+
+The final ordinary full regression passed, including the complete `K=5` capacity census, all 91
+dyadic faces, the original direct controls and the named `K=7` exhaustion.  Independent final
+ASan+UBSan builds then repeated both standard regressions, the dyadic survey and the full
+238,217,814-option `K=7` control with no finding.  Their build IDs were
+`753f173439099ac725fcb6db3d863370f42df9181600db508465726cfebda79a` (inequalities) and
+`fa93a5579885857cda37736a56b005b80a6f44ec5a11fffe699a33073429f646` (direct rows).

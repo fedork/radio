@@ -392,42 +392,52 @@ class DirectSplitSolver {
         }
 
         const auto &options = option_table_[row_index];
-        std::vector<std::size_t> order;
-        order.reserve(options.size() - std::min(minimum_option, options.size()));
+        struct Candidate {
+            std::size_t option_index = 0;
+            SearchState next;
+            std::tuple<int, int, long long, std::size_t> score;
+        };
+        std::vector<Candidate> candidates;
+        candidates.reserve(options.size() - std::min(minimum_option, options.size()));
         for (std::size_t i = minimum_option; i < options.size(); ++i) {
-            order.push_back(i);
+            ++result_.stats.options;
+            SearchState next;
+            if (!apply_option(state, options[i], next)) {
+                ++result_.stats.child_prunes;
+                continue;
+            }
+            const int penalty = preference_penalty(next);
+            const int minimum_mass =
+                std::min({next.masses[0], next.masses[1], next.masses[2]});
+            const int maximum_mass =
+                std::max({next.masses[0], next.masses[1], next.masses[2]});
+            const long long used_mass = row_prefix_[row_index + 1];
+            long long square_error = 0;
+            for (int mass : next.masses) {
+                const long long error = 3LL * mass - used_mass;
+                square_error += error * error;
+            }
+            candidates.push_back(Candidate{
+                i, std::move(next),
+                std::tuple<int, int, long long, std::size_t>(
+                    penalty, maximum_mass - minimum_mass, square_error, i)});
         }
 
         // This affects positive-witness discovery only.  It never prunes: when a
         // requested child triple is known, stay inside its submultisets first;
         // otherwise keep the three accumulated child masses roughly balanced.
-        std::sort(order.begin(), order.end(), [&](std::size_t lhs, std::size_t rhs) {
-            const auto score = [&](std::size_t option_index) {
-                SearchState next;
-                const bool child_ok = apply_option(state, options[option_index], next);
-                const int penalty = child_ok ? preference_penalty(next) : 1000000;
-                const int minimum_mass = std::min({next.masses[0], next.masses[1], next.masses[2]});
-                const int maximum_mass = std::max({next.masses[0], next.masses[1], next.masses[2]});
-                const long long used_mass = row_prefix_[row_index + 1];
-                long long square_error = 0;
-                for (int mass : next.masses) {
-                    const long long error = 3LL * mass - used_mass;
-                    square_error += error * error;
-                }
-                return std::tuple<int, int, long long, std::size_t>(
-                    penalty, maximum_mass - minimum_mass, square_error, option_index);
-            };
-            return score(lhs) < score(rhs);
-        });
+        // Each next state is built once; the former comparator rebuilt it O(log n)
+        // times per option and dominated the larger cleanroom controls.
+        std::sort(
+            candidates.begin(), candidates.end(),
+            [](const Candidate &lhs, const Candidate &rhs) {
+                return lhs.score < rhs.score;
+            });
 
-        for (std::size_t option_index : order) {
-            ++result_.stats.options;
+        for (Candidate &candidate : candidates) {
+            const std::size_t option_index = candidate.option_index;
             const RowTriple &option = options[option_index];
-            SearchState next;
-            if (!apply_option(state, option, next)) {
-                ++result_.stats.child_prunes;
-                continue;
-            }
+            const SearchState &next = candidate.next;
             const ResidualFailure failure = future_feasible(row_index + 1, next);
             if (failure != ResidualFailure::none) {
                 if (failure == ResidualFailure::mass) {
@@ -714,6 +724,30 @@ bool k6_tight_band_face_survey() {
     return ok;
 }
 
+void print_stats(const SearchStats &stats);
+
+bool k7_dyadic_family_control() {
+    const Partition parent = repeated({
+        {128, 1}, {127, 1}, {120, 2}, {99, 4}, {64, 7},
+        {32, 1}, {31, 16}, {8, 32}, {1, 64}});
+    DirectSplitSolver solver(7, parent);
+    const SearchResult result = solver.solve();
+    const bool ok = !result.feasible
+        && result.stats.nodes == 21489353
+        && result.stats.options == 238217814
+        && result.stats.maximum_depth == 31
+        && result.stats.child_prunes == 216728462
+        && result.stats.mass_prunes == 0
+        && result.stats.support_prunes == 0
+        && result.stats.prefix_prunes == 0;
+    std::cout << "K7_DYADIC_FAMILY_DIRECT_CONTROL"
+              << " verified=" << (ok ? "YES" : "NO")
+              << " feasible=" << (result.feasible ? "YES" : "NO");
+    print_stats(result.stats);
+    std::cout << '\n';
+    return ok;
+}
+
 void print_stats(const SearchStats &stats) {
     std::cout << " nodes=" << stats.nodes
               << " options=" << stats.options
@@ -949,8 +983,12 @@ int main(int argc, char **argv) {
         if (std::string(argv[1]) == "survey-k6-band15-32") {
             return k6_tight_band_face_survey() ? 0 : 1;
         }
+        if (std::string(argv[1]) == "k7-dyadic-family-control") {
+            return k7_dyadic_family_control() ? 0 : 1;
+        }
         std::cerr << "usage: " << argv[0]
-                  << " regression | survey-k6-band15-32 | solve K ROW [ROW ...]\n";
+                  << " regression | survey-k6-band15-32"
+                  << " | k7-dyadic-family-control | solve K ROW [ROW ...]\n";
         return 64;
     } catch (const std::exception &error) {
         std::cerr << "error: " << error.what() << '\n';

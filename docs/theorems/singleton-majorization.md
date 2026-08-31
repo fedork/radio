@@ -1,4 +1,4 @@
-# Singleton majorization: proved necessity and a `K=6` counterexample to the converse
+# Singleton majorization: necessity and counterexamples at every `K>=6`
 
 ## Status (resolved negatively 2026-08-30)
 
@@ -21,6 +21,21 @@ Aigner proved the necessary direction and explicitly left the converse open in 1
 counterexample answers that question negatively for the present formulation.  Publication
 priority beyond the sources surveyed here has not yet been audited.  See also
 [the scan note](../aigner-1988-scan.md).
+
+The failure is not isolated.  The proved
+[Dyadic Balanced-Band Family](tight-band-capacity.md#a-counterexample-at-every-k6) constructs a
+full-mass exact-support `G_K`-majorized parent with no legal first cut for **every `K>=6`**.
+For `K=2m` or `2m+1`, it balances the canonical band between ranks `2^(m+1)` and
+`2^(m+2)`; the two tight endpoints force symmetric pure-capacity violations.  The first new member
+is
+
+    (128,127,120^2,99^4,64^7,32,31^16,8^32,1^64) <=_w G_7.
+
+An independent direct-row solver exhausts this `K=7` state as well.  The construction, infinite
+proof, 20-instance machine survey through `K=15`, and provenance are in the
+[dyadic-family record](../../evidence/singleton_dyadic_counterexample_family_2026-08-31.md).
+The failure level `K=5` remains open, so `K=6` is still the smallest known failure rather than a
+proved minimum.
 
 The same proof involves only the first 32 rows, so the unit-free core
 

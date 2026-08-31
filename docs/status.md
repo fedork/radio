@@ -24,6 +24,19 @@ to the mixed child.  Mixed-child saturation at ranks 15 and 32, together with
 pure child needs 64 coins from nine rows that can retain at most 63.  Thus neither transition
 exists.  This is a human proof; the executable checks are regressions, not the trust base.
 
+This is now the first member of a proved infinite family.  For `K=2m` or `2m+1`, balance the
+`n+1` canonical rows between tight anchors `(n-1,2n)`, where `n=2^(m+1)`.  The two endpoint
+transitions again force one pure child to exceed the capacity of `n/2+1` band rows.  This gives a
+full-mass exact-support majorized parent with no legal first cut for **every `K>=6`**.  The first
+new state is
+
+    (128,127,120^2,99^4,64^7,32,31^16,8^32,1^64) <=_w G_7.
+
+The analytic construction and induction are in the
+[Tight-Band theorem](theorems/tight-band-capacity.md#a-counterexample-at-every-k6), with exact
+machine and independent `K=7` direct-search evidence in the
+[dyadic-family record](../evidence/singleton_dyadic_counterexample_family_2026-08-31.md).
+
 The counterexample has the minimum possible full-mass support `2^6=64`.  Complete censuses still
 prove the Row-Coloring property through `K=4`; whether a different `K=5` counterexample exists
 is undecided.  Hence `K=6` is the smallest known failure level, not a proved minimum.
@@ -77,8 +90,11 @@ canonical and `j=13`
 positive cuts, and independently exhausts both the padded hole and the mass-697 core in 9,345 DFS
 states / 34,958 row options each.  Its optimized and naive implementations agree on 201 small
 partitions, and it closes all 1,223 full-mass majorized types at `K<=3`, including all 1,206 at
-`K=3`; see the
-[clean-room verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md).
+`K=3`.  Hoisting candidate construction out of the option-sort comparator leaves every search
+node unchanged and makes an independent exhaustion of the new `K=7` parent practical: 21,489,353
+nodes and 238,217,814 options in 30.41 wall seconds, down from about five minutes; see the
+[clean-room verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md) and
+[dyadic-family record](../evidence/singleton_dyadic_counterexample_family_2026-08-31.md).
 The proved [Tight-Band Capacity Obstruction](theorems/tight-band-capacity.md) now turns two tight
 anchors into a deterministic no-first-cut certificate.  An inequality-only implementation finds
 the rank-15/32 certificate independently.  A complete survey of the fixed `[15,32)` face contains
@@ -93,6 +109,8 @@ every one.  Hence 14 is globally minimal for an exact-support no-first-cut hole,
 the certificate class.  Counts and provenance are in the
 [capacity record](../evidence/singleton_tight_band_capacity_2026-08-31.md) and
 [transfer-shell record](../evidence/singleton_transfer_shell_census_2026-08-31.md).
+The dyadic constructor separately checks 91 canonical faces through `K=15` and emits 20 certified
+parents, while the analytic binomial-tail argument proves at least one for every higher level.
 
 The actual `K=5` boundary remains large after every proved reduction: there are exactly
 1,431,800,647,444 full-mass exact-support parents, including 147,422,086,892 with no internal tight
@@ -166,7 +184,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
 | **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. |
-| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively at `K=6`; the independent direct-row verifier and proved tight-band capacity certificate are delivered.  The counterexample is the unique first-cut hole on its fixed rank-15/32 face, no eligible `K=5` band has this certificate, and exhaustive search makes distance 14 globally minimal among exact-support no-first-cut holes.  Settle the actual `K=5` problem; at `K=6`, keep first-cut minimality separate from recursive-unsolvability and core/uniqueness questions.  The excess-`q` Pareto-assembly avenue remains parked. |
+| **H4** | Structural theory | The Singleton Majorization Converse is resolved negatively: a proved dyadic balanced-band family gives no-first-cut parents at every `K>=6`, and the independent direct-row verifier exhausts the first new `K=7` member.  The original `K=6` counterexample is the unique first-cut hole on its fixed rank-15/32 face, no eligible `K=5` band has this certificate, and exhaustive search makes distance 14 globally minimal among exact-support no-first-cut holes.  Settle the actual `K=5` problem; at `K=6`, keep first-cut minimality separate from recursive-unsolvability and core/uniqueness questions.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established
 

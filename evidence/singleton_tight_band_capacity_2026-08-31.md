@@ -261,6 +261,10 @@ The Tight-Band Capacity Obstruction is a sound one-sided certificate.  The compl
 survey shows that it catches the only hole on that face, while the complete `K=5` certificate
 census shows that this obstruction class is empty there.  Neither result proves that every hole
 has a two-anchor certificate.  The later transfer-shell census rules out all closer uncertified
-exact-support first-cut holes at `K=6`, but the remaining questions include the actual `K=5`
-problem, uniqueness within the distance-14 shell, recursive-unsolvability minimality, and whether
-future uncertified holes require laminar multi-anchor or general Hall-dual certificates.
+exact-support first-cut holes at `K=6`.  A subsequent
+[dyadic balanced-band construction](singleton_dyadic_counterexample_family_2026-08-31.md) proves
+that this same two-anchor obstruction supplies a no-first-cut parent at every `K>=6`; higher-level
+existence is therefore settled.  The remaining questions include the actual `K=5` problem,
+minimality and classification at higher levels, uniqueness within the `K=6` distance-14 shell,
+recursive-unsolvability minimality, and whether uncertified holes require laminar multi-anchor or
+general Hall-dual certificates.

@@ -132,6 +132,95 @@ Thus both transitions fail.  The same state also has valid but longer certificat
 human certificate because it leaves only the two cases above.  Exact machine output is in the
 [capacity-certificate record](../../evidence/singleton_tight_band_capacity_2026-08-31.md).
 
+## A counterexample at every `K>=6`
+
+The same obstruction yields an explicit infinite family, although the anchors must widen as `K`
+grows.  Write
+
+\[
+V_K(j)=\sum_{i=j}^K {K\choose i};
+\]
+
+then `G_K` contains `2^(j-1)` copies of `V_K(j)` for `j>=1`.  Let `K=2m` or `2m+1`, with
+`m>=3`, and set
+
+\[
+d=m+1,\qquad n=2^d,qquad u=n-1,qquad v=2n.
+\]
+
+The canonical band on ranks `u+1,...,v` is
+
+\[
+b_0=(V_K(d),V_K(d+1)^n).
+\]
+
+Let `M` be its mass, write `M=(n+1)q+r` with `0<=r<n+1`, and replace it by the balanced
+equal-mass band
+
+\[
+b=((q+1)^r,q^{n+1-r}).                                       \tag{TB5}
+\]
+
+Keeping every row outside the band canonical gives a full-mass, exact-support parent `a_K`.
+Balancing only moves mass downward, so `a_K<=_w G_K`.
+
+> **Dyadic Balanced-Band Family.**  For every `K>=6`, the parent `a_K` in (TB5) has no legal
+> first cut into three `G_(K-1)`-majorized children.  Consequently singleton majorization is
+> insufficient at every level `K>=6`.
+
+Here is the capacity calculation.  Put
+
+\[
+A=V_{K-1}(d-1),\quad B=V_{K-1}(d),\quad C=V_{K-1}(d+1),
+\quad L=n+1,\quad s=n/2+1.
+\]
+
+Concavity gives `I(n-1)={n/2-1,n/2}` and `I(2n)={n}`.  Thus there are two transitions, and in
+either one a pure child needs `A+(n/2)B` coins from `s` band rows.  The mixed floor is `C`.
+Writing `B_b(s)` for the balanced band's `s`-row prefix, both transitions are therefore blocked
+if
+
+\[
+B_b(s)\le A+(n/2)B+sC-1.                                    \tag{TB6}
+\]
+
+Pascal recursion and one simplification give
+
+\[
+T-\frac{sM}{L}=\frac FL-1,qquad
+F=\frac n2 {K-1\choose d-1}-s{K-1\choose d},                \tag{TB7}
+\]
+
+where `T` is the right side of (TB6).  Integer balancing gives
+
+\[
+B_b(s)-\frac{sM}{L}<\frac L4.                                \tag{TB8}
+\]
+
+For even and odd `K`, respectively,
+
+\[
+F_m^E={2m-1\choose m+1}\left(\frac n{m-1}-1\right),\qquad
+F_m^O={2m\choose m+1}\left(\frac n{2m}-1\right).
+\]
+
+At `m=5`, both exceed `L^2/4+L`.  Adjacent binomial ratios show
+`F_{m+1}^E>4F_m^E` and `F_{m+1}^O>4F_m^O`, while doubling `n` multiplies
+`L^2/4+L` by less than four.  Hence (TB7)--(TB8) prove (TB6) for `m>=5`.
+The four remaining cases `K=6,7,8,9` are the exact integer bases; their two sides in (TB6) are
+`72=72`, `280=280`, `663=663`, and `2278<=2279`.  This proves the theorem.
+
+The first new member is
+
+\[
+(128,127,120^2,99^4,64^7,32,31^{16},8^{32},1^{64})
+\preceq_w G_7.
+\]
+
+An independent direct-row exhaustion rejects it in 21,489,353 nodes.  The full algebra, the first
+examples, a 20-counterexample dyadic survey through `K=15`, and provenance are in the
+[dyadic-family record](../../evidence/singleton_dyadic_counterexample_family_2026-08-31.md).
+
 ## Complete fixed-face classification
 
 Keep the first 15 rows
@@ -207,9 +296,11 @@ optimization argument and clean provenance for the inequality class remain in th
 
 [`tools/singleton_tight_band_certificate.cpp`](../../tools/singleton_tight_band_certificate.cpp)
 recomputes the Pascal profiles and evaluates only the tight-prefix, transition and capacity
-inequalities above.  It contains no split search, Hall test, result cache or dependency on the
-existing interval census.  The companion clean-room solver independently classifies the same 176
-bands by direct legal row triples.  Reproduce both with
+inequalities above.  Its `survey-dyadic-family 15` mode also constructs and checks all dyadic
+family members through the supported level.  It contains no split search, Hall test, result cache
+or dependency on the existing interval census.  The companion clean-room solver independently
+classifies the same 176 `K=6` bands by direct legal row triples.  Reproduce the standard controls
+with
 
 ```sh
 tools/singleton_tight_band_regression.sh

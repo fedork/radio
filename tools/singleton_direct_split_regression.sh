@@ -17,3 +17,10 @@ CC="${CXX:-clang++}" tools/build_radio.py \
     tools/singleton_direct_split_cleanroom.cpp \
     -o "$direct_split_tmp/singleton-direct"
 tools/run_with_provenance.py "$direct_split_tmp/singleton-direct" regression
+if [[ "${1:-}" == "--with-k7" ]]; then
+    tools/run_with_provenance.py \
+        "$direct_split_tmp/singleton-direct" k7-dyadic-family-control
+elif [[ $# -ne 0 ]]; then
+    echo "usage: $0 [--with-k7]" >&2
+    exit 64
+fi
