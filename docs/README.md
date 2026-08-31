@@ -20,6 +20,8 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [theorems/m5-pareto-assembly.md](theorems/m5-pareto-assembly.md) | Exact `m=5` theorem translated into the competing `3+2` / `4+1` assembly branches and a sharp symbolic D slice |
 | [theorems/recursive-pareto-lift.md](theorems/recursive-pareto-lift.md) | Proved lift-box lemma and the open recursive Pareto-lift programme |
 | [theorems/atom-lineage.md](theorems/atom-lineage.md) | All-depth D-lineage/kernel obstructions, exact eight-/sixteen-atom height-6 optima, and the one-rank 32-atom gap |
+| [theorems/singleton-majorization.md](theorems/singleton-majorization.md) | Singleton-majorization theory, its exact low-level boundary, and the `K=6` counterexample to sufficiency |
+| [theorems/tight-band-capacity.md](theorems/tight-band-capacity.md) | Proved two-anchor capacity obstruction and complete first-cut classification of the fixed `K=6` rank-15/32 face |
 
 ## How facts are recorded
 

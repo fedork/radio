@@ -47,7 +47,7 @@ normalization fixed it.
 
 ## `K=6` controls
 
-The clean optimized build at commit `bc11b23c6407c27940ab906b0f545ed9041b8531` had source SHA-256
+The original clean optimized build at commit `bc11b23c6407c27940ab906b0f545ed9041b8531` had source SHA-256
 `277b6ce9469980fe38ebbcb7956643666b6f8f2b7e6cb8d273ac53d7cb0fa691` and build ID
 `e5bd63dc7cc1fb7b9d036f73106b0bd482fdc8d594f24c03a82bb59c952d0427`.  Both
 `git_source_dirty` and `git_worktree_dirty` were `no`.  Its deterministic results were:
@@ -108,6 +108,16 @@ Separately, the optimized solver enumerates every full-mass partition majorized 
 These counts independently reproduce the existing 160-state exact-support `K=3` control while
 also checking the full 1,206-type universe.
 
+## Fixed rank-15/32 face extension
+
+At commit `944b16f28cf13e1457c9f176c25b62034152ee16`, the same direct-row implementation gained a
+bounded mode which enumerates every 17-part band of mass 134 weakly majorized by `(22,7^16)` while
+holding the other parent rows fixed.  It finds 176 bands, replays feasible allocations for 175,
+and exhausts exactly one hole, `(8^15,7^2)`.  The total is 141,216 DFS nodes and the unique hole is
+the largest search at 9,345 nodes.  A separate inequality-only program independently certifies
+exactly that state.  Full provenance and the restricted transfer-distance consequence are in the
+[tight-band capacity record](singleton_tight_band_capacity_2026-08-31.md).
+
 ## Reproduction and sanitizers
 
 The ordinary regression is one command and took 2.6 wall seconds including its provenance build
@@ -143,5 +153,6 @@ uses `detect_leaks=0` and covers AddressSanitizer plus UndefinedBehaviorSanitize
 
 This establishes an independent exhaustive implementation check for both the full-mass hole and
 its underfull core.  It does not supersede the two-line analytic capacity contradiction, which
-remains shorter and stronger as a proof.  It also does not decide `K=5`, classify other `K=6`
-holes, or prove that every minimal hole has a two-anchor certificate.
+remains shorter and stronger as a proof.  The extension completely classifies the fixed
+rank-15/32 face, but it does not decide `K=5`, classify `K=6` holes outside that face/support, or
+prove that every minimal hole has a two-anchor certificate.

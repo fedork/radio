@@ -178,11 +178,19 @@ is:
    all 1,206 types at `K=3`.
    Reproduction and exact counts are in the
    [clean-room verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md);
-2. formulate the rank-15/32 argument as a general **Tight-Band Capacity Obstruction**, then survey
-   whether it explains every low-level hole or only this one;
-3. settle `K=5`, and minimize the **non-unit core** under level, support, transfer distance and a
-   clearly specified dominance/normalization order.  Deleting the harmless `1^32` padding already
-   gives the 32-row mass-697 core, so that does not count as a new smaller obstruction;
+2. **Delivered 2026-08-31:** the proved **Tight-Band Capacity Obstruction** extracts every monotone
+   transition between two tight anchors and rejects it by a mixed-floor/pure-capacity inequality.
+   An inequality-only checker reproduces the two-case rank-15/32 proof.  On the complete fixed
+   `[15,32)` face, independent enumeration finds 176 dominated 17-row bands: the direct solver
+   classifies 175 as first-cut feasible, while both implementations identify `(8^15,7^2)` as the
+   unique hole.  Thus transfer distance 14 is minimal on this face, not globally.  See the
+   [theorem](theorems/tight-band-capacity.md) and
+   [verification record](../evidence/singleton_tight_band_capacity_2026-08-31.md);
+3. settle `K=5`, and minimize the **non-unit core** beyond the fixed face under level, support,
+   transfer distance and a clearly specified dominance/normalization order.  Deleting the harmless
+   `1^32` padding already gives the 32-row mass-697 core, so that does not count as a new smaller
+   obstruction.  Run the tight-band extractor on every new hole; if it misses one, retain that
+   state and seek a laminar multi-anchor or general Hall-dual certificate;
 4. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
    stable-partition/chain-partition formulation is exact but tautological; the target is a compact
    recursive support or forbidden-band criterion that recognizes when the union of fixed-color

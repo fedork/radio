@@ -203,6 +203,14 @@ including all 1,206 at `K=3`.
 Exact provenance, branch/prune counts, the replayable `j=13` allocation and sanitizer commands are
 in the [clean-room verification record](singleton_direct_split_cleanroom_2026-08-31.md).
 
+The analytic argument has also been generalized to the proved
+[Tight-Band Capacity Obstruction](../docs/theorems/tight-band-capacity.md).  Its separate
+inequality-only extractor finds the preferred `(15,32)` certificate above without performing a
+split search.  Together with a new clean-room face mode, it exhausts all 176 exact 17-row bands
+dominated by `(22,7^16)`: 175 have a majorized first cut and `(8^15,7^2)` is the unique hole.
+Consequently transfer distance 14 is minimal on this fixed face, though not proved globally at
+`K=6`.  See the [capacity record](singleton_tight_band_capacity_2026-08-31.md).
+
 All exhaustive runs are regression checks.  The short saturation-and-integrality argument above
 is the proof.
 

@@ -69,6 +69,10 @@ is proved: on 2026-08-31 the two individually sound reductions together deleted 
 representative of an all-unit solution and caused false negatives already at `K=1`.  The naive
 oracle in `tools/singleton_direct_split_cleanroom.cpp` is the regression for this trap.
 
+`tools/singleton_tight_band_certificate.cpp` is one-sided: a printed certificate proves that no
+majorized first cut exists, but absence of a certificate is `UNKNOWN`, not feasibility.  Positive
+face verdicts come from the separate direct-row solver and its replay check.
+
 Note that a missing `can't solve` line does **not** mean unsolvable. `canSolveB` returns a
 tri-state and gives up with `MAYBE` when it hits a deadline, printing nothing.
 

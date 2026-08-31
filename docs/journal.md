@@ -12157,3 +12157,55 @@ This independently verifies first-cut infeasibility, while the short two-anchor 
 remains the proof.  It does not provide a SAT/ILP certificate, settle K=5, establish global
 minimality at K=6, or classify other holes.  The next mathematical work remains the tight-band
 capacity survey and the K=5/minimal-hole search.  No background process was left running.
+
+## 2026-08-31 -- tight-band capacity theorem and complete rank-15/32 face
+
+The rank-15/32 argument generalizes cleanly.  At a tight parent rank `t`, take `p_t` to be the
+number of rows with a **positive** left-pure piece.  This avoids assigning an arbitrary orientation
+to all-mixed rows.  Equality in
+
+    A(t) <= H(p_t)+H(t)+H(t-p_t) <= H_K(t)=A(t)
+
+forces `p_t in I(t)` and saturates all three child contributions.  For tight `u<v`, the actual
+counts therefore give a monotone transition `p->q` with fixed left, mixed and right band masses.
+There is a useful strengthening of the proposed lemma: if
+`delta=H(v)-H(v-1)>0`, removing any one band mixed piece leaves a `(v-1)`-piece child submultiset,
+so every band mixed piece is at least `delta`, not merely positive.  A pure child assigned `s`
+rows has capacity at most the sum of the `s` largest `b_i-delta`.  If every endpoint transition
+exceeds one pure capacity, no first cut exists.  The proof is now stated in
+`docs/theorems/tight-band-capacity.md`.
+
+Added the independent inequality-only implementation
+`tools/singleton_tight_band_certificate.cpp`.  It contains no row-split search, Hall code or cache.
+For the padded state and core it finds exactly three anchor pairs `(15,30)`, `(15,31)` and
+`(15,32)`, with six, four and two transitions.  The deterministic primary certificate is the last:
+`7->16` needs 64 left-pure coins against capacity 63, while `8->16` needs the symmetric 64
+right-pure coins against 63.  This confirms why rank 30 is valid but is the wrong human anchor:
+it does not reduce the proof to two cases.
+
+A memoized exploratory count took 0.03 seconds and showed that the complete exact 17-row face
+below `(22,7^16)` has only 176 integer bands.  A first ad hoc clean-room classification then took
+4.80 seconds including its build and found 175 feasible bands and one hole.  The result was made
+durable in both implementations: the certificate extractor independently certifies exactly one
+state, and the direct-row solver independently finds exactly one negative.  Both states are
+`(8^15,7^2)`.  The direct survey uses 141,216 DFS nodes in total, with the unique hole the maximum
+at 9,345.  Thus the old transfer distance 14 is minimal over this entire fixed face, not merely
+along the displayed path.  This remains a first-cut statement and does not establish recursive
+solvability of the other 175 parents.
+
+The clean combined regression at commit `9bf0f4a8aa3a7b05c0d2ce76d700fdd6ee6b49ea` took 4.60
+seconds.  The capacity source hash/build ID were
+`72c7c04075d2fb324e89f2f23ad1b52310b3dcd98355538ff283f917bd847583` /
+`96976b088b511cab88b909de24e93c5068f6ac33c9beb81554be88ef7d4bb7a5`; the direct source hash/build
+ID were `885a0c4223ffe89515e407182dfbaf6c04fe4d4a9726d9f23c50648c2f77a00f` /
+`f63b7f1f2ff31886939274b4b818f0bb75f51e1973ab65dec22c8ea510a73d0d`.  Both source and worktree
+dirty flags were `no`.  Clean ASan+UBSan repetitions also passed: capacity build
+`6fb4eef4b660be79ea75735627f13772d8f774eba1ab1042b5d5993b8ce79f44` in 2.18 build-plus-run
+seconds and direct build `f34c58eb39e1a8575dee0604f249808544aa7a15e9c6a116b805f5b43ee7c1be` in 13.53 seconds.
+An earlier exploratory provenance build omitted `CC=clang++`, failed at the C++ runtime link after
+1.85 seconds, and executed no survey; the checked wrapper supplies the compiler explicitly.
+
+This closes P6's general-obstruction item and the first bounded hole survey.  It does not settle
+`K=5` or global `K=6` minimality.  The next search should range beyond the fixed face/support and
+feed every new hole through the extractor; a miss is the evidence needed to justify laminar
+multi-anchor or general Hall-dual certificates.  No background process was left running.

@@ -36,6 +36,11 @@ generically, reproduces the last feasible transfer cut, and agrees with an unquo
 its tiny controls.  This is an implementation check, not a replacement for the analytic proof; see
 the [verification record](../../evidence/singleton_direct_split_cleanroom_2026-08-31.md).
 
+The rank-15/32 argument is now an instance of the proved
+[Tight-Band Capacity Obstruction](tight-band-capacity.md).  Its inequality-only extractor and an
+independent direct-row enumeration also show that `(8^15,7^2)` is the unique first-cut hole among
+all 176 dominated 17-row bands on this fixed face; this does not claim global `K=6` minimality.
+
 The former proof in this file used a purported Three-Way Majorization Decomposition Lemma.  That
 lemma is false, and even a correct unconstrained polymatroid decomposition would not enforce the
 legal row condition that a singleton row cannot feed both pure children.  The exact Row-Coloring
@@ -358,6 +363,8 @@ This contradiction proves:
 The full calculation, original direct/Hall enumerations, clean-room direct-row check and
 transfer-path boundary are in the
 [counterexample record](../../evidence/singleton_k6_counterexample_2026-08-30.md).
+The general two-anchor theorem and complete fixed-face survey are in the
+[Tight-Band Capacity note](tight-band-capacity.md).
 
 The base has the elementary `2`-flat properties
 
@@ -2416,7 +2423,9 @@ singleton.
 The count path is essential, but the proposed **Positive-Band Extension Conjecture is false**.
 At `K=6`, the band `[15,32)` has canonical profile `(22,7^16)`, while the dominated equal-mass
 refinement `(8^15,7^2)` extends neither endpoint transition `7->16` or `8->16`.  This is exactly
-the band inside the global counterexample.
+the band inside the global counterexample.  The later
+[Tight-Band Capacity Obstruction](tight-band-capacity.md) proves this failure by two scalar
+capacity inequalities and classifies the entire 176-state fixed face.
 
 There is no longer a separate arbitrary-row tail conjecture.  The **Half-Unit Coalescence Lemma**
 says that if a capacity partition has at least as many unit parts as non-unit parts, merging the two
