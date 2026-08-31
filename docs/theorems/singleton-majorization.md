@@ -326,15 +326,15 @@ The parent majorization inequalities are only the balanced slice of (C):
 The `K=6` counterexample at the top of this note satisfies every balanced parent inequality but no
 coloring satisfies all off-diagonal pairs.  Equivalently, no legal first allocation exists.  Here
 is the short obstruction.  For `h=G_5`, let `H` be its prefix function.  The parent is tight at
-ranks 15 and 31, forcing the color counts `(p,q)` at those ranks to lie in
+ranks 15 and 32, forcing the color counts `(p,q)` at those ranks to lie in
 
-    {7,8} x {15,16}.
+    {7,8} x {16}.
 
-The 16 intervening rows have values `(8^15,7)`.  Tightness forces their mixed pieces to total
-`H(31)-H(15)=21`; if one were zero, 30 mixed pieces would have mass
-`H(15)+21=242>H(30)=241`.  Thus every band row sends at least one integral coin to the mixed child.
-In the four possible count transitions, one pure child consequently needs either 58 coins from
-eight rows, which can retain at most 56, or 64 coins from nine rows, which can retain at most 63.
+The 17 intervening rows have values `(8^15,7^2)`.  Tightness forces their mixed pieces to total
+`H(32)-H(15)=22`; if one were zero, 31 mixed pieces would have mass
+`H(15)+22=243>H(31)=242`.  Thus every band row sends at least one integral coin to the mixed child.
+In either possible count transition, one pure child consequently needs 64 coins from nine rows,
+which can retain at most 63.
 This contradiction proves:
 
 > **Singleton Majorization Counterexample Theorem.** Singleton majorization is necessary but not
@@ -2399,9 +2399,9 @@ is therefore a sum over count paths of products of local band multiplicities.  T
 singleton.
 
 The count path is essential, but the proposed **Positive-Band Extension Conjecture is false**.
-At `K=6`, the band `[15,31)` has canonical profile `(22,7^15)`, while the dominated equal-mass
-refinement `(8^15,7)` extends none of its four endpoint transitions
-`7->15, 7->16, 8->15, 8->16`.  This is exactly the band inside the global counterexample.
+At `K=6`, the band `[15,32)` has canonical profile `(22,7^16)`, while the dominated equal-mass
+refinement `(8^15,7^2)` extends neither endpoint transition `7->16` or `8->16`.  This is exactly
+the band inside the global counterexample.
 
 There is no longer a separate arbitrary-row tail conjecture.  The **Half-Unit Coalescence Lemma**
 says that if a capacity partition has at least as many unit parts as non-unit parts, merging the two

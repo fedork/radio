@@ -1259,8 +1259,10 @@ int main(int argc, char **argv) {
         const Sequence child_values = singleton_base(k - 1);
         const Capacity child(child_values);
 
-        // G_6 with the tight rank interval [15,31) changed from
-        // (22,7^15) to the equally massive refinement (8^15,7).
+        // G_6 with the tight rank interval [15,32) changed from
+        // (22,7^16) to the equally massive refinement (8^15,7^2).
+        // Rank 32 has a unique balanced color count, giving a two-transition
+        // obstruction.
         Sequence state{64, 63};
         state.insert(state.end(), 2, 57);
         state.insert(state.end(), 4, 42);
@@ -1281,24 +1283,24 @@ int main(int argc, char **argv) {
         }
         dominated = dominated && state_mass == parent.mass;
         if (!dominated || parent.mass != 729 || state.size() != 64 ||
-            parent.H(15) != 563 || parent.H(31) != 690 ||
+            parent.H(15) != 563 || parent.H(32) != 697 ||
             state_prefix != 729) {
             std::cerr << "SINGLETON_K6_INTERNAL_ERROR dominance"
                       << " state_mass=" << state_mass
                       << " parent_mass=" << parent.mass
                       << " support=" << state.size()
                       << " prefix15=" << parent.H(15)
-                      << " prefix31=" << parent.H(31) << '\n';
+                      << " prefix32=" << parent.H(32) << '\n';
             return 1;
         }
         int prefix15 = 0;
-        int prefix31 = 0;
+        int prefix32 = 0;
         for (int index = 0; index < 15; ++index) prefix15 += state[index];
-        for (int index = 0; index < 31; ++index) prefix31 += state[index];
-        if (prefix15 != parent.H(15) || prefix31 != parent.H(31)) {
+        for (int index = 0; index < 32; ++index) prefix32 += state[index];
+        if (prefix15 != parent.H(15) || prefix32 != parent.H(32)) {
             std::cerr << "SINGLETON_K6_INTERNAL_ERROR anchors"
                       << " prefix15=" << prefix15
-                      << " prefix31=" << prefix31 << '\n';
+                      << " prefix32=" << prefix32 << '\n';
             return 1;
         }
 
@@ -1410,17 +1412,18 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        // Independently test the four endpoint transitions forced by the two
-        // tight ranks.  Each transition must fail on the changed 16-row band.
+        // Independently test the two endpoint transitions forced by the two
+        // tight ranks.  Each transition must fail on the changed 17-row band.
         const int begin = 15;
-        const int end = 31;
+        const int end = 32;
         TransitionBandCensus band_census(
             child_values, parent_values, begin, end);
         Sequence band_state(15, 8);
-        band_state.push_back(7);
-        if (band_census.transitions.size() != 4 ||
+        band_state.insert(band_state.end(), 2, 7);
+        if (band_census.transitions.size() != 2 ||
             band_census.parent.values != Sequence({22, 7, 7, 7, 7, 7, 7, 7,
-                                                    7, 7, 7, 7, 7, 7, 7, 7})) {
+                                                    7, 7, 7, 7, 7, 7, 7, 7,
+                                                    7})) {
             std::cerr << "SINGLETON_K6_INTERNAL_ERROR transitions="
                       << band_census.transitions.size()
                       << " band=" << show(band_census.parent.values) << '\n';
@@ -1455,7 +1458,7 @@ int main(int argc, char **argv) {
                   << " state=" << show(state)
                   << " mass=" << state_mass
                   << " support=" << state.size()
-                  << " tight_ranks=(15,31)"
+                  << " tight_ranks=(15,32)"
                   << " full_coloring_found=NO"
                   << " full_nodes=" << full_search.nodes
                   << " direct_split_found=NO"
@@ -1464,7 +1467,7 @@ int main(int argc, char **argv) {
                   << " residual_coloring_found=NO"
                   << " residual_nodes=" << residual_search.nodes
                   << " first_failed_transfer=" << first_failed_transfer
-                  << " forced_transitions=4"
+                  << " forced_transitions=2"
                   << " band_nodes=" << band_nodes << '\n';
         return 0;
     }

@@ -1,8 +1,8 @@
 # Pascal tight-skeleton factorization and interval census (2026-08-29)
 
 **Superseded status (2026-08-30).**  The factorization and minimum-support reduction below remain
-proved, but Positive-Band Extension is false.  The `K=6` band `[15,31)` with target `(8^15,7)`
-extends none of its four forced endpoint transitions; see
+proved, but Positive-Band Extension is false.  The `K=6` band `[15,32)` with target `(8^15,7^2)`
+extends neither of its two forced endpoint transitions; see
 [the counterexample](singleton_k6_counterexample_2026-08-30.md).
 
 ## Outcome

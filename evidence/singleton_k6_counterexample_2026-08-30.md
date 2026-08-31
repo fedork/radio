@@ -51,7 +51,7 @@ Let `H(t)` be the saturated prefix sum of `G_5`.  The values needed below are
 
     H(7)=163, H(8)=179,
     H(15)=221, H(16)=227,
-    H(30)=241, H(31)=242.
+    H(31)=242, H(32)=243.
 
 Suppose for contradiction that (K6-1) has a legal first split.  Color a row `A`
 if it feeds the left pure child and the mixed child, and `B` if it feeds the
@@ -60,39 +60,37 @@ color `A`, their total mass is at most
 
     H(p)+H(t)+H(t-p).                                       (K6-2)
 
-The parent is tight at ranks 15 and 31:
+The parent is tight at ranks 15 and 32:
 
     sum_(i<=15) a_i = 563 = H(7)+H(15)+H(8),
-    sum_(i<=31) a_i = 690 = H(15)+H(31)+H(16).
+    sum_(i<=32) a_i = 697 = H(16)+H(32)+H(16).
 
 Concavity of `H` makes the maximizing color counts respectively
 
-    p in {7,8},       q in {15,16}.                          (K6-3)
+    p in {7,8},       q=16.                                  (K6-3)
 
 Moreover, equality in (K6-2) forces all three child bounds to be saturated at
-both ranks.  The 16 rows between those ranks therefore send exactly
+both ranks.  The 17 rows between those ranks, `(8^15,7^2)`, therefore send exactly
 
-    H(31)-H(15)=21
+    H(32)-H(15)=22
 
-coins to the mixed child.  Every one of those 16 mixed pieces is positive.  If
-one were zero, the other 15 band pieces together with the 15 head pieces would
-be at most 30 entries of the mixed child but would have mass
+coins to the mixed child.  Every one of those 17 mixed pieces is positive.  If
+one were zero, the other 16 band pieces together with the 15 head pieces would
+be at most 31 entries of the mixed child but would have mass
 
-    H(15)+21=242 > H(30)=241,
+    H(15)+22=243 > H(31)=242,
 
 contradicting mixed-child majorization.  Integrality is the decisive step: each
 band row consequently retains at most seven of its at-most-eight coins for its
 pure child.
 
-There are only four endpoint-count transitions.  In each one, one pure child
-has the displayed impossible requirement:
+There are only two endpoint-count transitions.  They give the same impossible
+requirement on opposite pure children:
 
-| `(p,q)` | pure side | band rows on that side | required pure mass | maximum after one mixed coin per row |
+| `p` | pure side | band rows on that side | required pure mass | maximum after one mixed coin per row |
 |---|---:|---:|---:|---:|
-| `(7,15)` | `A` | 8 | `H(15)-H(7)=58` | `8*7=56` |
-| `(7,16)` | `A` | 9 | `H(16)-H(7)=64` | `9*7=63` |
-| `(8,15)` | `B` | 9 | `H(16)-H(7)=64` | `9*7=63` |
-| `(8,16)` | `B` | 8 | `H(15)-H(7)=58` | `8*7=56` |
+| `7` | `A` | 9 | `H(16)-H(7)=64` | `9*7=63` |
+| `8` | `B` | 9 | `H(16)-H(7)=64` | `9*7=63` |
 
 Thus no transition is possible and no legal first split exists.  If the state
 were solvable in six tests, each child of its first test would be solvable in
@@ -106,11 +104,13 @@ integral obstruction.
 
 ## The one-transfer phase boundary
 
-The bad 16-row band is reached from the canonical band by the monotone path
+The changing 16-row core is reached from the canonical core by the monotone path
 
     b_j=(22-j,8^j,7^(15-j)),       0<=j<=14.                  (K6-4)
 
 Each step moves one coin from the first row to a distinct row of size seven.
+Together with the adjacent unchanged row of size seven, its last state is the
+17-row obstruction band `(8^15,7^2)` used above.
 The exact fixed-color Hall search finds a majorized first cut for every
 `j<=13` and none for `j=14`.  Hence the very last Robin--Hood transfer is a
 phase loss.  Reversing transfers makes the solution fiber locally reachable,
@@ -153,7 +153,7 @@ It performs four logically separate checks:
    tight ranks;
 2. enumerate every normalized row coloring and apply Fixed-Color Hall;
 3. enumerate the integer row splits directly, without the coloring reduction;
-4. contract the tight band and exhaust all four forced count transitions.
+4. contract the tight band and exhaust both forced count transitions.
 
 It also checks the 14-step transfer path and the two-anchor residual.
 
@@ -170,11 +170,11 @@ tools/run_with_provenance.py /tmp/singleton_pascal_interval_census \
 The final summary reports
 
     SINGLETON_K6_COUNTEREXAMPLE verified=YES ...
-      mass=729 support=64 tight_ranks=(15,31)
+      mass=729 support=64 tight_ranks=(15,32)
       full_coloring_found=NO full_nodes=7
       direct_split_found=NO direct_nodes=9373
       residual_coloring_found=NO residual_nodes=7
-      first_failed_transfer=14 forced_transitions=4 band_nodes=8796
+      first_failed_transfer=14 forced_transitions=2 band_nodes=4638
 
 The exhaustive runs are regression checks.  The short saturation-and-integrality
 argument above is the proof.

@@ -12020,16 +12020,16 @@ The nonsplitting proof is equally short and is driven entirely by the Pascal pro
 prefix function `H` of `G_5`,
 
     H(7)=163, H(8)=179, H(15)=221,
-    H(16)=227, H(30)=241, H(31)=242.
+    H(16)=227, H(31)=242, H(32)=243.
 
-The parent is tight at ranks 15 and 31.  If `p` and `q` are the numbers of left-oriented rows in
-those prefixes, concavity forces `p in {7,8}` and `q in {15,16}`, and equality forces all three
-child prefix bounds to saturate.  The intervening 16 rows must therefore send exactly
-`H(31)-H(15)=21` coins to the mixed child.  Every one of those mixed pieces is positive: otherwise
-the other 15 band pieces plus the 15 head pieces would put mass 242 in at most 30 mixed rows,
-contradicting `H(30)=241`.  Each band row consequently retains at most seven coins for its pure
-child.  The four count transitions then require respectively 58 coins on eight rows, 64 on nine,
-64 on nine, or 58 on eight, against maxima 56, 63, 63 and 56.  All four are impossible.
+The parent is tight at ranks 15 and 32.  If `p` and `q` are the numbers of left-oriented rows in
+those prefixes, concavity forces `p in {7,8}` and uniquely `q=16`, and equality forces all three
+child prefix bounds to saturate.  The intervening 17 rows must therefore send exactly
+`H(32)-H(15)=22` coins to the mixed child.  Every one of those mixed pieces is positive: otherwise
+the other 16 band pieces plus the 15 head pieces would put mass 243 in at most 31 mixed rows,
+contradicting `H(31)=242`.  Each band row consequently retains at most seven coins for its pure
+child.  If `p=7`, the A child needs `H(16)-H(7)=64` pure coins on nine band rows; if `p=8`, the B
+child has the same requirement.  Nine rows can retain at most 63.  Both cases are impossible.
 
 This is also the requested transfer phase change.  Along
 
@@ -12051,7 +12051,7 @@ The same example settles the derived universal targets.  It refutes Row-Coloring
 saturation/M-convexity, global Robin--Hood closure, Carry-Compatible Gale--Ryser, Balanced Pascal
 Realization, niceness and strong niceness of `Q_K`, canonical direct/allocation transport,
 Pascal-shuffle coverage, two-interval splicing, and all universal local escape/descent rules.  Its
-band `[15,31)` refutes Positive-Band Extension: none of the four endpoint transitions exists.  The
+band `[15,32)` refutes Positive-Band Extension: neither endpoint transition exists.  The
 proved Two-Anchor Reduction maps it to the residual hole
 
     (62,61,55^2,40^4,20^7,6^15,5^2)
@@ -12062,11 +12062,12 @@ factorization, switch connectivity, fixed-color exchange connectivity, and all e
 censuses remain valid.  This construction does not decide `K=5`; `K=6` is the smallest known
 failure level, not a proved minimum.
 
-`tools/singleton_pascal_interval_census.cpp` now has mode `singleton-k6-counterexample`.  A
-provenance build took 3.2 wall seconds and the regression run took 0.8 wall seconds.  It independently
+`tools/singleton_pascal_interval_census.cpp` now has mode `singleton-k6-counterexample`.  The
+initial provenance build/run took 3.2/0.8 wall seconds; the final rank-15/32 simplification reran in
+2.6/0.6 seconds.  It independently
 checked every parent prefix, exhausted normalized Hall colorings (7 search nodes), exhausted direct
-integer row splits (9,373 nodes), checked the residual hole (7 nodes), and exhausted the four
-forced bands (8,796 nodes).  A pre-existing `K=3` full-band regression still reports 160 states,
+integer row splits (9,373 nodes), checked the residual hole (7 nodes), and exhausted the two
+forced bands (4,638 nodes).  A pre-existing `K=3` full-band regression still reports 160 states,
 one transition and zero incomplete relations.  These searches are regressions; the tight-prefix
 argument above is the proof.
 
@@ -12077,3 +12078,23 @@ logged recursive evidence.  A focused web search located the Aigner/Shahriari/St
 questions and current nice-graph literature but did not establish publication priority; the
 publication inventory retains a required novelty audit.  No long-running process was started, and
 the counterexample/regression processes exited normally.
+
+## 2026-08-31 -- handover: the counterexample proof contracts to two cases
+
+While preparing the cold-start handover, rank 30 first looked like a shorter second anchor.  That
+was a false shortcut: the plateau of sixes in `G_5` gives three maximizing color counts
+`I(30)={14,15,16}`, hence six transitions rather than the assumed two.  The failed variant was
+caught immediately by the exact transition enumerator in a seconds-scale rebuild/run.
+
+Rank 32 is the correct simplification.  The parent is tight at 15 and 32, with endpoint counts
+`p in {7,8}` and uniquely `q=16`.  Saturation puts 22 mixed coins on the 17-row band
+`(8^15,7^2)`.  If one mixed piece vanished, mass 243 would occupy at most 31 entries, contradicting
+`H(31)=242`; hence every band row retains at most seven pure coins.  For `p=7`, A needs
+`H(16)-H(7)=64` pure coins on nine band rows; for `p=8`, B has the same requirement.  The capacity
+is only 63.  The final regression independently exhausts exactly these two transitions in 4,638
+nodes.
+
+The requested next programme is now in P6: a clean-room direct-row-split solver with no shared
+Hall implementation; a general Tight-Band Capacity Obstruction and a census of which holes it
+explains; a `K=5`/minimal-counterexample search; and a useful necessary-and-sufficient recursive
+support criterion beyond the tautological transcript-poset chain-partition characterization.

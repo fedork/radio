@@ -167,10 +167,22 @@ contains no number absent from `data/*.csv`.
 
 is majorized by `G_6` and has no legal first split.  Do not pursue a universal Row-Coloring,
 no-holes, transfer, switch, shuffle or chain-splicing proof; all such sufficient targets below are
-retained as historical structure and finite lower-level theorems.  The immediate research choices
-are narrower: determine whether `K=5` also has a hole if that is publication-relevant, and replace
-each nonembedded majorized witness leaf by an individual exact/canonical strategy rather than a
-blanket lemma.  See the
+retained as historical structure and finite lower-level theorems.  The next singleton programme is:
+
+1. build a dependency-free clean-room solver that enumerates legal row triples `(l,m,r)` directly,
+   shares no Hall/coloring code with the current census, and reproduces the `K=6` rejection after
+   exhaustive small-`K` controls;
+2. formulate the rank-15/32 argument as a general **Tight-Band Capacity Obstruction**, then survey
+   whether it explains every low-level hole or only this one;
+3. settle `K=5`, and minimize the counterexample under level, support, transfer distance and a
+   clearly specified dominance/normalization order;
+4. replace scalar majorization by a useful necessary-and-sufficient description.  The existing
+   stable-partition/chain-partition formulation is exact but tautological; the target is a compact
+   recursive support or forbidden-band criterion that recognizes when the union of fixed-color
+   Hall base sets contains the requested integer point.
+
+Separately, replace each nonembedded majorized witness leaf by an individual exact/canonical
+strategy rather than a blanket lemma.  See the
 [`K=6` proof](../evidence/singleton_k6_counterexample_2026-08-30.md) and
 [theorem note](theorems/singleton-majorization.md).
 
@@ -292,8 +304,8 @@ pattern and counterexamples are in the
 
 The broader **Positive-Band Extension Conjecture** is false.  It
 passes the exhaustive `K=4` census on 1,722,516 band-state instances, and the old direct suffix
-census passes 1,422,304 instances.  At `K=6`, the dominated band `(8^15,7)` below `(22,7^15)`
-extends none of its four endpoint transitions.  Internal tight subprefixes still factor immediately, but `(16,15,11,11,4^5)` refutes unrestricted
+census passes 1,422,304 instances.  At `K=6`, the dominated band `(8^15,7^2)` below `(22,7^16)`
+extends neither of its two endpoint transitions.  Internal tight subprefixes still factor immediately, but `(16,15,11,11,4^5)` refutes unrestricted
 prefix refinement, `(4^4)` in band `[5,9)` forces an orientation switch, and a 64-row strict
 `G_6` interior state refutes sorted alternation.  See the
 [tight-skeleton record](../evidence/singleton_pascal_tight_skeleton_2026-08-29.md) and original

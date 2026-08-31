@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-30**.
+don't know it. Last refreshed **2026-08-31**.
 
 The central singleton question is now resolved negatively.  Necessity remains proved, but weak
 majorization by `G_K` is not sufficient.  The exact-support, full-mass state
@@ -12,11 +12,11 @@ has no legal first split into three `G_5`-majorized children and is therefore un
 tests.  The short proof and independent direct-split/Hall regressions are in the
 [`K=6` counterexample record](../evidence/singleton_k6_counterexample_2026-08-30.md).
 
-The obstruction is exactly Pascal-shaped.  The parent is tight at ranks 15 and 31, forcing the four
-color-count transitions `7/8 -> 15/16`.  The 16 intervening rows `(8^15,7)` must send 21 coins
-to the mixed child.  Mixed-child saturation at ranks 15 and 31, together with the strict
-`H(30)=241<H(31)=242` step, forces every band mixed piece to be a positive integer.  One pure child then needs either 58 coins from eight rows that can retain at
-most 56, or 64 coins from nine rows that can retain at most 63.  Thus none of the four transitions
+The obstruction is exactly Pascal-shaped.  The parent is tight at ranks 15 and 32, forcing the two
+color-count transitions `7/8 -> 16`.  The 17 intervening rows `(8^15,7^2)` must send 22 coins
+to the mixed child.  Mixed-child saturation at ranks 15 and 32, together with
+`H(31)=242<H(32)=243`, forces every band mixed piece to be a positive integer.  In either case one
+pure child needs 64 coins from nine rows that can retain at most 63.  Thus neither transition
 exists.  This is a human proof; the executable checks are regressions, not the trust base.
 
 The counterexample has the minimum possible full-mass support `2^6=64`.  Complete censuses still
@@ -38,8 +38,8 @@ All equivalent or sufficient universal proof targets must be read accordingly.  
 Pascal orthant saturation, global Robin--Hood closure, Carry-Compatible Gale--Ryser, Balanced
 Pascal Realization, canonical direct/allocation transport, Pascal-shuffle coverage and
 two-interval splicing are false universally.  `Q_6` is not nice and therefore not strongly nice.
-The Positive-Band Extension Conjecture fails on the band `[15,31)`, where none of the four endpoint
-transitions works.  The Two-Anchor Reduction remains proved, but its residual conjecture is false
+The Positive-Band Extension Conjecture fails on the band `[15,32)`, where neither endpoint
+transition works.  The Two-Anchor Reduction remains proved, but its residual conjecture is false
 on
 
     (62,61,55^2,40^4,20^7,6^15,5^2)
@@ -62,6 +62,12 @@ The earlier real-cover holes remain correct, but the primitive integer question 
 rounding proof: the state above is the missing primitive lattice hole.  The theorem note has been
 superseded in place at
 [singleton-majorization.md](theorems/singleton-majorization.md).
+
+The next singleton work is deliberately verification-first: write an independent direct-row-split
+clean-room solver; extract a general Tight-Band Capacity Obstruction from the rank-15/32 proof;
+search `K=5` and minimize/classify `K=6` holes; then seek a useful exact recursive support
+criterion beyond the already exact but tautological transcript-poset chain-partition formulation.
+The ordered programme is recorded under P6 in [research-plan.md](research-plan.md).
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
