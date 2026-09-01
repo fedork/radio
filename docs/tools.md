@@ -598,7 +598,10 @@ heartbeat derives stage/overall percentages, current rate, stage/full ETAs and h
 The full ETA is labelled as a current-stage-rate projection because difficulty varies by rank band.
 `tools/singleton_k6_survey_status.sh [--watch]` reads the S3 heartbeat. The two
 `aws_shared_job_shutdown_*` scripts are the narrowly scoped lifecycle guard used when this census
-shares the `Sa(193)` host.
+shares the `Sa(193)` host. The current dedicated deployment uses
+`tools/singleton_k6_survey_ec2_launch.sh`: a restartable Spot worker which verifies the known hole
+before reading `NEXT_RANK` and resuming. The status helper resolves the newest survey instance by
+its `Purpose=k6-main-survey` tag.
 
 The live runner uses `radio_singleton_k6_survey.c`, a single-process C driver around `radiobase.c`.
 It walks the shell by direct DFS and calls `canSolveB` without serializing states. The ordinal and

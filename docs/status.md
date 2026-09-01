@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-08-31**.
+don't know it. Last refreshed **2026-09-01**.
 
 The central singleton question is now resolved negatively.  Necessity remains proved, but weak
 majorization by `G_K` is not sufficient.  The exact-support, full-mass state
@@ -138,9 +138,10 @@ adopting the research Hall algorithm. Survey builds disable cache lookup/retenti
 6—distinct full-mass, exact-support parents cannot dominate one another—but retain the valuable
 `K<=5` child cache. Locally, the first million distance-14 parents returned 999,999 exact positives,
 the known rank-55,096 hole, and zero `MAYBE` in 95.720 solver CPU seconds. An unlimited-budget,
-restartable census of all 9,960,648,265 shell states is now live on AWS,
-sharing the `Sa(193)` host but pinned to its other physical core. This is an implementation-
-independent exhaustive check, not a replacement for the much faster Hall discovery engine. See the
+restartable census of all 9,960,648,265 shell states is now live on AWS on a dedicated Spot
+`r7iz.xlarge`. It originally shared the `Sa(193)` host, pinned to its other physical core, but moved
+at the durable 19,000,000-rank boundary so the unique cold proof run is isolated. This is an
+implementation-independent exhaustive check, not a replacement for the much faster Hall discovery engine. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 Its first 10,000,000-state stage has completed with 9,999,999 positives, exactly the known hole,
 and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. Subsequent stages
@@ -151,16 +152,16 @@ Generation and solving now occur in one thin C driver: direct DFS iteration foll
 `canSolveB`, with the ordinal used only for checkpoint/resume. Matched 100,000-state measurements
 showed no material speed difference from the former text pipe, so this is intentionally a
 simplicity/provenance improvement rather than a performance claim. Ranks 10,000,000 through
-12,999,999 completed with three million positives and no exception; the integrated run is live from
-the durable 13,000,000 checkpoint.
+18,999,999 completed with no further exception; the dedicated worker resumed from the durable
+19,000,000 checkpoint after independently reproducing the known hole.
 
 The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the
 193 search. The on-demand `r7iz.xlarge` instance is `i-0318c3349a0df835b`; use
 `tools/sa193_status.sh` (now defaulting to `run10`) rather than the terminated historical instance.
-The co-resident singleton census is under `run10/k6-main-survey`; use
-`tools/singleton_k6_survey_status.sh`. A shutdown guard keeps the instance alive until both jobs
-finish, then stops it.
+The singleton census remains under `run10/k6-main-survey` but now runs on dedicated Spot
+`r7a.xlarge` instance `i-044d1e157c6d36e87`; use `tools/singleton_k6_survey_status.sh`, which resolves the newest survey
+instance by tag. The old host's scoped census service is inactive, and Sa continues alone.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).

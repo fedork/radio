@@ -181,3 +181,29 @@ These timings make the production solver a practical, independent exhaustive che
 the fastest discovery engine: the specialized Hall census remains hundreds of times faster.  Keep
 the two results separate because their implementations and proof burdens are intentionally
 different.
+
+## Migration to a dedicated Spot worker
+
+At Fedor's request the census was removed from the unique cold `Sa(193)` proof host. Before the
+migration, a same-position comparison against run9 showed that run10's extra CPU came principally
+from a larger exact search: at `left=2867/6178`, run10 had 44,988 `K=7` verdicts versus roughly
+24,900 in run9, and `K=7` self time was 3,904 versus roughly 2,147 seconds. Across 20,029 matching
+exact `K=7` negative verdicts, run10's completed activations were actually faster in aggregate
+(3,116 versus 3,762 CPU seconds). This does not rule out cache/memory contention, but it does rule
+out broad per-refutation slowdown as the main explanation.
+
+Ranks through 18,999,999 were already validated, uploaded and represented by the durable
+`NEXT_RANK=19000000` object. The just-started 19,000,000--21,999,999 attempt on the shared host was
+stopped by its scoped `radio-k6-survey.service`; it had no retained verdict and Sa remained alive.
+Dedicated Spot `r7iz.xlarge` instance `i-0e1c9c2b24e485f33` launched at
+2026-09-01 01:23:04 UTC. It rebuilt the same source commit and geometry, independently reproduced
+the rank-55,096 negative with zero `MAYBE`, read the S3 checkpoint and reached 500,000 completed
+queries. AWS then reclaimed it for `instance-terminated-no-capacity` at 01:28:07; because the stage
+had not committed, `NEXT_RANK` correctly remained 19,000,000. Placement scoring was only 1/10 for
+`r7iz.xlarge` in every Oregon zone. Replacement Spot `r7a.xlarge` instance
+`i-044d1e157c6d36e87` launched in us-west-2d at 01:30:11, again passed the known-hole smoke, and
+resumed from 19,000,000; its first direct inspection showed 100,000 positives and zero exception.
+`tools/singleton_k6_survey_ec2_launch.sh` is the reproducible launcher; it uses a 16-GiB
+address-space limit, 20-GiB service memory ceiling, three-million-rank stages and no search or
+overall deadline. Spot interruption terminates the ephemeral worker and loses at most its active
+stage; a replacement invocation reads the last committed S3 boundary.

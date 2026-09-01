@@ -7,7 +7,7 @@ set -euo pipefail
 
 bucket=${RADIO_K6_SURVEY_BUCKET:-radio-sa193-393287594714}
 prefix=${RADIO_K6_SURVEY_PREFIX:-run10/k6-main-survey}
-instance=${RADIO_K6_SURVEY_INSTANCE:-i-0318c3349a0df835b}
+instance=${RADIO_K6_SURVEY_INSTANCE:-}
 watch=0
 
 if (( $# > 1 )); then
@@ -24,9 +24,22 @@ render() {
     aws-vault exec --server default -- aws s3 cp "s3://$bucket/$prefix/STATUS" -
     modified=$(aws-vault exec --server default -- aws s3api head-object \
         --bucket "$bucket" --key "$prefix/STATUS" --query LastModified --output text)
-    state=$(aws-vault exec --server default -- aws ec2 describe-instances \
-        --region us-west-2 --instance-ids "$instance" \
-        --query 'Reservations[0].Instances[0].State.Name' --output text)
+    if [[ -z "$instance" ]]; then
+        instance=$(aws-vault exec --server default -- aws ec2 describe-instances \
+            --region us-west-2 \
+            --filters Name=tag:Purpose,Values=k6-main-survey \
+                      Name=instance-state-name,Values=pending,running,stopping,stopped \
+            --query 'sort_by(Reservations[].Instances[], &LaunchTime)[-1].InstanceId' \
+            --output text)
+    fi
+    if [[ -z "$instance" || "$instance" == None ]]; then
+        instance=none
+        state=none
+    else
+        state=$(aws-vault exec --server default -- aws ec2 describe-instances \
+            --region us-west-2 --instance-ids "$instance" \
+            --query 'Reservations[0].Instances[0].State.Name' --output text)
+    fi
     printf '\n  status object      %s\n' "$modified"
     printf '  instance           %s  %s\n' "$instance" "$state"
     printf '  durable prefix     s3://%s/%s/\n' "$bucket" "$prefix"

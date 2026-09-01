@@ -12750,3 +12750,29 @@ were fixed rather than hidden. The provenance-checked integrated build
 `5e4d58f646ff4f5b63f4bd8c63acddc21710ac0a685a12aa48f0b449ec4e38d5` passed the remote known-hole
 smoke and resumed at rank 13,000,000 under runner commit `9684bdb`; inspection shows one
 `k6-survey` process on CPU 0 and no ranker/oracle process.
+
+## 2026-09-01 -- Sa slowdown localized; K6 census moved to dedicated Spot
+
+The apparent `elapsed 3010/3020` at the first `Sa(193)` root was a deterministic work-budget
+display, not real time; because the invocation auto-extends, the denominator was not a deadline.
+At the identical `left=2867/6178, totalsplits=352` point, run9 had used 3,040 CPU seconds in the
+root while run10 reported `cpu=5014`. The slowdown was not concentrated in a few definitive
+refutations. Across 20,029 matching exact `K=7` negatives, run10's final activations took 3,116
+seconds versus 3,762 in run9. Instead, run10 had explored 44,988 `K=7` and 238,467 `K=6` verdicts,
+against roughly 24,900 and 189,100 in run9 at the same root position. `K=7` self time accounted for
+about 1,757 of the roughly 1,880 extra lower-level seconds. The necessity-only production policy
+therefore explains the dominant cost through additional exact exploration; hardware contention
+remained a possible secondary effect.
+
+For isolation, the production K6 shell census moved off the unique cold Sa host. Its scoped service
+was stopped with Sa still alive; the uncommitted beginning of the 19M--22M stage was discarded, and
+the durable S3 checkpoint remained 19,000,000. A dedicated Spot `r7iz.xlarge`,
+`i-0e1c9c2b24e485f33`, launched at 01:23:04 UTC using the retained source and runner. It passed
+provenance checks, reproduced the known rank-55,096 hole, resumed from 19,000,000 and reported its
+first 500,000 new states as solvable with zero `MAYBE`. AWS reclaimed it five minutes after launch
+with `instance-terminated-no-capacity`; its placement score was only 1/10 in all Oregon zones and
+the checkpoint correctly stayed at 19,000,000. Replacement Spot `r7a.xlarge`
+`i-044d1e157c6d36e87` launched in us-west-2d at 01:30:11, passed the same smoke and resumed from
+19,000,000. The new launcher makes this recovery path repeatable; a Spot interruption repeats only
+the active three-million-rank stage because
+`NEXT_RANK` advances after validation and artifact upload, never from the heartbeat counter.

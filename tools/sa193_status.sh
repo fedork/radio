@@ -95,6 +95,13 @@ compact_duration() {
     fi
 }
 
+clarify_unbounded_work() {
+    # RADIO_WORK_BUDGET's elapsed numerator is deterministic work converted at the nominal rate;
+    # once NO_DEADLINE auto-extension is active, the denominator is not a stopping deadline. Keep
+    # the raw log untouched, but do not present that pair as a time-to-deadline in the status view.
+    sed -E 's/elapsed ([0-9]+)\/[0-9]+ \(no deadline: auto-extends\) work=/work-equivalent \1s (unbounded invocation) work=/'
+}
+
 compact_level_times() {
     local snapshot="$1"
     python3 "$SCRIPT_DIR/sa193_level_times.py" <<<"$snapshot"
@@ -109,7 +116,8 @@ compact_row() {
     fi
     mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" \
         --key "$p/STATUS" --query LastModified --output text 2>/dev/null)
-    snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$p/STATUS" - 2>/dev/null)
+    snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$p/STATUS" - 2>/dev/null \
+        | clarify_unbounded_work)
     status=$(sed -n 's/^  solver process  *//p' <<<"$snapshot")
     [[ "$status" == alive ]] && status=live || status=done
     wall=$(sed -n 's/^  solver running for  *//p' <<<"$snapshot" | tr -d ' ')
@@ -151,7 +159,8 @@ show() {
     local mod age now snapshot age_note instance
     mod=$(aws-vault exec --server default -- aws s3api head-object --bucket "$BUCKET" --key "$PREFIX/STATUS" \
             --query LastModified --output text 2>/dev/null)
-    snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$PREFIX/STATUS" - 2>/dev/null)
+    snapshot=$(aws-vault exec --server default -- aws s3 cp "s3://$BUCKET/$PREFIX/STATUS" - 2>/dev/null \
+        | clarify_unbounded_work)
     printf '%s\n' "$snapshot"
     if [[ -n "$mod" ]]; then
         now=$(date -u +%s)
