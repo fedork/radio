@@ -62,8 +62,10 @@ write_status() {
     local rate stage_eta full_eta stage_unsolvable stage_maybe
     now=$(date -u +%FT%TZ)
     elapsed=$(( $(date +%s) - stage_started ))
-    rss_kib=$(ps -C k6-survey -o rss= 2>/dev/null | awk '{sum += $1} END {print sum + 0}')
-    sa_rss=$(ps -C radio_sa193 -o rss= 2>/dev/null | awk '{sum += $1} END {print sum + 0}')
+    rss_kib=$({ ps -C k6-survey -o rss= 2>/dev/null || true; } \
+        | awk '{sum += $1} END {print sum + 0}')
+    sa_rss=$({ ps -C radio_sa193 -o rss= 2>/dev/null || true; } \
+        | awk '{sum += $1} END {print sum + 0}')
     progress_file="$work_dir/ACTIVE_PROGRESS"
     progress_queries=0
     stage_unsolvable=0
