@@ -147,6 +147,12 @@ and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. S
 use three-million-rank checkpoints and 16/20-GiB process/cgroup limits. The minute heartbeat now
 shows exact in-stage counts to 100,000 states, stage/overall percentages, throughput, ETAs and
 human-readable memory; the full ETA is a current-band projection and will vary.
+Generation and solving now occur in one thin C driver: direct DFS iteration followed by
+`canSolveB`, with the ordinal used only for checkpoint/resume. Matched 100,000-state measurements
+showed no material speed difference from the former text pipe, so this is intentionally a
+simplicity/provenance improvement rather than a performance claim. Ranks 10,000,000 through
+12,999,999 completed with three million positives and no exception; the integrated run is live from
+the durable 13,000,000 checkpoint.
 
 The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the

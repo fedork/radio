@@ -129,6 +129,40 @@ The AWS ranker build ID is
 `f13f247618cc82cc98f2d1755e40fdd45a2c9c1571af7c6606a5f424e4f4bd7d` and the rebuilt oracle ID is
 `e8386449693d83ba7a117ee0fc152e6ccae85b25e56f57838fc34c758ffa66d2`.
 
+## Integrated C iteration
+
+The initial AWS runner used two processes: the C++ ranker serialized every 64-row state as text,
+and `radio_oracle.c` parsed it before calling the production solver.  A matched cold local window
+showed that this was not the speed bottleneck: 100,000 ranks took 17.78 wall / 17.37 user seconds
+through the pipe versus 18.00 wall / 17.33 user seconds in one process.  Integration is therefore a
+simplicity and observability improvement, not a claimed performance optimization.
+
+`radio_singleton_k6_survey.c` is the replacement.  It is a thin C driver including `radiobase.c`:
+ordinary depth-first generation, subtree counts only for checkpoint skipping, `getSbb(n,1)`, then
+direct `canSolveB(...,NO_DEADLINE)`.  There is no Hall code, parser, pipe, second process, reordering
+or buffered state corpus.  Its progress counter advances after a solver verdict, so the displayed
+count is now classified states rather than emitted states.
+
+The regression compares seven `K=3` states and their order against the independent C++ ranker,
+checks all seven exact recursive positives, and reproduces the rank-55,096 `K=6` negative.  A local
+100,000-state control returns 99,999 positives, exactly that negative and zero `MAYBE`.
+
+The preceding two-process ranks 10,000,000 through 12,999,999 completed with 3,000,000 positives,
+zero negatives and zero `MAYBE` in 882.066 solver CPU seconds.  Its provenance-checked S3 log has
+SHA-256 `f3650528f14f519753de15b01b5b2ff58eb8454a81fcbe8a72353aad66ce7d63`.
+The wrapper then stopped after preserving the checkpoint because its between-stage display tried to
+compute a percentage with a zero-length transient stage.  No verdict was lost.  The first
+integrated service start separately exposed a 658-ms startup race: under `pipefail`, the status
+sampler treated `ps` finding no newly scheduled process yet as fatal.  It ran no query.  Both status
+paths are now explicit and race-safe.
+
+The integrated AWS binary is source commit `d295b174984a0a91256622dc39c34c5ae17e1632`, build ID
+`5e4d58f646ff4f5b63f4bd8c63acddc21710ac0a685a12aa48f0b449ec4e38d5`; its source bundle SHA-256
+is `bf7762d8c96242a812baa0035dce0ba7333d261e28e91965191d42dabec33eed`.  The startup-race-safe
+runner is commit `9684bdb`.  A provenance-checked remote smoke test reproduced the known hole before
+the service resumed from rank 13,000,000.  Process inspection confirms one `k6-survey` process on
+CPU 0 and no ranker or oracle process.
+
 The source bundle is commit `30021dd1eb30145264651e0bc374f6270b7ac07b`, SHA-256
 `eccc0d00ca3cbd0d0c10226ce4cf279242b283e796d5813003ded533f7d292c5`.  The AWS ranker build ID is
 `90a97f3ec63f534b851de5ca71d5c1ac3bbcb329b9246eec8a3fe7194d4be09a`; the production oracle build

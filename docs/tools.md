@@ -600,6 +600,12 @@ The full ETA is labelled as a current-stage-rate projection because difficulty v
 `aws_shared_job_shutdown_*` scripts are the narrowly scoped lifecycle guard used when this census
 shares the `Sa(193)` host.
 
+The live runner uses `radio_singleton_k6_survey.c`, a single-process C driver around `radiobase.c`.
+It walks the shell by direct DFS and calls `canSolveB` without serializing states. The ordinal and
+completion-count memo exist only to skip to a durable checkpoint. Validate it with
+`tools/singleton_k6_integrated_survey_regression.sh`, which cross-checks a tiny ranked window against
+the independent C++ generator and reproduces the known `K=6` hole.
+
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
 reloads it linearly instead of re-deriving every dominance closure. Snapshot v4 begins the
 necessity-only singleton-majorization epoch; v1--v3 snapshots are rejected even by `restore-any`.
@@ -747,6 +753,8 @@ tools, not yet part of `radiobase.c`:
 | `tools/bundled_majorization.py` | evaluate the sound depth-`d` synchronized-majorization predicates and compare them with a complete pair table |
 | `tools/singleton_pair_coloring_census.cpp` | exhaust full-mass singleton partitions majorized by `G_K` through `K=4`; count, rank, window and parallelize exact-support transfer shells through `K=6`, using one-block lookahead followed by exact Fixed-Color Hall search; check Row-Coloring inequalities, global Adjacent-Fiber transfers and coloring rules; inspect labelled fixed-boundary delta exchange, dangerous tight-set core/hull, exact flip-blocker intersections, and maximum/positive crossing-mass rules; probe fixed feasible colorings for positive common neighbors through sampled `K=5` transfers; sample the exact `K=5` universe; check the padded Pascal-prefix reduction and its compressed `K=19` strict-alternation counterexample |
 | `tools/singleton_transfer_shell_regression.sh` | provenance-build the transfer-shell census; cross-check shell totals, fast rank-window skipping, parallel/sequential aggregates, all 160 exact-support `K=3` parents, the final `K=5` shell, and canonical / transfer-13 / counterexample `K=6` controls |
+| `radio_singleton_k6_survey.c` | directly DFS-iterate one ranked transfer-shell window and call the production `canSolveB` in the same C process; used by the live AWS distance-14 census |
+| `tools/singleton_k6_integrated_survey_regression.sh` | cross-check the integrated C iterator/order against an independent tiny `K=3` ranker window and reproduce the known rank-55,096 `K=6` negative |
 | `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce the exact-support `K=6` singleton-majorization counterexample, its 14-transfer phase boundary, residual hole, forced bands, and earlier rule counterexamples |
 | `tools/singleton_direct_split_cleanroom.cpp` | independently enumerate legal singleton row triples into three sorted child multisets, with no Hall code or shared cache; solve arbitrary first-cut queries, check the padded/mass-697/mass-683 `K=6` holes and the feasible one-8 deletion with slack-correct residual bounds, and classify all 176 bands on the fixed rank-15/32 face |
 | `tools/singleton_direct_split_regression.sh` | provenance-build the clean-room direct-row solver and run its canonical `G_6`, `j=13`, three negative counterexample forms, feasible one-8 deletion, fixed-face, naive-oracle and exhaustive `K<=3` controls |

@@ -12729,3 +12729,24 @@ AWS and deployed immediately; its first heartbeat read 300,000 / 3,000,000 (10.0
 states/s, 9m09s stage ETA, 0.103% overall, 23d10h full ETA at the current band's rate, and 1.76 GiB
 RSS. The full ETA is deliberately labelled as a current-stage projection because both difficulty
 and cache growth vary across the ranked shell.
+
+Fedor then cut through unnecessary iteration-order speculation: generation should simply live in a
+small C wrapper around the solver. That is now `radio_singleton_k6_survey.c`: direct DFS, subtree
+counts only to skip a checkpoint prefix, and an immediate `canSolveB(...,NO_DEADLINE)` call for each
+state. No Hall logic, text serialization, pipe, second process, state sorting or clever traversal
+was added. A matched first-100,000 benchmark was effectively identical—17.78 wall / 17.37 user
+seconds for the pipe, 18.00 wall / 17.33 user seconds integrated—so the result is simpler, not
+faster. The regression independently matches a seven-state `K=3` window/order and reproduces the
+rank-55,096 negative; the integrated first-100,000 control again gives 99,999 positives and one
+negative.
+
+The old two-process 10,000,000..13,000,000 stage completed before deployment: 3,000,000 positives,
+zero negatives, zero `MAYBE`, 882.066 solver CPU seconds, provenance-log SHA-256
+`f3650528f14f519753de15b01b5b2ff58eb8454a81fcbe8a72353aad66ce7d63`. A display-only zero-stage
+percentage division then stopped the wrapper after the checkpoint had been uploaded. The first
+integrated launch found a second status edge: `ps` briefly returned no process during scheduling,
+and `pipefail` promoted that normal startup instant to failure after 658 ms and zero queries. Both
+were fixed rather than hidden. The provenance-checked integrated build
+`5e4d58f646ff4f5b63f4bd8c63acddc21710ac0a685a12aa48f0b449ec4e38d5` passed the remote known-hole
+smoke and resumed at rank 13,000,000 under runner commit `9684bdb`; inspection shows one
+`k6-survey` process on CPU 0 and no ranker/oracle process.
