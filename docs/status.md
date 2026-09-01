@@ -133,43 +133,31 @@ colorings and explains why the majorization outer bound is exact through `K=5` b
 thin balanced-band hole at `K=6`.  The ordered programme is recorded under P6 in
 [research-plan.md](research-plan.md).
 
-The ordinary recursive solver is now usable for a broad independent `K=6` shell census without
-adopting the research Hall algorithm. Survey builds disable cache lookup/retention at level
-6—distinct full-mass, exact-support parents cannot dominate one another—but retain the valuable
-`K<=5` child cache. Locally, the first million distance-14 parents returned 999,999 exact positives,
-the known rank-55,096 hole, and zero `MAYBE` in 95.720 solver CPU seconds. An unlimited-budget,
-restartable census of all 9,960,648,265 shell states is now live on AWS on a dedicated Spot
-`r7iz.xlarge`. It originally shared the `Sa(193)` host, pinned to its other physical core, but moved
-at the durable 19,000,000-rank boundary so the unique cold proof run is isolated. This is an
-implementation-independent exhaustive check, not a replacement for the much faster Hall discovery engine. See the
+The ordinary recursive solver is usable for an independent `K=6` shell survey without adopting the
+research Hall algorithm. Survey builds disable cache lookup/retention at level 6—distinct
+full-mass, exact-support parents cannot dominate one another—but retain the valuable `K<=5` child
+cache. The attempted full distance-14 census was stopped on 2026-09-01 at the validated durable
+boundary 34,000,000 of 9,960,648,265 states (0.341%). Its nine provenance-checked stage logs contain
+33,999,999 exact positives, exactly the known rank-55,096 hole, and zero `MAYBE`. This is a finite
+diagnostic prefix, not evidence that the known hole is unique outside that prefix.
+
+The broad run was not economical to continue. Across 5h17m40s elapsed it suffered three Spot
+`instance-terminated-no-capacity` losses, then the final 26-GiB process limit was exhausted by the
+growing child cache after checkpointing 34,000,000. Systemd restarted correctly from that boundary,
+but the observed post-restart rate of 826 states/s projected about 139 more days. The uncommitted
+400,000-state tail reported no exception but is excluded from the durable result. The Auto Scaling
+group is retained at desired/minimum capacity zero and has no instance; all validated logs,
+checkpoints and the final stopped status remain under `run10/k6-main-survey` in S3. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
-Its first 10,000,000-state stage has completed with 9,999,999 positives, exactly the known hole,
-and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. Rolling
-three-million-rank markers now preserve those evidence boundaries without normally restarting the
-cache-warm solver. A transient solver death resumes from the last uploaded marker, while invalid
-markers/provenance fail permanently. The minute heartbeat shows exact in-stage counts to 100,000
-states, stage/overall percentages, throughput, ETAs, cache-epoch start and readable memory; the
-full ETA is a current-band projection and will vary.
-Generation and solving now occur in one thin C driver: direct DFS iteration followed by
-`canSolveB`, with the ordinal used only for checkpoint/resume. Matched 100,000-state measurements
-showed no material speed difference from the former text pipe, so this is intentionally a
-simplicity/provenance improvement rather than a performance claim. Ranks 10,000,000 through
-18,999,999 completed with no further exception; the dedicated worker resumed from the durable
-19,000,000 checkpoint after independently reproducing the known hole.
 
 The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the
 193 search. The on-demand `r7iz.xlarge` instance is `i-0318c3349a0df835b`; use
 `tools/sa193_status.sh` (now defaulting to `run10`) rather than the terminated historical instance.
-The singleton census remains under `run10/k6-main-survey`; use
-`tools/singleton_k6_survey_status.sh`, which re-resolves the active survey instance by tag on every
-refresh. Its deployment is a Spot-only one-instance Auto Scaling group spanning compatible
-32-GiB pools and all four Oregon zones: Spot termination is automatically replaced, transient
-process failure is automatically restarted, and validated completion scales desired capacity to
-zero. The first live rolling boundary is validated: ranks 28,000,000..30,999,999 were all positive
-with zero `MAYBE` in 840.946 seconds, and the same PID crossed into the next band with an 8.23-GiB
-cache. The durable checkpoint is therefore at least 31,000,000. The old Sa host's scoped census
-service is inactive, and Sa continues alone.
+The stopped singleton survey remains under `run10/k6-main-survey`; use
+`tools/singleton_k6_survey_status.sh` to read its final S3 status. The Auto Scaling group is at
+desired/minimum capacity zero, has no worker, and cannot replace one until deliberately scaled up.
+The old Sa host's scoped census service remains inactive, and Sa continues alone.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).

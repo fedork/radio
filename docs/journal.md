@@ -12825,3 +12825,33 @@ zero negatives, zero `MAYBE`, 840.946 wall seconds. The provenance-checked prefi
 02:40:25 UTC start time were identical before and after `NEXT_RANK` advanced to 31,000,000. Status
 then showed durable boundary 31,000,000, cache epoch start 28,000,000 and 8.23 GiB RSS. The solver
 continued into the next band with its cache intact.
+
+## 2026-09-01 -- K6 production survey stopped at 34 million
+
+The distance-14 production-engine survey was stopped by request at 05:13:25 UTC. Its nine retained
+stages all pass provenance validation and exactly exhaust ranks 0..33,999,999: 34,000,000 queries,
+33,999,999 solvable, the one known unsolvable rank 55,096, and zero `MAYBE`. This covers 0.341% of
+the 9,960,648,265-state shell. It is a useful independent diagnostic prefix, not evidence that the
+known counterexample is globally unique.
+
+The stopping decision was driven by measured cost and reliability. Over 5h17m40s elapsed, AWS
+reclaimed three Spot workers for `instance-terminated-no-capacity`. The final replacement reached
+the durable 34,000,000 boundary, then its growing lower-level cache exhausted the 26-GiB process
+ceiling and the solver exited status 75 with `out of memory allocating cache branch`. Systemd
+correctly restarted at 34,000,000; its uncommitted 400,000-state tail showed no exception but is not
+part of the result. Its last 826-state/s rate projected roughly 139 days to finish, so automatic
+restarts did not make the full census worthwhile.
+
+The final 31,000,000..33,999,999 stage contains 3,000,000 positives and zero other verdicts in
+2,365.833 wall seconds. Its SHA-256 is
+`b84d6c5470d540340137a1c5ba137dcb48cbde38a78a18d9e5c2b156ff0030bf`, build ID
+`25ccc2e7033b06b93294cff92448687dfded3937a99e95df60134e31cf32d118`, source commit
+`5fd2fc3ee640a7e946abf8f201dd5891b539d1c8`. S3 now contains a pre-stop status snapshot, final
+`STATUS`, `FINAL_SUMMARY`, all nine logs and `NEXT_RANK=34000000` under
+`run10/k6-main-survey`.
+
+The Auto Scaling group was scaled to minimum/desired capacity zero; final worker
+`i-0e0b1203ee2850803` terminated, so it cannot be automatically replaced. The inert group and
+launch template remain available if there is a new algorithmic or resource justification, but the
+present brute-force survey should not simply be restarted. The separate on-demand `Sa(193)` solver
+remained alive and untouched.

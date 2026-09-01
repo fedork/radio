@@ -17,7 +17,8 @@ deliberately retained. See
 | uncolored level replay | terminated: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived |
 | colored level replay | terminated: `i-0901e2b2c266f7db2`, volume `vol-0bdc1e36eea39386c` confirmed deleted |
 | persistent oracle | **terminated** 2026-08-31 14:25:41 UTC: `i-002cabc654b2078ed`; encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and `available` |
-| active jobs | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone. The unlimited `K=6` distance-14 census uses the durable `run10/k6-main-survey` prefix and a Spot-only one-instance Auto Scaling group; the current worker ID is intentionally discovered by `tools/singleton_k6_survey_status.sh`, not frozen here. |
+| active jobs | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone. |
+| stopped K6 survey | stopped by request 2026-09-01 05:13:25 UTC at durable rank 34,000,000; the Spot Auto Scaling group has desired/minimum capacity zero and no instance; validated artifacts remain under `run10/k6-main-survey` |
 | retained oracle volumes | five unattached 50-GiB volumes, 250 GiB total: `vol-0053276ecc6d1adf4`, `vol-03a28c8c01ae591a1`, `vol-0621d09062d023bce`, `vol-0ef7c8664c6cab66e`, and the final instance's `vol-04260ae18b515e7f5`; not deleted because this request authorized instance termination, not data deletion |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` — unaffected by termination, and the only copy of the run3/run/run2/run4-7 raw logs |
@@ -108,28 +109,32 @@ fix. Run9 is the proof source.
 | `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
 | `run10/` | post-refutation current main (`9e9e25a`) | 2026-08-31 23:29:01 | **live cold diagnostic rerun** on `i-0318c3349a0df835b`; build `54419a4988bb53065d8855cd66d09e6f133896816aecdea635692c0ef33a7492`; control passed |
 
-The dedicated `K=6` census uses `tools/singleton_k6_survey_status.sh [--watch]`. Its durable
-stages and checkpoint live at
-`s3://radio-sa193-393287594714/run10/k6-main-survey/`. It began on Sa's other physical core, then
-moved at the durable 19,000,000 checkpoint to a dedicated Spot worker; the scoped service on the Sa
-host is inactive. A first `r7iz.xlarge` Spot worker was reclaimed after five minutes for lack of
-pool capacity and advanced no checkpoint. Each singleton query has no deadline. The first
-10,000,000-state stage completed with exactly the known hole and zero `MAYBE`; after it approached
-its original 8-GiB address-space guard, subsequent stages use 16-GiB address-space and 20-GiB
-cgroup ceilings. A later ten-million-rank window reached 6.5 GiB after only about two million
-emitted states, so it was abandoned without a checkpoint and replaced by three-million-rank
-stages. The minute heartbeat reports exact in-stage counts to 100,000, percentages, rate, ETAs and
-GiB-scale memory. Since rank 13,000,000, `radio_singleton_k6_survey.c` generates the ordinary DFS
-and calls `canSolveB` in one process; the ordinal exists only for checkpoint skipping. There is no
-ranker/oracle pipe, and matched local timings found no material speed claim for removing it. Memory
-exhaustion remains an explicit abort. `tools/singleton_k6_survey_ec2_launch.sh` provisions a
-Spot-only one-instance Auto Scaling group over five compatible 32-GiB pools and public subnets in
-all four Oregon zones, runs a known-hole smoke test, and resumes from `NEXT_RANK`. One solver PID
-normally crosses all three-million-rank evidence boundaries, retaining its child cache. A transient
-process death is restarted from the last boundary; Spot loss is replaced by the group; permanent
-validation failures remain for inspection; completion scales desired capacity to zero. Capacity
-rebalance is off so two workers cannot race. The old shared-host lifecycle scripts remain in S3 as
-an audit record but no longer govern the live census.
+The dedicated `K=6` census was stopped by request at 2026-09-01 05:13:25 UTC. Its nine validated,
+provenance-checked stages exhaust the exact prefix ranks 0 through 33,999,999: 34,000,000 queries,
+33,999,999 solvable states, the single known unsolvable rank 55,096, and zero `MAYBE`. This is only
+0.341% of the 9,960,648,265-state distance-14 shell and must not be extrapolated to the remainder.
+The final stage, ranks 31,000,000 through 33,999,999, contains 3,000,000 positives and zero other
+verdicts in 2,365.833 wall seconds; its SHA-256 is
+`b84d6c5470d540340137a1c5ba137dcb48cbde38a78a18d9e5c2b156ff0030bf`, build ID
+`25ccc2e7033b06b93294cff92448687dfded3937a99e95df60134e31cf32d118`, source commit
+`5fd2fc3ee640a7e946abf8f201dd5891b539d1c8`.
+
+The 5h17m40s experiment suffered three Spot `instance-terminated-no-capacity` losses: initial
+one-time worker `i-0e1c9c2b24e485f33`, then Auto Scaling replacements
+`i-08fbb9e86f470fafb` and `i-09107580c2df9c8bb`. The final replacement
+`i-0e0b1203ee2850803` checkpointed 34,000,000, later exited status 75 with `out of memory allocating
+cache branch` after exhausting its 26-GiB process ceiling, and was automatically restarted from the
+checkpoint. Its 400,000-state post-restart tail reported no exceptions but was not committed and is
+excluded. At 826 states/s the displayed current-band projection was about 139 remaining days, so
+the crash rate, cache growth and runtime did not justify continuation.
+
+Auto Scaling group `radio-k6-main-survey` now has minimum/desired capacity zero and no instance;
+the final worker is terminated. The group and launch template are retained at zero cost for
+compute, while the ephemeral worker disk was configured for deletion on termination. Durable
+stages, checkpoint, pre-stop snapshot and `FINAL_SUMMARY` remain at
+`s3://radio-sa193-393287594714/run10/k6-main-survey/`. The final `STATUS` says `STOPPED BY USER`, and
+`tools/singleton_k6_survey_status.sh` displays it without trying to infer a live worker. The scoped
+service on the Sa host remains inactive; Sa was not interrupted.
 
 The `pareto_k8_aws` census **finished** at 2026-08-19 22:34:43 UTC with `exit_status=0`, after
 507,838 seconds at one full core and a 9.4 GiB working set that never approached its 20 GiB guard.

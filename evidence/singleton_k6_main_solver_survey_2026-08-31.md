@@ -262,3 +262,41 @@ solver was PID 16250 with start time 02:40:25 UTC. After `NEXT_RANK` advanced to
 still PID 16250 with the same start time, now at 8.23 GiB reported RSS. The heartbeat simultaneously
 showed durable checkpoint 31,000,000 and cache epoch start 28,000,000. This is direct live evidence
 that checkpointing no longer discards the populated child cache.
+
+## Final disposition: stopped at rank 34,000,000
+
+The survey was stopped by request at 2026-09-01 05:13:25 UTC because repeated worker failures and
+the projected remaining runtime no longer justified a full census. The exact durable result is the
+prefix ranks 0 through 33,999,999 of the 9,960,648,265-state distance-14 shell:
+
+- 34,000,000 queries (0.341% of the shell);
+- 33,999,999 solvable states;
+- one unsolvable state, the already known rank 55,096 counterexample;
+- zero `MAYBE`.
+
+All nine retained stage logs passed `tools/check_provenance.py`, and their markers sum to those
+counts. Thus this is a valid finite diagnostic result, but it neither establishes uniqueness of the
+known hole outside the prefix nor completes any further shell classification. The final stage,
+ranks 31,000,000 through 33,999,999, reports 3,000,000 positives and zero negative/`MAYBE` verdicts
+in 2,365.833 wall seconds. Its SHA-256 is
+`b84d6c5470d540340137a1c5ba137dcb48cbde38a78a18d9e5c2b156ff0030bf`, its build ID is
+`25ccc2e7033b06b93294cff92448687dfded3937a99e95df60134e31cf32d118`, and its source commit is
+`5fd2fc3ee640a7e946abf8f201dd5891b539d1c8`.
+
+The experiment ran for 5h17m40s from its first shared-host start to final shutdown. AWS reclaimed
+three Spot workers with `instance-terminated-no-capacity`: initial one-time worker
+`i-0e1c9c2b24e485f33`, followed by Auto Scaling workers `i-08fbb9e86f470fafb` and
+`i-09107580c2df9c8bb`. Final replacement `i-0e0b1203ee2850803` successfully checkpointed
+34,000,000, then later exited status 75 with `out of memory allocating cache branch` after
+exhausting the 26-GiB process address-space ceiling. Systemd restarted it from the durable boundary
+as designed. The restarted process reached a 400,000-state heartbeat with no exceptions, but that
+tail had no validated boundary and is deliberately excluded. At the final measured 826 states/s,
+the status projection was about 139 days remaining.
+
+Before shutdown, the running status was copied to `stopped/STATUS-before-stop`. The Auto Scaling
+group `radio-k6-main-survey` was then set to minimum and desired capacity zero, and final worker
+`i-0e0b1203ee2850803` was confirmed terminated. The group and launch template remain inert for
+possible reuse; the worker's ephemeral root volume was configured for deletion on termination.
+The nine stage logs, `NEXT_RANK=34000000`, final `STATUS`, and `FINAL_SUMMARY` are retained under
+`s3://radio-sa193-393287594714/run10/k6-main-survey/`. The final status explicitly says
+`STOPPED BY USER`. The separate on-demand `Sa(193)` run was not stopped or restarted.

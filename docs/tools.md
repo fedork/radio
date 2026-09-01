@@ -599,7 +599,7 @@ minute heartbeat derives stage/overall percentages, current rate, stage/full ETA
 The full ETA is labelled as a current-stage-rate projection because difficulty varies by rank band.
 `tools/singleton_k6_survey_status.sh [--watch]` reads the S3 heartbeat. The two
 `aws_shared_job_shutdown_*` scripts are the narrowly scoped lifecycle guard used when this census
-shares the `Sa(193)` host. The current dedicated deployment uses
+shares the `Sa(193)` host. The stopped dedicated deployment used
 `tools/singleton_k6_survey_ec2_launch.sh`: a Spot-only, capacity-optimized one-instance Auto Scaling
 group across compatible 32-GiB pools. It verifies the known hole before resuming. Systemd restarts
 a transient solver death from the last boundary; EC2 replacement handles Spot loss; a permanent
@@ -607,7 +607,7 @@ marker/provenance error stays failed for inspection; successful corpus completio
 to zero. Capacity rebalance is deliberately disabled so two workers cannot race on one checkpoint.
 The status helper re-resolves the active tagged instance on every refresh.
 
-The live runner uses `radio_singleton_k6_survey.c`, a single-process C driver around `radiobase.c`.
+The survey runner uses `radio_singleton_k6_survey.c`, a single-process C driver around `radiobase.c`.
 It walks the shell by direct DFS and calls `canSolveB` without serializing states. The ordinal and
 completion-count memo exist only to skip to a durable checkpoint. Validate it with
 `tools/singleton_k6_integrated_survey_regression.sh`, which cross-checks a tiny ranked window against
