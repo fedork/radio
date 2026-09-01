@@ -79,8 +79,12 @@ write_status() {
     stage_count=$((stage_end - next_rank))
     (( progress_queries > stage_count )) && progress_queries=$stage_count
     overall_completed=$((next_rank + progress_queries))
-    stage_percent=$(awk -v done="$progress_queries" -v total="$stage_count" \
-        'BEGIN { printf total == 0 ? "100.00" : "%.2f", 100 * done / total }')
+    if (( stage_count == 0 )); then
+        stage_percent=100.00
+    else
+        stage_percent=$(awk -v done="$progress_queries" -v total="$stage_count" \
+            'BEGIN { printf "%.2f", 100 * done / total }')
+    fi
     overall_percent=$(awk -v done="$overall_completed" -v total="$end_rank" \
         'BEGIN { printf "%.3f", 100 * done / total }')
     rate=0
