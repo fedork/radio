@@ -231,3 +231,34 @@ is deliberately disabled because overlapping workers could race on `NEXT_RANK`. 
 validation failure stays on its instance for inspection, and successful corpus completion checks
 the uploaded `COMPLETE` status before scaling desired capacity to zero. The 32-GiB worker gives the
 solver a 26-GiB address-space ceiling under a 28-GiB cgroup ceiling.
+
+The cutover occurred at the validated rank-28,000,000 boundary. The final one-time-worker stage,
+25,000,000 through 27,999,999, contains 3,000,000 positives, zero negatives and zero `MAYBE` in
+1,806.143 wall seconds. Its provenance-checked log SHA-256 is
+`bf37e619b400731900ddb795e0391bd077ddf4ae3c2ee268b1f283ea743b147c`. The old scoped service was
+then confirmed inactive with no `k6-survey` process before its ephemeral instance terminated.
+
+Auto Scaling group `radio-k6-main-survey` launched `r6i.xlarge` instance
+`i-08fbb9e86f470fafb`; desired/in-service capacity read back as 1/1 and the mixed policy as
+Spot-only `capacity-optimized`, with no capacity-rebalance setting. The initial live build uses
+source commit `14ea04a5e99c1289a3dff8b38e1cadc1a825888b`, source-bundle SHA-256
+`6fc9dc5e30960c772d7d967a93edce04545fef6b5365e3eee9ef9fbf84cc6ba6`, and build ID
+`dd353bcd83b291f359e631cc0aef2256d481020e19c31b776bb4356044dc1929`. Its retained smoke log
+passes provenance validation and reproduces the rank-55,096 hole with zero `MAYBE`.
+
+The first bootstrap also exposed that the service had started but was not enabled for an ordinary
+host reboot because the unit lacked an `[Install]` target. The live unit was attached to
+`multi-user.target` without restarting its solver, and launch-template version 2 fixes future
+workers at source commit `5fd2fc3ee640a7e946abf8f201dd5891b539d1c8`, bundle SHA-256
+`e790d9927c0c1aecabeacd1cad4c0d0b2335e49d2b43d575bd02ee3b1744a064`. Live readback reports
+`enabled`, `active`, `Restart=on-failure`, permanent exit exclusions 2 and 65, and the exact
+30,064,771,072-byte (`28G`) cgroup limit.
+
+The first real rolling boundary then completed without a restart. Ranks 28,000,000 through
+30,999,999 were all positive with zero `MAYBE`; the marker reports 840.946 wall seconds. Its
+provenance-checked prefix log SHA-256 is
+`4f8a121c45e63630fc97a723d4a4ad2de72d0c9fcfcceb814b49f9237f483ea5`. Before the boundary the
+solver was PID 16250 with start time 02:40:25 UTC. After `NEXT_RANK` advanced to 31,000,000 it was
+still PID 16250 with the same start time, now at 8.23 GiB reported RSS. The heartbeat simultaneously
+showed durable checkpoint 31,000,000 and cache epoch start 28,000,000. This is direct live evidence
+that checkpointing no longer discards the populated child cache.

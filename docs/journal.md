@@ -12800,3 +12800,28 @@ prevent overlapping checkpoint writers. Systemd restarts transient solver/proces
 the group replaces Spot loss; permanent validation failure remains live for inspection; a verified
 `COMPLETE` status scales desired capacity to zero. The new 26-GiB process / 28-GiB cgroup ceilings
 leave host headroom while allowing the lower-level cache substantially more room to saturate.
+
+Cutover waited for the old worker to validate ranks 25,000,000..27,999,999: all 3,000,000 were
+positive with zero `MAYBE` in 1,806.143 wall seconds, and the provenance-checked stage log has
+SHA-256 `bf37e619b400731900ddb795e0391bd077ddf4ae3c2ee268b1f283ea743b147c`. At the resulting durable
+28,000,000 boundary its scoped service was stopped, no solver remained, and the ephemeral instance
+terminated. Sa remained live and untouched on its separate host.
+
+The new group immediately placed healthy `r6i.xlarge` worker `i-08fbb9e86f470fafb`. It built commit
+`14ea04a` as build ID `dd353bcd83b291f359e631cc0aef2256d481020e19c31b776bb4356044dc1929`,
+passed provenance validation and reproduced the known hole before resuming at 28,000,000. The
+five-type placement set scored 9/10 in three Oregon zones and 2/10 in the fourth when checked.
+
+One bootstrap defect was caught from the retained log: `systemctl enable --now` started the service
+but could not enable it because the generated unit lacked an `[Install]` section. The live unit was
+attached to `multi-user.target` without restarting PID 16250. Commit `5fd2fc3` adds the target,
+allows safe in-place launch-template updates when every active worker belongs to the group, and is
+deployed as launch-template version 2 for future replacements. Readback confirms the live unit is
+enabled and active with the intended restart policy and 28-GiB cgroup limit.
+
+The first production rolling marker closed ranks 28,000,000..30,999,999: 3,000,000 positives,
+zero negatives, zero `MAYBE`, 840.946 wall seconds. The provenance-checked prefix log has SHA-256
+`4f8a121c45e63630fc97a723d4a4ad2de72d0c9fcfcceb814b49f9237f483ea5`. PID 16250 and its
+02:40:25 UTC start time were identical before and after `NEXT_RANK` advanced to 31,000,000. Status
+then showed durable boundary 31,000,000, cache epoch start 28,000,000 and 8.23 GiB RSS. The solver
+continued into the next band with its cache intact.

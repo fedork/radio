@@ -166,7 +166,10 @@ The singleton census remains under `run10/k6-main-survey`; use
 refresh. Its deployment is a Spot-only one-instance Auto Scaling group spanning compatible
 32-GiB pools and all four Oregon zones: Spot termination is automatically replaced, transient
 process failure is automatically restarted, and validated completion scales desired capacity to
-zero. The old Sa host's scoped census service is inactive, and Sa continues alone.
+zero. The first live rolling boundary is validated: ranks 28,000,000..30,999,999 were all positive
+with zero `MAYBE` in 840.946 seconds, and the same PID crossed into the next band with an 8.23-GiB
+cache. The durable checkpoint is therefore at least 31,000,000. The old Sa host's scoped census
+service is inactive, and Sa continues alone.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
