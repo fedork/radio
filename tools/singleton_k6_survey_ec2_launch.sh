@@ -48,8 +48,17 @@ active=$(aws-vault exec --server default -- aws ec2 describe-instances --region 
     --filters Name=tag:Purpose,Values=k6-main-survey \
               Name=instance-state-name,Values=pending,running \
     --query 'length(Reservations[].Instances[])' --output text)
-if [[ "$active" != 0 && "$DRY" == 0 ]]; then
-    echo "refusing to launch beside $active active K6 survey instance(s)" >&2
+asg_exists=$(aws-vault exec --server default -- aws autoscaling describe-auto-scaling-groups \
+    --region "$REGION" --auto-scaling-group-names "$ASG_NAME" \
+    --query 'length(AutoScalingGroups)' --output text)
+asg_instances=0
+if [[ "$asg_exists" == 1 ]]; then
+    asg_instances=$(aws-vault exec --server default -- aws autoscaling describe-auto-scaling-groups \
+        --region "$REGION" --auto-scaling-group-names "$ASG_NAME" \
+        --query 'length(AutoScalingGroups[0].Instances)' --output text)
+fi
+if [[ "$active" != "$asg_instances" && "$DRY" == 0 ]]; then
+    echo "refusing to launch beside $active active K6 instance(s), only $asg_instances owned by $ASG_NAME" >&2
     exit 69
 fi
 
@@ -132,6 +141,9 @@ ExecStart=/root/k6-survey/tools/singleton_k6_survey_remote.sh \$BUCKET \$PREFIX 
 Restart=on-failure
 RestartPreventExitStatus=2 65
 RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
 UNIT
 cat > /etc/systemd/system/radio-k6-survey-complete.service <<UNIT
 [Unit]
@@ -261,9 +273,6 @@ cat > "$mixed_policy" <<EOF
 }
 EOF
 
-asg_exists=$(aws-vault exec --server default -- aws autoscaling describe-auto-scaling-groups \
-    --region "$REGION" --auto-scaling-group-names "$ASG_NAME" \
-    --query 'length(AutoScalingGroups)' --output text)
 if [[ "$asg_exists" == 0 ]]; then
     aws-vault exec --server default -- aws autoscaling create-auto-scaling-group \
         --region "$REGION" --auto-scaling-group-name "$ASG_NAME" \
