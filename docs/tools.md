@@ -591,6 +591,12 @@ deterministic transfer-shell window, and its oracle runs with level 6 disabled u
 8-GiB cap (override with `RADIO_SURVEY_SECONDS` / `RADIO_SURVEY_RSS_GB`). See the
 [benchmark and scope record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 
+For the full AWS distance-14 census, `tools/singleton_k6_survey_remote.sh` processes durable rank
+stages with budget zero and advances `NEXT_RANK` only after exact-count/zero-`MAYBE` validation and
+upload. `tools/singleton_k6_survey_status.sh [--watch]` reads the S3 heartbeat. The two
+`aws_shared_job_shutdown_*` scripts are the narrowly scoped lifecycle guard used when this census
+shares the `Sa(193)` host.
+
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
 reloads it linearly instead of re-deriving every dominance closure. Snapshot v4 begins the
 necessity-only singleton-majorization epoch; v1--v3 snapshots are rejected even by `restore-any`.

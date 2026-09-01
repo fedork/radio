@@ -12682,3 +12682,26 @@ scope and hashes are in
 The same work fixed `tools/capped_run.sh` to preserve piped stdin explicitly when it backgrounds a
 monitored child; a four-byte stdin smoke test passed. The full transfer-shell regression, the new
 disabled-level cache regression, and the existing production singleton regression all passed.
+
+## 2026-08-31 -- full production-solver K6 shell census launched beside Sa(193)
+
+The inverse transfer-shell ranker puts the known padded `j=14` hole at zero-based rank 55,096.
+The production oracle's first 100,000 ranked parents contained 99,999 positives and exactly that
+negative in 16.829 solver CPU seconds; extending through the first million again found only that
+hole, with zero `MAYBE`, in 95.720 solver CPU / 110.20 wall seconds at 0.87 GiB peak RSS. These are
+diagnostic local outputs rather than archived evidence, but they supplied a scale measurement and
+an early negative control.
+
+At Fedor's request the full 9,960,648,265-state distance-14 shell started at 2026-08-31 23:55:45 UTC
+on the existing on-demand `r7iz.xlarge` Sa host. The production oracle is pinned to logical CPU 0,
+leaving Sa on the other physical core; both were independently observed at about 100% of one CPU.
+There is no search or overall time deadline. Ten-million-rank stages upload exception-only logs and
+advance a durable S3 checkpoint only after an exact query-count and zero-`MAYBE` check. The prefix
+is `run10/k6-main-survey` and the status helper is `tools/singleton_k6_survey_status.sh`.
+
+AWS Clang 15 rejected an existing C++20 lambda capture of a structured binding during the first
+build-only attempt, before any survey process started. GCC 11.5 built the standalone ranker; the C
+oracle remained on Clang. The live build IDs and source bundle hash are in the evidence record.
+Because the original Sa cloud-init powers the host off when Sa finishes, a scoped shutdown shim now
+defers that action only while the census is active; a monitor stops the host once both jobs end.
+Thus sharing hardware does not impose the shorter Sa lifetime or leave an idle instance billing.

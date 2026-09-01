@@ -64,9 +64,53 @@ transfer j=13     SOLVABLE     2.9 ms
 padded j=14       UNSOLVABLE   5.0 ms
 ```
 
-These timings show that the main solver is practical for targeted windows and as an independent
-validator of candidates.  They do **not** make it the right exhaustive engine for all
-9,960,648,265 distance-14 parents.  At the measured 10,000-state window rate, a serial full shell
-would still take weeks, whereas the specialized Hall census processes roughly a million states per
-second on the same laptop.  Use Hall for exhaustive discovery, then the ordinary solver and the
-tight-band extractor as independent checks of every hole it emits.
+The inverse ranker places the known padded `j=14` hole at zero-based shell rank 55,096.  A local
+production-oracle run of ranks 0 through 99,999 returned 99,999 solvable states, that one
+unsolvable state, and no `MAYBE` in 16.829 solver CPU seconds.  Extending the same window through
+rank 999,999 again found exactly that one hole and no `MAYBE`:
+
+```text
+queries=1000000 solvable=999999 unsolvable=1 maybe=0 total_ms=95720
+```
+
+The latter took 110.20 wall seconds and peaked at 0.87 GiB RSS.  It was a source-clean but
+worktree-dirty diagnostic build at `ad5d8f8`, build ID
+`8aca49f9ea71b7dc0040e7c42bb350c6ee288b1e2964da85473e8dbd84744dac`; it is not being promoted as
+a durable exhaustive result.  The ranker regression round-trips emitted states through the inverse
+rank command, including rank 55,096.
+
+## Full independent AWS census
+
+At Fedor's request, the production solver started an unlimited-budget census of all
+9,960,648,265 distance-14 parents at 2026-08-31 23:55:45 UTC.  It shares the on-demand
+`r7iz.xlarge` instance `i-0318c3349a0df835b` with the cold `Sa(193)` run, but is pinned to logical
+CPU 0 while `Sa(193)` occupies the other physical core.  Each query uses budget zero: there is no
+search or wall-clock deadline.  A 10-GiB systemd memory ceiling and an 8-GiB oracle address-space
+ceiling turn resource exhaustion into an abort, never a verdict.
+
+The run is divided into deterministic 10,000,000-rank stages.  Only a successfully completed stage
+with its exact query count and zero `MAYBE` advances `NEXT_RANK`; its provenance-bearing exception
+log is uploaded before the checkpoint.  Thus interruption loses at most the active stage.  The
+durable prefix is
+`s3://radio-sa193-393287594714/run10/k6-main-survey/`, and
+`tools/singleton_k6_survey_status.sh [--watch]` displays its heartbeat.  The first stage includes
+the known hole, so it also acts as an immediate negative control.
+
+The source bundle is commit `30021dd1eb30145264651e0bc374f6270b7ac07b`, SHA-256
+`eccc0d00ca3cbd0d0c10226ce4cf279242b283e796d5813003ded533f7d292c5`.  The AWS ranker build ID is
+`90a97f3ec63f534b851de5ca71d5c1ac3bbcb329b9246eec8a3fe7194d4be09a`; the production oracle build
+ID is `b902d45bac2c6e1e2af53ad4d934b0bc5f162269db093cca542e865dfd8d540f`.  The first build-only
+attempt used AWS Clang 15, which rejects an existing C++20 structured-binding lambda capture; it
+failed before any search process existed.  Rebuilding only the standalone C++ ranker with GCC
+11.5 succeeded, while the C oracle stayed on Clang.
+
+The host's original Sa cloud-init script powers off after Sa ends.  A narrow guard now defers that
+one shutdown while the census service is active, and a separate systemd monitor invokes the real
+shutdown only after both intended jobs have ended.  This prevents sharing the instance from
+silently imposing Sa's shorter lifetime on the census while still avoiding an indefinitely idle
+host.
+
+These timings make the production solver a practical, independent exhaustive check, although not
+the fastest discovery engine: the specialized Hall census remains hundreds of times faster.  Keep
+the two results separate because their implementations and proof burdens are intentionally
+different.
