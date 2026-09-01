@@ -59,17 +59,23 @@ format_duration() {
 write_status() {
     local state=$1 stage_end=$2 stage_started=$3 now rss_kib elapsed sa_rss
     local progress_file progress_queries stage_count overall_completed stage_percent overall_percent
-    local rate stage_eta full_eta
+    local rate stage_eta full_eta stage_unsolvable stage_maybe
     now=$(date -u +%FT%TZ)
     elapsed=$(( $(date +%s) - stage_started ))
-    rss_kib=$(ps -C k6-oracle -o rss= 2>/dev/null | awk '{sum += $1} END {print sum + 0}')
+    rss_kib=$(ps -C k6-survey -o rss= 2>/dev/null | awk '{sum += $1} END {print sum + 0}')
     sa_rss=$(ps -C radio_sa193 -o rss= 2>/dev/null | awk '{sum += $1} END {print sum + 0}')
     progress_file="$work_dir/ACTIVE_PROGRESS"
     progress_queries=0
+    stage_unsolvable=0
+    stage_maybe=0
     if [[ -s "$progress_file" ]]; then
         progress_queries=$(sed -n 's/^queries=\([0-9][0-9]*\)$/\1/p' "$progress_file" | tail -1)
+        stage_unsolvable=$(sed -n 's/^unsolvable=\([0-9][0-9]*\)$/\1/p' "$progress_file" | tail -1)
+        stage_maybe=$(sed -n 's/^maybe=\([0-9][0-9]*\)$/\1/p' "$progress_file" | tail -1)
     fi
     [[ "$progress_queries" =~ ^[0-9]+$ ]] || progress_queries=0
+    [[ "$stage_unsolvable" =~ ^[0-9]+$ ]] || stage_unsolvable=0
+    [[ "$stage_maybe" =~ ^[0-9]+$ ]] || stage_maybe=0
     stage_count=$((stage_end - next_rank))
     (( progress_queries > stage_count )) && progress_queries=$stage_count
     overall_completed=$((next_rank + progress_queries))
@@ -96,6 +102,8 @@ write_status() {
         printf '  active stage       %s..%s\n' "$next_rank" "$stage_end"
         printf '  stage progress     %s / %s  (%s%%)\n' \
             "$progress_queries" "$stage_count" "$stage_percent"
+        printf '  stage exceptions   %s unsolvable, %s MAYBE\n' \
+            "$stage_unsolvable" "$stage_maybe"
         printf '  stage elapsed      %s\n' "$(format_duration "$elapsed")"
         if (( rate > 0 )); then
             printf '  current rate       %s states/s\n' "$rate"
@@ -132,17 +140,10 @@ while (( next_rank < end_rank )); do
     rm -f "$progress_file" "$progress_file.tmp"
 
     (
-        set -o pipefail
-        {
-            printf 'report exceptions\n'
-            RADIO_TRANSFER_PROGRESS_FILE="$progress_file" taskset -c "$cpu" ./shell-ranker \
-                --transfer-shell-oracle-input 6 14 "$next_rank" "$count" 0
-        } | (
-            ulimit -v "$vm_kib"
-            exec taskset -c "$cpu" ./k6-oracle
-        ) 2> >(tail -n 200 > "$stage_err") \
-          | grep --line-buffered -E '^#|^OK report=|^VERDICT (UNSOLVABLE|MAYBE)|^OK queries=|^OK bye'
-    ) > "$stage_out" &
+        ulimit -v "$vm_kib"
+        exec taskset -c "$cpu" ./k6-survey \
+            6 14 "$next_rank" "$count" "$progress_file"
+    ) > "$stage_out" 2> >(tail -n 200 > "$stage_err") &
     stage_pid=$!
 
     last_status=0
@@ -161,8 +162,8 @@ while (( next_rank < end_rank )); do
         exit 1
     fi
 
-    summary=$(grep '^OK queries=' "$stage_out" | tail -1)
-    actual=$(sed -n 's/^OK queries=\([0-9][0-9]*\).*/\1/p' <<<"$summary")
+    summary=$(grep '^INTEGRATED_SUMMARY ' "$stage_out" | tail -1)
+    actual=$(sed -n 's/^INTEGRATED_SUMMARY queries=\([0-9][0-9]*\).*/\1/p' <<<"$summary")
     maybe=$(sed -n 's/.* maybe=\([0-9][0-9]*\).*/\1/p' <<<"$summary")
     [[ "$actual" == "$count" && "$maybe" == 0 ]] || {
         write_status INVALID "$stage_end" "$stage_started"
