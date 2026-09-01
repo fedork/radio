@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <random>
@@ -3741,6 +3743,7 @@ struct TransferShellCensus {
     std::unordered_map<std::uint64_t, std::uint64_t> completion_memo;
     bool emit_output = true;
     bool emit_oracle_queries = false;
+    const char *oracle_progress_path = std::getenv("RADIO_TRANSFER_PROGRESS_FILE");
     std::chrono::steady_clock::time_point started =
         std::chrono::steady_clock::now();
 
@@ -3858,6 +3861,25 @@ struct TransferShellCensus {
             std::cout << k;
             for (int value : state) std::cout << ' ' << value << " 1";
             std::cout << '\n';
+            if (oracle_progress_path != nullptr
+                && (tested % 100000 == 0 || tested == limit)) {
+                // Flush first so the checkpoint cannot run materially ahead of the pipe consumer.
+                // Atomic rename keeps the status reader from observing a partial record.
+                std::cout.flush();
+                const double seconds = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - started).count();
+                const std::string temporary =
+                    std::string(oracle_progress_path) + ".tmp";
+                {
+                    std::ofstream out(temporary);
+                    out << "queries=" << tested << '\n'
+                        << "elapsed_seconds=" << seconds << '\n';
+                }
+                if (std::rename(temporary.c_str(), oracle_progress_path) != 0) {
+                    std::cerr << "TRANSFER_SHELL_PROGRESS_WRITE_FAILED path="
+                              << oracle_progress_path << '\n';
+                }
+            }
             return;
         }
         if (greedy_block_coloring(state, hall, true)) {
