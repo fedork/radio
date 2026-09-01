@@ -203,7 +203,31 @@ had not committed, `NEXT_RANK` correctly remained 19,000,000. Placement scoring 
 `r7iz.xlarge` in every Oregon zone. Replacement Spot `r7a.xlarge` instance
 `i-044d1e157c6d36e87` launched in us-west-2d at 01:30:11, again passed the known-hole smoke, and
 resumed from 19,000,000; its first direct inspection showed 100,000 positives and zero exception.
-`tools/singleton_k6_survey_ec2_launch.sh` is the reproducible launcher; it uses a 16-GiB
-address-space limit, 20-GiB service memory ceiling, three-million-rank stages and no search or
-overall deadline. Spot interruption terminates the ephemeral worker and loses at most its active
-stage; a replacement invocation reads the last committed S3 boundary.
+That one-time worker used a 16-GiB address-space limit, 20-GiB service memory ceiling,
+three-million-rank stages and no search or overall deadline. Its manual replacement established
+that an interrupted invocation correctly reads the last committed S3 boundary; the automated
+successor below supersedes that operational arrangement.
+
+## Rolling cache epochs and automatic replacement
+
+Restarting the solver at every evidence boundary was not required for soundness: the S3 artifact
+and `NEXT_RANK` ordering supplies durability independently of process lifetime. The integrated
+driver now emits and flushes `INTEGRATED_CHECKPOINT` records every three million classifications,
+including interval and cumulative exact counts. The remote runner validates a marker, checks its
+provenance-bearing log snapshot, uploads that snapshot, and only then advances `NEXT_RANK`, while
+the same solver PID continues with its populated `K<=5` child cache. Its status distinguishes the
+current cache epoch start from the later durable boundary.
+
+The independent runner regression exercises two boundaries in one fake solver invocation, then a
+separate crash case. The crash occurs immediately after the first marker; the runner exits with
+the transient status 75, S3 retains rank 3, and the next invocation starts at rank 3 and completes
+rank 6. Marker/provenance/count failures instead exit 65 and are not automatically restarted.
+
+The AWS launcher now uses a Spot-only Auto Scaling group of desired capacity one, with
+capacity-optimized selection among `r7a.xlarge`, `r7i.xlarge`, `r7iz.xlarge`, `r6a.xlarge` and
+`r6i.xlarge` across public subnets in all four Oregon zones. Systemd restarts transient process
+failures from the durable boundary; the group replaces an interrupted instance. Capacity rebalance
+is deliberately disabled because overlapping workers could race on `NEXT_RANK`. A permanent
+validation failure stays on its instance for inspection, and successful corpus completion checks
+the uploaded `COMPLETE` status before scaling desired capacity to zero. The 32-GiB worker gives the
+solver a 26-GiB address-space ceiling under a 28-GiB cgroup ceiling.

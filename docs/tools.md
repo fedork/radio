@@ -591,23 +591,29 @@ deterministic transfer-shell window, and its oracle runs with level 6 disabled u
 8-GiB cap (override with `RADIO_SURVEY_SECONDS` / `RADIO_SURVEY_RSS_GB`). See the
 [benchmark and scope record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 
-For the full AWS distance-14 census, `tools/singleton_k6_survey_remote.sh` processes durable rank
-stages with budget zero and advances `NEXT_RANK` only after exact-count/zero-`MAYBE` validation and
-upload. The ranker atomically records emitted progress every 100,000 states; the runner's minute
-heartbeat derives stage/overall percentages, current rate, stage/full ETAs and human-readable RSS.
+For the full AWS distance-14 census, `tools/singleton_k6_survey_remote.sh` keeps one cache-warm
+solver process alive across durable rank stages with budget zero. The C driver flushes a rolling
+marker at each boundary; the runner advances `NEXT_RANK` only after exact-count/zero-`MAYBE`
+validation and upload. Its atomic progress file updates every 100,000 classified states, and the
+minute heartbeat derives stage/overall percentages, current rate, stage/full ETAs and readable RSS.
 The full ETA is labelled as a current-stage-rate projection because difficulty varies by rank band.
 `tools/singleton_k6_survey_status.sh [--watch]` reads the S3 heartbeat. The two
 `aws_shared_job_shutdown_*` scripts are the narrowly scoped lifecycle guard used when this census
 shares the `Sa(193)` host. The current dedicated deployment uses
-`tools/singleton_k6_survey_ec2_launch.sh`: a restartable Spot worker which verifies the known hole
-before reading `NEXT_RANK` and resuming. The status helper resolves the newest survey instance by
-its `Purpose=k6-main-survey` tag.
+`tools/singleton_k6_survey_ec2_launch.sh`: a Spot-only, capacity-optimized one-instance Auto Scaling
+group across compatible 32-GiB pools. It verifies the known hole before resuming. Systemd restarts
+a transient solver death from the last boundary; EC2 replacement handles Spot loss; a permanent
+marker/provenance error stays failed for inspection; successful corpus completion scales the group
+to zero. Capacity rebalance is deliberately disabled so two workers cannot race on one checkpoint.
+The status helper re-resolves the active tagged instance on every refresh.
 
 The live runner uses `radio_singleton_k6_survey.c`, a single-process C driver around `radiobase.c`.
 It walks the shell by direct DFS and calls `canSolveB` without serializing states. The ordinal and
 completion-count memo exist only to skip to a durable checkpoint. Validate it with
 `tools/singleton_k6_integrated_survey_regression.sh`, which cross-checks a tiny ranked window against
-the independent C++ generator and reproduces the known `K=6` hole.
+the independent C++ generator, checks rolling markers, and reproduces the known `K=6` hole.
+`tools/singleton_k6_continuous_runner_regression.sh` separately checks that two durable stages use
+one solver PID and that a simulated crash retains and resumes from the first boundary.
 
 **Snapshots.** `snapshot <path>` writes the cache structure; `restore <path>` or `--restore=<path>`
 reloads it linearly instead of re-deriving every dominance closure. Snapshot v4 begins the
@@ -758,6 +764,7 @@ tools, not yet part of `radiobase.c`:
 | `tools/singleton_transfer_shell_regression.sh` | provenance-build the transfer-shell census; cross-check shell totals, fast rank-window skipping, parallel/sequential aggregates, all 160 exact-support `K=3` parents, the final `K=5` shell, and canonical / transfer-13 / counterexample `K=6` controls |
 | `radio_singleton_k6_survey.c` | directly DFS-iterate one ranked transfer-shell window and call the production `canSolveB` in the same C process; used by the live AWS distance-14 census |
 | `tools/singleton_k6_integrated_survey_regression.sh` | cross-check the integrated C iterator/order against an independent tiny `K=3` ranker window and reproduce the known rank-55,096 `K=6` negative |
+| `tools/singleton_k6_continuous_runner_regression.sh` | verify same-PID rolling stage commits and exact durable-boundary resume after a simulated solver crash |
 | `tools/singleton_pascal_interval_census.cpp` | exhaust exact-row contracted Pascal bands and arbitrary-row suffixes through `K=4`; check tight-prefix transitions, two-anchor residual colorings, longest-half mixed splits and same-color predecessors; reproduce the exact-support `K=6` singleton-majorization counterexample, its 14-transfer phase boundary, residual hole, forced bands, and earlier rule counterexamples |
 | `tools/singleton_direct_split_cleanroom.cpp` | independently enumerate legal singleton row triples into three sorted child multisets, with no Hall code or shared cache; solve arbitrary first-cut queries, check the padded/mass-697/mass-683 `K=6` holes and the feasible one-8 deletion with slack-correct residual bounds, and classify all 176 bands on the fixed rank-15/32 face |
 | `tools/singleton_direct_split_regression.sh` | provenance-build the clean-room direct-row solver and run its canonical `G_6`, `j=13`, three negative counterexample forms, feasible one-8 deletion, fixed-face, naive-oracle and exhaustive `K<=3` controls |

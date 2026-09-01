@@ -9,7 +9,7 @@
      tools/build_radio.py -O3 -DMAX_K=6 -DMAX_N=793 -DMAX_PART_N=65 \
        -DRADIO_CACHE_DISABLED_LEVEL=6 radio_singleton_k6_survey.c -o survey
 
-   Usage: survey K DISTANCE SKIP LIMIT PROGRESS_FILE
+   Usage: survey K DISTANCE SKIP LIMIT PROGRESS_FILE [CHECKPOINT_INTERVAL]
 */
 
 #include <errno.h>
@@ -34,6 +34,8 @@ typedef struct {
     int state[1 << MAX_K];
     uint64_t skip, remaining_skip, limit, counted;
     uint64_t tested, solvable, unsolvable, maybe;
+    uint64_t checkpoint_interval, next_checkpoint;
+    uint64_t checkpoint_tested, checkpoint_solvable, checkpoint_unsolvable, checkpoint_maybe;
     double total_ms;
     const char *progress_path;
     FILE *report;
@@ -174,6 +176,8 @@ static void survey_write_progress(const survey_state *survey) {
         fprintf(stderr, "INTEGRATED_PROGRESS_WRITE_FAILED path=%s\n", temporary);
         return;
     }
+    fprintf(out, "start_rank=%" PRIu64 "\n", survey->skip);
+    fprintf(out, "absolute_rank=%" PRIu64 "\n", survey->skip + survey->tested);
     fprintf(out, "queries=%" PRIu64 "\n", survey->tested);
     fprintf(out, "solvable=%" PRIu64 "\n", survey->solvable);
     fprintf(out, "unsolvable=%" PRIu64 "\n", survey->unsolvable);
@@ -182,6 +186,36 @@ static void survey_write_progress(const survey_state *survey) {
     if (fclose(out) || rename(temporary, survey->progress_path))
         fprintf(stderr, "INTEGRATED_PROGRESS_WRITE_FAILED path=%s\n",
                 survey->progress_path);
+}
+
+static void survey_emit_checkpoint(survey_state *survey) {
+    uint64_t start = survey->skip + survey->checkpoint_tested;
+    uint64_t end = survey->skip + survey->tested;
+    uint64_t queries = survey->tested - survey->checkpoint_tested;
+    uint64_t solvable = survey->solvable - survey->checkpoint_solvable;
+    uint64_t unsolvable = survey->unsolvable - survey->checkpoint_unsolvable;
+    uint64_t maybe = survey->maybe - survey->checkpoint_maybe;
+    fprintf(survey->report,
+            "INTEGRATED_CHECKPOINT start=%" PRIu64 " end=%" PRIu64
+            " queries=%" PRIu64 " solvable=%" PRIu64
+            " unsolvable=%" PRIu64 " maybe=%" PRIu64
+            " cumulative_queries=%" PRIu64
+            " cumulative_solvable=%" PRIu64
+            " cumulative_unsolvable=%" PRIu64
+            " cumulative_maybe=%" PRIu64
+            " wall_seconds=%.3f\n",
+            start, end, queries, solvable, unsolvable, maybe,
+            survey->tested, survey->solvable, survey->unsolvable, survey->maybe,
+            survey_elapsed(survey));
+    fflush(survey->report);
+    survey->checkpoint_tested = survey->tested;
+    survey->checkpoint_solvable = survey->solvable;
+    survey->checkpoint_unsolvable = survey->unsolvable;
+    survey->checkpoint_maybe = survey->maybe;
+    if (survey->next_checkpoint < survey->limit) {
+        uint64_t remaining = survey->limit - survey->next_checkpoint;
+        survey->next_checkpoint += min(survey->checkpoint_interval, remaining);
+    }
 }
 
 static void survey_print_exception(
@@ -217,6 +251,8 @@ static void survey_inspect(survey_state *survey) {
         survey->maybe++;
         survey_print_exception(survey, result, ms);
     }
+    if (survey->checkpoint_interval && survey->tested == survey->next_checkpoint)
+        survey_emit_checkpoint(survey);
     if (survey->tested % 100000 == 0 || survey->tested == survey->limit)
         survey_write_progress(survey);
 }
@@ -258,8 +294,10 @@ static void survey_enumerate(
 }
 
 int main(int argc, char **argv) {
-    if (argc != 6) {
-        fprintf(stderr, "usage: %s K DISTANCE SKIP LIMIT PROGRESS_FILE\n", argv[0]);
+    if (argc != 6 && argc != 7) {
+        fprintf(stderr,
+                "usage: %s K DISTANCE SKIP LIMIT PROGRESS_FILE [CHECKPOINT_INTERVAL]\n",
+                argv[0]);
         return 2;
     }
     survey_state survey = {0};
@@ -272,6 +310,15 @@ int main(int argc, char **argv) {
         || !survey_parse_u64(argv[4], &survey.limit) || !survey.limit) {
         fprintf(stderr, "invalid integrated survey arguments\n");
         return 2;
+    }
+    if (argc == 7
+        && (!survey_parse_u64(argv[6], &survey.checkpoint_interval)
+            || !survey.checkpoint_interval)) {
+        fprintf(stderr, "invalid integrated survey checkpoint interval\n");
+        return 2;
+    }
+    if (survey.checkpoint_interval) {
+        survey.next_checkpoint = min(survey.checkpoint_interval, survey.limit);
     }
     survey.remaining_skip = survey.skip;
     survey.memo = calloc(SURVEY_MEMO_CAPACITY, sizeof(*survey.memo));

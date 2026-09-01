@@ -17,7 +17,7 @@ deliberately retained. See
 | uncolored level replay | terminated: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived |
 | colored level replay | terminated: `i-0901e2b2c266f7db2`, volume `vol-0bdc1e36eea39386c` confirmed deleted |
 | persistent oracle | **terminated** 2026-08-31 14:25:41 UTC: `i-002cabc654b2078ed`; encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and `available` |
-| active jobs | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone. The unlimited staged `K=6` distance-14 census moved at checkpoint 19,000,000 to dedicated Spot `r7a.xlarge` `i-044d1e157c6d36e87`, launched 2026-09-01 01:30:11 UTC under the same durable `run10/k6-main-survey` prefix. |
+| active jobs | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone. The unlimited `K=6` distance-14 census uses the durable `run10/k6-main-survey` prefix and a Spot-only one-instance Auto Scaling group; the current worker ID is intentionally discovered by `tools/singleton_k6_survey_status.sh`, not frozen here. |
 | retained oracle volumes | five unattached 50-GiB volumes, 250 GiB total: `vol-0053276ecc6d1adf4`, `vol-03a28c8c01ae591a1`, `vol-0621d09062d023bce`, `vol-0ef7c8664c6cab66e`, and the final instance's `vol-04260ae18b515e7f5`; not deleted because this request authorized instance termination, not data deletion |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` — unaffected by termination, and the only copy of the run3/run/run2/run4-7 raw logs |
@@ -111,10 +111,9 @@ fix. Run9 is the proof source.
 The dedicated `K=6` census uses `tools/singleton_k6_survey_status.sh [--watch]`. Its durable
 stages and checkpoint live at
 `s3://radio-sa193-393287594714/run10/k6-main-survey/`. It began on Sa's other physical core, then
-moved at the durable 19,000,000 checkpoint to Spot instance `i-044d1e157c6d36e87`; the scoped
-service on the Sa host is inactive. A first `r7iz.xlarge` Spot worker was reclaimed after five
-minutes for lack of pool capacity and advanced no checkpoint; the live replacement uses the
-better-scored `r7a.xlarge` pool. Each singleton query has no deadline. The first
+moved at the durable 19,000,000 checkpoint to a dedicated Spot worker; the scoped service on the Sa
+host is inactive. A first `r7iz.xlarge` Spot worker was reclaimed after five minutes for lack of
+pool capacity and advanced no checkpoint. Each singleton query has no deadline. The first
 10,000,000-state stage completed with exactly the known hole and zero `MAYBE`; after it approached
 its original 8-GiB address-space guard, subsequent stages use 16-GiB address-space and 20-GiB
 cgroup ceilings. A later ten-million-rank window reached 6.5 GiB after only about two million
@@ -124,9 +123,13 @@ GiB-scale memory. Since rank 13,000,000, `radio_singleton_k6_survey.c` generates
 and calls `canSolveB` in one process; the ordinal exists only for checkpoint skipping. There is no
 ranker/oracle pipe, and matched local timings found no material speed claim for removing it. Memory
 exhaustion remains an explicit abort. `tools/singleton_k6_survey_ec2_launch.sh` provisions a
-dedicated Spot worker, runs a known-hole smoke test, and resumes from `NEXT_RANK`; interruption can
-lose only the active three-million-rank stage. The old shared-host lifecycle scripts remain in S3
-as an audit record but no longer govern the live census.
+Spot-only one-instance Auto Scaling group over five compatible 32-GiB pools and public subnets in
+all four Oregon zones, runs a known-hole smoke test, and resumes from `NEXT_RANK`. One solver PID
+normally crosses all three-million-rank evidence boundaries, retaining its child cache. A transient
+process death is restarted from the last boundary; Spot loss is replaced by the group; permanent
+validation failures remain for inspection; completion scales desired capacity to zero. Capacity
+rebalance is off so two workers cannot race. The old shared-host lifecycle scripts remain in S3 as
+an audit record but no longer govern the live census.
 
 The `pareto_k8_aws` census **finished** at 2026-08-19 22:34:43 UTC with `exit_status=0`, after
 507,838 seconds at one full core and a 9.4 GiB working set that never approached its 20 GiB guard.

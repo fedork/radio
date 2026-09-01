@@ -8,6 +8,7 @@ set -euo pipefail
 bucket=${RADIO_K6_SURVEY_BUCKET:-radio-sa193-393287594714}
 prefix=${RADIO_K6_SURVEY_PREFIX:-run10/k6-main-survey}
 instance=${RADIO_K6_SURVEY_INSTANCE:-}
+asg=${RADIO_K6_SURVEY_ASG:-radio-k6-main-survey}
 watch=0
 
 if (( $# > 1 )); then
@@ -20,28 +21,35 @@ if (( $# == 1 )); then
 fi
 
 render() {
-    local modified state
+    local modified state resolved_instance asg_state
     aws-vault exec --server default -- aws s3 cp "s3://$bucket/$prefix/STATUS" -
     modified=$(aws-vault exec --server default -- aws s3api head-object \
         --bucket "$bucket" --key "$prefix/STATUS" --query LastModified --output text)
-    if [[ -z "$instance" ]]; then
-        instance=$(aws-vault exec --server default -- aws ec2 describe-instances \
+    resolved_instance=$instance
+    if [[ -z "$resolved_instance" ]]; then
+        resolved_instance=$(aws-vault exec --server default -- aws ec2 describe-instances \
             --region us-west-2 \
             --filters Name=tag:Purpose,Values=k6-main-survey \
-                      Name=instance-state-name,Values=pending,running,stopping,stopped \
+                      Name=instance-state-name,Values=pending,running \
             --query 'sort_by(Reservations[].Instances[], &LaunchTime)[-1].InstanceId' \
             --output text)
     fi
-    if [[ -z "$instance" || "$instance" == None ]]; then
-        instance=none
+    if [[ -z "$resolved_instance" || "$resolved_instance" == None ]]; then
+        resolved_instance=none
         state=none
     else
         state=$(aws-vault exec --server default -- aws ec2 describe-instances \
-            --region us-west-2 --instance-ids "$instance" \
+            --region us-west-2 --instance-ids "$resolved_instance" \
             --query 'Reservations[0].Instances[0].State.Name' --output text)
     fi
+    asg_state=$(aws-vault exec --server default -- aws autoscaling describe-auto-scaling-groups \
+        --region us-west-2 --auto-scaling-group-names "$asg" \
+        --query 'AutoScalingGroups[0].[DesiredCapacity,length(Instances[?LifecycleState==`InService`])]' \
+        --output text 2>/dev/null || true)
+    [[ -n "$asg_state" && "$asg_state" != None* ]] || asg_state='not configured'
     printf '\n  status object      %s\n' "$modified"
-    printf '  instance           %s  %s\n' "$instance" "$state"
+    printf '  instance           %s  %s\n' "$resolved_instance" "$state"
+    printf '  auto replacement   %s  (desired, in-service)\n' "$asg_state"
     printf '  durable prefix     s3://%s/%s/\n' "$bucket" "$prefix"
 }
 

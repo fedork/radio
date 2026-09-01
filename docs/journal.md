@@ -12776,3 +12776,27 @@ the checkpoint correctly stayed at 19,000,000. Replacement Spot `r7a.xlarge`
 19,000,000. The new launcher makes this recovery path repeatable; a Spot interruption repeats only
 the active three-million-rank stage because
 `NEXT_RANK` advances after validation and artifact upload, never from the heartbeat counter.
+
+## 2026-09-01 -- K6 rolling cache epochs and self-healing Spot deployment
+
+The three-million-rank boundary was serving two unrelated purposes: durable evidence and cache
+lifetime. Only the former requires a checkpoint. `radio_singleton_k6_survey.c` now flushes an exact
+interval/cumulative checkpoint marker while continuing its DFS and retaining the `K<=5` child
+cache. The remote runner validates and provenance-checks a snapshot, uploads it first, advances
+`NEXT_RANK` second, and leaves the solver PID alive. Status reports both the durable boundary and
+the earlier cache-epoch start.
+
+Two regressions separate the trust obligations. The integrated `K=3` window emits exact rolling
+intervals 10..13, 13..16 and 16..17 and still matches the independent ranker. A fake remote solver
+then crosses 0..3..6 in one PID. In a second run it dies just after 0..3: the runner returns
+transient status 75 with durable rank 3, and its replacement begins at 3 and completes rank 6.
+Malformed markers, count disagreement, nonzero `MAYBE` or provenance failure return permanent
+status 65 instead of restart-looping.
+
+The deployment launcher was correspondingly changed from a manually replaced one-time Spot request
+to a Spot-only, desired-one Auto Scaling group. It uses capacity-optimized selection across five
+compatible 32-GiB pools and public subnets in all four Oregon zones, with capacity rebalance off to
+prevent overlapping checkpoint writers. Systemd restarts transient solver/process-memory deaths;
+the group replaces Spot loss; permanent validation failure remains live for inspection; a verified
+`COMPLETE` status scales desired capacity to zero. The new 26-GiB process / 28-GiB cgroup ceilings
+leave host headroom while allowing the lower-level cache substantially more room to saturate.

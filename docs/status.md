@@ -144,10 +144,12 @@ at the durable 19,000,000-rank boundary so the unique cold proof run is isolated
 implementation-independent exhaustive check, not a replacement for the much faster Hall discovery engine. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 Its first 10,000,000-state stage has completed with 9,999,999 positives, exactly the known hole,
-and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. Subsequent stages
-use three-million-rank checkpoints and 16/20-GiB process/cgroup limits. The minute heartbeat now
-shows exact in-stage counts to 100,000 states, stage/overall percentages, throughput, ETAs and
-human-readable memory; the full ETA is a current-band projection and will vary.
+and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. Rolling
+three-million-rank markers now preserve those evidence boundaries without normally restarting the
+cache-warm solver. A transient solver death resumes from the last uploaded marker, while invalid
+markers/provenance fail permanently. The minute heartbeat shows exact in-stage counts to 100,000
+states, stage/overall percentages, throughput, ETAs, cache-epoch start and readable memory; the
+full ETA is a current-band projection and will vary.
 Generation and solving now occur in one thin C driver: direct DFS iteration followed by
 `canSolveB`, with the ordinal used only for checkpoint/resume. Matched 100,000-state measurements
 showed no material speed difference from the former text pipe, so this is intentionally a
@@ -159,9 +161,12 @@ The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`.
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the
 193 search. The on-demand `r7iz.xlarge` instance is `i-0318c3349a0df835b`; use
 `tools/sa193_status.sh` (now defaulting to `run10`) rather than the terminated historical instance.
-The singleton census remains under `run10/k6-main-survey` but now runs on dedicated Spot
-`r7a.xlarge` instance `i-044d1e157c6d36e87`; use `tools/singleton_k6_survey_status.sh`, which resolves the newest survey
-instance by tag. The old host's scoped census service is inactive, and Sa continues alone.
+The singleton census remains under `run10/k6-main-survey`; use
+`tools/singleton_k6_survey_status.sh`, which re-resolves the active survey instance by tag on every
+refresh. Its deployment is a Spot-only one-instance Auto Scaling group spanning compatible
+32-GiB pools and all four Oregon zones: Spot termination is automatically replaced, transient
+process failure is automatically restarted, and validated completion scales desired capacity to
+zero. The old Sa host's scoped census service is inactive, and Sa continues alone.
 
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
