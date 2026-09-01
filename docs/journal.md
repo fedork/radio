@@ -12884,6 +12884,9 @@ docs/certificate.md sentence proposing it now carries this measurement as its an
 
 The pilot's by-products directly size the surviving fallback, a pure re-search cleanroom checker:
 per-prune win rates at run9 k=7 are tail cut 48x charged (cle tables essential), per-(part,k)
-dead options 1.55x charged (Tier-1 bitmap essential), rb only 0.47% (deferrable), equal-part
-quotient 1.5%. Parity target: the refuter runs 12.3M charged cells/s/core on M4 Pro, 16M/s/core
-on c8a. The instrumentation is kept compile-gated for future measurement.
+dead options 1.55x charged (Tier-1 bitmap essential), equal-part quotient 1.5%, and rb measured
+counterfactually at 1.7% CPU / 0.9% prefixes (uninstrumented A/B with `-DRB_TRIGGER` set
+unreachable; firing counts alone cannot size a subtree prune) - deferrable. Parity target: the
+refuter runs 15.0M charged cells/s/core on M4 Pro uninstrumented, 16M/s/core on c8a; the pilot
+binary itself carries ~23% counter overhead, so timing baselines must use uninstrumented builds.
+The instrumentation is kept compile-gated for future measurement.

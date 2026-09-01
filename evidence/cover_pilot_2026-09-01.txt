@@ -78,7 +78,18 @@ Cost of this pilot: instrumentation + two local runs totalling under 12 wall min
 Useful positive by-products for the re-search fallback (per-prune win rates at run9 k=7):
   monotone tail cut retires 48x the charged count unevaluated  -> cle prefix tables essential
   per-(part,k) dead options skip 10.1e9 cells per 6.5e9 charged -> Tier-1 bitmap essential
-  rb rejects only 0.47% of charged                              -> rb can be deferred
+  rb: counterfactual A/B below                                  -> rb can be deferred
   equal-part quotient skips 1.5%                                 -> trivial, keep
-  refuter throughput: 12.3M charged cells/s/core on M4 Pro, 16M/s/core on c8a
-                                                                -> the parity target
+  refuter throughput: 15.0M charged cells/s/core on M4 Pro (uninstrumented, run 3 below),
+  16M/s/core on c8a                                             -> the parity target
+
+Run 3: rb_dead counterfactual A/B, same k=7 stride-500 sample, uninstrumented binaries
+--------------------------------------------------------------------------------------
+Firing counts alone (run 2: rb rejected 0.47% of charged) do not size a subtree prune, so
+rb was measured off directly: -DRB_TRIGGER=1000000000000000LL (never arms) vs default.
+  rb on : BATCH_DONE completed=5017/5017 verified=5017 gaps=0 prefixes=6528844773 cpu_s=434.326
+  rb off: BATCH_DONE completed=5017/5017 verified=5017 gaps=0 prefixes=6589164843 cpu_s=441.657
+Counterfactual value of rb for the frozen k=7 audit: 1.7% CPU, 0.9% prefixes.  (rb exists
+for the solver's monster solvable states; against a complete frozen support level the tail
+cut and dead options do the work.)  The pilot-instrumented binary in run 2 carries ~23%
+counter overhead (532.1 vs 434.3 CPU s) - use uninstrumented binaries for timing baselines.
