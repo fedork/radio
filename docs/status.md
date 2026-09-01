@@ -142,6 +142,9 @@ restartable census of all 9,960,648,265 shell states is now live on AWS in 10-mi
 sharing the `Sa(193)` host but pinned to its other physical core. This is an implementation-
 independent exhaustive check, not a replacement for the much faster Hall discovery engine. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
+Its first 10,000,000-state stage has completed with 9,999,999 positives, exactly the known hole,
+and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. Subsequent stages
+use 16/20-GiB process/cgroup limits after the first stage showed that 8 GiB was unnecessarily tight.
 
 The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the

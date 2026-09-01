@@ -12705,3 +12705,12 @@ oracle remained on Clang. The live build IDs and source bundle hash are in the e
 Because the original Sa cloud-init powers the host off when Sa finishes, a scoped shutdown shim now
 defers that action only while the census is active; a monitor stops the host once both jobs end.
 Thus sharing hardware does not impose the shorter Sa lifetime or leave an idle instance billing.
+
+The first 10,000,000-rank stage completed at 00:20:41 UTC with 9,999,999 positives, exactly the
+known rank-55,096 negative and zero `MAYBE`, consuming 1,404.888 solver CPU seconds. Its S3 log
+passes the provenance checker and has SHA-256
+`6fc5a3d888d40995085eca66d62dd363c00273bc80efd8621c4d0b486e7a6ba3`. The oracle approached its
+initial 8-GiB address-space guard, so at this clean checkpoint the next stage was relaunched with a
+16-GiB address-space limit and 20-GiB cgroup limit. A short, just-started second-stage attempt was
+discarded; no completed work, checkpoint or retained verdict was lost. Live readback confirmed the
+new limits while both the census and Sa continued on their assigned cores.

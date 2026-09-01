@@ -111,8 +111,10 @@ fix. Run9 is the proof source.
 The co-resident `K=6` census uses `tools/singleton_k6_survey_status.sh [--watch]`. Its durable
 stages and checkpoint live at
 `s3://radio-sa193-393287594714/run10/k6-main-survey/`. The oracle is pinned to CPU 0; `Sa(193)` is
-currently using the other physical core. Each singleton query has no deadline, while 8-GiB
-address-space and 10-GiB cgroup ceilings make memory exhaustion an explicit abort. The host's
+currently using the other physical core. Each singleton query has no deadline. The first
+10,000,000-state stage completed with exactly the known hole and zero `MAYBE`; after it approached
+its original 8-GiB address-space guard, subsequent stages use 16-GiB address-space and 20-GiB
+cgroup ceilings. Memory exhaustion remains an explicit abort. The host's
 cloud-init normally shuts down after Sa; `/usr/local/bin/shutdown` now defers only that final action
 while the census service is active, and `radio-shared-shutdown.service` stops the host once both
 jobs have ended. Lifecycle scripts are retained in the same S3 prefix and in `tools/`.

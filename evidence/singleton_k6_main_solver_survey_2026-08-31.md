@@ -85,16 +85,29 @@ At Fedor's request, the production solver started an unlimited-budget census of 
 9,960,648,265 distance-14 parents at 2026-08-31 23:55:45 UTC.  It shares the on-demand
 `r7iz.xlarge` instance `i-0318c3349a0df835b` with the cold `Sa(193)` run, but is pinned to logical
 CPU 0 while `Sa(193)` occupies the other physical core.  Each query uses budget zero: there is no
-search or wall-clock deadline.  A 10-GiB systemd memory ceiling and an 8-GiB oracle address-space
-ceiling turn resource exhaustion into an abort, never a verdict.
+search or wall-clock deadline.  Resource exhaustion is an abort, never a verdict.
 
 The run is divided into deterministic 10,000,000-rank stages.  Only a successfully completed stage
 with its exact query count and zero `MAYBE` advances `NEXT_RANK`; its provenance-bearing exception
 log is uploaded before the checkpoint.  Thus interruption loses at most the active stage.  The
 durable prefix is
 `s3://radio-sa193-393287594714/run10/k6-main-survey/`, and
-`tools/singleton_k6_survey_status.sh [--watch]` displays its heartbeat.  The first stage includes
-the known hole, so it also acts as an immediate negative control.
+`tools/singleton_k6_survey_status.sh [--watch]` displays its heartbeat.
+
+The first stage, ranks 0 through 9,999,999, completed and checkpointed at 2026-09-01 00:20:41 UTC:
+
+```text
+queries=10000000 solvable=9999999 unsolvable=1 maybe=0 total_ms=1404888
+```
+
+The only negative is the known rank-55,096 hole.  The retained exception log passes
+`tools/check_provenance.py` and has SHA-256
+`6fc5a3d888d40995085eca66d62dd363c00273bc80efd8621c4d0b486e7a6ba3`.  This stage ran with an
+8-GiB oracle address-space limit and 10-GiB cgroup ceiling.  Because it approached the former,
+subsequent stages run with 16-GiB address space and a 20-GiB cgroup ceiling.  The change was made at
+the durable 10,000,000 checkpoint; a just-started second-stage process was replaced, but no
+completed stage or retained verdict was lost.  The new process's live limits were read back as
+17,179,869,184 and 21,474,836,480 bytes respectively.
 
 The source bundle is commit `30021dd1eb30145264651e0bc374f6270b7ac07b`, SHA-256
 `eccc0d00ca3cbd0d0c10226ce4cf279242b283e796d5813003ded533f7d292c5`.  The AWS ranker build ID is
