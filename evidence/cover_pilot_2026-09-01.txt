@@ -1,0 +1,84 @@
+Coverage-certificate pilot, 2026-09-01
+=======================================
+
+Question: could a cleanroom verifier avoid re-searching split space if the frozen refuter
+(untrusted producer) emitted its rejection structure as a coverage certificate - per-claim
+records annotating every rejected candidate cell (rectangle-merged) plus every descend, in
+the LRAT style endorsed by docs/certificate.md:108-116?  This pilot instruments the frozen
+refuter with counters only (compile flag RADIO_COVER_PILOT in radiobase.c/radio_refute.c;
+the traversal is unchanged - tools/test_radio_refute.sh passes on the instrumented source)
+and measures what such a certificate would have to store.
+
+Record classes counted, per audited level k:
+  charged/accepted[np]  candidate cells evaluated / descended.  Every descend is one
+                        unmergeable `t` record, so accepted is a hard floor on cover size.
+  rejected[class]       cells rejected by: cap = prefix-child mass over 3^(k-1) (INFO),
+                        rb = suffix reachability, ch0/ch2/ch1 = that prefix child refuted
+                        at k-1 by theorem or frozen-trie citation, tail = options retired
+                        unevaluated by the monotone counting cut.
+  runs[class]           maximal same-class runs in enumeration order - an OPTIMISTIC proxy
+                        for merged rectangle records (ch runs may still split by citation).
+  pure subtrees         completed subtrees whose rejections are all cap/rb/tail: their
+                        validity depends only on (suffix part multiset, remaining cap
+                        triple), so equal signatures could share one library entry.
+                        Maximal pure subtrees only; duplicate signatures counted per worker
+                        (2^20-entry table per worker; saturation reported as drops).
+
+Build: tools/build_radio.py -O3 -pthread -DMAX_K=10 -DMAX_N=194 -DRADIO_COVER_PILOT
+radio_refute.c, build_id cf91592226d076105d8638799dc65227cd0b8f44fdc19593e73bb969ca343431,
+Apple clang 21.0.0, M4 Pro, built from the working tree whose instrumentation this commit
+introduces (git_source_dirty=yes in the embedded banner; performance/structure measurement,
+not proof evidence).
+
+Run 1: full Sa(113) normalized corpus (304,105 claims, v1), 12 workers
+----------------------------------------------------------------------
+Input: verifier-pipeline-2026-08-17 artifact, results/sa113-t14-naive-r1/normalized.cert.
+BATCH_DONE completed=304105/304105 verified=304105 gaps=0 prefixes=1254207128
+           wall_s=8.238 cpu_s=97.582   (pilot overhead vs the recorded 10.232 s: none visible)
+PILOT_COVER_DEADOPTS tables=893 options=213546 dead=144081
+k=6 dominates: charged 1.144e9, accepted 1.665e8 (14.6%),
+  rejected cap=3.31e8 ch0+ch2+ch1=6.47e8 tail=2.68e10 options,
+  runs cap=1.75e8 ch=4.65e8 tail=1.67e8,
+  pure subtrees: nodes 1.44e8 (12.5% of charged), dup nodes 2.5e7 (17% of pure).
+Verbatim cover for Sa(113) alone: ~1.0e9 records.
+
+Run 2: run9 k=7 level certificate, stride 500 (5,017 of 2,508,278 claims), 12 workers
+-------------------------------------------------------------------------------------
+Input: .artifacts/cert/sa193-k7.cert.zst (certificate of record).
+BATCH_DONE completed=5017/5017 verified=5017 gaps=0 prefixes=6528844773
+           wall_s=45.368 cpu_s=532.138
+PILOT_COVER_DEADOPTS tables=569 options=304647 dead=133992
+PILOT_COVER_NP k=7 np=2 charged=9858 accepted=179
+PILOT_COVER_NP k=7 np=3 charged=28627313 accepted=2162829
+PILOT_COVER_NP k=7 np=4 charged=6500207602 accepted=685780241
+PILOT_COVER_REJ  k=7 cap=2044922725 rb=30793355 ch0=1473450223 ch2=1480749050
+                 ch1=810986171 tail=310400436271
+PILOT_COVER_RUNS k=7 cap=810346725 rb=17054798 ch0=1137399011 ch2=1140734445
+                 ch1=461717114 tail=687943249
+PILOT_COVER_SKIPS k=7 deadopt=10097295284 eqperm=97959135 skiptop=681271
+PILOT_COVER_PURE k=7 maximal=580577209 nodes=987512242 dup=128585593 dup_nodes=116971435
+PILOT_COVER_SIGS workers=12 distinct_per_worker_sum=12582912 drops=439408704 (saturated)
+
+Projection to the full k=7 level (x500; sample prefix count x500 = 3.26e12, consistent with
+the recorded 3.22e12):
+  accepted `t` records:       ~3.4e11   (hard floor; 7x over the 5e10 GO line by itself)
+  rejection-run records:      ~1.8e12   (ch classes merge only ~1.3x even as runs)
+  tail-run records:           ~3.4e11
+  total verbatim cover:       ~2.5e12 records, multi-TB at any encoding
+  library (Tier-3) ceiling:   pure subtrees hold 15% of charged nodes; measured intra-worker
+                              signature duplication 12% of those (undercounted by table
+                              saturation, but bounded by the 15% regardless)
+
+Verdict: NO-GO for the coverage-certificate architecture, by ~50x against the GO threshold
+(5e10 records) and ~5x against the CONDITIONAL ceiling (5e11) with the library lever capped
+at 15%.  The run9 k=7 rejection structure is citation-dominated (58% of charged rejections
+cite the k-1 trie), prefix-dependent, and does not compress: checking must re-derive it.
+Cost of this pilot: instrumentation + two local runs totalling under 12 wall minutes.
+
+Useful positive by-products for the re-search fallback (per-prune win rates at run9 k=7):
+  monotone tail cut retires 48x the charged count unevaluated  -> cle prefix tables essential
+  per-(part,k) dead options skip 10.1e9 cells per 6.5e9 charged -> Tier-1 bitmap essential
+  rb rejects only 0.47% of charged                              -> rb can be deferred
+  equal-part quotient skips 1.5%                                 -> trivial, keep
+  refuter throughput: 12.3M charged cells/s/core on M4 Pro, 16M/s/core on c8a
+                                                                -> the parity target

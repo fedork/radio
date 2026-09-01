@@ -12855,3 +12855,35 @@ The Auto Scaling group was scaled to minimum/desired capacity zero; final worker
 launch template remain available if there is a new algorithmic or resource justification, but the
 present brute-force survey should not simply be restarted. The separate on-demand `Sa(193)` solver
 remained alive and untouched.
+
+## 2026-09-01 -- Coverage-certificate pilot: NO-GO, the run9 k=7 rejection structure does not compress
+
+Planning the cleanroom verifier (coverage-certificate + Rust checker architecture), the mandatory
+first phase was a counters-only pilot answering: if the frozen refuter emitted its rejection
+structure as an LRAT-style coverage certificate, how big would that certificate be? Compile-gated
+instrumentation (`-DRADIO_COVER_PILOT` in `radiobase.c` / `radio_refute.c`, traversal unchanged,
+`tools/test_radio_refute.sh` passes) classified every charged candidate cell in the frozen audit,
+counted same-class runs in enumeration order as an optimistic rectangle-merge proxy, and measured
+how many completed subtrees depend only on (suffix multiset, remaining cap triple) - the shareable
+"library" fraction - with per-worker signature dedup. Full record and both raw outputs' key
+sections: [evidence/cover_pilot_2026-09-01.txt](../evidence/cover_pilot_2026-09-01.txt).
+
+Two runs, both local M4 Pro, 12 workers, under 12 wall minutes total: the complete 304,105-claim
+Sa(113) corpus (8.2 s, zero gaps, pilot overhead invisible) and a stride-500 sample of the run9
+k=7 certificate of record (5,017 claims, 45.4 s, zero gaps, 6.53e9 prefixes - x500 projects to
+3.26e12, matching the recorded 3.22e12).
+
+**Verdict: NO-GO by ~50x.** Projected to full k=7: accepted descend cells alone are ~3.4e11
+unmergeable records (7x the 5e10 GO threshold on their own); rejected cells are
+citation-dominated (58% cite the k-1 trie) and merge only ~1.3x even as optimistic runs, giving
+~2.5e12 total records - multi-TB at any encoding. The library lever is capped at 15%: only 15% of
+charged nodes sit in cap/rb-pure subtrees at all, with ~12% measured intra-worker duplication.
+The endorsed "compact split-space cover" (docs/certificate.md) is therefore not compact for this
+proof: the coverage proof IS the enumeration, and anything that stores it scales with it. The
+docs/certificate.md sentence proposing it now carries this measurement as its answer.
+
+The pilot's by-products directly size the surviving fallback, a pure re-search cleanroom checker:
+per-prune win rates at run9 k=7 are tail cut 48x charged (cle tables essential), per-(part,k)
+dead options 1.55x charged (Tier-1 bitmap essential), rb only 0.47% (deferrable), equal-part
+quotient 1.5%. Parity target: the refuter runs 12.3M charged cells/s/core on M4 Pro, 16M/s/core
+on c8a. The instrumentation is kept compile-gated for future measurement.

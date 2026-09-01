@@ -108,11 +108,16 @@ records are in
 Full coloring remains deferred. The independent checker searches split space for every negative
 fact; top-down coloring decides which such searches to run but does not make them cheap. Its later
 optimized ordinary audit was stopped after confirming that repeated search still cost too much.
-The level-local solver-core refuter below is the practical baseline; a future independent
-certificate should have the solver record a compact coverage proof—ranges or subboxes of tests
-annotated with the rejecting outcome and cited lower-level fact—so the checker validates coverage
-and citations instead of reconstructing the proof by search. The readable text envelope remains
-appropriate; binary packing should remain an internal indexing choice until parsing or storage is
+The level-local solver-core refuter below is the practical baseline. The once-proposed compact
+coverage proof—ranges or subboxes of tests annotated with the rejecting outcome and cited
+lower-level fact, so a checker validates coverage instead of searching—was measured on
+2026-09-01 and is **not compact for this proof**: a stride-500 pilot of the run9 k=7 level
+projects ~3.4e11 unmergeable descend records plus ~1.8e12 citation-rejection records that merge
+only ~1.3x, with the shareable suffix-only fraction capped at 15% of nodes
+([evidence/cover_pilot_2026-09-01.txt](../evidence/cover_pilot_2026-09-01.txt)). An
+independent checker must re-derive the enumeration; making that re-derivation fast is the
+remaining route. The readable text envelope remains appropriate for the certificates we do
+ship; binary packing should remain an internal indexing choice until parsing or storage is
 measured as the bottleneck.
 
 ### Parallel checker and durable certificate prototype (2026-08-16)
@@ -259,8 +264,8 @@ former order and two failed alternatives remain selectable controls.
 These measurements justified a bounded ordinary audit of the existing run9 facts, not a return to
 coloring. Its sample verified all 9,995 facts with zero gaps in 341.32 seconds, but the partial full
 phase still repeated more work than the solver and was stopped at 251,131/2,576,885 k=7 claims.
-The replacement below is the solver-core baseline. Explicit split-space coverage remains the
-preferable independent certificate design. Full measurements and the index soundness argument are in
+The replacement below is the solver-core baseline. (Explicit split-space coverage was later
+measured non-viable; see the 2026-09-01 note above.) Full measurements and the index soundness argument are in
 [`../evidence/verifier_kd_index_2026-08-18.txt`](../evidence/verifier_kd_index_2026-08-18.txt).
 
 ### Frozen solver-core refutation (2026-08-18)
@@ -304,8 +309,8 @@ and projects 5.30 local wall hours for the four-part k7 band. Exact controls are
 The next bounded decision is a same-hardware AWS k7 gate, followed—only if its solver-cost gate
 passes—by a complete k7 replay. Per-root reachability telemetry/hints remain plausible. A global
 explicit-fact hash is deferred because no measured exact-hit case justifies paying another probe on
-every child. Explicit split-space coverage remains the route to an independently asymptotically
-cheaper checker.
+every child. (Explicit split-space coverage was later measured non-viable as that route; see the
+2026-09-01 note above and [evidence/cover_pilot_2026-09-01.txt](../evidence/cover_pilot_2026-09-01.txt).)
 
 ### Live completed-target telemetry (2026-08-17)
 

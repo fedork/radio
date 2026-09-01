@@ -2062,6 +2062,196 @@ static void rb_profile_begin(radio_reachability_state *rb, splits **tables,
 }
 #endif
 
+#ifdef RADIO_COVER_PILOT
+/* Coverage-certificate pilot (2026-09-01).  Untrusted-producer instrumentation for sizing a
+   split-space coverage certificate: if the frozen refuter emitted its rejection structure, how
+   many records would the trusted checker have to read?  Counters only; the traversal itself is
+   unchanged.  Compile only into radio_refute (needs pthread.h included first).
+
+   Per audited level k:
+     charged/accepted[np]  candidate cells evaluated / descended.  Every descend is one
+                           unmergeable `t` record, so accepted is a hard floor on cover size.
+     rejected[class]       cells rejected by: CAP prefix-child mass over 3^(k-1) (INFO),
+                           RB suffix reachability, CH0/CH2/CH1 that child refuted at k-1 by a
+                           theorem or the frozen trie, TAIL options retired unevaluated by the
+                           monotone counting cut (coverable by INFO staircase rectangles).
+     runs[class]           maximal same-class runs in enumeration order - an optimistic proxy
+                           for merged rectangle records (CH runs may still split by citation).
+     pure subtrees         completed subtrees whose rejections are all CAP/RB/TAIL: their
+                           validity depends only on (suffix part multiset, remaining cap
+                           triple), so instances with equal signatures could share one
+                           library entry.  Only maximal pure subtrees are recorded; duplicate
+                           signatures (per worker, so cross-worker reuse is undercounted)
+                           estimate the library dedup factor. */
+#define CP_NP_CAP 40
+enum { CP_CAP = 0, CP_RB, CP_CH0, CP_CH2, CP_CH1, CP_TAIL, CP_NCLASS };
+#define CP_SIG_BITS 20
+#define CP_SIG_SIZE ((size_t)1 << CP_SIG_BITS)
+#define CP_SIG_PROBES 64
+
+typedef struct { uint64_t sig; uint64_t count; } cp_sig_entry;
+typedef struct { uint64_t sig, nodes; } cp_pending;
+
+typedef struct {
+    uint64_t claims[MAX_K + 1];
+    uint64_t charged[MAX_K + 1][CP_NP_CAP + 1];
+    uint64_t accepted[MAX_K + 1][CP_NP_CAP + 1];
+    uint64_t rejected[MAX_K + 1][CP_NCLASS];
+    uint64_t runs[MAX_K + 1][CP_NCLASS];
+    uint64_t deadskip[MAX_K + 1], eqskip[MAX_K + 1], skiptop[MAX_K + 1];
+    uint64_t pure_max[MAX_K + 1], pure_max_nodes[MAX_K + 1];
+    uint64_t pure_dup[MAX_K + 1], pure_dup_nodes[MAX_K + 1];
+    uint64_t sig_drops;
+    cp_sig_entry *sigtab;
+    cp_pending *pend[CP_NP_CAP];
+    size_t pend_n[CP_NP_CAP], pend_cap[CP_NP_CAP];
+} cover_pilot;
+
+static _Thread_local cover_pilot *cp_tls;
+static cover_pilot cp_merged;
+static uint64_t cp_merged_sig_entries;
+static int cp_merged_workers;
+static pthread_mutex_t cp_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static cover_pilot *cp_get(void) {
+    if (cp_tls == NULL) {
+        cp_tls = (cover_pilot *)calloc(1, sizeof(*cp_tls));
+        if (cp_tls != NULL)
+            cp_tls->sigtab = (cp_sig_entry *)calloc(CP_SIG_SIZE, sizeof(cp_sig_entry));
+        if (cp_tls == NULL || cp_tls->sigtab == NULL) {
+            fprintf(stderr, "cover pilot: out of memory\n");
+            exit(2);
+        }
+    }
+    return cp_tls;
+}
+
+static inline uint64_t cp_mix(uint64_t h, uint64_t v) {
+    h ^= v;
+    h *= UINT64_C(1099511628211);
+    h ^= h >> 29;
+    return h;
+}
+
+/* Returns 1 when this signature was already present (a duplicate library instance). */
+static int cp_sig_insert(cover_pilot *cp, uint64_t sig) {
+    size_t idx = (size_t)(sig >> (64 - CP_SIG_BITS));
+    for (int p = 0; p < CP_SIG_PROBES; p++) {
+        cp_sig_entry *e = &cp->sigtab[(idx + (size_t)p) & (CP_SIG_SIZE - 1)];
+        if (e->count == 0) {
+            e->sig = sig;
+            e->count = 1;
+            return 0;
+        }
+        if (e->sig == sig) {
+            e->count++;
+            return 1;
+        }
+    }
+    cp->sig_drops++;
+    return 0;
+}
+
+static void cp_record_pure(cover_pilot *cp, int k, uint64_t sig, uint64_t nodes) {
+    cp->pure_max[k]++;
+    cp->pure_max_nodes[k] += nodes;
+    if (cp_sig_insert(cp, sig)) {
+        cp->pure_dup[k]++;
+        cp->pure_dup_nodes[k] += nodes;
+    }
+}
+
+static void cp_flush_pending(cover_pilot *cp, int k, int depth) {
+    for (size_t q = 0; q < cp->pend_n[depth]; q++)
+        cp_record_pure(cp, k, cp->pend[depth][q].sig, cp->pend[depth][q].nodes);
+    cp->pend_n[depth] = 0;
+}
+
+static void cp_pend_push(cover_pilot *cp, int depth, uint64_t sig, uint64_t nodes) {
+    if (cp->pend_n[depth] == cp->pend_cap[depth]) {
+        size_t next = cp->pend_cap[depth] ? cp->pend_cap[depth] * 2 : 64;
+        cp_pending *grown = (cp_pending *)realloc(cp->pend[depth], next * sizeof(*grown));
+        if (grown == NULL) {
+            fprintf(stderr, "cover pilot: out of memory\n");
+            exit(2);
+        }
+        cp->pend[depth] = grown;
+        cp->pend_cap[depth] = next;
+    }
+    cp->pend[depth][cp->pend_n[depth]].sig = sig;
+    cp->pend[depth][cp->pend_n[depth]].nodes = nodes;
+    cp->pend_n[depth]++;
+}
+
+static void radio_cover_pilot_flush(void) {
+    cover_pilot *cp = cp_tls;
+    if (cp == NULL) return;
+    pthread_mutex_lock(&cp_mu);
+    for (int k = 0; k <= MAX_K; k++) {
+        cp_merged.claims[k] += cp->claims[k];
+        for (int np = 0; np <= CP_NP_CAP; np++) {
+            cp_merged.charged[k][np] += cp->charged[k][np];
+            cp_merged.accepted[k][np] += cp->accepted[k][np];
+        }
+        for (int c = 0; c < CP_NCLASS; c++) {
+            cp_merged.rejected[k][c] += cp->rejected[k][c];
+            cp_merged.runs[k][c] += cp->runs[k][c];
+        }
+        cp_merged.deadskip[k] += cp->deadskip[k];
+        cp_merged.eqskip[k] += cp->eqskip[k];
+        cp_merged.skiptop[k] += cp->skiptop[k];
+        cp_merged.pure_max[k] += cp->pure_max[k];
+        cp_merged.pure_max_nodes[k] += cp->pure_max_nodes[k];
+        cp_merged.pure_dup[k] += cp->pure_dup[k];
+        cp_merged.pure_dup_nodes[k] += cp->pure_dup_nodes[k];
+    }
+    cp_merged.sig_drops += cp->sig_drops;
+    for (size_t q = 0; q < CP_SIG_SIZE; q++)
+        if (cp->sigtab[q].count) cp_merged_sig_entries++;
+    cp_merged_workers++;
+    pthread_mutex_unlock(&cp_mu);
+    free(cp->sigtab);
+    for (int d = 0; d < CP_NP_CAP; d++) free(cp->pend[d]);
+    free(cp);
+    cp_tls = NULL;
+}
+
+static void radio_cover_pilot_report(void) {
+    static const char *cls_name[CP_NCLASS] = {"cap", "rb", "ch0", "ch2", "ch1", "tail"};
+    for (int k = 1; k <= MAX_K; k++) {
+        if (cp_merged.claims[k] == 0) continue;
+        printf("PILOT_COVER k=%d claims=%llu\n", k,
+               (unsigned long long)cp_merged.claims[k]);
+        for (int np = 1; np <= CP_NP_CAP; np++) {
+            if (cp_merged.charged[k][np] == 0 && cp_merged.accepted[k][np] == 0) continue;
+            printf("PILOT_COVER_NP k=%d np=%d charged=%llu accepted=%llu\n", k, np,
+                   (unsigned long long)cp_merged.charged[k][np],
+                   (unsigned long long)cp_merged.accepted[k][np]);
+        }
+        printf("PILOT_COVER_REJ k=%d", k);
+        for (int c = 0; c < CP_NCLASS; c++)
+            printf(" %s=%llu", cls_name[c], (unsigned long long)cp_merged.rejected[k][c]);
+        putchar('\n');
+        printf("PILOT_COVER_RUNS k=%d", k);
+        for (int c = 0; c < CP_NCLASS; c++)
+            printf(" %s=%llu", cls_name[c], (unsigned long long)cp_merged.runs[k][c]);
+        putchar('\n');
+        printf("PILOT_COVER_SKIPS k=%d deadopt=%llu eqperm=%llu skiptop=%llu\n", k,
+               (unsigned long long)cp_merged.deadskip[k],
+               (unsigned long long)cp_merged.eqskip[k],
+               (unsigned long long)cp_merged.skiptop[k]);
+        printf("PILOT_COVER_PURE k=%d maximal=%llu nodes=%llu dup=%llu dup_nodes=%llu\n", k,
+               (unsigned long long)cp_merged.pure_max[k],
+               (unsigned long long)cp_merged.pure_max_nodes[k],
+               (unsigned long long)cp_merged.pure_dup[k],
+               (unsigned long long)cp_merged.pure_dup_nodes[k]);
+    }
+    printf("PILOT_COVER_SIGS workers=%d distinct_per_worker_sum=%llu drops=%llu\n",
+           cp_merged_workers, (unsigned long long)cp_merged_sig_entries,
+           (unsigned long long)cp_merged.sig_drops);
+}
+#endif /* RADIO_COVER_PILOT */
+
 int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                   uint64_t parent_deadline){
     int frozen_refute = parent_deadline == FROZEN_REFUTE;
@@ -2185,7 +2375,16 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
     int spi, spi2;
     
     int sb0p[size],sb2p[size],sb1p[size];
-    
+
+#ifdef RADIO_COVER_PILOT
+    cover_pilot *cp = NULL;
+    int cp_run_class[size];
+    unsigned char cp_pure[size];
+    uint64_t cp_nodes[size];
+    uint64_t cp_sigs[size];
+    if (frozen_refute && size <= CP_NP_CAP) cp = cp_get();
+#endif
+
     memset(splitsarr, 0, sizeof(splitsarr));
     /* Search is depth first.  Building every suffix table here made a large-k state pay for
        many parts it never reached.  Materialise the first table now and each suffix only when
@@ -2325,9 +2524,49 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
         i = 0;
         sb1[0] = -1; // to prevent skipping first due to skiptop
         int ck0,ck1,ck2;
+
+#ifdef RADIO_COVER_PILOT
+        if (cp != NULL) {
+            uint64_t h = UINT64_C(1469598103934665603);
+            cp->claims[k]++;
+            cp_run_class[0] = -1;
+            cp_pure[0] = 1;
+            cp_nodes[0] = 0;
+            cp->pend_n[0] = 0;
+            h = cp_mix(h, (uint64_t)k);
+            h = cp_mix(h, (uint64_t)size);
+            for (int z = 0; z < size; z++) h = cp_mix(h, (uint64_t)tmp[z]);
+            h = cp_mix(h, (uint64_t)max_pairs_1);
+            h = cp_mix(h, (uint64_t)max_pairs_1);
+            h = cp_mix(h, (uint64_t)max_pairs_1);
+            cp_sigs[0] = h;
+        }
+#endif
         
         while(cont) {
             while(splitindex[i] == 0) {
+#ifdef RADIO_COVER_PILOT
+                /* The depth-i subtree just completed.  Fold its node count and purity into the
+                   parent; a pure subtree whose parent is already impure is a maximal library
+                   candidate, one whose parent is still pure stays pending (subsumed if the
+                   parent itself ends pure). */
+                if (cp != NULL) {
+                    if (i > 0) {
+                        cp_nodes[i-1] += cp_nodes[i];
+                        if (cp_pure[i]) {
+                            if (cp_pure[i-1]) cp_pend_push(cp, i - 1, cp_sigs[i], cp_nodes[i]);
+                            else cp_record_pure(cp, k, cp_sigs[i], cp_nodes[i]);
+                        } else if (cp_pure[i-1]) {
+                            cp_pure[i-1] = 0;
+                            cp_flush_pending(cp, k, i - 1);
+                        }
+                        cp->pend_n[i] = 0;
+                    } else {
+                        if (cp_pure[0]) cp_record_pure(cp, k, cp_sigs[0], cp_nodes[0]);
+                        cp->pend_n[0] = 0;
+                    }
+                }
+#endif
                 //                if (splitindex[i] > 0) skipped_some = 1;
                 if (i==0) {
                     // can't solve
@@ -2375,6 +2614,9 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                 int spi2_1 = ordp[i-1][ords[i-1] * spi_1];
                 if (spi2 > spi2_1) {
                     debug_printf("skip permutations\n");
+#ifdef RADIO_COVER_PILOT
+                    if (cp != NULL) cp->eqskip[k]++;
+#endif
                     continue;
                 }
             }
@@ -2390,7 +2632,15 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                 if (ordmono[i] == 0)      pm = sb_pairs[s[0]] + (i>0?sb0p[i-1]:0);
                 else if (ordmono[i] == 1) pm = sb_pairs[s[1]] + sb_pairs[s[2]] + (i>0?sb1p[i-1]:0);
                 else                      pm = sb_pairs[s[3]] + (i>0?sb2p[i-1]:0);
-                if (pm > max_pairs_1) { splitindex[i] = 0; continue; }
+                if (pm > max_pairs_1) {
+#ifdef RADIO_COVER_PILOT
+                    if (cp != NULL) {
+                        cp->rejected[k][CP_TAIL] += (uint64_t)spi + 1;
+                        cp->runs[k][CP_TAIL]++;
+                        cp_run_class[i] = -1;
+                    }
+#endif
+                    splitindex[i] = 0; continue; }
             }
 
             /* Frozen refute tables have this one-part viability frontier prepared serially before
@@ -2414,6 +2664,9 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
             }
             if (s[5]>=k) {
                 debug_printf("skipping for split solvablility %s -> [%d, %d], s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
+#ifdef RADIO_COVER_PILOT
+                if (cp != NULL) cp->deadskip[k]++;
+#endif
             } else {
                 debug_printf("split solvablility ok %s -> [%d, %d], s[4]=%d s[5]=%d\n", sbb_to_str[tmp[i]], s[6], s[7], s[4], s[5]);
                 if (i==0 &&
@@ -2424,6 +2677,9 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                 {
                     skiptop++;
                     debug_printf("skiptop\n");
+#ifdef RADIO_COVER_PILOT
+                    if (cp != NULL) cp->skiptop[k]++;
+#endif
                 } else if (fast_solve
                            && (i<size_1)
                            && !s[FAST]
@@ -2432,6 +2688,12 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                     skipped_some = 1;
                 } else {
                     totalsplits++;
+#ifdef RADIO_COVER_PILOT
+                    if (cp != NULL) {
+                        cp->charged[k][size]++;
+                        cp_nodes[i]++;
+                    }
+#endif
                     radio_budget_charge_split_ctx(ctx);
                     /* Accepted prefixes can be extremely sparse in information-tight long states.
                        The deterministic clock is checked at every charged prefix.  The historical
@@ -2483,6 +2745,9 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                     int p2 = sb2p[i] = sb_pairs[sb2[i] = s[3]] + (i>0?sb2p[i-1]:0);
                     
                     int cs0, cs1, cs2;
+#ifdef RADIO_COVER_PILOT
+                    cs0 = cs1 = cs2 = -1; /* sentinel: not evaluated (short-circuit) */
+#endif
                     int within_cap = p0 <= max_pairs_1 && p1 <= max_pairs_1 && p2 <= max_pairs_1;
                     int rb_rejected = 0;
                     
@@ -2681,13 +2946,55 @@ int canSolveB_ctx(radio_search_context *ctx, int *sb, int size, int k,
                                 }
                             }
                             HOIST_ORDER(i);
+#ifdef RADIO_COVER_PILOT
+                            /* Descend: one unmergeable `t` record; open the depth-i subtree.
+                               Its library signature is (suffix part multiset, remaining cap
+                               triple) - the only inputs a CAP/RB/TAIL-pure subtree depends on. */
+                            if (cp != NULL) {
+                                uint64_t h = UINT64_C(1469598103934665603);
+                                cp->accepted[k][size]++;
+                                cp_run_class[i-1] = -1;
+                                cp_run_class[i] = -1;
+                                cp_pure[i] = 1;
+                                cp_nodes[i] = 0;
+                                cp->pend_n[i] = 0;
+                                h = cp_mix(h, (uint64_t)k);
+                                h = cp_mix(h, (uint64_t)(size - i));
+                                for (int z = i; z < size; z++) h = cp_mix(h, (uint64_t)tmp[z]);
+                                h = cp_mix(h, (uint64_t)(max_pairs_1 - p0));
+                                h = cp_mix(h, (uint64_t)(max_pairs_1 - p1));
+                                h = cp_mix(h, (uint64_t)(max_pairs_1 - p2));
+                                cp_sigs[i] = h;
+                            }
+#endif
                         }
                     }
+#ifdef RADIO_COVER_PILOT
+                    else if (cp != NULL) {
+                        /* Rejected candidate cell: classify by the check that killed it, in
+                           evaluation order.  CH* means that prefix child is refuted at k-1 by a
+                           theorem or a frozen-trie citation - prefix-dependent, so it breaks
+                           library purity.  CAP/RB depend only on masses and the suffix. */
+                        int cls = !within_cap ? CP_CAP
+                                : rb_rejected ? CP_RB
+                                : cs0 == FALSE ? CP_CH0
+                                : cs2 == FALSE ? CP_CH2 : CP_CH1;
+                        cp->rejected[k][cls]++;
+                        if (cls != cp_run_class[i]) {
+                            cp->runs[k][cls]++;
+                            cp_run_class[i] = cls;
+                        }
+                        if (cls >= CP_CH0 && cp_pure[i]) {
+                            cp_pure[i] = 0;
+                            cp_flush_pending(cp, k, i);
+                        }
+                    }
+#endif
                 }
             }
         }
     }
-    
+
     if (frozen_refute) {
         if (rb_here) rb_release_mode(rb, frozen_refute);
         if (!canSolve && !skipped_some) ctx->cant_solve_count++;

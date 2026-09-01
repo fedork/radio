@@ -947,9 +947,11 @@ Disposition and next design work:
    zero gaps, their manifests and release round trips were verified, and their hosts were
    terminated. A compact global exact hash remains deferred: neither the 34.7%
    theorem profile nor solver order demonstrates enough first-touch exact hits to justify another
-   lookup. Separately make the solver emit split-space coverage if an independently cheap verifier
-   is required: compact ranges/subboxes annotated with the outcome and exact lower-fact/theorem
-   citation, so checking scales with the cover instead of rediscovering it.
+   lookup. The split-space coverage idea (solver emits ranges/subboxes with citations so checking
+   scales with the cover) was measured on 2026-09-01 and rejected: the run9 k=7 cover projects to
+   ~2.5e12 records because the rejection structure is citation-dominated and does not merge; see
+   [evidence/cover_pilot_2026-09-01.txt](../evidence/cover_pilot_2026-09-01.txt). An
+   independently cheap verifier has to re-derive the enumeration efficiently instead.
 
 The first parallel-solver prerequisite is delivered. `canSolveB_ctx` carries one explicit search
 context through the complete recursive tree; its deterministic work clock, exact L1 and joint

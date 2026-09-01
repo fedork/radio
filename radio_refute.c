@@ -863,6 +863,12 @@ static void load_level_support_cache(void) {
    split.  TRUE and MAYBE both leave it in the exhaustive traversal.  Checking all three outcomes
    also finds a negative after an earlier MAYBE instead of inheriting the solver's incremental
    short-circuit. */
+#ifdef RADIO_COVER_PILOT
+/* Pilot: number of citation-dead options marked at freeze time = the Tier-1 shared
+   dead-option dictionary a coverage certificate would carry for this run. */
+static size_t pilot_dead_options;
+#endif
+
 static size_t freeze_one_table(radio_search_context *ctx, int sbb, int k) {
     splits *sp = ensure_splits(sbb, k);
     for (int c = 0; c < sp->size; c++) {
@@ -871,7 +877,12 @@ static size_t freeze_one_table(radio_search_context *ctx, int sbb, int k) {
         int v0 = canSolveB_ctx(ctx, s, 1, child_k, CACHE_ONLY);
         int v2 = canSolveB_ctx(ctx, s + 3, 1, child_k, CACHE_ONLY);
         int v1 = canSolveB_ctx(ctx, s + 1, 2, child_k, CACHE_ONLY);
-        if (v0 == FALSE || v1 == FALSE || v2 == FALSE) s[5] = k;
+        if (v0 == FALSE || v1 == FALSE || v2 == FALSE) {
+            s[5] = k;
+#ifdef RADIO_COVER_PILOT
+            pilot_dead_options++;
+#endif
+        }
     }
     return (size_t)sp->size;
 }
@@ -977,6 +988,9 @@ static void *verify_worker(void *vp) {
     }
 #ifdef RADIO_REFUTE_ENABLE_COLORING
     a->citation_hits = ctx.cache_citation_hits;
+#endif
+#ifdef RADIO_COVER_PILOT
+    radio_cover_pilot_flush();
 #endif
     radio_search_context_destroy(&ctx);
     return NULL;
@@ -1328,6 +1342,10 @@ int main(int argc, char **argv) {
     free(needed);
     printf("FREEZE_DONE tables=%zu options=%zu wall_s=%.3f\n",
            tables, options, monotonic_seconds() - freeze_start);
+#ifdef RADIO_COVER_PILOT
+    printf("PILOT_COVER_DEADOPTS tables=%zu options=%zu dead=%zu\n",
+           tables, options, pilot_dead_options);
+#endif
     split_checksum_before = frozen_split_checksum();
     printf("FROZEN_EPOCH cache_branches=%lld cache_fronts=%lld split_checksum=%016llx\n",
            frozen_cache_branches, frozen_cache_fronts,
@@ -1423,6 +1441,9 @@ int main(int argc, char **argv) {
     printf("TOTAL verified %zu, gaps %zu, prefixes %llu\n",
            atomic_load(&b.verified), atomic_load(&b.gaps),
            (unsigned long long)atomic_load(&b.prefixes));
+#ifdef RADIO_COVER_PILOT
+    radio_cover_pilot_report();
+#endif
 #ifdef RADIO_REFUTE_ENABLE_COLORING
     if (atomic_load(&b.gaps) == 0) {
         unsigned long long citation_hits = prep_citation_hits;
