@@ -32,6 +32,9 @@ rg -q '^INTEGRATED_CHECKPOINT start=16 end=17 queries=1 solvable=1 unsolvable=0 
     "$tmp_dir/integrated-k3.log"
 [[ "$(rg -c '^INTEGRATED_CHECKPOINT ' "$tmp_dir/integrated-k3.log")" == 3 ]]
 tools/check_provenance.py "$tmp_dir/integrated-k3.log"
+awk '{ print } /^INTEGRATED_CHECKPOINT start=10 end=13 / { exit }' \
+    "$tmp_dir/integrated-k3.log" > "$tmp_dir/checkpoint-prefix-k3.log"
+tools/check_provenance.py "$tmp_dir/checkpoint-prefix-k3.log"
 
 tools/build_radio.py -O3 -DMAX_K=6 -DMAX_N=793 -DMAX_PART_N=65 \
     -DRADIO_CACHE_DISABLED_LEVEL=6 \
