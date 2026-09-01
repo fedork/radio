@@ -35,3 +35,6 @@ __pycache__/
 # itself, and now the reproducibility source for weights embedded in radiobase.c. Committed
 # 2026-08-24 rather than left as a /tmp artifact, same reasoning as the evidence/*.txt rule above.
 !data/ml_order/*.txt
+
+# Rust build artifacts for the cleanroom verifier (tools/cleanroom); sources and lockfile are tracked.
+tools/cleanroom/target/

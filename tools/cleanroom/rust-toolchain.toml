@@ -1,0 +1,3 @@
+[toolchain]
+# Pinned for provenance: the checker of record must name its exact compiler.
+channel = "1.98.0"

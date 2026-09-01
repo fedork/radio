@@ -1,0 +1,13 @@
+[package]
+name = "radio_cleanroom"
+version = "0.1.0"
+edition = "2021"
+description = "Cleanroom verifier for radio negative certificates: no solver code, no dependencies."
+
+# Deliberately empty. The trust base is this crate and the Rust standard library, nothing else.
+[dependencies]
+
+[profile.release]
+debug = true
+lto = true
+codegen-units = 1
