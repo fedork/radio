@@ -12673,9 +12673,9 @@ and `tools/singleton_k6_main_solver_survey.sh` builds the ranker plus a correctl
 oracle under a one-hour/8-GiB cap. The clean committed distance-14 window at offset 5,000,000,000
 classified 10,000 states as 10,000 SOLVABLE, zero UNSOLVABLE, zero MAYBE in 1.709 solver CPU
 seconds. It also reproduced canonical `G_6` as positive, `j=13` as positive in 2.9 ms, and padded
-`j=14` as negative in 5.0 ms. The production solver is therefore suitable for targeted windows and
-independent candidate validation, but not for the complete 9,960,648,265-state shell; exhaustive
-discovery should remain with the hundreds-of-times-faster specialized Hall census. Full commands,
+`j=14` as negative in 5.0 ms. This initially established targeted validation; Fedor subsequently
+chose to spend the larger cost on a full implementation-independent shell check, while the
+hundreds-of-times-faster specialized Hall census remains the discovery engine. Full commands,
 scope and hashes are in
 `evidence/singleton_k6_main_solver_survey_2026-08-31.md`.
 
@@ -12695,7 +12695,7 @@ an early negative control.
 At Fedor's request the full 9,960,648,265-state distance-14 shell started at 2026-08-31 23:55:45 UTC
 on the existing on-demand `r7iz.xlarge` Sa host. The production oracle is pinned to logical CPU 0,
 leaving Sa on the other physical core; both were independently observed at about 100% of one CPU.
-There is no search or overall time deadline. Ten-million-rank stages upload exception-only logs and
+There is no search or overall time deadline. Ranked stages upload exception-only logs and
 advance a durable S3 checkpoint only after an exact query-count and zero-`MAYBE` check. The prefix
 is `run10/k6-main-survey` and the status helper is `tools/singleton_k6_survey_status.sh`.
 
@@ -12714,3 +12714,18 @@ initial 8-GiB address-space guard, so at this clean checkpoint the next stage wa
 16-GiB address-space limit and 20-GiB cgroup limit. A short, just-started second-stage attempt was
 discarded; no completed work, checkpoint or retained verdict was lost. Live readback confirmed the
 new limits while both the census and Sa continued on their assigned cores.
+
+The next ten-million-rank attempt made the old heartbeat's weakness concrete: it displayed only the
+durable boundary and raw KiB, including a misleading 4,316-KiB sample caught during process startup.
+The live oracle was actually at 4.56 GiB five minutes later. More importantly, this rank band had
+reached 6.5 GiB after only about two million emitted states. Rather than risk a late abort, the
+incomplete stage was discarded and restarted from rank 10,000,000 with three-million-rank
+checkpoints. This loses no retained verdict and does not limit any query.
+
+Commit `b62616e` adds an atomic ranker progress file every 100,000 emitted states and a one-minute
+heartbeat with stage/overall percentages, current rate, stage/full ETAs, GiB RSS and the VM limit.
+The transfer-shell regression checks the final progress count. The update was provenance-built on
+AWS and deployed immediately; its first heartbeat read 300,000 / 3,000,000 (10.00%), 4,918
+states/s, 9m09s stage ETA, 0.103% overall, 23d10h full ETA at the current band's rate, and 1.76 GiB
+RSS. The full ETA is deliberately labelled as a current-stage projection because both difficulty
+and cache growth vary across the ranked shell.

@@ -593,7 +593,10 @@ deterministic transfer-shell window, and its oracle runs with level 6 disabled u
 
 For the full AWS distance-14 census, `tools/singleton_k6_survey_remote.sh` processes durable rank
 stages with budget zero and advances `NEXT_RANK` only after exact-count/zero-`MAYBE` validation and
-upload. `tools/singleton_k6_survey_status.sh [--watch]` reads the S3 heartbeat. The two
+upload. The ranker atomically records emitted progress every 100,000 states; the runner's minute
+heartbeat derives stage/overall percentages, current rate, stage/full ETAs and human-readable RSS.
+The full ETA is labelled as a current-stage-rate projection because difficulty varies by rank band.
+`tools/singleton_k6_survey_status.sh [--watch]` reads the S3 heartbeat. The two
 `aws_shared_job_shutdown_*` scripts are the narrowly scoped lifecycle guard used when this census
 shares the `Sa(193)` host.
 

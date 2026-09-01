@@ -87,9 +87,10 @@ At Fedor's request, the production solver started an unlimited-budget census of 
 CPU 0 while `Sa(193)` occupies the other physical core.  Each query uses budget zero: there is no
 search or wall-clock deadline.  Resource exhaustion is an abort, never a verdict.
 
-The run is divided into deterministic 10,000,000-rank stages.  Only a successfully completed stage
-with its exact query count and zero `MAYBE` advances `NEXT_RANK`; its provenance-bearing exception
-log is uploaded before the checkpoint.  Thus interruption loses at most the active stage.  The
+The first stage used 10,000,000 ranks; subsequent stages use deterministic 3,000,000-rank windows.
+Only a successfully completed stage with its exact query count and zero `MAYBE` advances
+`NEXT_RANK`; its provenance-bearing exception log is uploaded before the checkpoint.  Thus
+interruption loses at most the active stage.  The
 durable prefix is
 `s3://radio-sa193-393287594714/run10/k6-main-survey/`, and
 `tools/singleton_k6_survey_status.sh [--watch]` displays its heartbeat.
@@ -108,6 +109,25 @@ subsequent stages run with 16-GiB address space and a 20-GiB cgroup ceiling.  Th
 the durable 10,000,000 checkpoint; a just-started second-stage process was replaced, but no
 completed stage or retained verdict was lost.  The new process's live limits were read back as
 17,179,869,184 and 21,474,836,480 bytes respectively.
+
+The first attempt at ranks 10,000,000 through 19,999,999 exposed much faster child-cache growth
+than the first rank band: after roughly two million emitted queries it was already at 6.5 GiB RSS.
+It was deliberately stopped without a verdict or checkpoint and restarted from the durable
+10,000,000 boundary in 3,000,000-rank stages.  This is checkpoint sizing, not a search cutoff; each
+query remains unlimited.
+
+The replacement runner writes an atomic emitted-query counter every 100,000 states and uploads a
+heartbeat every minute.  Status now gives exact rank counts to that granularity, stage and overall
+percentages, current throughput, stage ETA, full ETA at the current stage's rate, human-readable
+RSS, and the VM ceiling.  Its first live heartbeat showed 300,000 / 3,000,000 (10.00%), 4,918
+states/s, a 9m09s stage ETA, 0.103% overall and a 23d10h full ETA; the latter is explicitly a
+changing-band projection, not a promised completion date.
+
+The progress update is commit `b62616edf382dfad5e24bb74737cd51d70665604`; its source bundle has
+SHA-256 `b0c44b8eca35715157afd573e78462c21f1f5339f7c26baf3e50c12be71f0121`.
+The AWS ranker build ID is
+`f13f247618cc82cc98f2d1755e40fdd45a2c9c1571af7c6606a5f424e4f4bd7d` and the rebuilt oracle ID is
+`e8386449693d83ba7a117ee0fc152e6ccae85b25e56f57838fc34c758ffa66d2`.
 
 The source bundle is commit `30021dd1eb30145264651e0bc374f6270b7ac07b`, SHA-256
 `eccc0d00ca3cbd0d0c10226ce4cf279242b283e796d5813003ded533f7d292c5`.  The AWS ranker build ID is

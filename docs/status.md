@@ -138,13 +138,15 @@ adopting the research Hall algorithm. Survey builds disable cache lookup/retenti
 6—distinct full-mass, exact-support parents cannot dominate one another—but retain the valuable
 `K<=5` child cache. Locally, the first million distance-14 parents returned 999,999 exact positives,
 the known rank-55,096 hole, and zero `MAYBE` in 95.720 solver CPU seconds. An unlimited-budget,
-restartable census of all 9,960,648,265 shell states is now live on AWS in 10-million-state stages,
+restartable census of all 9,960,648,265 shell states is now live on AWS,
 sharing the `Sa(193)` host but pinned to its other physical core. This is an implementation-
 independent exhaustive check, not a replacement for the much faster Hall discovery engine. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 Its first 10,000,000-state stage has completed with 9,999,999 positives, exactly the known hole,
 and zero `MAYBE`; the provenance-checked log and checkpoint are durable in S3. Subsequent stages
-use 16/20-GiB process/cgroup limits after the first stage showed that 8 GiB was unnecessarily tight.
+use three-million-rank checkpoints and 16/20-GiB process/cgroup limits. The minute heartbeat now
+shows exact in-stage counts to 100,000 states, stage/overall percentages, throughput, ETAs and
+human-readable memory; the full ETA is a current-band projection and will vary.
 
 The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the

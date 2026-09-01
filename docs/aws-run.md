@@ -114,7 +114,10 @@ stages and checkpoint live at
 currently using the other physical core. Each singleton query has no deadline. The first
 10,000,000-state stage completed with exactly the known hole and zero `MAYBE`; after it approached
 its original 8-GiB address-space guard, subsequent stages use 16-GiB address-space and 20-GiB
-cgroup ceilings. Memory exhaustion remains an explicit abort. The host's
+cgroup ceilings. A later ten-million-rank window reached 6.5 GiB after only about two million
+emitted states, so it was abandoned without a checkpoint and replaced by three-million-rank
+stages. The minute heartbeat reports exact in-stage counts to 100,000, percentages, rate, ETAs and
+GiB-scale memory. Memory exhaustion remains an explicit abort. The host's
 cloud-init normally shuts down after Sa; `/usr/local/bin/shutdown` now defers only that final action
 while the census service is active, and `radio-shared-shutdown.service` stops the host once both
 jobs have ended. Lifecycle scripts are retained in the same S3 prefix and in `tools/`.
