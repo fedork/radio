@@ -56,9 +56,12 @@ valid_sha "$SOURCE_SHA256" || usage
 mkdir -p "$WORK"
 cd "$WORK"
 
-upload() { aws s3 cp "$1" "s3://$BUCKET/$PREFIX/$2" --no-progress || true; }
+# Absolute paths throughout: the build and gate stages cd into the crate directory, and a
+# relative stages.log there would create a second file and clobber the uploaded one (run
+# 20260902T004213Z lost its GATES line that way - cosmetic, but confusing to watch).
+upload() { aws s3 cp "$WORK/$1" "s3://$BUCKET/$PREFIX/$2" --no-progress || true; }
 stage() {
-    printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" | tee -a stages.log
+    printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" | tee -a "$WORK/stages.log"
     upload stages.log stages.log
 }
 fail() {
@@ -74,9 +77,9 @@ trap 'fail "unexpected error at line $LINENO"' ERR
 # would fault inside the handler itself.
 FINISHED=0
 trap 'rc=$?; if (( rc )) && (( ! FINISHED )); then
-        printf "%s ABORTED rc=%d\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> stages.log
-        aws s3 cp stages.log "s3://$BUCKET/$PREFIX/stages.log" --no-progress || true
-        aws s3 cp run.log "s3://$BUCKET/$PREFIX/run.log" --no-progress || true
+        printf "%s ABORTED rc=%d\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> "$WORK/stages.log"
+        aws s3 cp "$WORK/stages.log" "s3://$BUCKET/$PREFIX/stages.log" --no-progress || true
+        aws s3 cp "$WORK/run.log" "s3://$BUCKET/$PREFIX/run.log" --no-progress || true
         shutdown -h +2 || true
       fi' EXIT
 
@@ -115,9 +118,9 @@ grep -q 'SELFTEST PASSED' "$WORK/selftest.out" || fail "selftest output"
 if "$binary" audit "$SOURCE_DIR/tools/testdata/radio_refute_gap_v1.cert" \
     > "$WORK/fixture-gap.out" 2>&1; then fail "gap fixture did not fail closed"; fi
 cd "$WORK"
-"$binary" audit --threads "$threads" --stride 5000 sa193-k7.cert > smoke.out 2>&1 \
+"$binary" audit --threads "$threads" --stride 5000 sa193-k7.cert > "$WORK/smoke.out" 2>&1 \
     || fail "k7 smoke"
-grep -q ', gaps 0,' smoke.out || fail "k7 smoke gaps"
+grep -q ', gaps 0,' "$WORK/smoke.out" || fail "k7 smoke gaps"
 upload smoke.out smoke.out
 upload selftest.out selftest.out
 
