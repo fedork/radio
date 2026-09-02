@@ -1,0 +1,177 @@
+# radio-negative-level-certificate-v2 test fixture for tools/test_cleanroom.sh.
+# Verbatim level 3 of the sa193 certificate of record (artifact sa193-certificate-2026-08-19,
+# sa193-k3.cert.zst). 127 claims over 2 support facts; the support is load-bearing - dropping
+# it leaves 88 of the 127 claims unverifiable, which is what the mutation tests rely on.
+radio-negative-level-certificate-v2
+level 3
+parts 19
+part 1 2:1
+part 2 3:1
+part 3 2:2
+part 4 4:1
+part 5 5:1
+part 6 3:2
+part 7 6:1
+part 8 7:1
+part 9 4:2
+part 10 8:1
+part 11 3:3
+part 12 5:2
+part 13 4:3
+part 14 6:2
+part 15 7:2
+part 16 5:3
+part 17 4:4
+part 18 6:3
+part 19 5:4
+support 2 2 4
+fact 3 3
+fact 4 3
+split-hints 19
+split 3 uses 105
+split 11 uses 52
+split 7 uses 46
+split 5 uses 38
+split 8 uses 37
+split 4 uses 32
+split 10 uses 26
+split 2 uses 24
+split 6 uses 23
+split 9 uses 19
+split 1 uses 17
+split 13 uses 17
+split 17 uses 14
+split 12 uses 10
+split 14 uses 7
+split 16 uses 7
+split 15 uses 5
+split 18 uses 1
+split 19 uses 1
+claims 3 127 481
+claim 19
+claim 18
+claim 13 13
+claim 17 9
+claim 17 11
+claim 16 11
+claim 14 11
+claim 17 7
+claim 14 12
+claim 14 8
+claim 15 6
+claim 16 8
+claim 12 10
+claim 13 10
+claim 11 11 11
+claim 17 3 3
+claim 17 4 4
+claim 13 11 3
+claim 13 11 4
+claim 11 11 9
+claim 17 6 4
+claim 17 5 2
+claim 16 5 4
+claim 13 9 5
+claim 17 5 3
+claim 13 12 2
+claim 13 12 3
+claim 11 11 7
+claim 16 7 2
+claim 13 7 7
+claim 14 9 3
+claim 14 7 6
+claim 12 11 7
+claim 16 7 3
+claim 11 8 7
+claim 9 8 8
+claim 13 8 3
+claim 12 8 7
+claim 15 5 3
+claim 11 9 8
+claim 13 8 5
+claim 10 8 6
+claim 11 10 5
+claim 10 9 7
+claim 11 10 6
+claim 10 9 9
+claim 11 11 3 3
+claim 11 11 4 4
+claim 17 4 2 2
+claim 11 9 9 1
+claim 13 11 2 2
+claim 13 9 3 2
+claim 17 6 2 1
+claim 17 4 3 2
+claim 11 11 5 2
+claim 11 9 5 4
+claim 13 5 5 3
+claim 12 11 5 1
+claim 11 11 5 3
+claim 13 6 5 3
+claim 12 11 3 3
+claim 12 11 4 3
+claim 16 3 3 3
+claim 16 4 3 3
+claim 7 7 7 6
+claim 11 7 5 5
+claim 11 7 7 3
+claim 11 7 7 4
+claim 11 9 7 2
+claim 13 7 3 3
+claim 13 7 4 3
+claim 11 7 6 5
+claim 14 7 3 3
+claim 11 7 6 6
+claim 11 9 7 3
+claim 8 7 7 3
+claim 8 8 5 3
+claim 8 7 6 5
+claim 8 8 6 4
+claim 11 8 5 3
+claim 11 8 5 4
+claim 12 8 3 3
+claim 9 8 7 3
+claim 11 8 6 3
+claim 11 8 6 4
+claim 15 3 3 3
+claim 15 4 3 3
+claim 10 7 5 3
+claim 10 8 3 3
+claim 10 8 4 3
+claim 10 9 3 3
+claim 10 6 5 5
+claim 10 7 6 4
+claim 11 10 3 3
+claim 11 10 4 3
+claim 11 10 4 4
+claim 10 9 5 3
+claim 10 6 6 6
+claim 17 2 2 2 1
+claim 17 4 2 1 1
+claim 17 5 1 1 1
+claim 11 5 5 4 3
+claim 7 7 7 3 3
+claim 11 7 3 3 3
+claim 11 7 4 4 3
+claim 11 7 5 3 2
+claim 14 5 3 3 1
+claim 8 7 5 3 3
+claim 8 8 3 3 3
+claim 8 8 4 3 3
+claim 11 8 3 3 2
+claim 11 8 4 3 2
+claim 9 8 3 3 3
+claim 8 7 6 3 3
+claim 15 3 3 2 1
+claim 10 6 3 3 3
+claim 10 5 5 3 3
+claim 10 7 3 3 3
+claim 10 7 4 3 3
+claim 11 10 3 2 2
+claim 10 6 5 3 3
+claim 7 7 5 3 3 1
+claim 8 5 5 3 3 1
+claim 8 7 4 3 3 1
+claim 8 8 3 3 2 1
+claim 10 5 4 3 3 1
+claim 10 7 3 3 2 1
