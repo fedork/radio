@@ -62,7 +62,13 @@ tools/cleanroom_k7_ec2_launch.sh                                  # k=7, one ded
 It reads both `radio-negative-level-certificate-v2` and flat `radio-negative-certificate-v1`, and
 fails closed: a claim whose split space is not covered prints `GAP verdict=uncovered` with the
 witnessing take vector, and a claim that is solvable outright prints `GAP verdict=contradicted`.
-Exit 1 on any gap. It is not built by `tools/build_radio.py`, so `tools/run_with_provenance.py`
+Exit 1 on any gap. Note the verdict vocabularies are not identical: the checker carries no
+positive rules beyond Unit-Group Elimination, so where the refuter proves a claim false outright
+(it has the unconditional `[embedded G_k]` terminal) and says `contradicted`, the checker usually
+just fails to cover the split space and says `uncovered`. Both refuse; the refuter is the more
+diagnostic of the two. Cross-checked on a deliberately corrupted level 5 - the certificate of
+record with a solvable `Sb(2:1)` claim injected - where both reject and both still verify the
+80,634 genuine claims. It is not built by `tools/build_radio.py`, so `tools/run_with_provenance.py`
 does not apply; the two wrappers above emit an equivalent `radio-cleanroom-provenance-v1` header
 (commit, source dirtiness, binary hash, toolchain, host, input hashes, exact command).
 
