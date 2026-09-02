@@ -1,5 +1,15 @@
 # Publication-claim inventory
 
+**Status 2026-09-02.** The reproduction package is built and self-testing:
+`tools/make_repro_package.sh` produces a 15.7 MB tarball (certificate, both independent
+checkers, both witnesses, evidence) that was extracted to a clean directory and exercised
+end to end - manifest verified, witness verified unconditionally, chain structure verified,
+the Rust checker built from source in 7 s with no dependencies, its selftest passed, and the
+cheap levels audited with zero gaps. What remains before submission is not engineering:
+**(a)** the novelty audit below, still not done, and **(b)** depositing the package publicly
+with a DOI, since `fedork/radio-data` is private and every artifact link in this repo 404s
+for a referee.
+
 This is a deliberately conservative inventory for a prospective paper. A candidate claim is
 listed here because it has a proof object or a retained computational record; that is not by
 itself a claim of priority. Before submission, each item needs a focused prior-art check and the
