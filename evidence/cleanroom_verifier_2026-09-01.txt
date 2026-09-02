@@ -23,8 +23,45 @@ non-decreasing option index), SYM-S (square-part shore swap, an option-domain re
 and SYM-C (one whole-vector complement rule); the composition argument is in audit.rs and the
 regression for it is the exhaustive selftest below.
 
-Complete chain, run 20260902T045843Z
-------------------------------------
+Re-attestation at HEAD, run 20260902T181300Z (2026-09-02, 13:11 PDT)
+--------------------------------------------------------------------
+The complete-chain run below was made at commit aa884872; subsequent work changed
+semantically load-bearing things (the universe now excludes parts unreachable from the claim
+set, and support facts longer than any possible query are dropped), so the chain was verified
+again at commit e128dc17.
+
+  source commit   e128dc173e3462d7724d23e2699303c97ef6e09f
+  binary sha256   8267a02c811e3d7fcc2be9e1c2d950bcd43547771f7e4b1832b96e652e0101a2
+  host            i-077a4c7325d2e5d35, c8a.8xlarge, 32 threads (terminated after)
+  structure       tools/check_level_chain.py --expect-top-sum 193, on the host: passed
+  result          TOTAL verified 2846568, gaps 0, contradicted 0
+  candidate cells 3,252,096,103,282
+  wall / CPU      1:54:04 / 201,428.88 s;  peak RSS 3,195,048 KB
+  retained        s3://radio-sa193-393287594714/cleanroom-verify/20260902T181300Z/
+                  verify.out     sha256 1f1bea4fc68cd1803f5e5df36fabe23d46d7a42b7e04f3ac3812e54e8eab9850
+                  verify.out.zst sha256 417b7028062f1e9ea3cef31b0712a68b0ecc89a758a135030f9c30ed161a0e1a
+
+**The candidate-cell count is identical to the digit across the two commits**
+(3,252,096,103,282), as is every per-level count, and `chain-structure.out` hashes identically
+(d8c379d7...).  Two builds with different binaries and materially different index construction
+explore exactly the same tree - the strongest available check that the optimizations changed
+cost and nothing else.
+
+Second independent agreement, on citations specifically.  `STATS_RULES k=7` reports
+dom=1,179,555,891,520 citations, against the production engine's documented **1.18 trillion
+k=7 citation hits** (docs/sa193-certificate.md:114).  So the two implementations agree not
+only on total work (0.46% over 3.2 trillion cells) but on the number of times a lower-level
+fact is cited.  Rule split at k=7: star 667,707,002,350 / dom 1,179,555,891,520 / none
+2,621,810,261,003 / info 0 - INFO never fires there because `descend` applies the mass cap
+inline before the child check.
+
+Cost note: this run is ~5% slower than the one below (201,429 vs 191,800 CPU s) despite a
+faster index build (k=7 227.3 -> 184.8 s).  The `STATS_RULES` counters are the cause - they
+increment about 4.47e12 times at k=7.  Deliberately left in: attestation is pinned to a
+commit, so a 5% diagnostic cost is worth less than the churn of re-attesting to remove it.
+
+Complete chain, run 20260902T045843Z (superseded as the record of note)
+-----------------------------------------------------------------------
   source commit       aa884872ae207eb224c2e90056a2d1e453924c12
   binary sha256       bcd9c2e522198d9ad5f707c2e8effc371604c8dfa0300d92e0b8e4eb0c8a082b
   toolchain           rustc 1.98.0 / cargo 1.98.0

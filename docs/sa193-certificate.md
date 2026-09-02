@@ -86,6 +86,10 @@ are included.
   1h50m run on a `c8a.8xlarge` closes all eight levels with zero gaps — all 2,846,568 claims —
   having first run `tools/check_level_chain.py` over the same eight files on the same host.
   Record and hashes: [../evidence/cleanroom_verifier_2026-09-01.txt](../evidence/cleanroom_verifier_2026-09-01.txt).
+  Verified twice, at two commits with materially different index construction, reaching an
+  identical candidate-cell count to the digit (3,252,096,103,282) and an identical structural
+  check hash. The two implementations also agree on citations specifically: 1,179,555,891,520
+  against the engine's documented 1.18 trillion k=7 citation hits.
   It agrees with the production engine on total work to 0.46% over 3.2 trillion candidate cells, so
   it is exploring the same tree rather than a cheaper approximation of it.
 - The trimmed chain's *derivation* used the coloring run, but its *validity* does not depend on the
