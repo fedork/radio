@@ -83,12 +83,33 @@ Measured on an M4 Pro, 12 workers, against the frozen refuter on identical input
 
 | corpus | claims | cleanroom | refuter | ratio |
 |---|---|---|---|---|
-| Sa(113) full chain | 304,105 | 135.6 CPU s | 97.6 CPU s | 1.39x |
-| run9 k=7, stride 500 | 5,017 | 678 CPU s + 366 s one-time index build | 434 CPU s | 1.56x |
+| Sa(113) full chain, whole process | 304,105 | 135.6 CPU s | 100.6 CPU s | 1.35x |
+| run9 k=7 stride-500, verify phase | 5,017 | 678 CPU s | 434 CPU s | 1.56x |
+| run9 k=7 stride-500, index build | - | 366 s, 2.6 GB | 2.56 s, 21 MB | 140x |
 | run9 k=2..6, 8, 9 | 338,290 | 1,862 CPU s (+386 s k=8 build) | - | - |
 
-The k=7 index build is one-time per level and dominated by materializing the 41.1M-tuple upward
-closure of 230,725 facts; peak RSS 2.6 GB.
+Projected full k=7: ~339,000 CPU s against the refuter's measured 200,939 (1.69x), which is
+~2.9 wall hours on a 32-vCPU `c8a.8xlarge` against the refuter's 3.5 wall hours on 16 vCPU.
+
+**The gap is constant factors, not a missing prune.** Candidate-cell counts agree with the
+production engine to 0.26% per part-count on the k=7 sample (np=2 exactly, 9,858 both sides), so
+the two explore the same tree. Where the extra time goes, from a profile of the current binary
+(top three: child reconstruction, STAR, the dominance walk; malloc is noise):
+
+- **Child reconstruction.** `radiobase.c` keeps `sb0`/`sb1`/`sb2` live across the descent, writing
+  one slot per depth from child codes precomputed in the split table and accumulating mass from
+  the parent's running total. The cleanroom checker rebuilds each partial child from `(n,m)` at
+  every cell - subtract, orient, drop units, insertion-sort - three times over, and the outcome-1
+  child carries twice the pieces. Its sort key `(mass, n, m)` also multiplies per comparison where
+  the engine compares bare integer codes. This is the bulk of the 1.5x and is fixable without
+  touching any rule.
+- **Index build.** Both implement the same DOM lemma with different structures. The cleanroom
+  index pre-expands each fact's upward closure into explicit tuples (41.1M for k=7's 230,725
+  facts) so a query is an exact sub-multiset walk; the engine stores the facts and compares
+  against Pareto fronts at query time (10,218 branches, 136,626 fronts). The build is per level,
+  so it is 35% of a stride-500 sample but 0.1% of the full level - nearly free at scale, though it
+  is what makes peak RSS 2.6 GB rather than ~100 MB. Front-based storage is the improvement to
+  make if that memory ever matters.
 
 ## Independent negative verifier (retired)
 
