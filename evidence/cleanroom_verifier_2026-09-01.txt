@@ -183,3 +183,45 @@ is.  Isolating it needs instrumentation of the dominance trie, which is work on 
 verifier and was not attempted here.  A minimal one-fact certificate does not isolate it,
 because the refuter returns at its FIRST uncovered split and with one support fact that is a
 different split.  The remaining eight gaps were not examined individually.
+
+Mechanism found: the production cache's lookup is positional
+------------------------------------------------------------
+`tools/cache_citation_probe.c` (new) asks the production dominance cache one question in
+isolation: load these negative facts at level k, then is this state refuted at level k?  It
+loads exactly as `load_negative_cache` does and issues the single `CACHE_ONLY` query the audit
+would have issued.  The refuter's own audit path cannot be asked this - it bypasses the
+audited root's cache entry and returns at its FIRST uncovered split.
+
+Minimal reproducer, k=4:
+
+  fact Sb(8:3,7:5,3:3)  query Sb(8:3,7:5,5:2,3:3)   -> MAYBE   (wrong: literal sub-multiset)
+  fact Sb(8:3,7:5,3:3)  query Sb(8:3,7:5,3:3)       -> FALSE   (control)
+  fact Sb(8:3,7:5,3:3)  query Sb(8:3,7:5,3:3,2:1)   -> FALSE   (control, extra part 2:1)
+
+The discriminator is position, not content: adding `2:1` leaves the fact's parts a prefix of
+the sorted query, adding `5:2` forces the match to skip an interior part.  Sharper, with
+query `Sb(7:5,8:3,3:3)` and one-part facts:
+
+  fact Sb(7:5) -> FALSE      fact Sb(3:3) -> FALSE      fact Sb(8:3) -> MAYBE
+
+`Sb(8:3)` is literally one of the query's parts and is not found, while `Sb(3:3)` is found -
+because `3:3 <= 7:5` componentwise and so matches the query's FIRST part.
+
+`checkCacheTrie_ctx` (radiobase.c:1330) explains it.  It walks the query's parts in order,
+using query part `i` both as the dominance test at trie level `i` (`front_find_lesser_equal`
+against that node's negative front) and as the index that selects the next node
+(`node = b->slot[sbb]`).  There is no search over which query part a stored part maps to, so
+whether a fact is found depends on its parts aligning with the query's positions.  Complete-
+ness then rests entirely on the insert-side closure having stored the right position patterns.
+
+Consequences, stated carefully:
+  * This is a COMPLETENESS defect, not a soundness one.  A missed citation makes a child look
+    unrefuted, which costs search or yields MAYBE; it cannot manufacture a negative.  The
+    run9 proof and the certificate of record are unaffected.
+  * Its visible effect is exactly the spurious refuter gaps on the colored Sa(113) bundle.
+  * The cleanroom checker is unaffected because its walk tries every distinct query position
+    (dom.rs `walk`), which is a genuine sub-multiset search rather than a positional one.
+  * Not established: how much of the intended coverage the insert-side closure normally
+    restores, and therefore how often this bites in ordinary solving.  That wants an owner
+    who knows `cacheCantSolve`'s expansion; `tools/cache_upward_closure_regression.c` is the
+    existing lock on those semantics and is the place to add these cases.
