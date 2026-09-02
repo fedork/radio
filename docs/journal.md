@@ -12979,3 +12979,45 @@ table, would not catch anything currently missed — a depth-*d* partial child c
 earlier pair as a sub-multiset, so SUBMON already discharges those — it would only prune earlier.
 The measured counterfactual for that whole family is the engine's own `rb_dead`, worth **1.7%**
 here, so it is not the lever it was in `radio_verify`.
+
+## 2026-09-02 -- Publication track: reframed, de-risked, and handed over
+
+Turned toward publication. Four things changed.
+
+**The likely headline moved.** Reading Aigner 1988 Ch. 3 in full (the repo previously had only
+a scoped scan) found, at book p. 150 right after the proof of Prop. 3.25: "It is tempting to
+conjecture that the converse to 3.25 also holds... If true, this would provide a beautiful
+characterization of star forests with cost k, but so far only partial results are known." That
+is exactly what this project's `K=6` counterexample refutes, with the `K<=5` result being the
+"partial results" boundary made sharp. Refuting a conjecture posed in a standard monograph
+outranks a new sequence value, so `Sa(10)=192` is better cast as the flagship computation
+supporting a theory result. Recorded in
+[publication-handover.md](publication-handover.md).
+
+**Two priority errors corrected, and a third found in Aigner.** `subgraph-monotonicity.md`
+claimed the theorem "had never been stated" while the project's own Aigner scan identifies it as
+eq. (3.10) - fixed, in both that file and `status.md`. The `G_k` closed form turns out to be
+Aigner's *definition* (3.12), not ours. And Aigner's own Exercise 3.3.2 is an erratum: it states
+`n(k,4) = 2^k - k + 2`, which at `k=2` asserts 16 edges resolvable in 2 ternary tests against an
+information bound of 9, and disagrees with every verified cell; Li--Wu--Triesch's `2^k - 2k + 2`
+matches all of them. Exercises 3.3.1 and 3.3.3 independently confirm three of our cells.
+
+**Q2 de-risked as far as this environment allows.** All 43 entries of the ACM forward-citation
+list for the book were reviewed; none resolves the converse, and the nearest neighbours are each
+a different oracle (Gerzen's restricted test sets; Gerzen 2011's binary at-least-one testing;
+the two-arms-balance two-coin papers). But the list is demonstrably incomplete - Li--Wu--Triesch
+cite Aigner and are absent - so a Google Scholar pass is still required, along with the
+nice-graph literature, where the equivalent statement is that `Q_6` is not nice.
+
+**Reproducibility is no longer the blocker.** `tools/make_repro_package.sh` builds a 15.7 MB
+package - certificate, both independent checkers, both witnesses, evidence - and it was
+validated the way a referee would use it: extracted to a clean directory, manifest verified,
+witness verified unconditionally, chain structure verified, the Rust checker built from source
+in 7 s with zero dependencies, its selftest passed, and the non-k7 levels audited with zero
+gaps. What remains is a public deposit with a DOI, since `fedork/radio-data` is private and
+every artifact link in the repo currently 404s for a referee.
+
+Paper draft: the hand-typed `Sb` frontier became a generated block (it was the exact failure
+this repo is organised against), and the Google Docs export damage is repaired. Its structure
+was deliberately left alone - restructuring around the counterexample is a framing decision for
+a human, and the draft header now records the gap rather than guessing at it.

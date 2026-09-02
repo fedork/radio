@@ -7,8 +7,13 @@ entries. Last revised 2026-08-31.
 
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
 proven optimal through `k=10`, the `Sb` Pareto frontier proven for `k<=8`, and the foundational
-theorems. The draft in `paper/` can now state the exact `Sa(10)=192` boundary; its remaining
-work is the P5 cleanup and theorem integration.
+theorems. **Entry point is [publication-handover.md](publication-handover.md).** As of
+2026-09-02 the blocking work is prior art and a public deposit, not proving or computing:
+the certificate is independently verified, the reproduction package is built and validated, and
+the likely headline has shifted from `Sa(10)=192` to the refutation of the converse Aigner
+conjectured after Prop. 3.25. The draft in `paper/` is mechanically clean but predates the
+counterexample, the `K<=5` converse and the verification architecture, and needs restructuring
+around them; the remaining `<TODO>` sections are P5.
 
 **H2 - The K=9 Sb column.** Published theorems now make `m=1..5` exact, including the
 corrected `n(9,5)=481`; a retained exact replay makes `n(9,6)=473` exact as well. Run9 adds
