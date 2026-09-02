@@ -12,8 +12,8 @@ KNOWN WORK REMAINING - see docs/research-plan.md item P5:
       * the certified-verification architecture: the 2,846,568-claim certificate and its
         independent re-verification by tools/cleanroom.
     A restructure around these, rather than more polishing of the sections below, is the
-    remaining work. See docs/publishable-claims.md for the claim inventory and its
-    still-outstanding novelty audit.
+    remaining work. See docs/publishable-claims.md for the claim inventory and the
+    still-outstanding citation-graph portion of its novelty audit.
   - fixed 2026-09-02: the hand-typed Sb frontier is now a generated block; the (7)/(5)
     numbering collision, the dead image reference and the mangled G_k formula are resolved.
 Do not treat any number in this file as authoritative; data/*.csv is.
@@ -27,7 +27,10 @@ A specific case of quantity group testing is considered: given a group on *n* co
 
 Aigner's graph formulation identifies `Sa(n)` with search on the complete graph `K_n` and
 `Sb(n:m)` with search on `K_{m,n}`; his canonical sequence is the predecessor of the `G_k`
-sequence used below ([Aigner 1986](https://doi.org/10.1016/0166-218X(86)90026-0)).  The exact
+sequence used below ([Aigner 1986](https://doi.org/10.1016/0166-218X(86)90026-0)). The same
+paper defines the complete-graph threshold exactly as `Sa(k)` and prints the values through
+seven tests as `3,5,8,13,22,37`, calling 37 correct; Aigner's 1988 monograph repeats the table.
+The verified `Sa(38)` witness below therefore corrects that published last value. The exact
 `m=4` result and the piecewise exact `m=5` result are due to Li, Wu and Triesch
 ([2018](https://doi.org/10.1016/j.dam.2018.05.026)).  Hao's product inequality
 ([1990](https://doi.org/10.1016/0166-218X(90)90022-5)) and the explicit recursive algorithm of

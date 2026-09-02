@@ -6,7 +6,7 @@ k,n,bound,status,source,note
 4,8,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(8) and can't-solve Sa(9) both logged
 5,13,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(13) and can't-solve Sa(14) both logged
 6,22,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(22) and can't-solve Sa(23) both logged
-7,38,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(38) and can't-solve Sa(39) both logged
+7,38,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,"can-solve Sa(38) and can't-solve Sa(39) both logged; corrects Aigner 1986 Fig. 5 and Aigner 1988 Fig. 2.13, which print 37"
 8,65,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(65) and can't-solve Sa(66) both logged
 9,112,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(112) and can't-solve Sa(113) both logged
 10,192,max,proven-exhaustive,witnesses/sa192_k10_a.tree+sa193-cold-2026-08-16:run9_out_sa193.txt,"verified witness proves Sa(192) achievable; proof-safe cold single-session run9 exhaustively rejects every one of the 16 possible first-test Sb states for Sa(193)"

@@ -35,8 +35,12 @@ M. Aigner, “Search problems on graphs,” *Discrete Applied Mathematics* 14 (1
   `N(3)=(8,7,4,4,1,1,1,1)`, the direct predecessor of this repository's `G_k`.
 - Gives the exact complete-bipartite results for `m=2` and `m=3`.  These upgrade the `k=9`
   values 511 and 503 from lower bounds to published maxima.
+- Defines the complete-graph threshold `h(k)` exactly as this repository defines `Sa(k)`.
+  Figure 5 gives `3,5,8,13,22,37` for `k=2..7` and calls 37 the correct last value. The
+  repository's checked `Sa(38)` tree refutes that published seven-test claim; its audited
+  positive/negative boundary pair establishes the corrected exact value 38.
 
-### Aigner 1988 (scoped book scan)
+### Aigner 1988 (scoped book scan and indexed Chapter 2)
 
 M. Aigner, *Combinatorial Search* (Wiley--Teubner, 1988). The supplied scan is Chapter 3 and
 the relevant answers-to-exercises pages, rather than the book's Chapter 2 on weighing. Its
@@ -49,6 +53,11 @@ directly checked details are in [aigner-1988-scan.md](aigner-1988-scan.md).
 - Proposition 3.25 is only a necessary majorization condition. Its stated open converse is now
   resolved negatively by the explicit `K=6` state in this repository; the source itself proves
   only necessity.
+- Chapter 2, p. 102, defines the spring-scale threshold `m^(2)(k)` as the same `Sa(k)` and
+  repeats Aigner 1986's values through seven tests in Figure 2.13, including the incorrect 37.
+  This page was checked through the indexed Google Books source text, not the supplied PDF;
+  reproducible queries are in
+  [the publication prior-art record](../evidence/publication_prior_art_2026-09-02.md).
 
 ### Stanley 1998
 
@@ -231,6 +240,14 @@ Applied Mathematics* 113 (2001), 299–302.
 | old `m=5` closed form / `BBBD` profile | conjectured equality | refuted as equality at `k=9`; still a lower construction | same |
 | `n(9,6)=473` | verified lower bound | exact maximum after retained 473/474 replay | local exact replay |
 
+Aigner's published complete-graph threshold requires a separate correction not represented in
+the fixed-`m` table above. Values through six tests agree with [`pareto_sa.csv`](../data/pareto_sa.csv).
+At seven tests, Aigner 1986 Figure 5 and Aigner 1988 Figure 2.13 print 37, while the unconditional
+[`sa38_k7.tree`](../witnesses/sa38_k7.tree) proves 38 achievable and the audited 2026 boundary
+record makes 38 exact. No later correction was located in the scoped searches recorded
+[here](../evidence/publication_prior_art_2026-09-02.md); do not claim priority for the correction
+until the remaining cited-by pass is complete.
+
 The local replay is retained in `evidence/sb_m5_k9_frontier.txt`, its structurally checked but
 unsupported relaxed-terminal tree in `witnesses/majorized_481_5_at9.tree`, and the root-type scan in
 `evidence/sb_m5_k9_root_transition.txt`.  The adjacent exact `m=6` boundary is in
@@ -240,15 +257,17 @@ unsupported relaxed-terminal tree in `witnesses/majorized_481_5_at9.tree`, and t
 
 These are cited by the papers above but have not yet been checked directly here:
 
-- The *full* Chapter 2, “Weighing Problems,” of Aigner's *Combinatorial Search* (1988): the
-  newly supplied scan begins instead at Chapter 3. Chapter 3 is enough for the graph framework
-  and exact `m=2,3` cross-check; Chapter 2 would add the original balance/spring-scale account.
+- A page-by-page copy of Chapter 2, “Weighing Problems,” of Aigner's *Combinatorial Search*
+  (1988): the supplied scan begins at Chapter 3. Google's indexed source text has now supplied
+  p. 102's threshold definition and Figure 2.13, but not a full-chapter inspection.
 - C. A. Christen's earlier Fibonaccian-search reports and the original papers behind Hwang's
   survey: useful only if the historical development becomes part of the paper.  Search Oxford
   SOLO by title/author or request scans through Bodleian document delivery.
-- D.-Z. Du and F. K. Hwang, *Combinatorial Group Testing and Its Applications*: useful for a
-  modern group-testing overview, but lower priority than the primary exact papers already in
-  hand.
+- D.-Z. Du and F. K. Hwang, *Combinatorial Group Testing and Its Applications*: its searchable
+  second-edition text was checked on 2026-09-02 and exposed the relevant additive-model summary,
+  but no exact `Sa` or fixed-`m>=6` table. A page-by-page copy remains worth obtaining because
+  snippet-index coverage is not complete; see the
+  [audit record](../evidence/publication_prior_art_2026-09-02.md).
 - A. Ya. Belokopytov and V. N. Luzgin, “Block transmission of information in a summing
   multiple access channel with feedback,” *Problems of Information Transmission* 23(4) (1987),
   347–351: WCC 2019 attributes the then-best explicit asymptotic constant `1.3277` to it.

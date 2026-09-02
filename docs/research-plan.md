@@ -8,10 +8,13 @@ entries. Last revised 2026-08-31.
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
 proven optimal through `k=10`, the `Sb` Pareto frontier proven for `k<=8`, and the foundational
 theorems. **Entry point is [publication-handover.md](publication-handover.md).** As of
-2026-09-02 the blocking work is prior art and a public deposit, not proving or computing:
+2026-09-02 the blocking work is citation coverage and a public deposit, not proving or computing:
 the certificate is independently verified, the reproduction package is built and validated, and
 the likely headline has shifted from `Sa(10)=192` to the refutation of the converse Aigner
-conjectured after Prop. 3.25. The draft in `paper/` is mechanically clean but predates the
+conjectured after Prop. 3.25. The audit also found that Aigner's exact complete-graph threshold
+prints 37 at seven tests; the unconditional `Sa(38)` witness corrects that published value. OEIS,
+indexed Chapter 2/Du--Hwang text, and two current nice-graph papers are checked, while the Scholar
+cited-by pass and broader nice-graph coverage remain. The draft in `paper/` is mechanically clean but predates the
 counterexample, the `K<=5` converse and the verification architecture, and needs restructuring
 around them; the remaining `<TODO>` sections are P5.
 

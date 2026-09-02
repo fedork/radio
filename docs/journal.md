@@ -13021,3 +13021,41 @@ Paper draft: the hand-typed `Sb` frontier became a generated block (it was the e
 this repo is organised against), and the Google Docs export damage is repaired. Its structure
 was deliberately left alone - restructuring around the counterexample is a framing decision for
 a human, and the draft header now records the gap rather than guessing at it.
+
+## 2026-09-02 -- Publication audit corrects the Aigner record
+
+The first handover claim to test failed in the most useful possible way. Aigner did have the
+complete-graph threshold sequence. In “Search problems on graphs” (1986), p. 226, he defines
+`h(k)` by `c(K_n)<=k` iff `n<=h(k)`, prints `3,5,8,13,22,37` for `k=2..7` in Figure 5, and calls
+37 the correct seven-test value. Google Books' indexed text of *Combinatorial Search* p. 102
+defines `m^(2)(k)` as the same threshold for the two-defective spring-scale problem and repeats
+the table in Figure 2.13. The prior inference from his later “possibly only `K_5` and `K_8` are
+3-optimal” remark was invalid: a short exact table and that conjecture are perfectly compatible.
+It has been superseded everywhere it occurred.
+
+This makes the checked `witnesses/sa38_k7.tree` more important. Its complete strategy for 38 coins
+is an unconditional constructive refutation of Aigner's published 37, independent of the solver;
+the audited 2026 positive/negative pair separately establishes exactness at 38. The safe current
+claim is “corrects Aigner's printed seven-test value; no later correction located in the scoped
+audit.” Do not say “first correction” until the Google Scholar cited-by pass is complete.
+
+The same audit closed several smaller branches. Exact searches of the official OEIS Git export,
+timestamped `2026-09-02T03:01:04-04:00`, found no complete-sequence or long-tail match. Searchable
+Du--Hwang second-edition text exposed the relevant additive-model discussion but no `Sa` or
+fixed-`m>=6` table; this remains a snippet-index result, not a page-by-page read. Full-text searches
+of the two current nice/strongly-nice papers (`arXiv:2408.15074`, `arXiv:2608.16613`) found no
+transcript/search family. Scoped searches of Aigner 1986/1988 and Andreae 1989 found no general
+Unit-Group Elimination or edge-injective vertex-map pullback statement, although they use related
+isolated-edge and blow-up constructions in particular proofs. Commands, source links and coverage
+limits are retained in
+`evidence/publication_prior_art_2026-09-02.md`.
+
+The interactive-browser attempt stopped immediately because this session had no browser instance;
+no page was navigated and no process was started. That leaves the Scholar UI citation pass as the
+main novelty blocker, together with broader nice-graph coverage and a full Du--Hwang copy. The
+public DOI remains the other submission blocker.
+
+After the record was superseded, `tools/check_tables.py`, `tools/check_witness.py witnesses/*.tree`,
+and `tools/check_docs.py` all passed. The witness check again verified `sa38_k7.tree`
+unconditionally and reported only the two already-labelled arbitrary-majorization diagnostics as
+unsupported terminals.

@@ -6,7 +6,7 @@ checkers, both witnesses, evidence) that was extracted to a clean directory and 
 end to end - manifest verified, witness verified unconditionally, chain structure verified,
 the Rust checker built from source in 7 s with no dependencies, its selftest passed, and the
 cheap levels audited with zero gaps. What remains before submission is not engineering:
-**(a)** the novelty audit, still not done and now briefed question-by-question in
+**(a)** the citation-graph portion of the novelty audit, now partly completed and briefed question-by-question in
 [novelty-audit.md](novelty-audit.md), and **(b)** depositing the package publicly
 with a DOI, since `fedork/radio-data` is private and every artifact link in this repo 404s
 for a referee.
@@ -16,11 +16,24 @@ listed here because it has a proof object or a retained computational record; th
 itself a claim of priority. Before submission, each item needs a focused prior-art check and the
 stated reproducibility package.
 
-## Recommended headline: exact finite frontiers
+## Recommended framing: conjecture refutation and corrected exact frontiers
+
+### C0 — correction of Aigner's seven-test threshold
+
+Aigner 1986 defines `h(k)` exactly as `Sa(k)`, prints `h(7)=37` in Figure 5, and calls that value
+correct; Aigner 1988 repeats it in Figure 2.13. The checked
+[`sa38_k7.tree`](../witnesses/sa38_k7.tree) is a solver-independent strategy for 38 coins, so it
+constructively refutes the published value. The audited 2026 boundary pair additionally proves
+`Sa(7)=38` exactly; see [`pareto_sa.csv`](../data/pareto_sa.csv) and the
+[prior-art record](../evidence/publication_prior_art_2026-09-02.md).
+
+Publication value: this turns the finite computation into a correction and extension of the
+standard source, not a sequence computed in isolation. No later correction was located in the
+scoped audit, but the paper must not claim priority until the Google Scholar cited-by pass is done.
 
 ### C1 — `Sa(10)=192` exactly
 
-This is the strongest result. A checked witness proves `Sa(192)` is solvable in ten tests; the
+This is the strongest finite result. A checked witness proves `Sa(192)` is solvable in ten tests; the
 proof-safe cold run and its compact level-chain certificate refute `Sa(193)` in ten tests. Thus
 the result is a **computer-assisted exact theorem**, not merely a search result. See the source
 record in [pareto_sa.csv](../data/pareto_sa.csv), the explanation in
@@ -171,8 +184,8 @@ finite boundaries beyond the current implementation use.
 
 ## Sensible paper package
 
-1. **Main paper:** C1, C2, the unconditional part of C3, and T1--T3, with the finite tables and certificates as the central
-   contribution.
+1. **Main paper:** lead with T1, present C0--C2 and the unconditional part of C3 as the corrected
+   certified finite landscape, and use T2--T4 to connect theory to the verification method.
 2. **Supplement:** raw/provenanced solver artifacts, machine-readable frontiers, witness trees,
    independent checkers, and a command-by-command reproduction guide.
 3. **Possible later theory paper:** the synchronized hierarchy, only after it yields a useful

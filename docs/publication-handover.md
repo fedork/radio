@@ -12,7 +12,12 @@ submission is prior art and a public deposit, not proving or computing anything.
 ## What the paper is, and the reframing that happened
 
 The obvious headline is `Sa(10) = 192` — 192 coins resolvable in 10 tests, 193 not, extending
-`2, 2, 3, 5, 8, 13, 22, 38, 65, 112, 192`. **That is probably not the strongest contribution.**
+`2, 2, 3, 5, 8, 13, 22, 38, 65, 112, 192`. The prior-art audit has made that contribution more
+interesting: Aigner 1986 Figure 5 and Aigner 1988 Figure 2.13 both print the identical threshold
+through seven tests as `3,5,8,13,22,37`, and the former explicitly calls 37 correct. The checked
+`Sa(38)` tree constructively refutes that published value; the audited boundary pair establishes 38
+exactly. No later correction has yet been located, but that priority statement remains provisional
+until the cited-by pass is complete. **Even so, this is probably not the strongest contribution.**
 
 Aigner 1988, *Combinatorial Search*, p. 150, immediately after proving Prop. 3.25 (necessity of
 majorization by `N(k)` for star forests):
@@ -54,24 +59,26 @@ explicitly, since it connects the computation to his framework.
 
 1. **Novelty audit** — [novelty-audit.md](novelty-audit.md) asks five questions, records what is
    settled, and says what each possible answer changes. Current state:
-   - **Q1 (is the `Sa` sequence published?)** Aigner did *not* have it — after Cor. 3.29 he
-     speculates that "it is quite possible that `K_5` and `K_8` are the only 3-optimal graphs",
-     which is not how one writes having computed the values. **Outstanding:** OEIS
-     (`2, 3, 5, 8, 13, 22, 38, 65, 112` — Cloudflare-blocked from the agent environment), Du &
-     Hwang's *Combinatorial Group Testing*, and Aigner Chapter 2's table 2.13, which Ch. 3 cites
-     for `M(K_3) = 2` and which the available scan does not contain.
+   - **Q1 (is the `Sa` sequence published?)** Aigner published it through `k=7`, but with the
+     false last value 37. The repository's unconditional `Sa(38)` tree is already a constructive
+     correction; exactness at 38 has separate audited evidence. The official OEIS Git export has
+     no match, and searchable Du--Hwang text exposed no table. **Outstanding:** Google Scholar
+     cited-by checks, and ideally a page-by-page Du--Hwang copy. Reproducible searches are in
+     [the audit record](../evidence/publication_prior_art_2026-09-02.md).
    - **Q2 (is the converse still open?)** Aigner poses it as a conjecture (quote above). The
      complete ACM forward-citation list for the book was reviewed: **no resolution**, nearest
      neighbours all a different oracle. But that list is demonstrably incomplete — Li--Wu--Triesch
-     2018 cite Aigner and are absent. **Outstanding:** a Google Scholar "cited by" pass on the
-     book and on Aigner 1986, and the nice-graph literature, where the equivalent statement is
-     that `Q_6` is not nice.
+     2018 cite Aigner and are absent. Two current nice/strongly-nice papers have now been searched
+     and do not mention the transcript family. **Outstanding:** a Google Scholar "cited by" pass
+     on the book and on Aigner 1986, plus the broader nice-graph literature, where the equivalent
+     statement is that `Q_6` is not nice.
    - **Q3 (`Sb` frontier).** `m = 1..5` are published (Aigner 1986/1988 for 2,3; Li--Wu--Triesch
-     2018 for 4,5). Only `m >= 6` could be ours. **Outstanding:** any published table for
-     `m >= 6`.
+     2018 for 4,5). Only `m >= 6` could be ours. Searchable Du--Hwang text exposed no such
+     table. **Outstanding:** full-book and cited-by coverage for any published `m >= 6` table.
    - **Q4 (attribution spot-checks).** The `G_k` closed form is **Aigner's definition** (3.12) —
-     cite, do not claim. Unit-Group Elimination and the Vertex-Splitting Pullback Lemma are still
-     unchecked against Ch. 2.
+     cite, do not claim. A scoped check found no general Unit-Group Elimination or Vertex-Splitting
+     Pullback statement in Aigner 1986/1988 or Andreae 1989, but broader literature checking is
+     still required before calling either new.
 2. **Public deposit.** `fedork/radio-data` is private, so every artifact link in the repo 404s
    for a referee. The package above needs a Zenodo (or equivalent) DOI, cited from the paper.
    Needs an account; nothing else.
@@ -83,6 +90,10 @@ explicitly, since it connects the computation to his framework.
   at `k=3` it gives 7 where exhaustive search gives 4. Li--Wu--Triesch's `2^k - 2k + 2` matches
   every verified cell. Cite Aigner for the first statement of the case, note the erratum, cite
   Li--Wu--Triesch for the proof.
+- **Aigner's seven-test complete-graph value is also wrong.** Aigner 1986 Figure 5 defines the
+  same threshold as `Sa`, prints 37, and calls it correct; Aigner 1988 Figure 2.13 repeats it.
+  `witnesses/sa38_k7.tree` is a solver-independent constructive refutation, while the 2026
+  boundary record makes 38 exact. This is a publishable correction, not merely a new tail term.
 - **Exercises 3.3.1 and 3.3.3 independently confirm our cells**: `n(k,3) = 2^k - k`, and
   `M(K_{5,9}) = 4`, `M(K_{9,14}) = 5` matching `n(4,5) = 9` and `n(5,9) = 14`.
 - **Pre-empt the near-miss literature.** "Two counterfeit coins with two-arms balance"
@@ -110,7 +121,9 @@ retained source output; and the asymptotic constant, which Florin--Ho--Jiang set
 
 ## Suggested order
 
-1. Finish the novelty audit (needs a browser and, for Ch. 2, the book).
+1. Finish the citation-graph portion of the novelty audit. Chapter 2, OEIS, searchable Du--Hwang,
+   and the two current nice-graph papers are now checked; Google Scholar cited-by and broader
+   nice-graph coverage remain.
 2. Deposit the package; get the DOI.
 3. Restructure the paper around the counterexample. This is a framing decision and was
    deliberately left to a human — the draft header records the gap rather than guessing.

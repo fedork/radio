@@ -28,29 +28,33 @@ queried subset.
 
 **Where to look, in order:**
 
-> **VERDICT 2026-09-02, partial: Aigner did not have this sequence.** Corollary 3.29 bounds
-> `M(K_n)` from below, and the remark after it (book p. 152) says only: "The available data
-> suggest that for fixed `m`, only finitely many `K_{m,n}` are 3-optimal, while for the complete
-> graphs **it is quite possible that `K_5` and `K_8` are the only 3-optimal graphs**." That is
-> speculation about which `K_n` meet the information bound, not a table of values - he would not
-> phrase it that way if he had computed the sequence. Consistent with our data, incidentally:
-> `K_5` and `K_8` are exactly the complete graphs where `Sa(k)` meets `ceil(log_3 C(n,2))`.
-> **Still to do:** table 2.13 in Chapter 2, which Ch. 3 cites for `M(K_3) = 2` and which this
-> PDF (book pp. 119-194, Ch. 3 only) does not contain. That table is the one remaining place in
-> Aigner where small `M(K_n)` values could be tabulated.
+> **VERDICT 2026-09-02, corrected: Aigner published this threshold through `k=7`, but his last
+> value is wrong.** Aigner 1986, p. 226, defines `h(k)` by `c(K_n)<=k` iff `n<=h(k)`, exactly the
+> present `Sa(k)`. Figure 5 prints `3,5,8,13,22,37` for `k=2..7` and explicitly calls `h(7)=37`
+> correct. Aigner 1988, p. 102, independently defines `m^(2)(k)` as the largest population
+> solvable in `k` tests and repeats the same values in Figure 2.13. The unconditional tree
+> `witnesses/sa38_k7.tree` therefore refutes a published exact value; the audited 2026 boundary
+> pair additionally establishes `Sa(7)=38` exactly. This is a stronger and safer publication
+> story than the retracted inference from the speculative remark after Cor. 3.29.
+>
+> **OEIS verdict:** the official `oeis/oeisdata` export dated 2026-09-02 contains neither the
+> complete sequence nor any of the long tails ending in `38,65,112,192`. **Du--Hwang verdict,
+> scoped:** searchable second-edition text exposes the relevant additive-model summary but no
+> `Sa` table or matching sequence. A page-by-page copy is still wanted. Commands, source links,
+> exact scope and limitations are retained in
+> [the prior-art search record](../evidence/publication_prior_art_2026-09-02.md).
+>
+> **Still to do:** forward citations of Aigner 1986/1988 and Li--Wu--Triesch 2018, especially in
+> Google Scholar. Until that pass is complete, say that no later correction has been *located*,
+> not that this is the first correction in the literature.
 
-1. **OEIS.** Search `2, 3, 5, 8, 13, 22, 38, 65, 112`, and separately the tail
-   `22, 38, 65, 112, 192` (early terms often differ by indexing convention). I could not do
-   this — oeis.org serves a Cloudflare challenge to this environment. If the sequence is
-   present, its references and comments answer most of Q1 immediately.
-2. **Aigner 1988, *Combinatorial Search*, Ch. 3.** The repo's scan
-   ([aigner-1988-scan.md](aigner-1988-scan.md)) is scoped to Ch. 3 and captures Props. 3.24,
-   3.25, Cor. 3.26 and the answer to Ex. 3.3.1. **Check specifically for a table of `M(K_n)`
-   values, or worked small cases,** which a scoped scan could easily have skipped. Also check
-   Ch. 2, which the repo has not read at all.
+1. **OEIS — checked 2026-09-02.** Exact searches of the dated official Git export found no
+   match. Repeat before submission if the audit remains open long enough for the export to change.
+2. **Aigner 1986/1988 — checked 2026-09-02.** Both sources publish the threshold through seven
+   tests; both give the now-refuted last value 37. Cite both when presenting the correction.
 3. **Du & Hwang, *Combinatorial Group Testing and Its Applications*, 2nd ed. (World
-   Scientific, 2000).** The standard reference work. If small-case tables for the two-defective
-   quantitative model exist anywhere, they are most likely here.
+   Scientific, 2000) — searchable preview checked 2026-09-02.** No exact sequence was located;
+   retain the full-book pass as a coverage check.
 4. **Forward citations of Aigner 1986** (`10.1016/0166-218X(86)90026-0`) and **Li–Wu–Triesch
    2018** (`10.1016/j.dam.2018.05.026`) in Google Scholar. This is the highest-yield single
    technique for the whole audit: anyone computing these values would cite one of them.
@@ -59,7 +63,8 @@ queried subset.
 
 | finding | consequence |
 |---|---|
-| the sequence is in OEIS with references | follow them; likely resolves Q1 and Q3 both |
+| the sequence later enters OEIS with references | follow them; likely resolves Q1 and Q3 both |
+| a later source already corrects Aigner's 37 to 38 | cite it; the local result becomes an independent certificate and extension rather than the correction |
 | published through `k = 9` (i.e. 112 is known) | only `Sa(10) = 192` is ours. The paper's computational claim narrows to one value plus the certified method — this is the most likely outcome and is fine |
 | published only to `k = 5` or so | the whole upper range is ours; the computational contribution is substantially larger |
 | `Sa(10) = 192` already published | the computational headline is gone. The counterexample (Q2) becomes the paper, and the verification architecture becomes the methodological contribution |
@@ -107,6 +112,14 @@ queried subset.
 > the Stanley--Gasharov conjecture (every claw-free graph is Schur-positive) was disproved in
 > 2024-25 by Prajapati and independently by Matherne--Morales, with infinite counterexample
 > families following (`arXiv:2607.27166`), so someone could plausibly touch `Q_K` soon.
+>
+> **VERDICT 2026-09-02, part 3: the two current nice/strongly-nice papers named by the audit do
+> not contain this result.** Full-text searches of Li--Li--Yang--Zhang (`arXiv:2408.15074`) and
+> Zhang (`arXiv:2608.16613`) found no Aigner/search/transcript/star-forest connection and neither
+> paper mentions `Q_K`. They confirm that *nice* is the right current vocabulary, but they study
+> other explicit graph families. This narrows the search; it does not replace the broader citation
+> pass. Search terms and links are in
+> [the audit record](../evidence/publication_prior_art_2026-09-02.md).
 
 **The claim.** Every singleton state solvable in `K` is weakly majorized by `G_K` (necessity;
 this is Aigner's, Prop. 3.25). The converse holds for `K <= 5` (proved here, exhaustively) and
@@ -164,8 +177,10 @@ restates as open the converse of Prop. 3.25.
 > - **Ex. 3.3.3**: `M(K_{5,9}) = 4` and `M(K_{9,14}) = 5` - both match our `n(4,5)=9` and
 >   `n(5,9)=14`. Independent confirmation of two cells.
 >
-> **Still to do:** any published table for `m >= 6`, which is where our own contribution would
-> lie. Nothing in Ch. 3 gives one.
+> **Du--Hwang check 2026-09-02:** its searchable additive-model chapter summarizes the
+> Aigner/Christen/Hao/Gargano bounds and constructions but exposed no exact fixed-`m>=6` table.
+> This is scoped negative evidence, not a full-book inspection. **Still to do:** a page-by-page
+> copy and the forward-citation pass. Nothing checked so far gives an `m>=6` table.
 
 **The claim.** `n(k,m)` complete and proven maximal for `k = 1..8`, 130 cells
 (`data/pareto_sb.csv`, evidence in `evidence/pareto_certification_k1_8.txt`).
@@ -207,6 +222,14 @@ literature before any of them is stated as ours:
   `G_3`. So the closed form must be cited, not claimed; what is ours is only the choice to
   *define* `G_k` by the recurrence and derive the closed form as a cross-check.
 
+> **VERDICT 2026-09-02, scoped:** no general Unit-Group Elimination equivalence or
+> edge-injective vertex-map pullback statement was found in Aigner 1986, the available/full-text
+> Chapter 3 material from Aigner 1988, Andreae 1989, or indexed searches across the 1988 book.
+> Aigner and Andreae do use isolated edges in particular constructions, and Aigner uses a vertex
+> blow-up in a binary-search construction; neither is the general theorem stated here. Broader
+> decision-tree and graph-search literature remains to be checked before claiming novelty. See
+> [the audit record](../evidence/publication_prior_art_2026-09-02.md).
+
 For each: either find the citation, or state in the paper that no published statement was
 found, having actually looked.
 
@@ -214,11 +237,12 @@ found, having actually looked.
 
 ## Q5. Framing check — what is this problem called elsewhere?
 
-Worth an hour because it affects discoverability and referee selection. The model appears under
-several names: *quantitative group testing*, *coin weighing* with a counting oracle, *search
-with a quantitative oracle*, and in Aigner's formulation *ternary edge search on graphs*. Find
-which community currently owns it and which journal published the nearest recent work
-(Li–Wu–Triesch went to *Discrete Applied Math*, which is the obvious first target).
+**VERDICT 2026-09-02, partial.** The directly relevant sources use *quantitative group testing*,
+*coin weighing with a spring scale*, and *ternary search on graphs*. The current neighboring graph
+literature uses *nice* and *strongly nice* for the dominance property. Use all four vocabularies in
+the title/abstract/keywords or related work so both communities can find the paper. The nearest
+finite exact paper remains Li--Wu--Triesch in *Discrete Applied Mathematics*; journal selection is
+still a human decision.
 
 ---
 

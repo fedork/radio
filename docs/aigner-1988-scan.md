@@ -1,6 +1,6 @@
 # Aigner 1988 scan: relevant extraction
 
-Source inspected 2026-08-24: Martin Aigner, *Combinatorial Search* (Wiley--Teubner, 1988), supplied scan `Aigner.pdf`.  The continuous chapter in the scan is Chapter 3, book pp. 123--191 (PDF pp. 5--73); it is **not** the book's Chapter 2, “Weighing Problems.”  PDF pp. 74--76 separately contain answers to recommended exercises on book pp. 344--346.
+Source inspected 2026-08-24: Martin Aigner, *Combinatorial Search* (Wiley--Teubner, 1988), supplied scan `Aigner.pdf`.  The continuous chapter in the scan is Chapter 3, book pp. 123--191 (PDF pp. 5--73); it is **not** the book's Chapter 2, “Weighing Problems.”  PDF pp. 74--76 separately contain answers to recommended exercises on book pp. 344--346. On 2026-09-02 the searchable Google Books copy supplied the load-bearing Chapter 2 definition and Figure 2.13; exact scope and reproducible queries are in [the publication prior-art record](../evidence/publication_prior_art_2026-09-02.md).
 
 ## Direct relation to this project
 
@@ -21,11 +21,11 @@ This independently matches the state-transition table in [problem.md](problem.md
 - **Exact `m=2`.** Corollary 3.26 gives `M(K_{2,n}) = ceil(log_2(n+1))` (book p. 150, PDF p. 32), equivalent to `n(k,2) = 2^k - 1`.
 - **Exact `m=3`.** The answer to Exercise 3.3.1 proves `M(K_{3,2^k-k}) <= k` and `M(K_{3,2^k-k+1}) >= k+1` (book p. 345, PDF p. 75), equivalent to `n(k,3) = 2^k-k` for `k >= 2`.
 
-The scan supports the graph/model discussion and the exact small-`m` citations already used in [literature.md](literature.md).  It does not supply the Chapter 2 balance/spring-scale exposition or the results referred to there as 2.10 and 2.13.
+The supplied PDF supports the graph/model discussion and the exact small-`m` citations already used in [literature.md](literature.md). It does not supply the Chapter 2 balance/spring-scale exposition. The searchable book copy now supplies the threshold definition and Figure 2.13, but not a page-by-page Chapter 2 inspection.
 
 ## Additions from the full Chapter 3 scan, 2026-09-02
 
-Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only; Chapter 2 is still unread).
+Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only).
 
 - **The converse conjecture, verbatim** (book p. 150, right after the proof of Prop. 3.25):
   "It is tempting to conjecture that the converse to **3.25** also holds: `A <= N(k) ==>
@@ -38,9 +38,8 @@ Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only; Chapter 2 is still unr
   equals `G_3`. **The dyadic-block partial-binomial-sum form is therefore Aigner's, not ours.**
 - **Corollary 3.29** (book p. 152): `M(K_n) >= k+1` whenever `C(n,2) > lambda * 3^(k-1)`,
   `lambda = 3/(2 sqrt 3 - 2)`. The remark after it says "it is quite possible that `K_5` and
-  `K_8` are the only 3-optimal graphs" - speculation, so **Aigner did not have the `Sa`
-  sequence**. He cites table 2.13 (Chapter 2) for `M(K_3) = 2`; that table is the remaining
-  place to check.
+  `K_8` are the only 3-optimal graphs." That speculation is compatible with having a short
+  exact threshold table and does not support the former inference that Aigner lacked one.
 - **Exercise 3.3.1**: `M(K_{3,n}) <= k <=> n <= 2^k - k`. Matches our `n(k,3)` exactly.
 - **Exercise 3.3.2**: `M(K_{4,n}) <= k <=> n <= 2^k - k + 2`. **The printed formula is an
   erratum.** At `k=2` it claims `M(K_{4,4}) <= 2`, i.e. 16 edges in 2 ternary tests, against
@@ -53,3 +52,18 @@ Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only; Chapter 2 is still unr
 - **Proposition 3.32** (attributed to Andreae 1988b): for forests of max degree `<= r`, the
   exact gap between `M(F)` and the information-theoretic bound. Adjacent to, but not the same
   as, the star-forest question.
+
+## Additions from indexed Chapter 2 text, 2026-09-02
+
+- Book p. 102 defines `m^(2)(k)` as the largest `n` for which the two-defective spring-scale
+  problem has cost at most `k`. Under the book's Chapter 3 graph translation this is exactly
+  this repository's `Sa(k)`.
+- Figure 2.13 prints `m^(2)(k)=3,5,8,13,22,37` for `k=2..7`. Aigner 1986 Figure 5 gives the
+  same table in the graph notation `h(k)` and explicitly calls 37 the correct seven-test value.
+- The verified [`sa38_k7.tree`](../witnesses/sa38_k7.tree) is therefore an unconditional
+  constructive refutation of Aigner's printed 37. The 2026 positive/negative boundary record in
+  [`pareto_sa.csv`](../data/pareto_sa.csv) separately establishes that the corrected exact value
+  is 38.
+
+The Chapter 2 result is based on Google's indexed source text rather than the supplied PDF. Do not
+claim that the whole chapter was read; retain the page-by-page copy as a bibliography task.
