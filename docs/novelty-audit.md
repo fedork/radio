@@ -28,6 +28,17 @@ queried subset.
 
 **Where to look, in order:**
 
+> **VERDICT 2026-09-02, partial: Aigner did not have this sequence.** Corollary 3.29 bounds
+> `M(K_n)` from below, and the remark after it (book p. 152) says only: "The available data
+> suggest that for fixed `m`, only finitely many `K_{m,n}` are 3-optimal, while for the complete
+> graphs **it is quite possible that `K_5` and `K_8` are the only 3-optimal graphs**." That is
+> speculation about which `K_n` meet the information bound, not a table of values - he would not
+> phrase it that way if he had computed the sequence. Consistent with our data, incidentally:
+> `K_5` and `K_8` are exactly the complete graphs where `Sa(k)` meets `ceil(log_3 C(n,2))`.
+> **Still to do:** table 2.13 in Chapter 2, which Ch. 3 cites for `M(K_3) = 2` and which this
+> PDF (book pp. 119-194, Ch. 3 only) does not contain. That table is the one remaining place in
+> Aigner where small `M(K_n)` values could be tabulated.
+
 1. **OEIS.** Search `2, 3, 5, 8, 13, 22, 38, 65, 112`, and separately the tail
    `22, 38, 65, 112, 192` (early terms often differ by indexing convention). I could not do
    this — oeis.org serves a Cloudflare challenge to this environment. If the sequence is
@@ -56,6 +67,19 @@ queried subset.
 ---
 
 ## Q2. The singleton-majorization converse — is it still open? **(highest stakes)**
+
+> **VERDICT 2026-09-02, part 1: Aigner poses it as an open conjecture. Verbatim, book p. 150,
+> immediately after the proof of Prop. 3.25:**
+>
+> > "It is tempting to conjecture that the converse to **3.25** also holds:
+> > `A <= N(k) ==> M(A) <= k`. If true, this would provide a beautiful characterization of star
+> > forests with cost `k`, but so far only partial results are known."
+>
+> So the framing is sound: Aigner states the converse, calls the characterization it would give
+> "beautiful", and says only partial results were known. The `K=6` counterexample refutes
+> exactly this conjecture, and the `K<=5` result is exactly the "partial results" boundary made
+> sharp. **Still to do:** whether anyone resolved it between 1988 and now - forward citations,
+> and the nice-graph literature, since the counterexample is equivalent to `Q_6` not being nice.
 
 **The claim.** Every singleton state solvable in `K` is weakly majorized by `G_K` (necessity;
 this is Aigner's, Prop. 3.25). The converse holds for `K <= 5` (proved here, exhaustively) and
@@ -98,6 +122,24 @@ restates as open the converse of Prop. 3.25.
 
 ## Q3. The `Sb` frontier for `k <= 8` — which of the 130 cells are new?
 
+> **VERDICT 2026-09-02, partial, from Aigner Ch. 3 exercises (book p. 154):**
+>
+> - **Ex. 3.3.1**: `M(K_{3,n}) <= k <=> n <= 2^k - k`. This is `n(k,3) = 2^k - k` and it matches
+>   our data exactly (k=3,4,5,9 -> 5, 12, 27, 503). Attribution already correct in
+>   `literature.md`.
+> - **Ex. 3.3.2**: `M(K_{4,n}) <= k <=> n <= 2^k - k + 2`. **The printed formula is wrong.** At
+>   `k=2` it asserts `M(K_{4,4}) <= 2`, i.e. 16 edges resolved by 2 ternary tests, which
+>   violates the information bound `16 > 3^2 = 9`. It also disagrees with all our verified
+>   cells (`k=3` gives 7 against the exhaustively established 4). Li--Wu--Triesch's Corollary 3,
+>   `n(k,4) = 2^k - 2k + 2`, matches every cell (4, 10, 24, 54, 116, 242, 496). Almost certainly
+>   a typo for `2^k - 2k + 2`. **The paper should cite Aigner's exercise as the first statement
+>   of the m=4 case, note the printed erratum, and cite Li--Wu--Triesch for the proof.**
+> - **Ex. 3.3.3**: `M(K_{5,9}) = 4` and `M(K_{9,14}) = 5` - both match our `n(4,5)=9` and
+>   `n(5,9)=14`. Independent confirmation of two cells.
+>
+> **Still to do:** any published table for `m >= 6`, which is where our own contribution would
+> lie. Nothing in Ch. 3 gives one.
+
 **The claim.** `n(k,m)` complete and proven maximal for `k = 1..8`, 130 cells
 (`data/pareto_sb.csv`, evidence in `evidence/pareto_certification_k1_8.txt`).
 
@@ -130,7 +172,13 @@ literature before any of them is stated as ours:
 - **Vertex-Splitting Pullback Lemma** and its star-expansion corollary — the repo notes it is
   *not* a restatement of Subgraph Monotonicity, but check Aigner Ch. 2–3 for a pullback or
   homomorphism-monotonicity principle.
-- **The `G_k` closed form** (dyadic blocks of partial binomial sums) — plausibly folklore.
+- **The `G_k` closed form** (dyadic blocks of partial binomial sums) — **RESOLVED 2026-09-02:
+  it is Aigner's, and it is his *definition*.** Book p. 147, display (3.12) defines `N(k)` by
+  `n_1 = 2^k`, `n_2 = C(k,0)+...+C(k,k-1)`, and generally
+  `n_{2^{i-1}+1} = ... = n_{2^i} = C(k,0)+...+C(k,k-i)`, with Lemma 3.23 giving
+  `sum n_i = 3^k` and the two recursions. `N(3) = (8,7,4,4,1,1,1,1)` is printed there and equals
+  `G_3`. So the closed form must be cited, not claimed; what is ours is only the choice to
+  *define* `G_k` by the recurrence and derive the closed form as a cross-check.
 
 For each: either find the citation, or state in the paper that no published statement was
 found, having actually looked.

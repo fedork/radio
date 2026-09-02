@@ -22,3 +22,34 @@ This independently matches the state-transition table in [problem.md](problem.md
 - **Exact `m=3`.** The answer to Exercise 3.3.1 proves `M(K_{3,2^k-k}) <= k` and `M(K_{3,2^k-k+1}) >= k+1` (book p. 345, PDF p. 75), equivalent to `n(k,3) = 2^k-k` for `k >= 2`.
 
 The scan supports the graph/model discussion and the exact small-`m` citations already used in [literature.md](literature.md).  It does not supply the Chapter 2 balance/spring-scale exposition or the results referred to there as 2.10 and 2.13.
+
+## Additions from the full Chapter 3 scan, 2026-09-02
+
+Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only; Chapter 2 is still unread).
+
+- **The converse conjecture, verbatim** (book p. 150, right after the proof of Prop. 3.25):
+  "It is tempting to conjecture that the converse to **3.25** also holds: `A <= N(k) ==>
+  M(A) <= k`. If true, this would provide a beautiful characterization of star forests with
+  cost `k`, but so far only partial results are known."  This is the sentence the `K=6`
+  counterexample refutes, and the one a paper must quote.
+- **`N(k)` is defined by the closed form**, display (3.12), book p. 147:
+  `n_1 = 2^k`, and `n_{2^{i-1}+1} = ... = n_{2^i} = C(k,0) + ... + C(k,k-i)`. Lemma 3.23 adds
+  `sum n_i = 3^k` and the two halving recursions. `N(3) = (8,7,4,4,1,1,1,1)` is printed and
+  equals `G_3`. **The dyadic-block partial-binomial-sum form is therefore Aigner's, not ours.**
+- **Corollary 3.29** (book p. 152): `M(K_n) >= k+1` whenever `C(n,2) > lambda * 3^(k-1)`,
+  `lambda = 3/(2 sqrt 3 - 2)`. The remark after it says "it is quite possible that `K_5` and
+  `K_8` are the only 3-optimal graphs" - speculation, so **Aigner did not have the `Sa`
+  sequence**. He cites table 2.13 (Chapter 2) for `M(K_3) = 2`; that table is the remaining
+  place to check.
+- **Exercise 3.3.1**: `M(K_{3,n}) <= k <=> n <= 2^k - k`. Matches our `n(k,3)` exactly.
+- **Exercise 3.3.2**: `M(K_{4,n}) <= k <=> n <= 2^k - k + 2`. **The printed formula is an
+  erratum.** At `k=2` it claims `M(K_{4,4}) <= 2`, i.e. 16 edges in 2 ternary tests, against
+  the information bound `16 > 9`; and it gives 7 at `k=3` where exhaustive search gives 4. The
+  intended statement is Li--Wu--Triesch's Corollary 3, `n(k,4) = 2^k - 2k + 2`, which matches
+  every verified cell. Cite Aigner for the first statement of the case, note the erratum, cite
+  Li--Wu--Triesch for the proof.
+- **Exercise 3.3.3**: `M(K_{5,9}) = 4` and `M(K_{9,14}) = 5` - both agree with our `n(4,5)=9`
+  and `n(5,9)=14`.
+- **Proposition 3.32** (attributed to Andreae 1988b): for forests of max degree `<= r`, the
+  exact gap between `M(F)` and the information-theoretic bound. Adjacent to, but not the same
+  as, the star-forest question.
