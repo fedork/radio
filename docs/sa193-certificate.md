@@ -68,9 +68,15 @@ are included.
   sixteen roots in one session. This certificate is a compact, checkable *replay* artifact derived
   from that run's output. Adopting it changes which file you hand out, not the provenance of the
   result.
-- The refuter shares the solver core (split enumeration, dominance). So a zero-gap replay is
-  solver-core validation, **not** an independent second implementation. `tools/check_level_chain.py`
-  is genuinely independent of the solver, but it checks structure only.
+- The refuter shares the solver core (split enumeration, dominance), so a zero-gap refuter replay
+  is solver-core validation, **not** an independent second implementation.
+- **The chain is now also verified independently** (2026-09-01). `tools/cleanroom` shares no code
+  with the solver and recomputes every rule from `docs/problem.md` and `docs/theorems/`; it closes
+  all eight levels with zero gaps — 2,508,278 claims at k=7 on one `c8a.8xlarge`, the other 338,290
+  locally, summing to exactly the 2,846,568 claims `tools/check_level_chain.py` counts. Record and
+  hashes: [../evidence/cleanroom_verifier_2026-09-01.txt](../evidence/cleanroom_verifier_2026-09-01.txt).
+  It agrees with the production engine on total work to 0.46% over 3.2 trillion candidate cells, so
+  it is exploring the same tree rather than a cheaper approximation of it.
 - The trimmed chain's *derivation* used the coloring run, but its *validity* does not depend on the
   coloring being correct: coloring only proposed the subset, and the zero-gap replay plus the
   structural check are what establish it.

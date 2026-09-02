@@ -97,17 +97,19 @@ Measured on an M4 Pro, 12 workers, against the frozen refuter on identical input
 
 | corpus | claims | cleanroom | refuter | ratio |
 |---|---|---|---|---|
-| Sa(113) full chain, whole process | 304,105 | 135.6 CPU s | 100.6 CPU s | 1.35x |
-| run9 k=7 stride-500, verify phase | 5,017 | 678 CPU s | 434 CPU s | 1.56x |
-| run9 k=7 stride-500, index build | - | 366 s, 2.6 GB | 2.56 s, 21 MB | 140x |
-| run9 k=2..6, 8, 9 | 338,290 | 1,862 CPU s (+386 s k=8 build) | - | - |
+| **run9 k=7, complete** (c8a.8xlarge, 32 threads) | 2,508,278 | **262,192 CPU s / 2h21m wall** | 200,939 CPU s / 3h29m wall (16 threads) | 1.30x CPU, 0.68x wall |
+| Sa(113) full chain, whole process (M4 Pro, 12) | 304,105 | 135.6 CPU s | 100.6 CPU s | 1.35x |
+| run9 k=2..6, 8, 9 (M4 Pro, 12) | 338,290 | 1,862 CPU s (+386 s k=8 build) | - | - |
+| run9 k=7 index build | - | 298 s on c8a, 2.66 GB peak | 2.56 s, 21 MB | ~120x |
 
-Projected full k=7: ~339,000 CPU s against the refuter's measured 200,939 (1.69x), which is
-~2.9 wall hours on a 32-vCPU `c8a.8xlarge` against the refuter's 3.5 wall hours on 16 vCPU.
+At full k=7 scale the two engines charge 3,234,992,515,839 candidate cells against
+3,220,215,775,519 accepted prefixes — **0.46% apart over 3.2 trillion**, so they explore the same
+tree. (My earlier projection from a stride-500 sample said 1.69x CPU; the real figure is 1.30x,
+because the sample's fixed index build is amortized over 500x more claims at full scale.)
 
 **The gap is constant factors, not a missing prune.** Candidate-cell counts agree with the
-production engine to 0.26% per part-count on the k=7 sample (np=2 exactly, 9,858 both sides), so
-the two explore the same tree. Where the extra time goes, from a profile of the current binary
+production engine to 0.46% on the complete k=7 level (and to 0.26% per part-count on a
+stride-500 sample, np=2 exactly at 9,858 both sides), so the two explore the same tree. Where the extra time goes, from a profile of the current binary
 (top three: child reconstruction, STAR, the dominance walk; malloc is noise):
 
 - **Child reconstruction.** `radiobase.c` keeps `sb0`/`sb1`/`sb2` live across the descent, writing

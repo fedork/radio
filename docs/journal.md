@@ -12890,3 +12890,50 @@ unreachable; firing counts alone cannot size a subtree prune) - deferrable. Pari
 refuter runs 15.0M charged cells/s/core on M4 Pro uninstrumented, 16M/s/core on c8a; the pilot
 binary itself carries ~23% counter overhead, so timing baselines must use uninstrumented builds.
 The instrumentation is kept compile-gated for future measurement.
+
+## 2026-09-01 -- The Sa(193) certificate is now verified by an independent implementation
+
+`tools/cleanroom` closes all eight levels of the certificate of record with zero gaps. It is
+Rust, standard library only, shares no code with the solver, and recomputes every rule from the
+statement it cites — `G_k` from its recurrence with the closed form only as a test, dominance as
+an insert-time up-closure trie, STAR with the documented tail clamp. Full record, hashes and
+falsification evidence: [evidence/cleanroom_verifier_2026-09-01.txt](../evidence/cleanroom_verifier_2026-09-01.txt).
+
+k=7 (2,508,278 claims) ran on one `c8a.8xlarge`: 2h21m wall, 262,192 CPU s, 2.66 GB peak RSS,
+zero gaps. The other 338,290 claims ran locally. 338,290 + 2,508,278 = 2,846,568, exactly what
+`tools/check_level_chain.py` counts, so every claim is accounted for and the structural and
+semantic halves now come from different implementations. **This retires the standing caveat that
+a zero-gap replay was solver-core validation rather than an independent second implementation**;
+`docs/sa193-certificate.md`, the H3 row and the `radio_verify.c` section are updated in place.
+
+The strongest evidence that it is really doing the work: it charged 3,234,992,515,839 candidate
+cells against the frozen refuter's 3,220,215,775,519 accepted prefixes — 0.46% apart over 3.2
+trillion. Same search tree at full scale, not a cheaper approximation.
+
+Cost: 262,192 CPU s against the refuter's 200,939 on the same level, i.e. **1.30x the CPU but
+1.48x faster in wall clock** on the hardware each used (32 vCPU vs 16). The gap is constant
+factors, not missing prunes — a profile puts it in child reconstruction, where the C engine keeps
+its three child arrays live across the descent and writes one slot per depth while the checker
+rebuilds and re-sorts each partial child from coordinates at every cell. That is fixable without
+touching a rule and is the obvious next improvement, along with replacing the pre-expanded
+up-closure (41.1M tuples, 366 s, 2.6 GB) with query-time Pareto fronts like the engine's, which
+cost it 2.56 s for the same facts.
+
+Two things worth carrying forward. **The complement quotient is an exact 2x, not the 0.01% the
+solver's `skiptop` counter suggests** — that counter sees only depth-0 adjacent duplicates and
+misses that one orbit dedup at the root halves every subtree beneath it. A first draft omitted
+SYM-C on the strength of that number; adding it as a single whole-vector lexicographic rule took
+Sa(113) from 2.45e9 cells to 1.22e9. **And a mutation test that does not bite is worse than no
+test**: mutating the v1 fixture's support proves nothing because its claims are STAR-refutable
+outright, so `tools/test_cleanroom.sh` mutates a real load-bearing level instead (dropping level
+3's support leaves 88 of 127 claims unverifiable).
+
+Also measured, and negative: the coverage-certificate route this work originally planned. See the
+separate entry above — the run9 k=7 rejection structure does not compress, so the checker has to
+re-derive the enumeration, which is what this one does.
+
+Process cost worth recording: two aborted EC2 launches, ~$0.85, both my pipeline bugs rather than
+the checker's — a cloud-init `HOME` fault under `set -u` that also defeated the ERR trap and left
+the host idle-billing, and launching a 3-hour job with no progress output at all. Both are fixed
+in `tools/cleanroom_ec2_*`, which now also verifies the complete chain by default rather than
+k=7 alone.

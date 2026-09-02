@@ -1,0 +1,93 @@
+Cleanroom verification of the Sa(193) certificate of record, 2026-09-01
+========================================================================
+
+The certificate of record (artifact sa193-certificate-2026-08-19, 8 level-v2 files,
+2,846,568 claims) is now verified end to end by an implementation that shares no code with
+the solver: tools/cleanroom, Rust, standard library only, every rule recomputed from the
+statement it cites.  This is the first independent semantic verification of the chain.
+Before it, `tools/check_level_chain.py` checked structure only, and every semantic replay
+was `radio_refute.c`, which `#include`s `radiobase.c` and is therefore solver-core
+validation rather than a second implementation.
+
+Trust base and what it rests on
+-------------------------------
+Inputs the checker was written from: docs/problem.md, docs/theorems/*.md, and the
+certificate grammars in docs/certificate.md.  It reads no cache, includes no solver source,
+and recomputes G_k from its defining recurrence (the closed form appears only as a test).
+The rules are exactly INFO, STAR (tail-clamped), DOM, and UNIT in canonicalization, applied
+to full or partial children under Subgraph Monotonicity.  Split-space quotients are SYM-E
+(equal-part, non-decreasing option index), SYM-S (square-part shore swap, an option-domain
+restriction), and SYM-C (one whole-vector complement rule); the composition argument is in
+audit.rs and the regression for it is the exhaustive selftest below.
+
+Level k=7 on EC2, run 20260902T010521Z
+--------------------------------------
+  source commit       32976c18e00fb61e2303653762f725e28c338b14
+  binary sha256       1b23f3c19e8f226b53b2a45b9b1a1a684180fe18cae9087af214430fc03ec6d5
+  toolchain           rustc 1.98.0 / cargo 1.98.0
+  host                i-0998b2e47b8c0f6f9, c8a.8xlarge, 32 threads (terminated after)
+  input               sa193-k7.cert sha256 41a233f73eea36012aa325eb1d61d1e3ca5bc857d6a7b30418c112cec6e8a9a6
+  gates passed        cargo test; exhaustive selftest; closed fixture; gap fixture (failed
+                      closed as required); 1/5000 k=7 smoke, 0 gaps
+  index build         298.469 s, 41,132,111 closure tuples, 236,868/429,440 options dead
+  result              TOTAL verified 2508278, gaps 0, contradicted 0
+  candidate cells     3,234,992,515,839
+  wall / CPU          2:21:23 (8,483 s) / 262,192.33 s, 3090% CPU
+  peak RSS            2,785,772 KB (2.66 GB)
+  retained            s3://radio-sa193-393287594714/cleanroom-verify/20260902T010521Z/
+                      k7-verify.out.zst sha256 132726dadec871044ccc6e7a321994678299517c242826ac26f06fc13f9131a2
+
+Remaining levels, local (M4 Pro, 12 threads), tools/cleanroom_verify_chain.sh
+-----------------------------------------------------------------------------
+  k=2      2 verified, 0 gaps
+  k=3    127 verified, 0 gaps
+  k=4 24,635 verified, 0 gaps
+  k=5 80,634 verified, 0 gaps
+  k=6 230,725 verified, 0 gaps
+  k=8  2,151 verified, 0 gaps
+  k=9     16 verified, 0 gaps
+  TOTAL 338,290 verified, 0 gaps, 17,103,587,443 cells, 1,862 CPU s
+Structure, independently: tools/check_level_chain.py --expect-top-sum 193 over all eight
+levels reports 2,846,568 claims, internally consistent, inductively closed and terminating.
+338,290 + 2,508,278 = 2,846,568, so every claim in the chain is accounted for.
+
+Agreement with the production engine
+------------------------------------
+Same search tree, at full scale.  On k=7 the cleanroom checker charged 3,234,992,515,839
+candidate cells against the frozen refuter's 3,220,215,775,519 accepted prefixes - a 0.46%
+difference over 3.2 trillion.  (The stride-500 sample agreed to 0.26% per part-count, with
+np=2 identical at 9,858.)  No prune is missing and none is unsound in a way that would show
+as a smaller tree.
+
+Cost, against the refuter on the same level:
+  cleanroom  262,192 CPU s / 8,483 wall s on 32 vCPU
+  refuter    200,939 CPU s / 12,561 wall s on 16 vCPU
+So 1.30x the CPU, and 1.48x faster in wall clock on the hardware each actually used.  The
+gap is constant factors, not extra work - see docs/tools.md for the profile attributing it
+to child reconstruction, and the 140x index-build difference (pre-expanded up-closure tuples
+versus the engine's query-time Pareto fronts).
+
+Falsification evidence
+----------------------
+Verifying good certificates proves little on its own; a checker that accepts everything
+passes that test.  What was also checked:
+  * The gap fixture (a deliberately false `fact 1 Sb(1:1)`) fails closed, on the EC2 host as
+    a launch gate.
+  * The certificate of record's level 5 with a solvable `Sb(2:1)` claim injected: the
+    cleanroom checker reports GAP verdict=uncovered and exits 1, while still verifying the
+    80,634 genuine claims.  The frozen refuter independently rejects the same file
+    (verdict=contradicted - it has the positive embedded-G_k terminal, which the cleanroom
+    checker deliberately lacks) and also verifies the same 80,634.
+  * tools/test_cleanroom.sh, 19 checks in ~30 s: unit tests, the exhaustive selftest, both
+    shared fixtures, semantic mutations against a load-bearing level (dropping level 3's
+    support leaves 88 of 127 claims unverifiable), v2 grammar strictness, and thread- and
+    shard-invariance of the verdict.
+  * The selftest is the regression that guards the quotients: for every state with at most
+    three parts, n <= 6 and k <= 4, a deliberately unquotiented naive solver written from
+    docs/problem.md decides solvability, and the audit engine must verify exactly the
+    unsolvable ones and refuse the solvable ones even given complete support.  That is the
+    control shape that caught the 2026-08-31 quotient-composition trap.
+
+Cost of the whole exercise: two aborted EC2 launches (~$0.85, both my pipeline bugs - a
+cloud-init HOME fault and a 3-hour job with no progress output), one completed k=7 run
+(~$3.3), and about 40 local CPU-minutes.
