@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-09-01**.
+don't know it. Last refreshed **2026-09-02**.
 
 The central singleton question is now resolved negatively.  Necessity remains proved, but weak
 majorization by `G_K` is not sufficient.  The exact-support, full-mass state
@@ -221,7 +221,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 |---|---|---|
 | **H1** | Publish | Draft in `paper/`. `Sa` is now proven through k=10; the `<TODO>` sections and remaining paper cleanup are tracked in P5. |
 | **H2** | The K=9 Sb column | **Main open front.** Exact maxima are known for `m=1..6`; run9 supplies proven upper bounds at `m=81..96`, retained legacy lower bounds cover parts of `m=65..94`, and the band **m=7..64 is entirely blank**. |
-| **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16; independently re-verified 2026-09-01.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. The certificate of record is now closed with zero gaps by `tools/cleanroom`, which shares no code with the solver — all 2,846,568 claims across the eight levels, agreeing with the production engine on total work to 0.46%. See [the record](../evidence/cleanroom_verifier_2026-09-01.txt). The trust base for the negative half is therefore no longer a single implementation. |
+| **H3** | Is `Sa = 192` maximal at k=10? | **Done 2026-08-16; independently re-verified 2026-09-02.** Proof-safe cold run9 rejected all sixteen `Sb(n1:193-n1)@9` roots in one session; a verified tree proves 192 achievable. The certificate of record is closed with zero gaps by `tools/cleanroom`, which shares no code with the solver: all 2,846,568 claims and the structural chain check in one 1h50m run, agreeing with the production engine on total work to 0.46%. See [the record](../evidence/cleanroom_verifier_2026-09-01.txt). The trust base for the negative half is therefore no longer a single implementation. |
 | **H4** | Structural theory | The Singleton Majorization Converse is exhaustively true through `K=5` and false for every `K>=6`; hence `K=6` is the proved first failure level.  Prefix cylinders plus exact Hall fallback close all 1,431,800,647,444 exact-support `K=5` parents, and the Exact Prefix-Cylinder Extension Lemma now isolates their reusable sufficient criterion.  The original `K=6` counterexample is the unique first-cut hole on its fixed rank-15/32 face, and exhaustive search makes distance 14 globally minimal for exact-support recursive unsolvability.  Next classify the distance-14 holes/non-unit cores and seek the laminar Hall-dual law eliminating the coloring choice.  The excess-`q` Pareto-assembly avenue remains parked. |
 
 ## What is established

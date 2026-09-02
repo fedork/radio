@@ -97,15 +97,23 @@ Measured on an M4 Pro, 12 workers, against the frozen refuter on identical input
 
 | corpus | claims | cleanroom | refuter | ratio |
 |---|---|---|---|---|
-| **run9 k=7, complete** (c8a.8xlarge, 32 threads) | 2,508,278 | **262,192 CPU s / 2h21m wall** | 200,939 CPU s / 3h29m wall (16 threads) | 1.30x CPU, 0.68x wall |
-| Sa(113) full chain, whole process (M4 Pro, 12) | 304,105 | 135.6 CPU s | 100.6 CPU s | 1.35x |
-| run9 k=2..6, 8, 9 (M4 Pro, 12) | 338,290 | 1,862 CPU s (+386 s k=8 build) | - | - |
-| run9 k=7 index build | - | 298 s on c8a, 2.66 GB peak | 2.56 s, 21 MB | ~120x |
+| **complete chain** (c8a.8xlarge, 32 threads) | 2,846,568 | **191,800 CPU s / 1h50m wall**, 3.05 GB | 201,983 CPU s / 3h30m wall (16 threads), 1.24 GB | **0.95x CPU, 0.52x wall** |
+| run9 k=7 alone, within that run | 2,508,278 | 5,941 s wall + 227 s index build | - | - |
+| Sa(113) full chain (M4 Pro, 12) | 304,105 | 94.1 CPU s | 100.6 CPU s | 0.94x |
 
 At full k=7 scale the two engines charge 3,234,992,515,839 candidate cells against
 3,220,215,775,519 accepted prefixes — **0.46% apart over 3.2 trillion**, so they explore the same
-tree. (My earlier projection from a stride-500 sample said 1.69x CPU; the real figure is 1.30x,
-because the sample's fixed index build is amortized over 500x more claims at full scale.)
+tree. k=7 is 99.5% of the audit; k=8's cost is almost entirely its index build (2,508,278 support
+facts serving 2,151 claims).
+
+Two things carry that performance, and both were added after a first version measured 1.30x the
+refuter's CPU. Neither touches a rule — the cell counts are bit-identical before and after.
+**Partial children are incremental**: options carry precomputed canonical pieces and universe ids,
+and each depth caches its prefix child in the two orders the rules consume (ascending id for DOM,
+descending width for STAR), so a cell merges one or two pieces instead of rebuilding and
+re-sorting the whole child from coordinates. **The support is antichain-reduced** at build time:
+facts are inserted in ascending (mass, parts) order and one whose dominator is already present is
+dropped with its whole closure, which is Subgraph Monotonicity corollary 3 applied where it pays.
 
 **The gap is constant factors, not a missing prune.** Candidate-cell counts agree with the
 production engine to 0.46% on the complete k=7 level (and to 0.26% per part-count on a

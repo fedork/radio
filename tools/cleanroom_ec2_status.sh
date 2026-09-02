@@ -52,11 +52,26 @@ report_once() {
     [[ -n "$RUN_ID" ]] || RUN_ID=$discovered
     local prefix="cleanroom-verify/$RUN_ID"
 
+    local stages
+    stages=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/stages.log" - --no-progress 2>/dev/null || true)
+
     local elapsed="" cost=""
     # BSD date -j -f ignores the trailing offset and assumes local time, so force TZ=UTC.
     if launched_epoch=$(TZ=UTC date -j -f '%Y-%m-%dT%H:%M:%S+00:00' "$launched" +%s 2>/dev/null \
             || date -d "$launched" +%s 2>/dev/null); then
-        local secs=$(( $(date -u +%s) - launched_epoch ))
+        # Bill only until the host stopped working. Charging to "now" for an instance that
+        # self-stopped overnight reported $14 for a $2.60 run.
+        local end_epoch; end_epoch=$(date -u +%s)
+        if [[ "$state" != running && "$state" != pending ]]; then
+            local last_stamp
+            last_stamp=$(grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z' \
+                <<<"$stages" | tail -1)
+            if [[ -n "$last_stamp" ]]; then
+                end_epoch=$(TZ=UTC date -j -f '%Y-%m-%dT%H:%M:%SZ' "$last_stamp" +%s 2>/dev/null \
+                    || date -d "$last_stamp" +%s 2>/dev/null || date -u +%s)
+            fi
+        fi
+        local secs=$(( end_epoch - launched_epoch ))
         elapsed=$(printf '%dh%02dm' $(( secs / 3600 )) $(( secs % 3600 / 60 )))
         local rate; rate=$(hourly_rate "$itype")
         [[ "$rate" == 0 ]] || cost=$(awk -v s="$secs" -v r="$rate" 'BEGIN{printf "$%.2f", s/3600*r}')
@@ -68,8 +83,6 @@ report_once() {
     [[ -z "$cost" ]] || printf ' on_demand_cost~%s' "$cost"
     echo
 
-    local stages
-    stages=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/stages.log" - --no-progress 2>/dev/null || true)
     if [[ -z "$stages" ]]; then
         echo '  stage=bootstrapping; no stages.log yet (Rust toolchain install takes ~1 min)'
     else

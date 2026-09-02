@@ -12937,3 +12937,45 @@ the checker's — a cloud-init `HOME` fault under `set -u` that also defeated th
 the host idle-billing, and launching a 3-hour job with no progress output at all. Both are fixed
 in `tools/cleanroom_ec2_*`, which now also verifies the complete chain by default rather than
 k=7 alone.
+
+## 2026-09-02 -- Complete-chain cleanroom verification, and the checker overtakes the refuter
+
+Follow-up to the previous entry. Both inefficiencies it named are fixed, and the whole
+certificate of record is now verified in a single run rather than k=7 separately from the rest:
+run `20260902T045843Z`, one `c8a.8xlarge`, **all 2,846,568 claims, zero gaps, 1h49m35s wall,
+191,800 CPU s, 3.05 GB peak**, with `tools/check_level_chain.py` run over the same eight files on
+the same host beforehand. Record, hashes and per-level numbers:
+[evidence/cleanroom_verifier_2026-09-01.txt](../evidence/cleanroom_verifier_2026-09-01.txt).
+
+**The independent checker is now faster than the solver-core refuter**: 191,800 CPU s against
+201,983 for the same trimmed chain (0.95x), and 1.92x faster in wall clock on the hardware each
+used. It started at 1.30x. The two fixes, neither touching a rule:
+
+- *Incremental partial children.* Each cell had been rebuilding every partial child from `(n,m)`
+  coordinates — subtract, orient, strip units, insertion-sort — three times over, quadratic in
+  depth. Options now carry precomputed canonical pieces with universe ids, and each depth caches
+  its prefix child in the two orders the rules consume, so a cell merges one or two pieces.
+- *Antichain reduction of the support.* Facts are inserted in ascending (mass, parts) order and
+  one whose dominator is already present is dropped along with its whole closure — Subgraph
+  Monotonicity corollary 3 applied at build time. At k=7 it drops 1,384 facts but 19% of the
+  closure (41.1M to 33.2M tuples), because redundant facts had large closures.
+
+The safety property that made this comfortable to do: **candidate-cell counts are bit-identical
+before and after** — 1,221,827,462 on Sa(113), 6,545,617,897 on the k=7 sample, and
+3,234,992,515,839 for the full k=7 level across two independent EC2 runs at different commits.
+Any change to the search tree would have shown up immediately.
+
+What is left slower is memory and the index build: 3.05 GB against the refuter's 1.24 GB, and
+227 s (k=7) plus 353 s (k=8) of build. That is the pre-expanded up-closure. Replacing it with
+query-time Pareto fronts like the engine's needs the general injection matcher, because a sorted
+greedy walk is incomplete — the crossing counterexample is in `dom.rs`'s tests — so it is a real
+piece of work, not a swap.
+
+Also settled, from a question worth recording: single-option elimination is upfront and shared
+(55% of options dead at k=7, once per `(part,k)`), but the depth-0 partial-child check re-tests
+exactly what that filter already certified. Skipping it is sound and was left undone deliberately:
+depth-0 cells are ~0.03% of the tree. The interesting generalization, a pairwise/forward-checking
+table, would not catch anything currently missed — a depth-*d* partial child contains every
+earlier pair as a sub-multiset, so SUBMON already discharges those — it would only prune earlier.
+The measured counterfactual for that whole family is the engine's own `rb_dead`, worth **1.7%**
+here, so it is not the lever it was in `radio_verify`.

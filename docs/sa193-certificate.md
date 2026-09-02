@@ -58,6 +58,17 @@ REFUTE_MIN_K=<k> REFUTE_MAX_K=<k> ./run9_refute sa193-k<k>.cert
 Each level must print `TOTAL verified <claims>, gaps 0`. A missing refutation is reported as a gap,
 so an inadequate certificate fails loudly rather than passing quietly.
 
+**Semantics, independently** — this is the stronger check, since the refuter shares the solver
+core and `tools/cleanroom` shares nothing:
+
+```
+cd tools/cleanroom && cargo build --release
+./target/release/radio_cleanroom audit --threads N --progress 300 sa193-k*.cert
+```
+
+It must print `TOTAL verified 2846568, gaps 0`. `tools/cleanroom_ec2_launch.sh` runs both halves
+on one dedicated host and does exactly this; the whole chain is about 1h50m on 32 vCPU.
+
 The release contains the verification evidence for exactly these files: run `20260819T020000Z`
 verified all 2,846,568 claims with zero gaps, and its per-level logs, totals and provenance checks
 are included.
@@ -71,10 +82,10 @@ are included.
 - The refuter shares the solver core (split enumeration, dominance), so a zero-gap refuter replay
   is solver-core validation, **not** an independent second implementation.
 - **The chain is now also verified independently** (2026-09-01). `tools/cleanroom` shares no code
-  with the solver and recomputes every rule from `docs/problem.md` and `docs/theorems/`; it closes
-  all eight levels with zero gaps — 2,508,278 claims at k=7 on one `c8a.8xlarge`, the other 338,290
-  locally, summing to exactly the 2,846,568 claims `tools/check_level_chain.py` counts. Record and
-  hashes: [../evidence/cleanroom_verifier_2026-09-01.txt](../evidence/cleanroom_verifier_2026-09-01.txt).
+  with the solver and recomputes every rule from `docs/problem.md` and `docs/theorems/`; one
+  1h50m run on a `c8a.8xlarge` closes all eight levels with zero gaps — all 2,846,568 claims —
+  having first run `tools/check_level_chain.py` over the same eight files on the same host.
+  Record and hashes: [../evidence/cleanroom_verifier_2026-09-01.txt](../evidence/cleanroom_verifier_2026-09-01.txt).
   It agrees with the production engine on total work to 0.46% over 3.2 trillion candidate cells, so
   it is exploring the same tree rather than a cheaper approximation of it.
 - The trimmed chain's *derivation* used the coloring run, but its *validity* does not depend on the
