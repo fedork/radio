@@ -106,6 +106,12 @@ At full k=7 scale the two engines charge 3,234,992,515,839 candidate cells again
 tree. k=7 is 99.5% of the audit; k=8's cost is almost entirely its index build (2,508,278 support
 facts serving 2,151 claims).
 
+Two orderings were measured and are settled. Part enumeration order is heaviest-first: on
+Sa(113), mass-descending charges 1.22e9 candidate cells against 8.78e9 for long-side-first and
+17.78e9 for mass-ascending. And the closure build's cost is node count, not allocation or
+region bounds - three successive bounds (INFO mass cap, STAR majorization, and the
+claim-reachability downset) all measure as already saturated, `uni=.../+0` at every level.
+
 Two things carry that performance, and both were added after a first version measured 1.30x the
 refuter's CPU. Neither touches a rule — the cell counts are bit-identical before and after.
 **Partial children are incremental**: options carry precomputed canonical pieces and universe ids,

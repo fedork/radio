@@ -47,8 +47,10 @@ impl Part {
 
 /// Canonical total order for storing states: descending (mass, n, m).
 /// Any fixed total order works for CANON; the choice matters only for enumeration cost
-/// (it decides which part the audit splits first). Measured on the Sa(113) corpus:
-/// mass-descending 2.45e9 cells vs long-side-first 8.78e9 - keep mass-descending.
+/// (it decides which part the audit splits first). Measured on the Sa(113) corpus, candidate
+/// cells: mass-descending 1.22e9, long-side-first 8.78e9 (7.2x worse), mass-ASCENDING
+/// 17.78e9 (14.6x worse). Heaviest-part-first is the right choice and the margin is large -
+/// do not re-litigate this without a corpus-scale measurement.
 pub fn part_key(p: Part) -> (u32, u16, u16) {
     (p.mass(), p.n, p.m)
 }
