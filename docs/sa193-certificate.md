@@ -1,7 +1,7 @@
 # The Sa(193) certificate of record
 
 Adopted 2026-08-19. The artifact you hand someone who wants to re-check that `Sa(193)` is
-unsolvable in 9 tests is the **trimmed eight-level chain**, released as
+unsolvable in **10** tests is the **trimmed eight-level chain**, released as
 [`sa193-certificate-2026-08-19`](https://github.com/fedork/radio-data/releases/tag/sa193-certificate-2026-08-19).
 
 ## What it is

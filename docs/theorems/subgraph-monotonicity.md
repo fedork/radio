@@ -1,6 +1,13 @@
 # The Graph Reformulation and the Subgraph Monotonicity Theorem
 
-Written up 2026-08-03. The theorem is elementary, but it had never been stated, and it is
+Written up 2026-08-03; **the attribution below was corrected 2026-09-02.** The theorem is
+elementary and it is **published**: Aigner 1988, *Combinatorial Search*, equation (3.10),
+book p. 145, states `H subset-of G => M(H) <= M(G)` (see
+[../aigner-1988-scan.md](../aigner-1988-scan.md)). This page's earlier claim that it "had
+never been stated" was wrong and must not be repeated in any write-up - cite Aigner. What
+follows is a self-contained proof in this project's graph reformulation, kept because the
+certificate and cache arguments below depend on the exact form of the corollaries, not
+because the result is new. It is
 what the solver's entire result cache rests on — `cacheCanSolve` closes downward and
 `cacheCantSolve` closes upward over the relation built in
 `sbb_lesser` / `sbb_greater`. It is also the lemma a negative certificate needs in order to
