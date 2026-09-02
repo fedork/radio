@@ -11,6 +11,14 @@
 # host, input hashes, exact command).
 set -euo pipefail
 
+# cloud-init runs user data with no HOME, and `set -u` makes an unguarded $HOME fatal - that
+# killed run 20260902T002643Z right after the toolchain install, leaving the host idle and
+# billing because a `set -u` shell error does not reliably run the ERR trap. Pin all three
+# explicitly, and give the toolchain a fixed home rather than an inherited one.
+export HOME=${HOME:-/root}
+export RUSTUP_HOME=${RUSTUP_HOME:-/root/.rustup}
+export CARGO_HOME=${CARGO_HOME:-/root/.cargo}
+
 BUCKET=radio-sa193-393287594714
 WORK=
 PREFIX=
@@ -60,6 +68,17 @@ fail() {
     exit 1
 }
 trap 'fail "unexpected error at line $LINENO"' ERR
+# Belt and braces: a `set -u` expansion error exits without running the ERR trap, so catch
+# every nonzero exit path here too. Otherwise the host sits idle at full price until the
+# 12-hour systemd hard stop. FINISHED is set before the trap that reads it, or `set -u`
+# would fault inside the handler itself.
+FINISHED=0
+trap 'rc=$?; if (( rc )) && (( ! FINISHED )); then
+        printf "%s ABORTED rc=%d\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" >> stages.log
+        aws s3 cp stages.log "s3://$BUCKET/$PREFIX/stages.log" --no-progress || true
+        aws s3 cp run.log "s3://$BUCKET/$PREFIX/run.log" --no-progress || true
+        shutdown -h +2 || true
+      fi' EXIT
 
 stage SETUP
 instance_id=$(TOKEN=$(curl -fsS -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' \
@@ -135,4 +154,5 @@ sha256sum k7-verify.out k7-verify.out.zst > final.sha256
 upload final.sha256 final.sha256
 upload run.log run.log
 stage DONE
+FINISHED=1
 shutdown -h +2
