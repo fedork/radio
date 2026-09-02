@@ -10,6 +10,7 @@ Two-defective quantity group testing: how large a coin set can be resolved in `k
 | [results.md](results.md) | What is established, with provenance |
 | [literature.md](literature.md) | Primary-source map, exact imported theorems, scalable algorithms, citation notes |
 | [publishable-claims.md](publishable-claims.md) | Conservative inventory of paper-worthy results, proof standards and exclusions |
+| [novelty-audit.md](novelty-audit.md) | The blocking prior-art questions, where to look, and what each answer changes |
 | [conjectures.md](conjectures.md) | What is predicted, and the experiment that would settle each |
 | [research-plan.md](research-plan.md) | Goals and what to work on next |
 | [tools.md](tools.md) | The solver, its drivers, and the verification tools |

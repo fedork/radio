@@ -6,7 +6,8 @@ checkers, both witnesses, evidence) that was extracted to a clean directory and 
 end to end - manifest verified, witness verified unconditionally, chain structure verified,
 the Rust checker built from source in 7 s with no dependencies, its selftest passed, and the
 cheap levels audited with zero gaps. What remains before submission is not engineering:
-**(a)** the novelty audit below, still not done, and **(b)** depositing the package publicly
+**(a)** the novelty audit, still not done and now briefed question-by-question in
+[novelty-audit.md](novelty-audit.md), and **(b)** depositing the package publicly
 with a DOI, since `fedork/radio-data` is private and every artifact link in this repo 404s
 for a referee.
 
