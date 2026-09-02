@@ -42,9 +42,60 @@ checkpoints, and `parse_file` ignores and re-echoes it while replaying facts. `t
 new solver log which lacks a complete block; `RADIO_ALLOW_LEGACY_PROVENANCE=1` exists only for a
 pre-banner historical file whose limitation is explicitly recorded in `docs/data.md`.
 
-## Independent negative verifier
+## Cleanroom verifier (`tools/cleanroom`, Rust)
 
-`radio_verify.c` shares no search code with `radiobase.c`. Build it with pthread support:
+The independent checker of record since 2026-09-01. It shares no code with the solver, has no
+external crates (std only), and recomputes every mathematical object from the statement it cites:
+`G_k` from its recurrence (closed form only as a test cross-check), dominance as an insert-time
+up-closure trie, STAR with the documented tail clamp. Every rule carries its lemma tag - INFO,
+STAR, DOM, UNIT, SUBMON, and the quotients SYM-E/SYM-S/SYM-C - and the module headers point at
+`docs/problem.md` and `docs/theorems/`.
+
+```
+cd tools/cleanroom && cargo build --release      # pinned to the toolchain in rust-toolchain.toml
+./target/release/radio_cleanroom selftest        # exhaustive agreement with an unquotiented oracle
+./target/release/radio_cleanroom audit --threads 12 [--stride S --offset O] CERT...
+tools/cleanroom_verify_chain.sh --threads 12 > chain.out          # every level except k=7
+tools/cleanroom_k7_ec2_launch.sh                                  # k=7, one dedicated c8a host
+```
+
+It reads both `radio-negative-level-certificate-v2` and flat `radio-negative-certificate-v1`, and
+fails closed: a claim whose split space is not covered prints `GAP verdict=uncovered` with the
+witnessing take vector, and a claim that is solvable outright prints `GAP verdict=contradicted`.
+Exit 1 on any gap. It is not built by `tools/build_radio.py`, so `tools/run_with_provenance.py`
+does not apply; the two wrappers above emit an equivalent `radio-cleanroom-provenance-v1` header
+(commit, source dirtiness, binary hash, toolchain, host, input hashes, exact command).
+
+`selftest` is the load-bearing regression, and the reason the quotients can be trusted: for every
+state with at most three parts, `n <= 6` and `k <= 4`, a deliberately unquotiented naive solver
+written from `docs/problem.md` decides solvability, and the audit engine must verify exactly the
+unsolvable ones and refuse the solvable ones even with complete support. That is the same shape of
+control that caught the 2026-08-31 quotient-composition trap.
+
+**The complement quotient is worth an exact 2x - do not "simplify" it away.** A first draft omitted
+SYM-C after reading the C solver's `skiptop` counter as 0.01% of work; that counter measures
+adjacent-duplicate skips at depth 0 only, and misses that one depth-0 orbit dedup halves every
+subtree beneath it. Adding SYM-C as a single whole-vector lexicographic rule (never a per-part
+normalization) took Sa(113) from 2.45e9 candidate cells to 1.22e9 and brought the per-part-count
+cell counts within 0.26% of the reference engine's.
+
+Measured on an M4 Pro, 12 workers, against the frozen refuter on identical inputs:
+
+| corpus | claims | cleanroom | refuter | ratio |
+|---|---|---|---|---|
+| Sa(113) full chain | 304,105 | 135.6 CPU s | 97.6 CPU s | 1.39x |
+| run9 k=7, stride 500 | 5,017 | 678 CPU s + 366 s one-time index build | 434 CPU s | 1.56x |
+| run9 k=2..6, 8, 9 | 338,290 | 1,862 CPU s (+386 s k=8 build) | - | - |
+
+The k=7 index build is one-time per level and dominated by materializing the 41.1M-tuple upward
+closure of 230,725 facts; peak RSS 2.6 GB.
+
+## Independent negative verifier (retired)
+
+`radio_verify.c` shares no search code with `radiobase.c`. It is superseded by the cleanroom
+checker above - it could not finish run9 k=7 (stopped at 251,131/2,576,885 claims) and its colored
+Sa(113) output is an active trap. Retained for its measurements and as a second opinion on small
+corpora. Build it with pthread support:
 
 ```
 tools/build_radio.py -O3 -pthread radio_verify.c -o radio_verify
