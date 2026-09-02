@@ -2,12 +2,20 @@
 Imported 2026-08-02 from the Google Docs export, punctuation unescaped.
 
 KNOWN WORK REMAINING - see docs/research-plan.md item P5:
-  - lemma numbering: (7) duplicates (5); "(7) holds true k up to 8" refers to (u1)
-  - <TODO> sections: Terminology, Unit Group Triviality Lemma, Insights, Refuted lemmas
-  - lemma (10)'s transcription is corrected, but the corrected conjecture is now refuted at k=10
-  - lemma (8) and the exact piecewise replacement for lemma (9) are now known from
-    Li--Wu--Triesch (2018); integrate the citation style with the final bibliography
-  - add lemma (12) for m=8 and the G_k = sum-of-binomials closed form
+  - <TODO> sections: Terminology, Unit Group Triviality Lemma, Insights
+  - add lemma (12) for m=8
+  - THE DRAFT PREDATES THE STRONGEST RESULTS AND DOES NOT YET CONTAIN THEM:
+      * singleton majorization by G_K is necessary but NOT sufficient - the K=6
+        counterexample and the infinite family for every K>=6, which answer negatively the
+        converse Aigner 1988 left open after Prop. 3.25;
+      * the converse IS true for K<=5 (exhaustive, 2026-08-31);
+      * the certified-verification architecture: the 2,846,568-claim certificate and its
+        independent re-verification by tools/cleanroom.
+    A restructure around these, rather than more polishing of the sections below, is the
+    remaining work. See docs/publishable-claims.md for the claim inventory and its
+    still-outstanding novelty audit.
+  - fixed 2026-09-02: the hand-typed Sb frontier is now a generated block; the (7)/(5)
+    numbering collision, the dead image reference and the mangled G_k formula are resolved.
 Do not treat any number in this file as authoritative; data/*.csv is.
 -->
 
@@ -65,68 +73,111 @@ produced known false negatives.
 
 **Maximum solvable Sb states with size 1**
 
-The following table enumerates all *max* values of single-group Sb states for k up to 8 ( Sb(n1 : n2) is considered to be *max* iff Sb(n1 : n2)  can be solved in k tests, but both Sb((n1+1) : n2) and Sb(n1 : (n2+1)) cannot. Therefore the set of these values for a given k forms a pareto front such that all values on or below the line are solvable in k and all values above it are not. The following table lists the maximum value of n1 for given k and n2 where n1>=n2 and Sb(n1 : n2) is solvable in k.
+Write `n(k,m)` for the largest `n1` with `Sb(n1 : m)` solvable in `k` tests, where `n1 >= m`.
+For each `k` these values form a Pareto frontier: every state on or below the line is solvable
+in `k`, every state above it is not. The frontier is complete and proven maximal for
+`k <= 8`. At `k = 9` only `m = 1..6` are settled, of which `m = 1..5` are published results
+(Aigner 1986 for `m = 2, 3`; Li--Wu--Triesch 2018 for `m = 4, 5`) and `m = 6` is established
+here; the band `m = 7..64` is open. At `k = 10` only `m = 5` (published) and an upper bound at
+`m = 6` are known.
 
-| n2\\K | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-| ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| **1** | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 |
-| **2** |  | 3 | 7 | 15 | 31 | 63 | 127 | 255 |
-| **3** |  |  | 5 | 12 | 27 | 58 | 121 | 248 |
-| **4** |  |  | 4 | 10 | 24 | 54 | 116 | 242 |
-| **5** |  |  |  | 9 | 22 | 50 | 109 | 231 |
-| **6** |  |  |  | 7 | 19 | 46 | 104 | 225 |
-| **7** |  |  |  |  | 17 | 42 | 97 | 214 |
-| **8** |  |  |  |  | 15 | 38 | 91 | 206 |
-| **9** |  |  |  |  | 14 | 36 | 87 | 198 |
-| **10** |  |  |  |  | 12 | 33 | 82 | 189 |
-| **11** |  |  |  |  | 11 | 31 | 77 | 182 |
-| **12** |  |  |  |  |  | 29 | 73 | 174 |
-| **13** |  |  |  |  |  | 27 | 69 | 168 |
-| **14** |  |  |  |  |  | 25 | 66 | 161 |
-| **15** |  |  |  |  |  | 24 | 63 | 155 |
-| **16** |  |  |  |  |  | 22 | 60 | 150 |
-| **17** |  |  |  |  |  | 21 | 58 | 144 |
-| **18** |  |  |  |  |  | 20 | 55 | 139 |
-| **19** |  |  |  |  |  | 19 | 53 | 135 |
-| **20** |  |  |  |  |  |  | 51 | 130 |
-| **21** |  |  |  |  |  |  | 49 | 126 |
-| **22** |  |  |  |  |  |  | 47 | 122 |
-| **23** |  |  |  |  |  |  | 45 | 118 |
-| **24** |  |  |  |  |  |  | 43 | 115 |
-| **25** |  |  |  |  |  |  | 41 | 111 |
-| **26** |  |  |  |  |  |  | 40 | 108 |
-| **27** |  |  |  |  |  |  | 38 | 105 |
-| **28** |  |  |  |  |  |  | 37 | 102 |
-| **29** |  |  |  |  |  |  | 36 | 100 |
-| **30** |  |  |  |  |  |  | 35 | 97 |
-| **31** |  |  |  |  |  |  | 34 | 94 |
-| **32** |  |  |  |  |  |  | 33 | 92 |
-| **33** |  |  |  |  |  |  | 32 | 89 |
-| **34** |  |  |  |  |  |  |  | 87 |
-| **35** |  |  |  |  |  |  |  | 85 |
-| **36** |  |  |  |  |  |  |  | 83 |
-| **37** |  |  |  |  |  |  |  | 81 |
-| **38** |  |  |  |  |  |  |  | 79 |
-| **39** |  |  |  |  |  |  |  | 77 |
-| **40** |  |  |  |  |  |  |  | 76 |
-| **41** |  |  |  |  |  |  |  | 74 |
-| **42** |  |  |  |  |  |  |  | 72 |
-| **43** |  |  |  |  |  |  |  | 71 |
-| **44** |  |  |  |  |  |  |  | 69 |
-| **45** |  |  |  |  |  |  |  | 68 |
-| **46** |  |  |  |  |  |  |  | 66 |
-| **47** |  |  |  |  |  |  |  | 65 |
-| **48** |  |  |  |  |  |  |  | 64 |
-| **49** |  |  |  |  |  |  |  | 62 |
-| **50** |  |  |  |  |  |  |  | 61 |
-| **51** |  |  |  |  |  |  |  | 60 |
-| **52** |  |  |  |  |  |  |  | 59 |
-| **53** |  |  |  |  |  |  |  | 58 |
-| **54** |  |  |  |  |  |  |  | 57 |
-| **55** |  |  |  |  |  |  |  | 56 |
-|  |  |  |  |  |  |  |  |  |
+<!-- generated:pareto_sb -->
+| m\k | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **1** | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 |  |
+| **2** |  | 3 | 7 | 15 | 31 | 63 | 127 | 255 | 511 |  |
+| **3** |  |  | 5 | 12 | 27 | 58 | 121 | 248 | 503 |  |
+| **4** |  |  | 4 | 10 | 24 | 54 | 116 | 242 | 496 |  |
+| **5** |  |  |  | 9 | 22 | 50 | 109 | 231 | 481 | 985 |
+| **6** |  |  |  | 7 | 19 | 46 | 104 | 225 | 473 | ≤973 |
+| **7** |  |  |  |  | 17 | 42 | 97 | 214 |  |  |
+| **8** |  |  |  |  | 15 | 38 | 91 | 206 |  |  |
+| **9** |  |  |  |  | 14 | 36 | 87 | 198 |  |  |
+| **10** |  |  |  |  | 12 | 33 | 82 | 189 |  |  |
+| **11** |  |  |  |  | 11 | 31 | 77 | 182 |  |  |
+| **12** |  |  |  |  |  | 29 | 73 | 174 |  |  |
+| **13** |  |  |  |  |  | 27 | 69 | 168 |  |  |
+| **14** |  |  |  |  |  | 25 | 66 | 161 |  |  |
+| **15** |  |  |  |  |  | 24 | 63 | 155 |  |  |
+| **16** |  |  |  |  |  | 22 | 60 | 150 |  |  |
+| **17** |  |  |  |  |  | 21 | 58 | 144 |  |  |
+| **18** |  |  |  |  |  | 20 | 55 | 139 |  |  |
+| **19** |  |  |  |  |  | 19 | 53 | 135 |  |  |
+| **20** |  |  |  |  |  |  | 51 | 130 |  |  |
+| **21** |  |  |  |  |  |  | 49 | 126 |  |  |
+| **22** |  |  |  |  |  |  | 47 | 122 |  |  |
+| **23** |  |  |  |  |  |  | 45 | 118 |  |  |
+| **24** |  |  |  |  |  |  | 43 | 115 |  |  |
+| **25** |  |  |  |  |  |  | 41 | 111 |  |  |
+| **26** |  |  |  |  |  |  | 40 | 108 |  |  |
+| **27** |  |  |  |  |  |  | 38 | 105 |  |  |
+| **28** |  |  |  |  |  |  | 37 | 102 |  |  |
+| **29** |  |  |  |  |  |  | 36 | 100 |  |  |
+| **30** |  |  |  |  |  |  | 35 | 97 |  |  |
+| **31** |  |  |  |  |  |  | 34 | 94 |  |  |
+| **32** |  |  |  |  |  |  | 33 | 92 |  |  |
+| **33** |  |  |  |  |  |  |  | 89 |  |  |
+| **34** |  |  |  |  |  |  |  | 87 |  |  |
+| **35** |  |  |  |  |  |  |  | 85 |  |  |
+| **36** |  |  |  |  |  |  |  | 83 |  |  |
+| **37** |  |  |  |  |  |  |  | 81 |  |  |
+| **38** |  |  |  |  |  |  |  | 79 |  |  |
+| **39** |  |  |  |  |  |  |  | 77 |  |  |
+| **40** |  |  |  |  |  |  |  | 76 |  |  |
+| **41** |  |  |  |  |  |  |  | 74 |  |  |
+| **42** |  |  |  |  |  |  |  | 72 |  |  |
+| **43** |  |  |  |  |  |  |  | 71 |  |  |
+| **44** |  |  |  |  |  |  |  | 69 |  |  |
+| **45** |  |  |  |  |  |  |  | 68 |  |  |
+| **46** |  |  |  |  |  |  |  | 66 |  |  |
+| **47** |  |  |  |  |  |  |  | 65 |  |  |
+| **48** |  |  |  |  |  |  |  | 64 |  |  |
+| **49** |  |  |  |  |  |  |  | 62 |  |  |
+| **50** |  |  |  |  |  |  |  | 61 |  |  |
+| **51** |  |  |  |  |  |  |  | 60 |  |  |
+| **52** |  |  |  |  |  |  |  | 59 |  |  |
+| **53** |  |  |  |  |  |  |  | 58 |  |  |
+| **54** |  |  |  |  |  |  |  | 57 |  |  |
+| **55** |  |  |  |  |  |  |  | 56 |  |  |
+| **65** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **66** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **67** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **68** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **69** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **70** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **71** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **72** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **73** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **74** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **75** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **76** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **77** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **78** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **79** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **80** |  |  |  |  |  |  |  |  | ≥112 |  |
+| **81** |  |  |  |  |  |  |  |  | 82–111 |  |
+| **82** |  |  |  |  |  |  |  |  | 83–110 |  |
+| **83** |  |  |  |  |  |  |  |  | 84–109 |  |
+| **84** |  |  |  |  |  |  |  |  | 85–108 |  |
+| **85** |  |  |  |  |  |  |  |  | 86–107 |  |
+| **86** |  |  |  |  |  |  |  |  | 87–106 |  |
+| **87** |  |  |  |  |  |  |  |  | 88–105 |  |
+| **88** |  |  |  |  |  |  |  |  | 89–104 |  |
+| **89** |  |  |  |  |  |  |  |  | 90–103 |  |
+| **90** |  |  |  |  |  |  |  |  | 91–102 |  |
+| **91** |  |  |  |  |  |  |  |  | 92–101 |  |
+| **92** |  |  |  |  |  |  |  |  | 93–100 |  |
+| **93** |  |  |  |  |  |  |  |  | 94–99 |  |
+| **94** |  |  |  |  |  |  |  |  | 95–98 |  |
+| **95** |  |  |  |  |  |  |  |  | ≤97 |  |
+| **96** |  |  |  |  |  |  |  |  | ≤96 |  |
 
-![][image1]
+A bare number is a proven maximum. `≥n` is a lower bound (a solution exists, maximality open), `≤n` an upper bound (exhaustively refuted above), `a–b` a two-sided bracket. Per-cell status and evidence are in `data/pareto_sb.csv`.
+<!-- /generated -->
+
+Blank means not established; `≤` marks an upper bound without a matching construction.
+Evidence per cell is in `data/pareto_sb.csv`; this block is rendered by
+`tools/check_tables.py --render` and must never be edited by hand.
 
 **“Unit Group Triviality Lemma”** 
 
@@ -168,19 +219,24 @@ Sb(2^(k-1):1, 2^(k-1):1, 2^(k-1) - (k-1) - 1:1) (since (2^k - k -1) - (2^(k-1)-1
 Sb(2^(k-1)-1:1) (solvable per (1))  
 	Sb(2^(k-1)-k:2) (solvable per (3) since 2^(k-1)-k \= 2^(k-1)-(k-1)-1 ), and  
 	Sb(2^(k-1)-1:2, 2^(k-1)-(k-1):1) solvable per (5)  
-(7) **Sb(2^k-1:2, 2^k-k:1)**
 
 (8) `n(k,4)=2^k-2k+2` exactly for `k>=3` (Li--Wu--Triesch, Corollary 3).  The local
 construction remains useful as an independent lower proof; the published theorem supplies the
 upper bound.
 
-3k-2k \= i=0k-12il=0ik!/(l!(k-l)!) where l=0ik!/(l!(k-l)!) is partial sum of binomial sequence
+Entries of `G_k` come in dyadic blocks of sizes `1, 1, 2, 4, ..., 2^(k-1)`, and every entry in
+block `r` (zero-indexed) equals the partial binomial sum `sum_{i=0}^{k-r} C(k, i)`; the block
+sizes double, and the total is `sum G_k = 3^k`. Verified against the defining recurrence for
+`k <= 12` in `tools/cleanroom`'s test suite.
 
 **Proposed unproven lemmas:**
 
 **(u1)** if Sb(n1 : n2) for any n1>=n2 can be solved in k then Sb( (n1+1) : (n2-1) ) can also be solved in k.
 
-(7) holds true k up to 8 and is expected to also hold for any k, but the author was unable to find a rigorous proof. 
+**(u1)** is verified on all 130 proven cells for `k = 1..8`, and exhaustively for every
+one-part state at `k <= 5`, but no proof is known; two natural proof routes were refuted on
+2026-08-03. Its multi-part analogue is outright false: `Sb(15:2, 5:4)` is solvable in 4 while
+`Sb(15:2, 6:3)` is not, despite the lower mass.
 
 (9) The former formula `F(k)=2^k-k(k-3)/2-5` is exact only through `k=8`.
 Li--Wu--Triesch, Theorems 1--3 and Remark 1, prove
