@@ -61,11 +61,14 @@ for k in $LEVELS; do
     [[ "$(sha256_file "$f")" == "$want" ]] || { echo "sa193-k$k.cert.zst hash mismatch" >&2; exit 66; }
 done
 
-active=$("${aws_cmd[@]}" ec2 describe-instances --region "$REGION" \
-    --filters Name=tag:Purpose,Values=cleanroom-verify \
-              Name=instance-state-name,Values=pending,running \
-    --query 'length(Reservations[].Instances[])' --output text)
-[[ "$active" == 0 ]] || { echo 'a cleanroom-verify instance is already active' >&2; exit 69; }
+# Not in dry-run mode: checking the plan while another run is in flight is a normal thing to do.
+if (( ! DRY )); then
+    active=$("${aws_cmd[@]}" ec2 describe-instances --region "$REGION" \
+        --filters Name=tag:Purpose,Values=cleanroom-verify \
+                  Name=instance-state-name,Values=pending,running \
+        --query 'length(Reservations[].Instances[])' --output text)
+    [[ "$active" == 0 ]] || { echo 'a cleanroom-verify instance is already active' >&2; exit 69; }
+fi
 
 offered=$("${aws_cmd[@]}" ec2 describe-instance-type-offerings --region "$REGION" \
     --location-type availability-zone --filters Name=location,Values=us-west-2b \
