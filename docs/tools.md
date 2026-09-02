@@ -55,8 +55,10 @@ STAR, DOM, UNIT, SUBMON, and the quotients SYM-E/SYM-S/SYM-C - and the module he
 cd tools/cleanroom && cargo build --release      # pinned to the toolchain in rust-toolchain.toml
 ./target/release/radio_cleanroom selftest        # exhaustive agreement with an unquotiented oracle
 ./target/release/radio_cleanroom audit --threads 12 [--stride S --offset O] [--progress SECONDS] CERT...
-tools/cleanroom_verify_chain.sh --threads 12 > chain.out          # every level except k=7
-tools/cleanroom_k7_ec2_launch.sh                                  # k=7, one dedicated c8a host
+tools/cleanroom_verify_chain.sh --threads 12 > chain.out    # local; every level except k=7
+tools/cleanroom_ec2_launch.sh                              # all eight levels, one c8a host
+tools/cleanroom_ec2_status.sh [--follow]                   # progress of the running host
+tools/test_cleanroom.sh                                    # 19-check regression, ~30 s
 ```
 
 It reads both `radio-negative-level-certificate-v2` and flat `radio-negative-certificate-v1`, and
@@ -84,6 +86,12 @@ adjacent-duplicate skips at depth 0 only, and misses that one depth-0 orbit dedu
 subtree beneath it. Adding SYM-C as a single whole-vector lexicographic rule (never a per-part
 normalization) took Sa(113) from 2.45e9 candidate cells to 1.22e9 and brought the per-part-count
 cell counts within 0.26% of the reference engine's.
+
+The EC2 pipeline verifies the **complete chain** by default: `tools/check_level_chain.py` for
+structural closure, then a semantic audit of every level, and it requires the full 2,846,568
+claims to be accounted for rather than merely reporting zero gaps. k=7 is ~99% of the cost, so
+restricting the set buys little; `--levels` exists for cheap probes and skips the structural
+check, which is a property of the whole chain.
 
 Measured on an M4 Pro, 12 workers, against the frozen refuter on identical inputs:
 
