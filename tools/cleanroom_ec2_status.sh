@@ -79,8 +79,12 @@ report_once() {
 
     # The verify log carries the provenance header, then BUILD/RESULT_LEVEL/TOTAL as they land.
     # It is re-uploaded every 600 s while the audit runs, so this tail is the progress view.
+    # verify.out is the current name; k7-verify.out is what runs launched before the
+    # 2026-09-01 full-chain rename upload, and one of those may still be in flight.
     local verify
     verify=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/verify.out" - --no-progress 2>/dev/null || true)
+    [[ -n "$verify" ]] || verify=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/k7-verify.out" - \
+        --no-progress 2>/dev/null || true)
     if [[ -n "$verify" ]]; then
         echo '  VERIFY (last upload, refreshed every 10 min)'
         grep -E '^(BUILD|PROGRESS|STATS_NP|RESULT_LEVEL|TOTAL|GAP|# started_utc|# finished_utc|# host|Elapsed|Maximum resident)' \
