@@ -136,7 +136,7 @@ stage VERIFY
     echo "# host=$instance_id type=$instance_type threads=$threads"
     echo "# uname=$(uname -a)"
     echo "# input=sa193-k7.cert sha256=$CERT_SHA256 (zst $CERT_ZST_SHA256)"
-    echo "# command=radio_cleanroom audit --threads $threads sa193-k7.cert"
+    echo "# command=radio_cleanroom audit --threads $threads --progress 300 sa193-k7.cert"
     echo "# started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "# radio-cleanroom-provenance-v1 end"
 } > k7-verify.out
@@ -145,7 +145,7 @@ upload k7-verify.out k7-verify.out
 ( while sleep 600; do upload k7-verify.out k7-verify.out; done ) &
 heartbeat=$!
 
-/usr/bin/time -v "$binary" audit --threads "$threads" sa193-k7.cert >> k7-verify.out 2>&1 \
+/usr/bin/time -v "$binary" audit --threads "$threads" --progress 300 sa193-k7.cert >> k7-verify.out 2>&1 \
     || { kill "$heartbeat" || true; upload k7-verify.out k7-verify.out; fail "k7 verify"; }
 kill "$heartbeat" 2>/dev/null || true
 echo "# finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> k7-verify.out

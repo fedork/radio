@@ -54,7 +54,7 @@ STAR, DOM, UNIT, SUBMON, and the quotients SYM-E/SYM-S/SYM-C - and the module he
 ```
 cd tools/cleanroom && cargo build --release      # pinned to the toolchain in rust-toolchain.toml
 ./target/release/radio_cleanroom selftest        # exhaustive agreement with an unquotiented oracle
-./target/release/radio_cleanroom audit --threads 12 [--stride S --offset O] CERT...
+./target/release/radio_cleanroom audit --threads 12 [--stride S --offset O] [--progress SECONDS] CERT...
 tools/cleanroom_verify_chain.sh --threads 12 > chain.out          # every level except k=7
 tools/cleanroom_k7_ec2_launch.sh                                  # k=7, one dedicated c8a host
 ```

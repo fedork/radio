@@ -1,6 +1,6 @@
 //! CLI: audit negative certificates (level-v2 or flat v1), or run the built-in selftest.
 //!
-//!   radio_cleanroom audit [--threads N] [--stride S] [--offset O] <cert>...
+//!   radio_cleanroom audit [--threads N] [--stride S] [--offset O] [--progress SECONDS] <cert>...
 //!   radio_cleanroom selftest
 //!
 //! Exit status: 0 = every selected claim verified; 1 = gaps or contradictions; 2 = usage,
@@ -11,7 +11,7 @@ use radio_cleanroom::audit::{Auditor, Scratch, Verdict};
 use radio_cleanroom::naive::Naive;
 use radio_cleanroom::parse::{parse, Cert};
 use radio_cleanroom::state::{Part, State};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -19,12 +19,14 @@ struct Args {
     threads: usize,
     stride: usize,
     offset: usize,
+    /// Seconds between PROGRESS lines during a level; 0 disables reporting.
+    progress: u64,
     paths: Vec<String>,
 }
 
 fn usage() -> ! {
     eprintln!(
-        "usage: radio_cleanroom audit [--threads N] [--stride S] [--offset O] <cert>...\n       radio_cleanroom selftest"
+        "usage: radio_cleanroom audit [--threads N] [--stride S] [--offset O] [--progress SECONDS] <cert>...\n       radio_cleanroom selftest"
     );
     std::process::exit(2);
 }
@@ -33,12 +35,13 @@ fn main() {
     let mut argv = std::env::args().skip(1);
     match argv.next().as_deref() {
         Some("audit") => {
-            let mut args = Args { threads: 1, stride: 1, offset: 0, paths: Vec::new() };
+            let mut args =
+                Args { threads: 1, stride: 1, offset: 0, progress: 0, paths: Vec::new() };
             let rest: Vec<String> = argv.collect();
             let mut i = 0;
             while i < rest.len() {
                 match rest[i].as_str() {
-                    "--threads" | "--stride" | "--offset" => {
+                    "--threads" | "--stride" | "--offset" | "--progress" => {
                         let v: usize = rest
                             .get(i + 1)
                             .and_then(|s| s.parse().ok())
@@ -46,6 +49,7 @@ fn main() {
                         match rest[i].as_str() {
                             "--threads" => args.threads = v.clamp(1, 256),
                             "--stride" => args.stride = v.max(1),
+                            "--progress" => args.progress = v as u64,
                             _ => args.offset = v,
                         }
                         i += 2;
@@ -134,36 +138,127 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
     let gaps = AtomicUsize::new(0);
     let contradicted = AtomicUsize::new(0);
     let cells = AtomicUsize::new(0);
+    let done = AtomicUsize::new(0);
     let report = Mutex::new(0usize);
     let np_stats = Mutex::new(([0u64; 9], [0u64; 9]));
+    // Per-worker liveness for the reporter: which claim each worker holds and since when.
+    // A single hard claim can occupy a worker for minutes, and without this a long level is
+    // indistinguishable from a hang.
+    let live_claim: Vec<AtomicUsize> =
+        (0..args.threads).map(|_| AtomicUsize::new(usize::MAX)).collect();
+    let live_since: Vec<AtomicU64> = (0..args.threads).map(|_| AtomicU64::new(0)).collect();
+    let live_cells: Vec<AtomicU64> = (0..args.threads).map(|_| AtomicU64::new(0)).collect();
+    let stop = AtomicBool::new(false);
     let start = Instant::now();
 
+    // Every shared binding is turned into a reference HERE, outside thread::scope: the
+    // spawned closures must be `move` (they capture the Copy worker index), and a borrow
+    // taken inside the scope body does not live for 'scope.
+    let (a_next, a_sel, a_aud, a_claims) = (&next, &selected, &aud, claims);
+    let (a_verified, a_gaps, a_contra, a_cells, a_done) =
+        (&verified, &gaps, &contradicted, &cells, &done);
+    let (a_report, a_np) = (&report, &np_stats);
+    let (a_live, a_since, a_lcells, a_stop, a_start) =
+        (&live_claim, &live_since, &live_cells, &stop, &start);
+
     std::thread::scope(|scope| {
-        for _ in 0..args.threads {
-            scope.spawn(|| {
+        // The reporter runs until `stop`, so the workers are joined explicitly before it is
+        // set; letting the scope join everything at once would deadlock on the reporter.
+        let reporter = if args.progress > 0 {
+            Some(scope.spawn(move || {
+                let mut last_done = 0usize;
+                let mut last_at = 0f64;
+                loop {
+                    // Sleep in short ticks so the level ends promptly rather than after a
+                    // full reporting interval.
+                    let mut waited = 0f64;
+                    while waited < args.progress as f64 {
+                        if a_stop.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        waited += 0.2;
+                    }
+                    let now = a_start.elapsed().as_secs_f64();
+                    let d = a_done.load(Ordering::Relaxed);
+                    let c: u64 = a_lcells.iter().map(|x| x.load(Ordering::Relaxed)).sum();
+                    let window = now - last_at;
+                    let recent = if window > 0.0 {
+                        (d - last_done) as f64 / window
+                    } else {
+                        0.0
+                    };
+                    let eta = if recent > 0.0 {
+                        a_sel.len().saturating_sub(d) as f64 / recent
+                    } else {
+                        -1.0
+                    };
+                    println!(
+                        "PROGRESS k={k} elapsed_s={now:.1} completed={d}/{} percent={:.4} \
+verified={} gaps={} cells={c} rate_total={:.2}/s rate_window={recent:.2}/s eta_s={eta:.0}",
+                        a_sel.len(),
+                        100.0 * d as f64 / a_sel.len().max(1) as f64,
+                        a_verified.load(Ordering::Relaxed),
+                        a_gaps.load(Ordering::Relaxed),
+                        d as f64 / now.max(1e-9),
+                    );
+                    // Name the oldest in-flight claim: what to blame if throughput collapses.
+                    let mut oldest: Option<(f64, usize)> = None;
+                    for w in 0..args.threads {
+                        let ci = a_live[w].load(Ordering::Acquire);
+                        if ci == usize::MAX {
+                            continue;
+                        }
+                        let age = now - a_since[w].load(Ordering::Relaxed) as f64 / 1000.0;
+                        if oldest.map_or(true, |(a, _)| age > a) {
+                            oldest = Some((age, ci));
+                        }
+                    }
+                    if let Some((age, ci)) = oldest {
+                        if age >= args.progress as f64 {
+                            println!("PROGRESS_ACTIVE k={k} age_s={age:.1} {}", show(&a_claims[ci]));
+                        }
+                    }
+                    last_done = d;
+                    last_at = now;
+                }
+            }))
+        } else {
+            None
+        };
+
+        let mut workers = Vec::with_capacity(args.threads);
+        for slot in 0..args.threads {
+            workers.push(scope.spawn(move || {
                 let mut s = Scratch::new();
                 loop {
-                    let q = next.fetch_add(1, Ordering::Relaxed);
-                    if q >= selected.len() {
+                    let q = a_next.fetch_add(1, Ordering::Relaxed);
+                    if q >= a_sel.len() {
                         break;
                     }
-                    let claim = &claims[selected[q]];
-                    match aud.audit_claim(&claim.parts, claim.mass_full, &mut s) {
+                    let idx = a_sel[q];
+                    let claim = &a_claims[idx];
+                    a_since[slot].store(
+                        (a_start.elapsed().as_secs_f64() * 1000.0) as u64,
+                        Ordering::Relaxed,
+                    );
+                    a_live[slot].store(idx, Ordering::Release);
+                    match a_aud.audit_claim(&claim.parts, claim.mass_full, &mut s) {
                         Verdict::Verified => {
-                            verified.fetch_add(1, Ordering::Relaxed);
+                            a_verified.fetch_add(1, Ordering::Relaxed);
                         }
                         Verdict::Contradicted => {
-                            contradicted.fetch_add(1, Ordering::Relaxed);
-                            gaps.fetch_add(1, Ordering::Relaxed);
-                            let mut printed = report.lock().unwrap();
+                            a_contra.fetch_add(1, Ordering::Relaxed);
+                            a_gaps.fetch_add(1, Ordering::Relaxed);
+                            let mut printed = a_report.lock().unwrap();
                             if *printed < 100 {
                                 println!("GAP verdict=contradicted k={k} {}", show(claim));
                                 *printed += 1;
                             }
                         }
                         Verdict::Gap { take } => {
-                            gaps.fetch_add(1, Ordering::Relaxed);
-                            let mut printed = report.lock().unwrap();
+                            a_gaps.fetch_add(1, Ordering::Relaxed);
+                            let mut printed = a_report.lock().unwrap();
                             if *printed < 100 {
                                 println!(
                                     "GAP verdict=uncovered k={k} {} take={:?}",
@@ -174,14 +269,24 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
                             }
                         }
                     }
+                    a_live[slot].store(usize::MAX, Ordering::Release);
+                    a_done.fetch_add(1, Ordering::Relaxed);
+                    a_lcells[slot].store(s.cells, Ordering::Relaxed);
                 }
-                cells.fetch_add(s.cells as usize, Ordering::Relaxed);
-                let mut agg = np_stats.lock().unwrap();
+                a_cells.fetch_add(s.cells as usize, Ordering::Relaxed);
+                let mut agg = a_np.lock().unwrap();
                 for np in 0..9 {
                     agg.0[np] += s.cells_by_np[np];
                     agg.1[np] += s.descends_by_np[np];
                 }
-            });
+            }));
+        }
+        for w in workers {
+            let _ = w.join();
+        }
+        a_stop.store(true, Ordering::Relaxed);
+        if let Some(r) = reporter {
+            let _ = r.join();
         }
     });
 
