@@ -115,3 +115,28 @@ that test.  What was also checked:
 Cost of the whole exercise: two aborted EC2 launches (~$0.85, both pipeline bugs - a
 cloud-init HOME fault and a 3-hour job with no progress output), the k=7 run (~$3.3), the
 complete-chain run (~$2.6), and about an hour of local CPU.
+
+Postscript 2026-09-02: the colored Sa(113) bundle
+-------------------------------------------------
+Run against `verifier-bench-20260817T181300Z/results/sa113-t14-naive-r1/colored.cert` from
+artifact `verifier-pipeline-2026-08-17` - the bundle behind the standing trap "Do not use the
+old Sa(113) colored certificate as proof", where `radio_verify.c` reported closure and the
+frozen solver-core refuter exposed nine uncovered splits.
+
+  TOTAL verified 120537, gaps 0, cells 1126967042
+  per level: k=2 5, k=3 424, k=4 49,619, k=5 9,311, k=6 60,738, k=7 431, k=8 9
+
+So the cleanroom checker closes it, agreeing with `radio_verify.c` against the refuter.  The
+documented first gap `Sb(15:8,8:5,8:5)@5` is present in the file and verifies here.
+
+This is a data point, NOT a resolution, and it should not be used to promote that bundle:
+  * Two independent implementations agreeing does not exclude a shared misreading; both were
+    written from the same theorem documents.
+  * The record count is 120,537 against the documented 120,302 audited claims, so artifact
+    identity wants confirming before anyone leans on this.
+  * It does shift where to look.  The refuter prunes its upward closure at the `G_k`
+    majorization boundary; on the complete corpus the needed fact is present exactly, while on
+    a thinned support set a citation must be inferred through that closure, which is where a
+    boundary mismatch would surface as a false gap.  That is a testable hypothesis about the
+    refuter, and the direct experiment is to ask which rule discharges `Sb(15:8,8:5,8:5)@5` in
+    each of the three implementations.
