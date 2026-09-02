@@ -227,6 +227,12 @@ pub struct Scratch {
     p2: Vec<u32>,
     /// Charged candidate cells (comparable to the reference verifier's prefix count).
     pub cells: u64,
+    /// Which rule discharged each refuted partial child, and how many child checks found
+    /// nothing. Diagnostic: this is what says whether the dominance index earns its cost.
+    pub fired_info: u64,
+    pub fired_star: u64,
+    pub fired_dom: u64,
+    pub fired_none: u64,
     /// Diagnostics: cells and descends by the claim's part count (index np, up to 8+).
     pub cells_by_np: [u64; 9],
     pub descends_by_np: [u64; 9],
@@ -315,6 +321,10 @@ impl Scratch {
             p1: Vec::new(),
             p2: Vec::new(),
             cells: 0,
+            fired_info: 0,
+            fired_star: 0,
+            fired_dom: 0,
+            fired_none: 0,
             cells_by_np: [0; 9],
             descends_by_np: [0; 9],
             descends: 0,
@@ -671,6 +681,7 @@ impl Auditor {
         let kk = self.k - 1;
         // INFO
         if mass_full as u64 > 3u64.pow(kk as u32) {
+            s.fired_info += 1;
             return true;
         }
         let base = oi * MAXP;
@@ -678,11 +689,13 @@ impl Auditor {
         // STAR (rejection-only; sound on the stripped parts by UNIT). cur_wid is already in
         // descending star-width order, so no sort here.
         if self.g.star_refutes_presorted(&s.cur_wid[base..base + w], kk) {
+            s.fired_star += 1;
             return true;
         }
         // DOM. Mass prefilter: an injecting fact cannot outweigh the query (dom.rs).
         let n = s.cur_idn[oi] as usize;
         if n == 0 || s.cur_smass[oi] < self.dom.min_fact_mass {
+            s.fired_none += 1;
             return false;
         }
         s.suffix_mass.clear();
@@ -692,7 +705,13 @@ impl Auditor {
             acc += s.cur_pmass[base + i];
             s.suffix_mass[i] = acc;
         }
-        self.dom.refutes(&s.cur_ids[base..base + n], &s.suffix_mass)
+        let hit = self.dom.refutes(&s.cur_ids[base..base + n], &s.suffix_mass);
+        if hit {
+            s.fired_dom += 1;
+        } else {
+            s.fired_none += 1;
+        }
+        hit
     }
 }
 

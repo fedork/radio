@@ -142,6 +142,7 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
     let done = AtomicUsize::new(0);
     let report = Mutex::new(0usize);
     let np_stats = Mutex::new(([0u64; 9], [0u64; 9]));
+    let rules = Mutex::new((0u64, 0u64, 0u64, 0u64));
     // Per-worker liveness for the reporter: which claim each worker holds and since when.
     // A single hard claim can occupy a worker for minutes, and without this a long level is
     // indistinguishable from a hang.
@@ -158,7 +159,7 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
     let (a_next, a_sel, a_aud, a_claims) = (&next, &selected, &aud, claims);
     let (a_verified, a_gaps, a_contra, a_cells, a_done) =
         (&verified, &gaps, &contradicted, &cells, &done);
-    let (a_report, a_np) = (&report, &np_stats);
+    let (a_report, a_np, a_rules) = (&report, &np_stats, &rules);
     let (a_live, a_since, a_lcells, a_stop, a_start) =
         (&live_claim, &live_since, &live_cells, &stop, &start);
 
@@ -280,6 +281,11 @@ verified={} gaps={} cells={c} rate_total={:.2}/s rate_window={recent:.2}/s eta_s
                     agg.0[np] += s.cells_by_np[np];
                     agg.1[np] += s.descends_by_np[np];
                 }
+                let mut r = a_rules.lock().unwrap();
+                r.0 += s.fired_info;
+                r.1 += s.fired_star;
+                r.2 += s.fired_dom;
+                r.3 += s.fired_none;
             }));
         }
         for w in workers {
@@ -301,6 +307,15 @@ verified={} gaps={} cells={c} rate_total={:.2}/s rate_window={recent:.2}/s eta_s
                     agg.0[np], agg.1[np]
                 );
             }
+        }
+    }
+    {
+        let r = rules.lock().unwrap();
+        if r.0 + r.1 + r.2 + r.3 > 0 {
+            println!(
+                "STATS_RULES k={k} info={} star={} dom={} none={}",
+                r.0, r.1, r.2, r.3
+            );
         }
     }
     let v = verified.load(Ordering::Relaxed) as u64;

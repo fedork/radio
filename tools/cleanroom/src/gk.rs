@@ -108,6 +108,49 @@ impl GTables {
         false
     }
 
+    /// STAR on a state given as ascending universe ids, resolved through `parts_of`, with a
+    /// caller-provided scratch. Lets the closure build avoid materializing a Vec<Part> per
+    /// candidate replacement.
+    pub fn star_refutes_ids(
+        &self,
+        ids: &[u32],
+        parts_of: &[Part],
+        k: usize,
+        runs: &mut Vec<(u64, u64)>,
+    ) -> bool {
+        runs.clear();
+        for &id in ids {
+            let p = parts_of[id as usize];
+            let it = (p.n as u64, p.m as u64);
+            let mut j = runs.len();
+            runs.push(it);
+            while j > 0 && runs[j - 1].0 < it.0 {
+                runs[j] = runs[j - 1];
+                j -= 1;
+            }
+            runs[j] = it;
+        }
+        let gp = &self.prefix[k];
+        let glen = (gp.len() - 1) as u64;
+        let mut t = 0u64;
+        let mut phi_sum = 0u64;
+        for &(w, c) in runs.iter() {
+            let end = t + c;
+            let checked_end = end.min(glen);
+            if checked_end > t {
+                phi_sum += w * (checked_end - t);
+                if phi_sum > gp[checked_end as usize] {
+                    return true;
+                }
+            }
+            t = end;
+            if t >= glen {
+                break;
+            }
+        }
+        false
+    }
+
     /// star_refutes with a caller-provided scratch buffer (the hot path calls this once
     /// per candidate child; a fresh stack buffer's zero-init was measurable).
     pub fn star_refutes_with(

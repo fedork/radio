@@ -257,6 +257,24 @@ impl ClosureIndex {
     }
 
     fn grow(&mut self, ids: &mut Vec<u32>, k: usize, cap: u64, uni: &PartUniverse, g: &GTables) {
+        let mut next = Vec::with_capacity(ids.len() + 1);
+        let mut runs = Vec::with_capacity(ids.len() + 1);
+        self.grow_inner(ids, k, cap, uni, g, &mut next, &mut runs);
+    }
+
+    /// Scratch-carrying body. The two buffers are reused down the whole recursion: cloning
+    /// the id vector and collecting a Vec<Part> per CANDIDATE replacement - before the STAR
+    /// test rejected most of them - was the bulk of this build's cost.
+    fn grow_inner(
+        &mut self,
+        ids: &mut Vec<u32>,
+        k: usize,
+        cap: u64,
+        uni: &PartUniverse,
+        g: &GTables,
+        next: &mut Vec<u32>,
+        runs: &mut Vec<(u64, u64)>,
+    ) {
         if self.insert_tuple(ids) {
             self.revisits += 1;
             return; // already present: its closure was already expanded
@@ -287,16 +305,17 @@ impl ClosureIndex {
                 if base_mass + uni.parts[w as usize].mass() as u64 > cap {
                     continue;
                 }
-                let mut next = ids.clone();
+                next.clear();
+                next.extend_from_slice(ids);
                 next[i] = w;
                 next.sort_unstable();
-                let parts: Vec<Part> =
-                    next.iter().map(|&id| uni.parts[id as usize]).collect();
-                // parts are ascending id = descending part_key: State order convention.
-                if g.star_refutes(&parts, k) {
+                if g.star_refutes_ids(next, &uni.parts, k, runs) {
                     continue;
                 }
-                self.grow(&mut next, k, cap, uni, g);
+                // The recursion needs its own buffers; `next` is this level's.
+                let mut child = std::mem::take(next);
+                self.grow(&mut child, k, cap, uni, g);
+                *next = child;
             }
         }
     }
