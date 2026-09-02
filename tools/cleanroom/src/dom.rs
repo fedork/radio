@@ -194,13 +194,44 @@ impl ClosureIndex {
     /// replacement state is pruned when INFO (mass > 3^k) or STAR refutes it at level k,
     /// since the audit rejects such a query before consulting DOM. Equal-part choices are
     /// quotiented: growing either of two equal parts yields the same multiset.
+    /// Is `ids` already refuted by what has been inserted so far? Used to drop redundant
+    /// facts before their closure is expanded: if a stored F' injects into F, then every
+    /// query F would refute is already refuted by F', so F contributes nothing. This is
+    /// Subgraph Monotonicity corollary 3 - "certificates may store antichains" - applied at
+    /// build time. Same walk as FrozenIndex::refutes, without the sealed bounds.
+    pub fn refuted_by_existing(&self, ids: &[u32]) -> bool {
+        self.walk_builder(0, ids)
+    }
+
+    fn walk_builder(&self, node: usize, ids: &[u32]) -> bool {
+        let n = &self.nodes[node];
+        if n.terminal {
+            return true;
+        }
+        let mut qi = 0;
+        while qi < ids.len() {
+            let id = ids[qi];
+            if qi == 0 || ids[qi - 1] != id {
+                if let Ok(pos) = n.edges.binary_search_by_key(&id, |e| e.0) {
+                    if self.walk_builder(n.edges[pos].1 as usize, &ids[qi + 1..]) {
+                        return true;
+                    }
+                }
+            }
+            qi += 1;
+        }
+        false
+    }
+
+    /// Returns false when the fact was dropped as redundant (see refuted_by_existing) or
+    /// as unusable, true when its closure was expanded.
     pub fn insert_closure(
         &mut self,
         fact: &State,
         k: usize,
         uni: &PartUniverse,
         g: &GTables,
-    ) {
+    ) -> bool {
         // Fact parts as ids; a fact part outside the universe cannot be grown into any
         // query part either, but the fact itself may still refute queries containing it
         // exactly... a part outside the universe has mass > 3^k, and any query containing
@@ -209,13 +240,20 @@ impl ClosureIndex {
         for p in &fact.parts {
             match uni.id(*p) {
                 Some(i) => ids.push(i),
-                None => return,
+                None => return false,
             }
         }
         ids.sort_unstable();
+        // Antichain reduction. Callers insert in nondecreasing (mass, parts) order, so any
+        // F' that injects into this fact has already been inserted; if one has, this fact's
+        // whole closure is redundant.
+        if self.refuted_by_existing(&ids) {
+            return false;
+        }
         self.min_fact_mass = self.min_fact_mass.min(fact.mass_stripped());
         let cap = 3u64.pow(k as u32);
         self.grow(&mut ids, k, cap, uni, g);
+        true
     }
 
     fn grow(&mut self, ids: &mut Vec<u32>, k: usize, cap: u64, uni: &PartUniverse, g: &GTables) {

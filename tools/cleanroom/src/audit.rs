@@ -54,6 +54,18 @@ use std::collections::HashMap;
 
 const MAX_QUERY_PARTS: usize = 96;
 
+/// One canonical non-unit piece an option contributes to one outcome's child, with its
+/// universe id resolved once at table-build time. Live options never produce a piece outside
+/// the universe: a piece heavier than 3^(k-1) would make the option's own isolated child
+/// INFO-refuted, and such options are dropped as dead.
+#[derive(Clone, Copy, Default)]
+struct Piece {
+    id: u32,
+    n: u16,
+    m: u16,
+    mass: u32,
+}
+
 #[derive(Clone, Copy)]
 struct Opt {
     a: u16,
@@ -64,6 +76,10 @@ struct Opt {
     /// Position in the shared live table; the SYM-E non-decreasing constraint compares
     /// these. Any fixed order works; this is generation order (a asc, then b asc).
     static_idx: u32,
+    /// Precomputed pieces per outcome, so the hot loop never re-derives a child from
+    /// coordinates: outcome 2 and 0 contribute at most one part each, outcome 1 at most two.
+    pc: [[Piece; 2]; 3],
+    npc: [u8; 3],
 }
 
 struct OptTable {
@@ -87,6 +103,8 @@ pub struct Auditor {
     tables: HashMap<Part, OptTable>,
     pub dead_options: u64,
     pub total_options: u64,
+    /// Facts dropped as redundant by the antichain reduction (diagnostic only).
+    pub redundant_facts: u64,
 }
 
 #[derive(Debug)]
@@ -172,12 +190,36 @@ fn canon_into(pieces: impl Iterator<Item = (u16, u16)>, out: &mut Vec<Part>) {
     }
 }
 
+const MAXD: usize = 48;
+const MAXP: usize = 96;
+#[inline]
+fn slot(o: usize, d: usize) -> usize {
+    (o * MAXD + d) * MAXP
+}
+
 /// Per-worker scratch to keep the hot path allocation-free.
+///
+/// The prefix caches are the reason this is not a naive rebuild. For each outcome and each
+/// depth we keep the canonical partial child of the CHOSEN prefix, in the two orders the
+/// rules need: `pre_ids` ascending by universe id (equivalently descending part_key, the
+/// canonical state order, which is what the DOM walk consumes) and `pre_wid` descending by
+/// star width for STAR. A cell then merges only its own one or two pieces into those, which
+/// is O(parts) with no arithmetic, instead of re-deriving and re-sorting the whole child
+/// from coordinates. The prefix for depth+1 is written once per descent, not once per cell.
 pub struct Scratch {
-    child: Vec<Part>,
-    ids: Vec<u32>,
+    pre_ids: Vec<u32>,
+    pre_pmass: Vec<u32>,
+    pre_idn: Vec<u8>,
+    pre_wid: Vec<Part>,
+    pre_widn: Vec<u8>,
+    pre_smass: Vec<u32>,
+    cur_ids: Vec<u32>,
+    cur_pmass: Vec<u32>,
+    cur_idn: [u8; 3],
+    cur_wid: Vec<Part>,
+    cur_widn: [u8; 3],
+    cur_smass: [u32; 3],
     suffix_mass: Vec<u32>,
-    star_runs: Vec<(u64, u64)>,
     take: Vec<(u16, u16)>,
     prev_static: Vec<u32>,
     p0: Vec<u32>,
@@ -192,12 +234,81 @@ pub struct Scratch {
 }
 
 impl Scratch {
+    /// Merge one option's pieces for outcome `o` into the depth-`depth` prefix, leaving the
+    /// full partial child in the `cur_*` buffers. Both orders are maintained by insertion,
+    /// so the result is exactly what canonicalizing the whole child from scratch would give.
+    #[inline]
+    fn build_child(&mut self, o: usize, depth: usize, pieces: &[Piece]) {
+        let src = slot(o, depth);
+        let n = self.pre_idn[o * MAXD + depth] as usize;
+        let w = self.pre_widn[o * MAXD + depth] as usize;
+        let dst = o * MAXP;
+        self.cur_ids[dst..dst + n].copy_from_slice(&self.pre_ids[src..src + n]);
+        self.cur_pmass[dst..dst + n].copy_from_slice(&self.pre_pmass[src..src + n]);
+        self.cur_wid[dst..dst + w].copy_from_slice(&self.pre_wid[src..src + w]);
+        let mut n = n;
+        let mut w = w;
+        let mut smass = self.pre_smass[o * MAXD + depth];
+        for pc in pieces {
+            // ids ascending (== canonical descending part_key)
+            let mut i = n;
+            while i > 0 && self.cur_ids[dst + i - 1] > pc.id {
+                self.cur_ids[dst + i] = self.cur_ids[dst + i - 1];
+                self.cur_pmass[dst + i] = self.cur_pmass[dst + i - 1];
+                i -= 1;
+            }
+            self.cur_ids[dst + i] = pc.id;
+            self.cur_pmass[dst + i] = pc.mass;
+            n += 1;
+            // star widths descending
+            let part = Part { n: pc.n, m: pc.m };
+            let mut j = w;
+            while j > 0 && self.cur_wid[dst + j - 1].n < pc.n {
+                self.cur_wid[dst + j] = self.cur_wid[dst + j - 1];
+                j -= 1;
+            }
+            self.cur_wid[dst + j] = part;
+            w += 1;
+            smass += pc.mass;
+        }
+        self.cur_idn[o] = n as u8;
+        self.cur_widn[o] = w as u8;
+        self.cur_smass[o] = smass;
+    }
+
+    /// Promote the three `cur_*` children to the depth-`depth` prefix, once per descent.
+    #[inline]
+    fn promote(&mut self, depth: usize) {
+        for o in 0..3 {
+            let src = o * MAXP;
+            let dst = slot(o, depth);
+            let n = self.cur_idn[o] as usize;
+            let w = self.cur_widn[o] as usize;
+            // cur_* and pre_* are distinct fields, so these are disjoint borrows: no copy.
+            self.pre_ids[dst..dst + n].copy_from_slice(&self.cur_ids[src..src + n]);
+            self.pre_pmass[dst..dst + n].copy_from_slice(&self.cur_pmass[src..src + n]);
+            self.pre_wid[dst..dst + w].copy_from_slice(&self.cur_wid[src..src + w]);
+            self.pre_idn[o * MAXD + depth] = n as u8;
+            self.pre_widn[o * MAXD + depth] = w as u8;
+            self.pre_smass[o * MAXD + depth] = self.cur_smass[o];
+        }
+    }
+
     pub fn new() -> Scratch {
         Scratch {
-            child: Vec::with_capacity(MAX_QUERY_PARTS),
-            ids: Vec::with_capacity(MAX_QUERY_PARTS),
-            suffix_mass: Vec::with_capacity(MAX_QUERY_PARTS + 1),
-            star_runs: Vec::with_capacity(MAX_QUERY_PARTS),
+            pre_ids: vec![0; 3 * MAXD * MAXP],
+            pre_pmass: vec![0; 3 * MAXD * MAXP],
+            pre_idn: vec![0; 3 * MAXD],
+            pre_wid: vec![Part { n: 0, m: 0 }; 3 * MAXD * MAXP],
+            pre_widn: vec![0; 3 * MAXD],
+            pre_smass: vec![0; 3 * MAXD],
+            cur_ids: vec![0; 3 * MAXP],
+            cur_pmass: vec![0; 3 * MAXP],
+            cur_idn: [0; 3],
+            cur_wid: vec![Part { n: 0, m: 0 }; 3 * MAXP],
+            cur_widn: [0; 3],
+            cur_smass: [0; 3],
+            suffix_mass: Vec::with_capacity(MAXP + 1),
             take: Vec::new(),
             prev_static: Vec::new(),
             p0: Vec::new(),
@@ -221,11 +332,21 @@ impl Auditor {
         let cap = pow3(k as u32 - 1);
         let uni = PartUniverse::build(n_max, cap);
         let mut builder = ClosureIndex::new();
-        for f in facts {
+        // Ascending (mass, parts) so a fact's potential dominators are already in the index
+        // when it is considered - that is what makes the antichain reduction in
+        // insert_closure valid. F' injecting into F forces mass(F') <= mass(F) and
+        // |F'| <= |F|, with equality only when F' == F.
+        let mut order: Vec<&State> = facts.iter().collect();
+        order.sort_by_key(|f| (f.mass_stripped(), f.parts.len()));
+        let mut kept = 0u64;
+        for f in order {
             // A fact with units stripped is what refutes (UNIT); mass screening of queries
             // is INFO's job, not the index's.
-            builder.insert_closure(f, k - 1, &uni, &g);
+            if builder.insert_closure(f, k - 1, &uni, &g) {
+                kept += 1;
+            }
         }
+        let redundant_facts = facts.len() as u64 - kept;
         let dom = builder.seal(&uni);
         let mut aud = Auditor {
             k,
@@ -235,6 +356,7 @@ impl Auditor {
             tables: HashMap::new(),
             dead_options: 0,
             total_options: 0,
+            redundant_facts,
         };
         for p in claim_parts {
             aud.ensure_table(*p);
@@ -275,6 +397,18 @@ impl Auditor {
                     self.dead_options += 1;
                     continue;
                 }
+                // Precompute the canonical pieces this option contributes to each outcome.
+                // c2/c0/c1 are already canonical (oriented, units stripped, sorted), so this
+                // is exactly what the hot loop would otherwise re-derive per cell.
+                let mut pc = [[Piece::default(); 2]; 3];
+                let mut npc = [0u8; 3];
+                for (o, child) in [(2usize, &c2), (0usize, &c0), (1usize, &c1)] {
+                    for (j, part) in child.parts.iter().enumerate() {
+                        let id = self.uni.id(*part).expect("live option piece outside universe");
+                        pc[o][j] = Piece { id, n: part.n, m: part.m, mass: part.mass() };
+                        npc[o] = (j + 1) as u8;
+                    }
+                }
                 opts.push(Opt {
                     a,
                     b,
@@ -282,6 +416,8 @@ impl Auditor {
                     m1: c1.mass_full,
                     m2: c2.mass_full,
                     static_idx: 0,
+                    pc,
+                    npc,
                 });
             }
         }
@@ -345,6 +481,12 @@ impl Auditor {
         s.p0.clear();
         s.p1.clear();
         s.p2.clear();
+        // Depth 0's prefix child is empty for every outcome.
+        for o in 0..3 {
+            s.pre_idn[o * MAXD] = 0;
+            s.pre_widn[o * MAXD] = 0;
+            s.pre_smass[o * MAXD] = 0;
+        }
         let cells0 = s.cells;
         let desc0 = s.descends;
         let r = self.descend(parts, 0, true, s);
@@ -483,12 +625,17 @@ impl Auditor {
             if q0 > cap || q1 > cap || q2 > cap {
                 continue;
             }
-            s.take.truncate(depth);
-            s.take.push((o.a, o.b));
-            // Partial children (SUBMON): outcome 2, then 0, then 1.
-            let covered = self.child_refuted(parts, s, 2, q2)
-                || self.child_refuted(parts, s, 0, q0)
-                || self.child_refuted(parts, s, 1, q1);
+            // Partial children (SUBMON), cheapest first: outcome 2, then 0, then 1. Each is
+            // the cached prefix child plus this option's precomputed pieces.
+            let mut covered = false;
+            for (oi, qm) in [(2usize, q2), (0usize, q0), (1usize, q1)] {
+                let npc = o.npc[oi] as usize;
+                s.build_child(oi, depth, &o.pc[oi][..npc]);
+                if self.child_refuted_cur(oi, qm, s) {
+                    covered = true;
+                    break;
+                }
+            }
             if covered {
                 continue;
             }
@@ -496,6 +643,8 @@ impl Auditor {
                 // Complete split, no child discharged: the audit fails with this witness.
                 return Some(());
             }
+            s.take.truncate(depth);
+            s.take.push((o.a, o.b));
             s.prev_static.truncate(depth);
             s.prev_static.push(o.static_idx);
             s.p0.truncate(depth);
@@ -505,6 +654,8 @@ impl Auditor {
             s.p1.push(q1);
             s.p2.push(q2);
             s.descends += 1;
+            // All three children survived, so they are this cell's prefix for depth+1.
+            s.promote(depth + 1);
             if self.descend(parts, depth + 1, child_tied, s).is_some() {
                 return Some(());
             }
@@ -512,50 +663,36 @@ impl Auditor {
         None
     }
 
+    /// Is the partial child currently in the `cur_*` buffers for outcome `oi` refuted at
+    /// k-1? Same three rules as ever - INFO, STAR, DOM - but reading a merged child rather
+    /// than rebuilding one.
     #[inline]
-    fn child_refuted(&self, parts: &[Part], s: &mut Scratch, outcome: u8, mass: u32) -> bool {
-        let depth = s.take.len();
-        // Borrow-splitting: temporarily move the scratch buffers out.
-        let mut child = std::mem::take(&mut s.child);
-        match outcome {
-            2 => canon_into(
-                s.take.iter().map(|&(a, b)| (a, b)),
-                &mut child,
-            ),
-            0 => canon_into(
-                parts[..depth]
-                    .iter()
-                    .zip(&s.take)
-                    .map(|(p, &(a, b))| (p.n - a, p.m - b)),
-                &mut child,
-            ),
-            _ => canon_into(
-                parts[..depth]
-                    .iter()
-                    .zip(&s.take)
-                    .flat_map(|(p, &(a, b))| [(a, p.m - b), (p.n - a, b)]),
-                &mut child,
-            ),
+    fn child_refuted_cur(&self, oi: usize, mass_full: u32, s: &mut Scratch) -> bool {
+        let kk = self.k - 1;
+        // INFO
+        if mass_full as u64 > 3u64.pow(kk as u32) {
+            return true;
         }
-        let mut ids = std::mem::take(&mut s.ids);
-        let mut sm = std::mem::take(&mut s.suffix_mass);
-        let mut runs = std::mem::take(&mut s.star_runs);
-        let r = refuted_reason(
-            &self.g,
-            &self.uni,
-            &self.dom,
-            self.k - 1,
-            mass,
-            &child,
-            &mut ids,
-            &mut sm,
-            &mut runs,
-        );
-        s.child = child;
-        s.ids = ids;
-        s.suffix_mass = sm;
-        s.star_runs = runs;
-        r
+        let base = oi * MAXP;
+        let w = s.cur_widn[oi] as usize;
+        // STAR (rejection-only; sound on the stripped parts by UNIT). cur_wid is already in
+        // descending star-width order, so no sort here.
+        if self.g.star_refutes_presorted(&s.cur_wid[base..base + w], kk) {
+            return true;
+        }
+        // DOM. Mass prefilter: an injecting fact cannot outweigh the query (dom.rs).
+        let n = s.cur_idn[oi] as usize;
+        if n == 0 || s.cur_smass[oi] < self.dom.min_fact_mass {
+            return false;
+        }
+        s.suffix_mass.clear();
+        s.suffix_mass.resize(n + 1, 0);
+        let mut acc = 0u32;
+        for i in (0..n).rev() {
+            acc += s.cur_pmass[base + i];
+            s.suffix_mass[i] = acc;
+        }
+        self.dom.refutes(&s.cur_ids[base..base + n], &s.suffix_mass)
     }
 }
 

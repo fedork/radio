@@ -78,6 +78,36 @@ impl GTables {
         self.star_refutes_with(parts, k, &mut runs)
     }
 
+    /// STAR on parts already sorted by star width (n) descending - the hot path keeps the
+    /// child in that order, so no sort is needed here. Semantics identical to
+    /// `star_refutes`; see the module comment for the tail clamp and endpoint-run argument.
+    pub fn star_refutes_presorted(&self, parts_by_width_desc: &[Part], k: usize) -> bool {
+        if parts_by_width_desc.is_empty() {
+            return false;
+        }
+        debug_assert!(parts_by_width_desc.windows(2).all(|w| w[0].n >= w[1].n));
+        let gp = &self.prefix[k];
+        let glen = (gp.len() - 1) as u64;
+        let mut t = 0u64;
+        let mut phi_sum = 0u64;
+        for p in parts_by_width_desc {
+            let (w, c) = (p.n as u64, p.m as u64);
+            let end = t + c;
+            let checked_end = end.min(glen);
+            if checked_end > t {
+                phi_sum += w * (checked_end - t);
+                if phi_sum > gp[checked_end as usize] {
+                    return true;
+                }
+            }
+            t = end;
+            if t >= glen {
+                break;
+            }
+        }
+        false
+    }
+
     /// star_refutes with a caller-provided scratch buffer (the hot path calls this once
     /// per candidate child; a fresh stack buffer's zero-init was measurable).
     pub fn star_refutes_with(

@@ -121,8 +121,9 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
     claim_parts.dedup();
     let aud = Auditor::build(k, &claim_parts, support);
     println!(
-        "BUILD k={k} facts={} closure_tuples={} closure_nodes={} dead_options={}/{} wall_s={:.3}",
+        "BUILD k={k} facts={} redundant={} closure_tuples={} closure_nodes={} dead_options={}/{} wall_s={:.3}",
         support.len(),
+        aud.redundant_facts,
         aud.dom.inserted_tuples,
         aud.dom.node_count,
         aud.dead_options,
