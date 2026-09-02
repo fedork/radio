@@ -1,119 +1,293 @@
 # Publication prior-art audit, 2026-09-02
 
-This note records the reproducible part of the publication search begun from
-[`docs/publication-handover.md`](../docs/publication-handover.md).  It is a search record, not a
-proof that unlocated prior art does not exist.  The Google Scholar cited-by pass remains open
-because no interactive browser session was available.
+This is the reproducible record of the publication search begun from
+[`docs/publication-handover.md`](../docs/publication-handover.md). The decisive correction from
+the second pass is positive, not negative: Gargano--Montuori--Setaro--Vaccaro 1992 publishes an
+exact `Sb(32:32)` decision tree and also states that `K_{21,17}` is 3-optimal. Together with
+Aigner's earlier complete-graph constructions, these give published constructions for `Sa(64)`
+in eight tests and `Sa(38)` in seven tests. The local trees are independent certificates, but
+they are not the first published achievability proofs.
 
-## Aigner's complete-graph threshold
+No finite source located in the corpus below states or implies `Sa(65)`, `Sa(112)`, or `Sa(192)`,
+and none proves the upper boundary `Sa(38) <= 7`. That is a **corpus-scoped conclusion**, not a
+proof that an unindexed or inaccessible publication does not exist. The remaining access gaps
+are listed explicitly at the end.
 
-The model and threshold are identical to this repository's `Sa(k)`:
+## Finite results found in primary sources
 
-- Aigner 1986, p. 226, defines `h(k)` by `c(K_n) <= k` iff `n <= h(k)`.
-- The same page's Figure 5 prints `h(k) = 3, 5, 8, 13, 22, 37` for `k = 2,...,7` and calls
-  `h(7)=37` the correct value.  Source:
-  [DOI 10.1016/0166-218X(86)90026-0](https://doi.org/10.1016/0166-218X(86)90026-0).
-- Aigner 1988, p. 102, defines `m^(2)(k)` as the largest `n` for which two defectives among
-  `n` coins can be found in `k` spring-scale tests.  Figure 2.13 repeats
-  `3, 5, 8, 13, 22, 37` for `k = 2,...,7`.  Source:
-  [Google Books record](https://books.google.com/books?id=JyRDAQAAIAAJ); the indexed source
-  text is reproducible with:
+### Aigner 1986
 
-  ```sh
-  curl -sS 'https://books.google.com/books?jscmd=SearchWithinVolume2&q=jump%20points&vid=JyRDAQAAIAAJ'
-  curl -sS 'https://books.google.com/books?jscmd=SearchWithinVolume2&q=37&vid=JyRDAQAAIAAJ'
-  ```
+Source: M. Aigner, “Search problems on graphs,” *Discrete Applied Mathematics* 14 (1986),
+215--230, [DOI 10.1016/0166-218X(86)90026-0](https://doi.org/10.1016/0166-218X(86)90026-0).
 
-The repository's [`sa38_k7.tree`](../witnesses/sa38_k7.tree) is an unconditional constructive
-refutation of the printed `37`: `tools/check_witness.py` verifies a complete `Sa(38)` strategy
-without trusting the solver.  The exact upper boundary at 38 is separately recorded in
-[`pareto_sa.csv`](../data/pareto_sa.csv) from the audited 2026 solver artifacts.  Thus the safe
-publication statement is already stronger than “the sequence was absent from Aigner”: the project
-corrects Aigner's published seven-test value.  No later correction was located in the sources and
-searches below, but priority for the correction remains provisional until the cited-by audit is
-complete.
+- Corollaries 2, 3 and 4 give the exact complete-bipartite formulas for `m=2`, `m=3` **and
+  `m=4`**. In particular, Corollary 4 prints the correct
+  `c(K_{4,n}) <= k <=> n <= 2^k - 2k + 2` for `k >= 3`. The later typo is confined to
+  Aigner's 1988 Exercise 3.3.2; Li--Wu--Triesch 2018 is an independent later proof, not the
+  first published proof of the `m=4` formula.
+- Figure 4 is an exact table of `c(K_{m,n})` for the displayed small pairs. It prints
+  `c(K_{6,7})=4` and `c(K_{6,8})=5`, so the frontier cell `n(4,6)=7` was already published.
+  It also supplies numerous finite constructions that are below later frontiers.
+- Page 226 defines `h(k)` by `c(K_n) <= k <=> n <= h(k)`, exactly the present `Sa(k)`.
+  Figure 5 prints `3,5,8,13,22,37` for `k=2,...,7` and calls 37 the correct final value.
+  Thus the exact complete-graph thresholds through six tests are published; the seven-test
+  upper claim is false.
+- The same page records `c(K_{9,13})=5` and `c(K_{15,22})=6`. These are construction inputs,
+  not complete fixed-`m` frontier theorems.
 
-## OEIS
+The full page images and extracted text were checked, not merely the abstract or metadata.
 
-The official [`oeis/oeisdata`](https://github.com/oeis/oeisdata) export timestamp was
-`2026-09-02T03:01:04-04:00`.  GitHub code search of that export returned no matches for the complete
-project sequence or any of these long tails:
+### Aigner 1988
+
+Source: M. Aigner, *Combinatorial Search* (Wiley--Teubner, 1988); local Chapter 3 scan and
+[indexed Google Books record](https://books.google.com/books?id=JyRDAQAAIAAJ).
+
+- Section 3.3 supplies the exact graph translation, Subgraph Monotonicity, the canonical
+  singleton sequence `N(k)`, and the open converse after Proposition 3.25.
+- Exercise 3.3.1 gives exact `m=3`; Exercise 3.3.2 misprints the `m=4` formula as
+  `2^k-k+2`, even though the 1986 journal paper has the correct `2^k-2k+2`; Exercise 3.3.3
+  records `M(K_{5,9})=4` and `M(K_{9,14})=5`.
+- Chapter 2, p. 102, defines the same complete-graph threshold as `m^(2)(k)` and repeats
+  `3,5,8,13,22,37` in Figure 2.13.
+
+The supplied scan does not contain Chapter 2. The p. 102 statements were checked in indexed
+source text, so a page-by-page Chapter 2 inspection remains an access task.
+
+### Zhang--Berger--Massey 1987
+
+Source: Z. Zhang, T. Berger and J. L. Massey, “Some families of zero-error block codes for the
+two-user binary adder channel with feedback,” *IEEE Transactions on Information Theory* 33(5)
+(1987), 613--619, [DOI 10.1109/TIT.1987.1057358](https://doi.org/10.1109/TIT.1987.1057358),
+[author-hosted PDF](https://www.isiweb.ee.ethz.ch/archive/massey_pub/pdf/BI427.pdf).
+
+Full-feedback uniquely decodable pairs are exactly `Sb` strategies under the standard coding
+translation. The paper explicitly gives `(5,3)` in three uses, `(5,9)` in four, `(8,14)` in
+five, and `(5,45)` in six, as well as infinite recurrence families. These are genuine finite
+prior constructions. Among the displayed points, `(5,3)` and `(5,9)` lie on local frontiers, but the
+paper does not supply all adjacent impossibility results needed for a frontier table; the other
+listed points lie below the present frontiers.
+
+### Gargano--Montuori--Setaro--Vaccaro 1992
+
+Source: L. Gargano, V. Montuori, G. Setaro and U. Vaccaro, “An improved algorithm for
+quantitative group testing,” *Discrete Applied Mathematics* 36 (1992), 299--306,
+[DOI 10.1016/0166-218X(92)90260-H](https://doi.org/10.1016/0166-218X(92)90260-H).
+
+- Lemma 2.3 states `T(32,32)=7`; the appendix, Figures 1--3, is the complete decision tree.
+  Equality follows from the information bound as well as from the paper's statement that
+  `K_{32,32}` is 3-optimal.
+- The conclusion on p. 305 says that analysis of the appendix algorithm also makes
+  `K_{14,9}` and `K_{21,17}` 3-optimal. Hence `T(14,9)=5` and `T(21,17)=6` exactly.
+- These exact costs do **not** alone prove the maxima `n(5,9)=14` or `n(6,17)=21`: a larger
+  neighboring bipartite graph can still fit under the same ternary information bound. They
+  publish the positive half of those local frontier points.
+- A footnote on p. 300 says a referee reported that Christen announced an unpublished result
+  similar to this algorithm at the 1986 SIAM Conference on Discrete Mathematics. This is not a
+  publication, but it is a historical-priority caveat and makes the unobtained talk worth checking.
+
+Two immediate complete-graph consequences were not called out as separate theorems in the
+paper, but are obtained by its constructions and the standard first-test decomposition:
+
+1. Split 38 coins into parts of 21 and 17. The mixed outcome is `Sb(21:17)`, solvable in six
+   further tests by Gargano et al.; either pure outcome is a complete graph on at most 21
+   vertices, solvable in six further tests by Aigner's published `h(6)=22`. Therefore
+   `Sa(38)` is solvable in seven tests.
+2. Split 64 coins into two parts of 32. The mixed outcome is `Sb(32:32)`, solvable in seven
+   further tests by the appendix tree; either pure outcome `Sa(32)` is solvable in seven
+   further tests by Aigner. Therefore `Sa(64)` is solvable in eight tests.
+
+Consequently, the repository's checked `sa38_k7.tree` is an independent certificate and the
+local 38/39 boundary establishes the exact correction to Aigner, but the *achievability* of 38
+was already implicit in published constructions. At eight tests, the prior construction reaches
+64; the repository's exact `Sa(8)=65` improves it by one.
+
+### Later exact theorem
+
+Li--Wu--Triesch 2018 proves the exact piecewise `m=5` frontier and reproves the `m=4` formula:
+S. Li, X. Wu and E. Triesch, “A ternary search problem on two disjoint sets,” *Discrete Applied
+Mathematics* 251 (2018), 221--235,
+[DOI 10.1016/j.dam.2018.05.026](https://doi.org/10.1016/j.dam.2018.05.026).
+The first publication priority for `m=4`, however, is Aigner 1986 Corollary 4.
+
+## Cell-honest effect on the claimed finite results
+
+| repository result | publication status after this audit |
+|---|---|
+| `Sa(k)` through `k=6` | exact values published by Aigner 1986 |
+| `Sa(7)=38` | 38-achievability follows from Gargano's published `Sb(21:17)@6`; no prior upper proof or explicit corrected threshold was located |
+| `Sa(8)=65` | Gargano's `Sb(32:32)@7` gives the prior lower bound 64; no source located reaches 65 |
+| `Sa(9)=112`, `Sa(10)=192` | no finite statement or construction reaching either value located in the searched corpus |
+| fixed `m=2,3,4` frontiers | exact formulas published by Aigner 1986 |
+| fixed `m=5` frontier | exact piecewise formula published by Li--Wu--Triesch 2018 |
+| `n(4,6)=7` | exact cell already printed in Aigner 1986 Figure 4 |
+| `n(5,9)=14` | prior constructions at the endpoint (Aigner 1988; Zhang--Berger--Massey 1987; Gargano 1992); the endpoint's maximality was not located |
+| `n(6,17)=21` | prior construction at the endpoint (Gargano 1992); the endpoint's maximality was not located |
+| `Sb(32:32)@7` | exact published tree, Gargano 1992; it is below the local `n(7,32)=33` frontier |
+| remaining `m>=6` cells through `k=8`, and `n(9,6)=473` | no published maxima located; individual older lower constructions must still be credited where they occur |
+
+This table deliberately separates “a strategy for the endpoint” from “the endpoint is maximal.”
+A 3-optimal graph has minimum cost equal to its information lower bound, but that does not rule
+out a larger graph with the same cost.
+
+## Backward source closure
+
+The following same-model sources were read in full or through the relevant complete sections:
+
+- F. K. Hwang, “A Tale of Two Coins” (1987),
+  [DOI 10.2307/2322412](https://doi.org/10.2307/2322412): the model-Q Fibonacci construction,
+  but no later finite threshold table.
+- F. H. Hao, “The optimal procedures for quantitative group testing” (1990),
+  [DOI 10.1016/0166-218X(90)90022-5](https://doi.org/10.1016/0166-218X(90)90022-5): product
+  inequalities and limit existence; its finite input `T(15,22)=6` is cited from Aigner.
+- C. A. Christen, “Search problems: one, two or many rounds” (1994),
+  [DOI 10.1016/0012-365X(94)00106-S](https://doi.org/10.1016/0012-365X(94)00106-S): repeats
+  `T_A(32,32)=7` and surveys the older asymptotic coefficients. The quantities 7, 12 and 20 in
+  its recursive asymptotic bounds are not claims that `T(7,7)=4`, `T(12,12)=5`, or
+  `T(20,20)=6`.
+- Jiang--Polyanskii--Vorobyev 2019,
+  [proceedings PDF](https://www.lebesgue.fr/sites/default/files/proceedings_WCC/WCC_2019_paper_65.pdf):
+  reviews the exact same historical chain and adds an explicit asymptotic construction. It cites
+  Belokopytov--Luzgin's very large family
+  `K_{2^(235n+61),2^(235n+61)}` in `312n+123` tests; this has no small-`k` frontier consequence.
+- Florin--Ho--Jiang 2022,
+  [DOI 10.1109/TIT.2021.3137965](https://doi.org/10.1109/TIT.2021.3137965): proves the exact
+  equivalence between `Sb(n:n)` strategies and full-feedback binary-adder codes, reviews the
+  same finite sources, and settles the asymptotic rate rather than the small finite table.
+- Bshouty 2009,
+  [COLT PDF](https://www.learningtheory.org/colt2009/papers/004.pdf): “optimal” there is a
+  constant-factor guarantee for the general spring-scale problem, not a finite exact result.
+- Karimi--Kazemi--Heidarzadeh--Sprintson 2018,
+  [arXiv:1805.02977](https://arxiv.org/abs/1805.02977): average-case and a broader weight model
+  permitting one weight-2 coin, not the present distinct-two-defective worst case.
+
+The two modern same-model papers' bibliographies return to Aigner, Christen, Hao, Gargano,
+Belokopytov and the feedback-coding papers; they did not reveal another finite exact table.
+
+## Forward citations and broad discovery
+
+Eight seed records were used: Aigner 1986, Hwang 1987, Hwang 1989, Andreae 1989, Hao 1990,
+Gargano 1992, Christen 1994 and Li--Wu--Triesch 2018.
+
+### OpenAlex
+
+The API counts on 2026-09-02 were respectively 36, 31, 3, 3, 11, 16, 3 and 0. Deduplicating
+all returned forward citations gave 69 works. The query form is:
 
 ```text
-2,2,3,5,8,13,22,38,65,112,192
-22,38,65,112,192
-38,65,112,192
-65,112,192
+https://api.openalex.org/works?per-page=200&filter=cites:W1977708615
 ```
 
-The check used the repository-specific exact queries below; all four returned `total_count = 0`:
+with seed IDs `W1977708615`, `W2032413558`, `W2136029256`, `W1974102038`, `W2081703448`,
+`W2066296454`, `W1972805208`, and `W2807652950`. All 69 titles were screened; the same-model
+candidates were then checked in primary text. The other hits were binary-outcome group testing,
+parity/balance/underweight models, nonadaptive QGT, noisy or probabilistic variants, graph
+reconstruction, or general coding work.
 
-```sh
-GH_CONFIG_DIR=.gh gh api -X GET search/code \
-  -f q='"2,2,3,5,8,13,22,38,65,112,192" repo:oeis/oeisdata'
+Four independent OpenAlex discovery searches were exhausted rather than stopped at the first page:
+
+```text
+"quantitative group testing"               138 records
+"ternary search" graph                     216 records
+"coin weighing" "spring scale"             56 records
+"binary adder channel" feedback             39 records
 ```
 
-and the same command with each displayed tail.  This settles only whether the sequence occurs in
-that dated OEIS export; it does not settle publication elsewhere.
+Their deduplicated union contained 424 records. Title screening and primary-text follow-up found
+the sources above, plus near-misses recorded below, but no additional finite `Sa` threshold or
+complete `Sb` frontier.
 
-## Du--Hwang and the exact finite frontiers
+Crossref `query.bibliographic` searches with the same four concept families were also used as a
+noisy discovery supplement. Crossref's token matching reported millions of nominal hits, so only
+the first 1,000 relevance-ranked records per query were screened and this is **not** counted as an
+exhausted database. The useful additions it surfaced were the Zhang--Berger--Massey, Kramer,
+Deppe--Lebedev, Bshouty and Karimi items already classified above or below.
 
-The searchable text of the second edition of Du and Hwang, *Combinatorial Group Testing and Its
-Applications* (2000), was checked through its
-[Google Books record](https://books.google.com/books?id=nD5kDQAAQBAJ).  Section 11.2's indexed text
-summarizes Christen's golden-ratio construction, Hao's two-disjoint-set formulation, and the later
-asymptotic improvements.  Exact searches for `22 38 65 112`, `65 112 192`, `threshold function`,
-and `K38` produced no matching threshold table.  The indexed occurrences of `Aigner` and `Hao` on
-pp. 220 and 230 lead to bounds/constructions and references, not an `Sa` table or a fixed-`m >= 6`
-frontier.
+### Semantic Scholar and publisher citation lists
 
-The indexed searches are reproducible by substituting each URL-encoded term for `QUERY` here:
+Semantic Scholar returned 38, 33, 4, 2, 11, 16, 2 and 0 forward-citation records for the same
+eight DOI seeds (106 records before cross-seed deduplication). These sets were title-screened and
+the technically relevant additions checked. The reproducible endpoint is:
 
-```sh
-curl -sS 'https://books.google.com/books?jscmd=SearchWithinVolume2&q=QUERY&vid=nD5kDQAAQBAJ'
+```text
+https://api.semanticscholar.org/graph/v1/paper/DOI:10.1016%2F0166-218X%2886%2990026-0/citations?limit=1000&fields=title,year,externalIds
 ```
 
-This is useful negative evidence, not a substitute for a page-by-page copy of the book: Google
-Books exposes searchable snippets rather than every page.  The full-book inspection remains open.
+The complete ACM forward-citation list for Aigner's book (43 entries) was separately reviewed.
+It contains no resolution of the singleton-majorization converse, but is known to be incomplete:
+Li--Wu--Triesch cite the book and do not appear there. Google Scholar could not be queried because
+the in-app browser had no available session; a Scholar export remains the best independent
+coverage check.
 
-## Citation and nice-graph checks
+## Exact-string, OEIS and book searches
 
-The [OpenAlex forward-citation result](https://api.openalex.org/works?filter=cites:W1977708615&per-page=100)
-for Aigner 1986 was title-screened for work on the same
-complete-graph threshold.  The technically adjacent primary sources already in
-[`literature.md`](../docs/literature.md)—Andreae 1989, Hao 1990, and Li--Wu--Triesch 2018—were
-searched directly.  None states `Sa(7)=38` or a later complete-graph threshold table.  This is not a
-replacement for Google Scholar because citation databases have different coverage.
+The official [`oeis/oeisdata`](https://github.com/oeis/oeisdata) export timestamped
+`2026-09-02T03:01:04-04:00` contains no exact match for the complete project sequence or the
+tails `22,38,65,112,192`, `38,65,112,192`, or `65,112,192`. A broad web search for
+`3,5,8,13,22,38` does find OEIS A297497, but that is an unrelated recursively generated triangle;
+it is not this search threshold.
 
-The full searchable text of the two current papers named in the nice-graph audit was checked for
-`Aigner`, `combinatorial search`, `quantitative group testing`, `ternary search`, `transcript
-graph`, `star forest`, and `N(k)`:
+The searchable text of Du and Hwang, *Combinatorial Group Testing and Its Applications*, second
+edition (2000), was queried through its
+[Google Books record](https://books.google.com/books?id=nD5kDQAAQBAJ). Section 11.2's indexed
+text cites Aigner, Christen, Hao and Gargano. Queries for the complete sequence and its tails,
+`T(32,32)`, `32,32`, `21,17`, `14,9`, `K32,32`, `Gargano`, and `threshold function` exposed
+the asymptotic discussion and references but no finite threshold table. Reproduce by replacing
+`QUERY` here:
 
-- Li--Li--Yang--Zhang,
-  [*Strongly nice property and Schur positivity of graphs*](https://arxiv.org/abs/2408.15074).
-- Zhang,
-  [*Three Infinite Families Separating Schur Positivity, the Strongly Nice Property, and the Nice
-  Property*](https://arxiv.org/abs/2608.16613).
+```text
+https://books.google.com/books?jscmd=SearchWithinVolume2&q=QUERY&vid=nD5kDQAAQBAJ
+```
 
-Neither paper mentions the transcript family `Q_K` or the search/majorization question.  They do
-confirm that niceness is current terminology and that the current literature studies other
-explicit separating families.  Absence from these two papers does not settle the older or broader
-nice-graph literature.
+This is a snippet-index result, not a page-by-page inspection.
+
+## Near-misses explicitly excluded
+
+- Chang--Hwang 1980/1981, Chang--Hwang--Lin 1982, and Deppe--Lebedev 2013 use a binary
+  positive/negative group-test oracle, not the exact-count oracle.
+- Andreae's broader graph search papers are relevant context but add no located finite complete
+  graph or complete-bipartite threshold.
+- The “two counterfeit coins with two-arms balance,” parity-check, complementary-weight,
+  underweight, multi-arm, and unreliable-test papers have different feedback.
+- Nonadaptive quantitative group testing, nested-only plans, expected-test objectives, noisy or
+  semi-quantitative models, and general additive graph reconstruction do not establish these
+  unrestricted adaptive worst-case values.
+- Kramer's 1997 one-page “sequential strategy” for the feedback adder channel is a
+  capacity/variable-sequential result, not a fixed-block zero-error `Sb` value.
 
 ## Supporting-theorem attribution
 
-Searches of Aigner 1986, the available Chapter 3 scan of Aigner 1988, Andreae 1989, and the indexed
-1988 book text found no general statement of either the Unit-Group Elimination equivalence or the
-edge-injective vertex-map pullback lemma.  Aigner and Andreae do use isolated edges inside
-particular constructions; Aigner also replaces vertices by groups in a binary-search construction.
-Those are related techniques, not the general statements proved here.  Treat this as a scoped
-negative result: broader graph-search and decision-tree literature still needs checking before the
-paper calls either theorem new.
+Searches of Aigner 1986, the complete available Chapter 3 scan of Aigner 1988, Andreae 1989,
+and the indexed 1988 book text found no general Unit-Group Elimination equivalence or
+edge-injective vertex-map pullback lemma. Aigner and Andreae use related special constructions,
+not the general statements proved here. This remains a scoped negative result; the finite-value
+audit is much stronger than the attribution audit for these elementary lemmas.
 
-## Remaining blocking searches
+## Remaining access-dependent checks
 
-- Google Scholar cited-by passes for Aigner 1986, Aigner 1988, and Li--Wu--Triesch 2018.
-- A page-by-page copy of Du--Hwang 2000, especially the additive-model chapter.
-- The older Christen reports and the unobtained Belokopytov papers listed in
-  [`literature.md`](../docs/literature.md).
-- A broader citation search around Stanley's nice graphs and generalized Griggs chain partitions.
+These are the only material gaps identified by the citation and bibliography closure:
+
+1. A page-by-page copy of Du--Hwang 2000, especially pp. 211--230.
+2. Hwang, “Updating a Tale of Two Coins” (1989), pp. 259--265,
+   [DOI 10.1111/j.1749-6632.1989.tb16406.x](https://doi.org/10.1111/j.1749-6632.1989.tb16406.x).
+   Its date rules out knowledge of Gargano 1992, but it may clarify older finite results.
+3. Christen, *A Fibonaccian algorithm for the detection of two elements*, Publ. 341,
+   Université de Montréal (1980), and the 1986 SIAM conference presentation “Adaptive versus
+   non-adaptive quantitative detection.”
+4. A Google Scholar cited-by export for Aigner 1986, Aigner's 1988 book, Gargano 1992, and
+   Li--Wu--Triesch 2018, to compare against the 69-work OpenAlex and 106-record Semantic Scholar
+   passes.
+
+Belokopytov's 1987/1989 papers remain desirable for asymptotic attribution, but the later full
+texts state their consequences precisely enough to show that they do not settle the small finite
+values at issue here.
+
+## Safe publication language after this pass
+
+- Do **not** call the local `Sa(38)` tree the first construction, or call `Sb(21:17)` or
+  `Sb(32:32)` new. Cite Gargano 1992.
+- It is safe to say that the local 38/39 boundary corrects Aigner's exact seven-test value while
+  independently certifying a construction already implicit in Gargano.
+- It is safe to say that Aigner 1986, not Li--Wu--Triesch 2018, first proves exact `m=4`.
+- For `Sa(65)`, `Sa(112)`, `Sa(192)`, the remaining `m>=6` maxima, and the Aigner-converse
+  counterexample, say “no prior result was located in the audited corpus,” not “first ever,”
+  until the four access-dependent checks above are closed.

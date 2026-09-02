@@ -1,25 +1,30 @@
 # Research plan
 
 Living document. Update it when a goal is met or reprioritised; do not accumulate stale
-entries. Last revised 2026-08-31.
+entries. Last revised 2026-09-02.
 
 ## High-level goals
 
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
 proven optimal through `k=10`, the `Sb` Pareto frontier proven for `k<=8`, and the foundational
 theorems. **Entry point is [publication-handover.md](publication-handover.md).** As of
-2026-09-02 the blocking work is citation coverage and a public deposit, not proving or computing:
+2026-09-02 the blocking work is four access checks and a public deposit, not proving or computing:
 the certificate is independently verified, the reproduction package is built and validated, and
 the likely headline has shifted from `Sa(10)=192` to the refutation of the converse Aigner
 conjectured after Prop. 3.25. The audit also found that Aigner's exact complete-graph threshold
-prints 37 at seven tests; the unconditional `Sa(38)` witness corrects that published value. OEIS,
-indexed Chapter 2/Du--Hwang text, and two current nice-graph papers are checked, while the Scholar
-cited-by pass and broader nice-graph coverage remain. The draft in `paper/` is mechanically clean but predates the
+prints 37 at seven tests, but Gargano 1992's published `Sb(21:17)@6` already implies a
+seven-test construction for 38, and its full `Sb(32:32)@7` tree implies an eight-test
+construction for 64. The local 38/39 boundary supplies the exact correction; `Sa(65)` is the
+first complete-graph value beyond the located prior construction. The 69-work OpenAlex citation
+union, 106 Semantic Scholar seed records, 424 broad discovery records, OEIS, indexed
+Chapter 2/Du--Hwang text, and two current nice-graph papers are checked. Scholar and three
+inaccessible source groups remain. The draft in `paper/` is mechanically clean but predates the
 counterexample, the `K<=5` converse and the verification architecture, and needs restructuring
 around them; the remaining `<TODO>` sections are P5.
 
-**H2 - The K=9 Sb column.** Published theorems now make `m=1..5` exact, including the
-corrected `n(9,5)=481`; a retained exact replay makes `n(9,6)=473` exact as well. Run9 adds
+**H2 - The K=9 Sb column.** Published theorems now make `m=1..5` exact (Aigner 1986 for
+`m=2,3,4`, Li--Wu--Triesch 2018 for `m=5`), including `n(9,5)=481`; a retained exact replay
+makes `n(9,6)=473` exact as well. Run9 adds
 proven upper bounds at `m=81..96`; legacy lower bounds remain in parts of `m=65..94`. The band
 `m=7..64` is entirely blank.
 This is the main open front.
@@ -155,12 +160,14 @@ pursue it at all.
   result only as historical cost context.
 - Fix the numbering collision: `(7)` is currently a duplicate of `(5)`, and the sentence
   "(7) holds true k up to 8" plainly refers to `(u1)`.
-- Replace proposed lemma (8) by the published exact `m=4` theorem and proposed lemma (9) by
+- Replace proposed lemma (8) by Aigner 1986 Corollary 4's exact `m=4` theorem and proposed lemma (9) by
   Li--Wu--Triesch's exact piecewise `m=5` theorem.  Record the independently replayed
   `n(9,5)=481` / `n(9,5)<482` boundary and the `3+2` to `4+1` structural switch.
 - Add the primary-source discussion from [literature.md](literature.md): Aigner for the graph
-  model and exact `m=2,3`, Li--Wu--Triesch for `m=4,5`, and Hao/Gargano et al. for scalable
-  product constructions; also distinguish the modern asymptotic results of
+  model and exact `m=2,3,4`, Li--Wu--Triesch for `m=5`, Zhang--Berger--Massey for finite
+  feedback-code constructions, and Hao/Gargano et al. for scalable product constructions.
+  Credit Gargano's exact `Sb(21:17)@6` and full `Sb(32:32)@7` tree and their `Sa(38)` / `Sa(64)`
+  consequences. Also distinguish the modern asymptotic results of
   Jiang--Polyanskii--Vorobyev and Florin--Ho--Jiang from finite fixed-`m` claims. Do not copy
   Li et al.'s apparently inconsistent intermediate equations (69)–(70) without recomputing
   their indices.

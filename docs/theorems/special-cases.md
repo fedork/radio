@@ -74,9 +74,13 @@ See [../literature.md#aigner-1986](../literature.md#aigner-1986).
 
 ## (8) `Sb(2^k - 2k + 2 : 4)` - published exact theorem
 
-Li--Wu--Triesch, Corollary 3, proves this is the exact maximum for every `k>=3`; see
-[../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018).  The `k=9` value
-496 also has the independent verified witness `witnesses/canon_496_4_at9.tree`.
+Aigner 1986, Corollary 4, proves this is the exact maximum for every `k>=3`;
+Li--Wu--Triesch, Corollary 3, gives an independent later proof. See
+[../literature.md#aigner-1986](../literature.md#aigner-1986) and
+[../literature.md#li-wu-triesch-2018](../literature.md#li-wu-triesch-2018). Aigner's 1988
+Exercise 3.3.2 drops the second factor of `k` and is an erratum, not the original source of the
+formula. The `k=9` value 496 also has the independent verified witness
+`witnesses/canon_496_4_at9.tree`.
 
 ## (9) `m=5` - published exact piecewise theorem
 

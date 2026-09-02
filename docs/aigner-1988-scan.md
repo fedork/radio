@@ -43,10 +43,11 @@ Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only).
 - **Exercise 3.3.1**: `M(K_{3,n}) <= k <=> n <= 2^k - k`. Matches our `n(k,3)` exactly.
 - **Exercise 3.3.2**: `M(K_{4,n}) <= k <=> n <= 2^k - k + 2`. **The printed formula is an
   erratum.** At `k=2` it claims `M(K_{4,4}) <= 2`, i.e. 16 edges in 2 ternary tests, against
-  the information bound `16 > 9`; and it gives 7 at `k=3` where exhaustive search gives 4. The
-  intended statement is Li--Wu--Triesch's Corollary 3, `n(k,4) = 2^k - 2k + 2`, which matches
-  every verified cell. Cite Aigner for the first statement of the case, note the erratum, cite
-  Li--Wu--Triesch for the proof.
+  the information bound `16 > 9`; and it gives 7 at `k=3` where exhaustive search gives 4.
+  Aigner's own 1986 journal paper, Corollary 4, already proves the correct
+  `n(k,4) = 2^k - 2k + 2`; Li--Wu--Triesch Corollary 3 later reproves it. Cite Aigner 1986
+  for the first proof, distinguish the 1988 erratum, and cite Li--Wu--Triesch as an independent
+  later source.
 - **Exercise 3.3.3**: `M(K_{5,9}) = 4` and `M(K_{9,14}) = 5` - both agree with our `n(4,5)=9`
   and `n(5,9)=14`.
 - **Proposition 3.32** (attributed to Andreae 1988b): for forests of max degree `<= r`, the
@@ -60,10 +61,12 @@ Read from `Aigner.pdf` (book pp. 119-194, Chapter 3 only).
   this repository's `Sa(k)`.
 - Figure 2.13 prints `m^(2)(k)=3,5,8,13,22,37` for `k=2..7`. Aigner 1986 Figure 5 gives the
   same table in the graph notation `h(k)` and explicitly calls 37 the correct seven-test value.
-- The verified [`sa38_k7.tree`](../witnesses/sa38_k7.tree) is therefore an unconditional
-  constructive refutation of Aigner's printed 37. The 2026 positive/negative boundary record in
+- Gargano et al. 1992's published `Sb(21:17)@6` construction already implies a seven-test
+  strategy for 38 by using 21/17 as the first split and Aigner's six-test threshold 22 for the pure
+  branches. The verified [`sa38_k7.tree`](../witnesses/sa38_k7.tree) is an independent
+  constructive refutation of Aigner's printed 37; the 2026 positive/negative boundary record in
   [`pareto_sa.csv`](../data/pareto_sa.csv) separately establishes that the corrected exact value
-  is 38.
+  is 38. Do not claim that the local tree is the first construction.
 
 The Chapter 2 result is based on Google's indexed source text rather than the supplied PDF. Do not
 claim that the whole chapter was read; retain the page-by-page copy as a bibliography task.

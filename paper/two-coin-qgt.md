@@ -13,7 +13,7 @@ KNOWN WORK REMAINING - see docs/research-plan.md item P5:
         independent re-verification by tools/cleanroom.
     A restructure around these, rather than more polishing of the sections below, is the
     remaining work. See docs/publishable-claims.md for the claim inventory and the
-    still-outstanding citation-graph portion of its novelty audit.
+    completed citation-graph audit and its explicitly listed access gaps.
   - fixed 2026-09-02: the hand-typed Sb frontier is now a generated block; the (7)/(5)
     numbering collision, the dead image reference and the mangled G_k formula are resolved.
 Do not treat any number in this file as authoritative; data/*.csv is.
@@ -30,12 +30,18 @@ Aigner's graph formulation identifies `Sa(n)` with search on the complete graph 
 sequence used below ([Aigner 1986](https://doi.org/10.1016/0166-218X(86)90026-0)). The same
 paper defines the complete-graph threshold exactly as `Sa(k)` and prints the values through
 seven tests as `3,5,8,13,22,37`, calling 37 correct; Aigner's 1988 monograph repeats the table.
-The verified `Sa(38)` witness below therefore corrects that published last value. The exact
-`m=4` result and the piecewise exact `m=5` result are due to Li, Wu and Triesch
-([2018](https://doi.org/10.1016/j.dam.2018.05.026)).  Hao's product inequality
+Gargano, Montuori, Setaro and Vaccaro's later exact `Sb(21:17)@6` result, together with Aigner's
+published six-test complete-graph threshold 22, already implies that
+38 is achievable in seven tests; the verified `Sa(38)` witness below independently constructs
+it, and the local 38/39 boundary corrects Aigner's claimed maximum. Aigner 1986 Corollary 4
+also gives the exact `m=4` formula; Li, Wu and Triesch independently reprove it and establish
+the piecewise exact `m=5` result
+([2018](https://doi.org/10.1016/j.dam.2018.05.026)). Hao's product inequality
 ([1990](https://doi.org/10.1016/0166-218X(90)90022-5)) and the explicit recursive algorithm of
 Gargano, Montuori, Setaro and Vaccaro
 ([1992](https://doi.org/10.1016/0166-218X(92)90260-H)) provide the scalable asymptotic context.
+The latter paper publishes the full `Sb(32:32)@7` tree, which implies `Sa(64)@8`, as well as
+exact costs for `Sb(14:9)@5` and `Sb(21:17)@6`.
 Jiang, Polyanskii and Vorobyev give an explicit near-optimal mixed construction
 ([2019](https://www.lebesgue.fr/sites/default/files/proceedings_WCC/WCC_2019_paper_65.pdf));
 Florin, Ho and Jiang determine the sharp leading asymptotic rate
@@ -79,8 +85,10 @@ produced known false negatives.
 Write `n(k,m)` for the largest `n1` with `Sb(n1 : m)` solvable in `k` tests, where `n1 >= m`.
 For each `k` these values form a Pareto frontier: every state on or below the line is solvable
 in `k`, every state above it is not. The frontier is complete and proven maximal for
-`k <= 8`. At `k = 9` only `m = 1..6` are settled, of which `m = 1..5` are published results
-(Aigner 1986 for `m = 2, 3`; Li--Wu--Triesch 2018 for `m = 4, 5`) and `m = 6` is established
+`k <= 8`. Aigner 1986 already publishes the isolated `m=6,k=4` frontier cell as well as
+the fixed-`m=2,3,4` formulas; older papers also contain individual lower constructions at
+other frontier endpoints. At `k = 9` only `m = 1..6` are settled, of which `m = 1..5` follow
+published formulas (Aigner 1986 for `m = 2,3,4`; Li--Wu--Triesch 2018 for `m = 5`) and `m = 6` is established
 here; the band `m = 7..64` is open. At `k = 10` only `m = 5` (published) and an upper bound at
 `m = 6` are known.
 

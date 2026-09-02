@@ -7,7 +7,8 @@ Everything below is either already committed or explicitly flagged as undone.
 ## The one-line state
 
 The mathematics and the verification are done and independently checked. **What blocks
-submission is prior art and a public deposit, not proving or computing anything.**
+submission is closing four explicit access gaps, making a public deposit, and revising the
+paper's priority language—not proving or computing anything.**
 
 ## What the paper is, and the reframing that happened
 
@@ -15,9 +16,13 @@ The obvious headline is `Sa(10) = 192` — 192 coins resolvable in 10 tests, 193
 `2, 2, 3, 5, 8, 13, 22, 38, 65, 112, 192`. The prior-art audit has made that contribution more
 interesting: Aigner 1986 Figure 5 and Aigner 1988 Figure 2.13 both print the identical threshold
 through seven tests as `3,5,8,13,22,37`, and the former explicitly calls 37 correct. The checked
-`Sa(38)` tree constructively refutes that published value; the audited boundary pair establishes 38
-exactly. No later correction has yet been located, but that priority statement remains provisional
-until the cited-by pass is complete. **Even so, this is probably not the strongest contribution.**
+`Sa(38)` tree constructively refutes that published value and the audited boundary pair establishes
+38 exactly. However, Gargano--Montuori--Setaro--Vaccaro 1992 already publish
+`Sb(21:17)@6`; with Aigner's published six-test complete-graph threshold 22, a 21/17 first split gives a published construction for
+`Sa(38)`. Their appendix's exact `Sb(32:32)@7` tree likewise gives `Sa(64)@8`. Thus the local
+novelty is the **upper boundary and exact correction at 38**, not the first construction; at eight
+tests the local exact 65 improves the published construction by one. No source in the completed
+indexed corpus states 65, 112 or 192. **Even so, this is probably not the strongest contribution.**
 
 Aigner 1988, *Combinatorial Search*, p. 150, immediately after proving Prop. 3.25 (necessity of
 majorization by `N(k)` for star forests):
@@ -57,24 +62,29 @@ explicitly, since it connects the computation to his framework.
 
 ## What blocks submission
 
-1. **Novelty audit** — [novelty-audit.md](novelty-audit.md) asks five questions, records what is
-   settled, and says what each possible answer changes. Current state:
+1. **Novelty audit access closure** — [novelty-audit.md](novelty-audit.md) now records the
+   completed 69-work OpenAlex forward-citation union, 106 Semantic Scholar seed records, 424
+   broad discovery records, backward source closure, and exact-string searches. Current state:
    - **Q1 (is the `Sa` sequence published?)** Aigner published it through `k=7`, but with the
-     false last value 37. The repository's unconditional `Sa(38)` tree is already a constructive
-     correction; exactness at 38 has separate audited evidence. The official OEIS Git export has
-     no match, and searchable Du--Hwang text exposed no table. **Outstanding:** Google Scholar
-     cited-by checks, and ideally a page-by-page Du--Hwang copy. Reproducible searches are in
+     false last value 37. Gargano 1992's `Sb(21:17)@6` already implies 38-achievability;
+     the repository independently certifies it and proves the missing upper boundary. Gargano's
+     `Sb(32:32)@7` similarly gives the prior eight-test lower bound 64. The official OEIS Git
+     export has no match, and searchable Du--Hwang text exposed no table. **Outstanding:** a
+     Scholar export and page-by-page Du--Hwang copy. Reproducible searches are in
      [the audit record](../evidence/publication_prior_art_2026-09-02.md).
    - **Q2 (is the converse still open?)** Aigner poses it as a conjecture (quote above). The
      complete ACM forward-citation list for the book was reviewed: **no resolution**, nearest
      neighbours all a different oracle. But that list is demonstrably incomplete — Li--Wu--Triesch
-     2018 cite Aigner and are absent. Two current nice/strongly-nice papers have now been searched
-     and do not mention the transcript family. **Outstanding:** a Google Scholar "cited by" pass
-     on the book and on Aigner 1986, plus the broader nice-graph literature, where the equivalent
-     statement is that `Q_6` is not nice.
-   - **Q3 (`Sb` frontier).** `m = 1..5` are published (Aigner 1986/1988 for 2,3; Li--Wu--Triesch
-     2018 for 4,5). Only `m >= 6` could be ours. Searchable Du--Hwang text exposed no such
-     table. **Outstanding:** full-book and cited-by coverage for any published `m >= 6` table.
+     2018 cite Aigner and are absent. OpenAlex and Semantic Scholar forward citations, plus two
+     current nice/strongly-nice papers, have now been searched and expose no resolution.
+     **Outstanding:** a Scholar export for independent database coverage and a broader
+     nice-graph check before an unqualified priority claim.
+   - **Q3 (`Sb` frontier).** Exact formulas for `m=2,3,4` are already Aigner 1986; `m=5` is
+     Li--Wu--Triesch 2018. Aigner Figure 4 also publishes `n(4,6)=7`. Zhang--Berger--Massey
+     and Gargano publish individual finite constructions, notably `Sb(21:17)@6` and the full
+     `Sb(32:32)@7` tree, without supplying the neighboring negatives needed for a frontier.
+     **Outstanding:** page-by-page Du--Hwang, Hwang 1989, the older Christen report/talk, and
+     a Scholar export. Treat every older endpoint construction as prior even when maximality is local.
    - **Q4 (attribution spot-checks).** The `G_k` closed form is **Aigner's definition** (3.12) —
      cite, do not claim. A scoped check found no general Unit-Group Elimination or Vertex-Splitting
      Pullback statement in Aigner 1986/1988 or Andreae 1989, but broader literature checking is
@@ -85,15 +95,22 @@ explicitly, since it connects the computation to his framework.
 
 ## Findings a new session should not have to rediscover
 
-- **Aigner Exercise 3.3.2 is an erratum.** It states `M(K_{4,n}) <= k <=> n <= 2^k - k + 2`.
+- **Aigner 1988 Exercise 3.3.2 is an erratum, but Aigner 1986 is correct.** The exercise states
+  `M(K_{4,n}) <= k <=> n <= 2^k - k + 2`.
   At `k=2` that asserts 16 edges resolved by 2 ternary tests against an information bound of 9;
   at `k=3` it gives 7 where exhaustive search gives 4. Li--Wu--Triesch's `2^k - 2k + 2` matches
-  every verified cell. Cite Aigner for the first statement of the case, note the erratum, cite
-  Li--Wu--Triesch for the proof.
+  every verified cell, but Aigner 1986 Corollary 4 already prints and proves that correct formula.
+  Cite Aigner 1986 for priority, distinguish the book typo, and cite Li--Wu--Triesch as an
+  independent later proof.
 - **Aigner's seven-test complete-graph value is also wrong.** Aigner 1986 Figure 5 defines the
   same threshold as `Sa`, prints 37, and calls it correct; Aigner 1988 Figure 2.13 repeats it.
-  `witnesses/sa38_k7.tree` is a solver-independent constructive refutation, while the 2026
-  boundary record makes 38 exact. This is a publishable correction, not merely a new tail term.
+  Gargano 1992 already makes 38 achievable via `Sb(21:17)@6`; `witnesses/sa38_k7.tree` is an
+  independent solver-free construction, while the 2026 boundary record makes 38 exact. The
+  publishable correction is the exact upper boundary, not first achievability.
+- **Gargano 1992 contains more finite prior art than its abstract suggests.** Besides the full
+  `Sb(32:32)@7` appendix tree, its conclusion gives exact costs for `Sb(14:9)@5` and
+  `Sb(21:17)@6`. The latter implies `Sa(38)@7`; the former two-set results do not by themselves
+  prove fixed-`m` maximality.
 - **Exercises 3.3.1 and 3.3.3 independently confirm our cells**: `n(k,3) = 2^k - k`, and
   `M(K_{5,9}) = 4`, `M(K_{9,14}) = 5` matching `n(4,5) = 9` and `n(5,9) = 14`.
 - **Pre-empt the near-miss literature.** "Two counterfeit coins with two-arms balance"
@@ -121,9 +138,9 @@ retained source output; and the asymptotic constant, which Florin--Ho--Jiang set
 
 ## Suggested order
 
-1. Finish the citation-graph portion of the novelty audit. Chapter 2, OEIS, searchable Du--Hwang,
-   and the two current nice-graph papers are now checked; Google Scholar cited-by and broader
-   nice-graph coverage remain.
+1. Close the four access tasks listed in the audit: full Du--Hwang pp. 211--230, Hwang 1989,
+   Christen 1980/1986, and a Google Scholar cited-by export. The public citation graph and broad
+   database search are otherwise complete.
 2. Deposit the package; get the DOI.
 3. Restructure the paper around the counterexample. This is a framing decision and was
    deliberately left to a human — the draft header records the gap rather than guessing.

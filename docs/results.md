@@ -175,6 +175,13 @@ bounds; `m=95,96` have proof-safe upper bounds only. Thus all sixteen ceilings u
 `Sa(193)` proof are established, but none of these rows is an exact K=9 maximum. The whole
 band `m=7..64` is blank.
 
+Publication priority is finer-grained than proof status. Aigner 1986 already gives the exact
+`m=2,3,4` formulas and the isolated exact cell `n(4,6)=7`; Li--Wu--Triesch 2018 gives exact
+`m=5`. Zhang--Berger--Massey 1987 and Gargano et al. 1992 also publish individual finite
+constructions at several local frontier endpoints, including exact costs for `Sb(21:17)@6` and
+`Sb(32:32)@7`, but not the neighboring negative verdicts needed for the corresponding fixed-`m`
+maxima. See [the cell-honest prior-art audit](../evidence/publication_prior_art_2026-09-02.md).
+
 At `k=10`, Li--Wu--Triesch's theorem gives the exact cell **`n(10,5)=985`**.  Independently,
 the exhaustive rejection of `Sb(974:6)` proves **`n(10,6)<=973`**.  The checked 115-node file
 `witnesses/majorized_973_6_at10.tree` reaches 77 singleton terminals; 71 already fit in distinct

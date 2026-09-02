@@ -13033,11 +13033,10 @@ the table in Figure 2.13. The prior inference from his later “possibly only `K
 3-optimal” remark was invalid: a short exact table and that conjecture are perfectly compatible.
 It has been superseded everywhere it occurred.
 
-This makes the checked `witnesses/sa38_k7.tree` more important. Its complete strategy for 38 coins
-is an unconditional constructive refutation of Aigner's published 37, independent of the solver;
-the audited 2026 positive/negative pair separately establishes exactness at 38. The safe current
-claim is “corrects Aigner's printed seven-test value; no later correction located in the scoped
-audit.” Do not say “first correction” until the Google Scholar cited-by pass is complete.
+**Superseded later the same day:** the checked `witnesses/sa38_k7.tree` is an unconditional
+constructive refutation of Aigner's published 37, and the audited boundary separately establishes
+exactness, but Gargano 1992 already contains a different published construction for 38. The full
+correction and safe claim language are in the next journal entry.
 
 The same audit closed several smaller branches. Exact searches of the official OEIS Git export,
 timestamped `2026-09-02T03:01:04-04:00`, found no complete-sequence or long-tail match. Searchable
@@ -13059,3 +13058,43 @@ After the record was superseded, `tools/check_tables.py`, `tools/check_witness.p
 and `tools/check_docs.py` all passed. The witness check again verified `sa38_k7.tree`
 unconditionally and reported only the two already-labelled arbitrary-majorization diagnostics as
 unsupported terminals.
+
+## 2026-09-02 -- Exhaustive publication pass finds the missing finite prior art
+
+The earlier same-day publication note is superseded on its central novelty point. Direct inspection
+of Gargano--Montuori--Setaro--Vaccaro 1992 found Lemma 2.3 and the complete appendix tree for
+`T(32,32)=7`. More importantly for the seven-test threshold, p. 305 states that `K_{14,9}` and
+`K_{21,17}` are also 3-optimal. The latter exact six-test construction, combined with Aigner's
+published six-test complete-graph threshold 22, gives a seven-test strategy for 38 by a 21/17 first split. The 32/32 tree
+similarly gives an eight-test strategy for 64. Therefore the local `sa38_k7.tree` is an independent
+certificate, not the first construction; the new part at seven tests is the checked 38/39 upper
+boundary that corrects Aigner's claimed exact 37. At eight tests, the local exact 65 improves the
+located published construction by one.
+
+The same primary-source pass corrected another attribution. Aigner 1986 Corollary 4 already prints
+and proves `n(k,4)=2^k-2k+2`. The bad `2^k-k+2` occurs in the 1988 book exercise, not in the
+original journal theorem. Li--Wu--Triesch 2018 is an independent later proof and remains the source
+of the exact piecewise `m=5` theorem. Aigner 1986 Figure 4 also publishes
+`c(K_{6,7})=4`, `c(K_{6,8})=5`, hence the exact frontier cell `n(4,6)=7`.
+
+The feedback-coding branch was checked rather than treated as merely asymptotic.
+Zhang--Berger--Massey 1987 explicitly constructs full-feedback attainable pairs `(5,3)@3`,
+`(5,9)@4`, `(8,14)@5`, and `(5,45)@6`; by the modern exact equivalence these are finite `Sb`
+strategies. Christen 1994 repeats `T_A(32,32)=7`. Hao 1990 supplies product/limit results but no
+new finite frontier. Bshouty 2009 is constant-factor “optimal,” Karimi et al. 2018 is average-case
+in a broader model permitting a weight-2 coin, and the 1997 sequential feedback strategy is not a
+fixed-block zero-error result.
+
+The citation/discovery search then closed every public API page: eight seed papers yielded 69
+unique OpenAlex forward citations and 106 Semantic Scholar seed records before cross-seed
+deduplication. Four broad OpenAlex searches returned 138, 216, 56, and 39 records, 424 after union
+deduplication. All titles were screened and same-model candidates checked in primary text. No
+additional finite `Sa` threshold or complete `Sb` frontier was located. Exact web/OEIS searches
+and the searchable Du--Hwang text likewise produced no 65/112/192 threshold.
+
+This is conclusive for the recorded corpus, not a proof of global absence. Four access-dependent
+checks remain: a page-by-page Du--Hwang pp. 211--230; Hwang 1989 pp. 259--265; Christen's 1980
+report and 1986 talk; and a Google Scholar cited-by export for the core seeds. The in-app browser
+reported no available session, so the Scholar check could not be run. Exact queries, source links,
+counts, model exclusions, and the cell-by-cell publication ledger are in
+`evidence/publication_prior_art_2026-09-02.md`.

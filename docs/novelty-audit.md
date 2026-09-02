@@ -11,9 +11,10 @@ Fill in the verdict lines as they are answered. A question answered "already pub
 success: it converts a risky claim into a citation and removes it from the paper's novelty
 surface before a referee does it for us.
 
-Known-good starting point: [literature.md](literature.md) already has 12 primary sources read
-directly, with DOIs, and an explicit imported-vs-own ledger. The five sources it names as still
-wanted are exactly the ones most likely to answer Q1–Q3.
+Known-good source map: [literature.md](literature.md) records the primary sources read directly,
+with DOIs and an explicit imported-vs-own ledger. The exhaustive indexed search and its four
+remaining access gaps are recorded in
+[`publication_prior_art_2026-09-02.md`](../evidence/publication_prior_art_2026-09-02.md).
 
 ---
 
@@ -32,10 +33,11 @@ queried subset.
 > value is wrong.** Aigner 1986, p. 226, defines `h(k)` by `c(K_n)<=k` iff `n<=h(k)`, exactly the
 > present `Sa(k)`. Figure 5 prints `3,5,8,13,22,37` for `k=2..7` and explicitly calls `h(7)=37`
 > correct. Aigner 1988, p. 102, independently defines `m^(2)(k)` as the largest population
-> solvable in `k` tests and repeats the same values in Figure 2.13. The unconditional tree
-> `witnesses/sa38_k7.tree` therefore refutes a published exact value; the audited 2026 boundary
-> pair additionally establishes `Sa(7)=38` exactly. This is a stronger and safer publication
-> story than the retracted inference from the speculative remark after Cor. 3.29.
+> solvable in `k` tests and repeats the same values in Figure 2.13. Gargano et al. 1992 then
+> publish exact `Sb(21:17)@6`, which with Aigner's six-test threshold 22 implies `Sa(38)@7`; their full
+> `Sb(32:32)@7` appendix tree similarly implies `Sa(64)@8`. The local `sa38_k7.tree` is an
+> independent construction, while the audited 38/39 boundary establishes the corrected exact
+> value. The correction is therefore the missing **upper boundary at 38**, not first achievability.
 >
 > **OEIS verdict:** the official `oeis/oeisdata` export dated 2026-09-02 contains neither the
 > complete sequence nor any of the long tails ending in `38,65,112,192`. **Du--Hwang verdict,
@@ -44,29 +46,32 @@ queried subset.
 > exact scope and limitations are retained in
 > [the prior-art search record](../evidence/publication_prior_art_2026-09-02.md).
 >
-> **Still to do:** forward citations of Aigner 1986/1988 and Li--Wu--Triesch 2018, especially in
-> Google Scholar. Until that pass is complete, say that no later correction has been *located*,
-> not that this is the first correction in the literature.
+> **Citation-corpus verdict:** all 69 unique OpenAlex forward citations to eight seed works,
+> 106 Semantic Scholar seed-citation records before cross-seed deduplication, and 424 broad
+> OpenAlex discovery records were screened. The same-model candidates were checked in primary
+> text; none states 65, 112 or 192, or supplies the 38 upper boundary. **Still to do:** a Google
+> Scholar export for independent coverage, plus the three inaccessible source groups listed below.
 
 1. **OEIS — checked 2026-09-02.** Exact searches of the dated official Git export found no
    match. Repeat before submission if the audit remains open long enough for the export to change.
 2. **Aigner 1986/1988 — checked 2026-09-02.** Both sources publish the threshold through seven
    tests; both give the now-refuted last value 37. Cite both when presenting the correction.
-3. **Du & Hwang, *Combinatorial Group Testing and Its Applications*, 2nd ed. (World
+3. **Gargano et al. 1992 — checked 2026-09-02.** The paper publishes the finite constructions
+   that imply 38 in seven tests and 64 in eight; it does not state the corrected `Sa` threshold.
+4. **Du & Hwang, *Combinatorial Group Testing and Its Applications*, 2nd ed. (World
    Scientific, 2000) — searchable preview checked 2026-09-02.** No exact sequence was located;
    retain the full-book pass as a coverage check.
-4. **Forward citations of Aigner 1986** (`10.1016/0166-218X(86)90026-0`) and **Li–Wu–Triesch
-   2018** (`10.1016/j.dam.2018.05.026`) in Google Scholar. This is the highest-yield single
-   technique for the whole audit: anyone computing these values would cite one of them.
+5. **Forward citations — public API pass complete.** OpenAlex and Semantic Scholar seed sets
+   are screened. A Google Scholar export remains useful because database coverage differs.
 
 **What each answer changes.**
 
 | finding | consequence |
 |---|---|
 | the sequence later enters OEIS with references | follow them; likely resolves Q1 and Q3 both |
-| a later source already corrects Aigner's 37 to 38 | cite it; the local result becomes an independent certificate and extension rather than the correction |
+| a later source already constructs 38 | **found:** cite Gargano; the local result remains the exact upper correction and an independent certificate |
 | published through `k = 9` (i.e. 112 is known) | only `Sa(10) = 192` is ours. The paper's computational claim narrows to one value plus the certified method — this is the most likely outcome and is fine |
-| published only to `k = 5` or so | the whole upper range is ours; the computational contribution is substantially larger |
+| no source reaches 65 or above | current corpus result: the locally new finite tail begins at the one-step improvement 64 to 65, subject to the remaining access gaps |
 | `Sa(10) = 192` already published | the computational headline is gone. The counterexample (Q2) becomes the paper, and the verification architecture becomes the methodological contribution |
 
 ---
@@ -104,11 +109,13 @@ queried subset.
 >   the oracle is a three-way balance comparison, not a count of defectives in the queried set.
 >   Worth a sentence in the paper's related work so the resemblance is pre-empted.
 >
-> **This is evidence, not proof: the ACM list is incomplete.** Li--Wu--Triesch 2018 certainly
-> cite Aigner and do not appear in it, so ACM is not indexing the relevant Elsevier venues
-> fully. A Google Scholar "cited by" pass on the book, and on Aigner 1986, would be the
-> conclusive check. **Still to do:** that pass, and the nice-graph literature, where the
-> equivalent statement is that `Q_6` is not nice. Note the neighbourhood is currently active -
+> **The wider citation pass is now complete for the public APIs.** The 69-work deduplicated
+> OpenAlex union and 106 Semantic Scholar seed records for eight core sources were screened;
+> neither exposes a resolution. The ACM list remains demonstrably incomplete because
+> Li--Wu--Triesch 2018 cite Aigner and do not appear in it. A Google Scholar export remains an
+> independent-coverage check, not a substitute for the completed public citation graph.
+> **Still to do:** that export and broader nice-graph literature, where the equivalent statement
+> is that `Q_6` is not nice. Note the neighbourhood is currently active -
 > the Stanley--Gasharov conjecture (every claw-free graph is Schur-positive) was disproved in
 > 2024-25 by Prajapati and independently by Matherne--Morales, with infinite counterexample
 > families following (`arXiv:2607.27166`), so someone could plausibly touch `Q_K` soon.
@@ -162,7 +169,7 @@ restates as open the converse of Prop. 3.25.
 
 ## Q3. The `Sb` frontier for `k <= 8` — which of the 130 cells are new?
 
-> **VERDICT 2026-09-02, partial, from Aigner Ch. 3 exercises (book p. 154):**
+> **VERDICT 2026-09-02, corrected after the journal and citation pass:**
 >
 > - **Ex. 3.3.1**: `M(K_{3,n}) <= k <=> n <= 2^k - k`. This is `n(k,3) = 2^k - k` and it matches
 >   our data exactly (k=3,4,5,9 -> 5, 12, 27, 503). Attribution already correct in
@@ -172,28 +179,39 @@ restates as open the converse of Prop. 3.25.
 >   violates the information bound `16 > 3^2 = 9`. It also disagrees with all our verified
 >   cells (`k=3` gives 7 against the exhaustively established 4). Li--Wu--Triesch's Corollary 3,
 >   `n(k,4) = 2^k - 2k + 2`, matches every cell (4, 10, 24, 54, 116, 242, 496). Almost certainly
->   a typo for `2^k - 2k + 2`. **The paper should cite Aigner's exercise as the first statement
->   of the m=4 case, note the printed erratum, and cite Li--Wu--Triesch for the proof.**
+>   a typo for `2^k - 2k + 2`. **Aigner 1986 Corollary 4 already prints and proves the correct
+>   formula.** Cite the journal paper for priority, distinguish the 1988 erratum, and cite
+>   Li--Wu--Triesch as an independent later proof.
 > - **Ex. 3.3.3**: `M(K_{5,9}) = 4` and `M(K_{9,14}) = 5` - both match our `n(4,5)=9` and
->   `n(5,9)=14`. Independent confirmation of two cells.
+>   `n(5,9)=14` endpoints as constructions, but a cost statement at one graph is not by itself
+>   the fixed-`m` maximality claim.
 >
-> **Du--Hwang check 2026-09-02:** its searchable additive-model chapter summarizes the
-> Aigner/Christen/Hao/Gargano bounds and constructions but exposed no exact fixed-`m>=6` table.
-> This is scoped negative evidence, not a full-book inspection. **Still to do:** a page-by-page
-> copy and the forward-citation pass. Nothing checked so far gives an `m>=6` table.
+> - **Aigner 1986 Figure 4** publishes the exact small table including
+>   `c(K_{6,7})=4`, `c(K_{6,8})=5`, hence the `m=6,k=4` frontier `n(4,6)=7`.
+> - **Zhang--Berger--Massey 1987** publishes finite full-feedback code pairs equivalent to
+>   `Sb` constructions, including `(5,3)@3`, `(5,9)@4`, `(8,14)@5` and `(5,45)@6`.
+> - **Gargano et al. 1992** publishes the complete `Sb(32:32)@7` tree and exact costs for
+>   `Sb(14:9)@5` and `Sb(21:17)@6`. The last two hit locally maximal endpoints but do not prove
+>   the neighboring negative, hence do not by themselves publish those frontier maxima.
+>
+> **Corpus verdict:** no further fixed-`m>=6` maximum was exposed by the complete public-API
+> citation/discovery pass or searchable Du--Hwang text. **Still to do:** page-by-page Du--Hwang,
+> Hwang 1989, Christen 1980/1986, and a Scholar export.
 
 **The claim.** `n(k,m)` complete and proven maximal for `k = 1..8`, 130 cells
 (`data/pareto_sb.csv`, evidence in `evidence/pareto_certification_k1_8.txt`).
 
 **Already known to be published**, per the ledger in `literature.md`: `m=1` (trivial
-dichotomy), `m=2` and `m=3` (Aigner 1986/1988), `m=4` and `m=5` (Li–Wu–Triesch 2018). So the
-open question is only **`m >= 6` for `k <= 8`**, plus `n(9,6) = 473`.
+dichotomy), exact `m=2,3,4` (Aigner 1986), and exact `m=5` (Li–Wu–Triesch 2018). In the
+`m>=6` region, `n(4,6)=7` is also published and several later frontier endpoints have published
+positive constructions. The remaining publication question is therefore **cell and bound
+specific**, not simply “all `m>=6` are ours.”
 
 **What to find.** Any published table or theorem giving `n(k,m)` for `m >= 6`.
 
-**Where to look:** Du & Hwang's book again; Christen's Fibonaccian search reports (named in
-`literature.md`, unobtained); forward citations of Li–Wu–Triesch, whose own related-work
-section is the best short survey of exactly this frontier.
+**Where still to look:** the page-by-page Du--Hwang book; Christen's Fibonaccian search report
+and 1986 talk; Hwang 1989; and a Google Scholar export. The public citation databases and the
+backward bibliographies of the modern same-model papers are already exhausted.
 
 **Consequence.** Whatever is found converts cells from "ours" to "cited" in the same ledger
 format `literature.md` already uses. Low risk either way, but it must be done cell-honestly —

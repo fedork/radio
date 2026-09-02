@@ -6,8 +6,8 @@ checkers, both witnesses, evidence) that was extracted to a clean directory and 
 end to end - manifest verified, witness verified unconditionally, chain structure verified,
 the Rust checker built from source in 7 s with no dependencies, its selftest passed, and the
 cheap levels audited with zero gaps. What remains before submission is not engineering:
-**(a)** the citation-graph portion of the novelty audit, now partly completed and briefed question-by-question in
-[novelty-audit.md](novelty-audit.md), and **(b)** depositing the package publicly
+**(a)** closing the four access-dependent gaps left by the completed public citation-graph audit,
+as briefed question-by-question in [novelty-audit.md](novelty-audit.md), and **(b)** depositing the package publicly
 with a DOI, since `fedork/radio-data` is private and every artifact link in this repo 404s
 for a referee.
 
@@ -18,18 +18,21 @@ stated reproducibility package.
 
 ## Recommended framing: conjecture refutation and corrected exact frontiers
 
-### C0 — correction of Aigner's seven-test threshold
+### C0 — exact correction of Aigner's seven-test threshold
 
 Aigner 1986 defines `h(k)` exactly as `Sa(k)`, prints `h(7)=37` in Figure 5, and calls that value
-correct; Aigner 1988 repeats it in Figure 2.13. The checked
-[`sa38_k7.tree`](../witnesses/sa38_k7.tree) is a solver-independent strategy for 38 coins, so it
-constructively refutes the published value. The audited 2026 boundary pair additionally proves
+correct; Aigner 1988 repeats it in Figure 2.13. Gargano et al. 1992's exact
+`Sb(21:17)@6` construction, combined with Aigner's published six-test threshold 22, already implies a seven-test
+strategy for 38 coins. The checked [`sa38_k7.tree`](../witnesses/sa38_k7.tree) independently
+certifies achievability, and the audited 2026 boundary pair proves the missing upper boundary,
 `Sa(7)=38` exactly; see [`pareto_sa.csv`](../data/pareto_sa.csv) and the
 [prior-art record](../evidence/publication_prior_art_2026-09-02.md).
 
-Publication value: this turns the finite computation into a correction and extension of the
-standard source, not a sequence computed in isolation. No later correction was located in the
-scoped audit, but the paper must not claim priority until the Google Scholar cited-by pass is done.
+Publication value: this turns the finite computation into an exact correction of the standard
+source, not a first construction. No prior upper proof or explicitly corrected threshold was
+located in the 69-work OpenAlex citation union, 106 Semantic Scholar seed records, 424 broad
+discovery records, or the sources read directly. Keep that scope explicit until the Scholar and
+three inaccessible-source checks are closed.
 
 ### C1 — `Sa(10)=192` exactly
 
@@ -55,11 +58,15 @@ Every reported `Sb` cell through eight tests is a maximum: the source-of-truth r
 [results.md](results.md#provenance). This is a finite classification, not an extrapolated formula.
 
 Publication value: it maps the complete bipartite finite landscape much more finely than the
-published asymptotic constructions. It is best presented as the companion dataset and theorem
-to C1 rather than as an isolated large table.
+published formulas, small exact table, isolated constructions, and asymptotic results. Aigner
+already publishes the exact `m=2,3,4` formulas and `n(4,6)=7`; Li--Wu--Triesch publishes exact
+`m=5`; Zhang--Berger--Massey and Gargano publish several endpoint constructions including the
+full `Sb(32:32)@7` tree. It is best presented as the companion dataset and theorem to C1 rather
+than as an isolated all-new table.
 
-Before submission: establish which cells, if any, already appeared in an accessible exact table;
-include both boundary verdicts and their artifact hashes in supplementary material.
+Before submission: mark prior formulas, the isolated published exact cell, and prior endpoint
+constructions cell-honestly; close the four access gaps; include both local boundary verdicts and
+their artifact hashes in supplementary material.
 
 ### C3 — an exact `m=6` boundary, a new upper bound, and failure of the former continuation
 
