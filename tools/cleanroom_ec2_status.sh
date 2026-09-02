@@ -77,8 +77,8 @@ report_once() {
         sed 's/^/    /' <<<"$stages"
     fi
 
-    # The verify log carries the provenance header, then BUILD/RESULT_LEVEL/TOTAL as they land.
-    # It is re-uploaded every 600 s while the audit runs, so this tail is the progress view.
+    # The verify log carries the provenance header, then BUILD/PROGRESS/RESULT_LEVEL/TOTAL as
+    # they land. The host re-uploads it every PROGRESS_SECONDS, so this tail is the live view.
     # verify.out is the current name; k7-verify.out is what runs launched before the
     # 2026-09-01 full-chain rename upload, and one of those may still be in flight.
     local verify
@@ -119,7 +119,7 @@ report_once() {
 
 if (( FOLLOW )); then
     while true; do
-        date -u +'=== %Y-%m-%dT%H:%M:%SZ'
+        date +'=== %Y-%m-%d %-I:%M:%S %p %Z'
         if report_once; then
             echo 'terminal stage reached'
             exit 0
