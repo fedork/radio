@@ -263,8 +263,8 @@ impl ClosureIndex {
         }
     }
 
-    /// Fill the per-node minimum-requirement bounds. Call once after all inserts.
-    pub fn seal(&mut self, uni: &PartUniverse) {
+    /// Freeze into the flat query-time form. Consumes the builder.
+    pub fn seal(mut self, uni: &PartUniverse) -> FrozenIndex {
         // Post-order without recursion: children always have larger indices than their
         // parent (nodes are appended on first descent), so a reverse index sweep works.
         for i in (0..self.nodes.len()).rev() {
@@ -284,38 +284,68 @@ impl ClosureIndex {
             self.nodes[i].min_len = min_len.min(200) as u8;
             self.nodes[i].min_mass = min_mass;
         }
+        let n = self.nodes.len();
+        let mut f = FrozenIndex {
+            terminal: Vec::with_capacity(n),
+            min_len: Vec::with_capacity(n),
+            min_mass: Vec::with_capacity(n),
+            edge_start: Vec::with_capacity(n + 1),
+            edge_id: Vec::new(),
+            edge_child: Vec::new(),
+            root_child: vec![u32::MAX; uni.parts.len()],
+            inserted_tuples: self.inserted_tuples,
+            node_count: n,
+            min_fact_mass: self.min_fact_mass,
+        };
+        for node in &self.nodes {
+            f.terminal.push(node.terminal);
+            f.min_len.push(node.min_len);
+            f.min_mass.push(node.min_mass);
+            f.edge_start.push(f.edge_id.len() as u32);
+            for &(id, child) in &node.edges {
+                f.edge_id.push(id);
+                f.edge_child.push(child);
+            }
+        }
+        f.edge_start.push(f.edge_id.len() as u32);
+        // Direct root dispatch: the root's edge list is the largest by far and is probed
+        // once per query part; an array lookup replaces its binary search.
+        for &(id, child) in &self.nodes[0].edges {
+            f.root_child[id as usize] = child;
+        }
+        f
     }
+}
 
+/// Flat, read-only form of the closure trie (see ClosureIndex): contiguous edge arrays,
+/// per-node minimum-requirement bounds, direct root dispatch. Semantics identical.
+pub struct FrozenIndex {
+    terminal: Vec<bool>,
+    min_len: Vec<u8>,
+    min_mass: Vec<u32>,
+    edge_start: Vec<u32>,
+    edge_id: Vec<u32>,
+    edge_child: Vec<u32>,
+    root_child: Vec<u32>,
+    pub inserted_tuples: u64,
+    pub node_count: usize,
+    pub min_fact_mass: u32,
+}
+
+impl FrozenIndex {
     /// DOM query: is some stored tuple a sub-multiset of the query? `ids` ascending
     /// (canonical order), `suffix_mass[qi]` = total mass of parts qi.. (so
     /// suffix_mass[len] = 0); both prepared by the caller.
     pub fn refutes(&self, ids: &[u32], suffix_mass: &[u32]) -> bool {
-        self.walk(0, ids, suffix_mass)
-    }
-
-    fn walk(&self, node: usize, ids: &[u32], suffix_mass: &[u32]) -> bool {
-        let n = &self.nodes[node];
-        if n.terminal {
-            return true;
-        }
-        // Minimum-requirement pruning (see seal()).
-        if (ids.len() as u32) < n.min_len as u32 || suffix_mass[0] < n.min_mass {
-            return false;
-        }
-        // For each DISTINCT remaining query part, descend along a matching edge if one
-        // exists. Descending at a part's first occurrence subsumes its later duplicates
-        // (the suffix only shrinks), so duplicates are skipped. Query length is small
-        // (state parts), edge lists can be large (thousands at the root), so search the
-        // edges per query position rather than merging linearly.
+        // Root level inlined with direct dispatch; terminal root would mean an empty
+        // stored tuple, which insert_closure never produces.
         let mut qi = 0;
         while qi < ids.len() {
             let id = ids[qi];
-            if qi > 0 && ids[qi - 1] == id {
-                qi += 1;
-                continue;
-            }
-            if let Ok(pos) = n.edges.binary_search_by_key(&id, |e| e.0) {
-                if self.walk(n.edges[pos].1 as usize, &ids[qi + 1..], &suffix_mass[qi + 1..]) {
+            if qi == 0 || ids[qi - 1] != id {
+                let child = self.root_child[id as usize];
+                if child != u32::MAX && self.walk(child, &ids[qi + 1..], &suffix_mass[qi + 1..])
+                {
                     return true;
                 }
             }
@@ -324,8 +354,40 @@ impl ClosureIndex {
         false
     }
 
-    pub fn node_count(&self) -> usize {
-        self.nodes.len()
+    fn walk(&self, node: u32, ids: &[u32], suffix_mass: &[u32]) -> bool {
+        let ni = node as usize;
+        if self.terminal[ni] {
+            return true;
+        }
+        // Minimum-requirement pruning (computed in seal()).
+        if (ids.len() as u32) < self.min_len[ni] as u32 || suffix_mass[0] < self.min_mass[ni] {
+            return false;
+        }
+        let lo = self.edge_start[ni] as usize;
+        let hi = self.edge_start[ni + 1] as usize;
+        let edge_ids = &self.edge_id[lo..hi];
+        // For each DISTINCT remaining query part, descend along a matching edge if one
+        // exists. Descending at a part's first occurrence subsumes its later duplicates
+        // (the suffix only shrinks), so duplicates are skipped.
+        let mut qi = 0;
+        while qi < ids.len() {
+            let id = ids[qi];
+            if qi > 0 && ids[qi - 1] == id {
+                qi += 1;
+                continue;
+            }
+            if let Ok(pos) = edge_ids.binary_search(&id) {
+                if self.walk(
+                    self.edge_child[lo + pos],
+                    &ids[qi + 1..],
+                    &suffix_mass[qi + 1..],
+                ) {
+                    return true;
+                }
+            }
+            qi += 1;
+        }
+        false
     }
 }
 
@@ -372,11 +434,11 @@ mod tests {
             State::canon([(14, 1), (4, 4)]),
             State::canon([(5, 3)]),
         ];
-        let mut idx = ClosureIndex::new();
+        let mut builder = ClosureIndex::new();
         for f in &facts {
-            idx.insert_closure(f, k, &uni, &g);
+            builder.insert_closure(f, k, &uni, &g);
         }
-        idx.seal(&uni);
+        let idx = builder.seal(&uni);
         // All queries with up to 3 parts drawn from a small pool, within INFO and STAR at
         // level k (the region DOM is consulted in).
         let pool: Vec<Part> = uni.parts.clone();

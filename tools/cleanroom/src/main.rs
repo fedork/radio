@@ -120,7 +120,7 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
         "BUILD k={k} facts={} closure_tuples={} closure_nodes={} dead_options={}/{} wall_s={:.3}",
         support.len(),
         aud.dom.inserted_tuples,
-        aud.dom.node_count(),
+        aud.dom.node_count,
         aud.dead_options,
         aud.total_options,
         build_start.elapsed().as_secs_f64()
@@ -135,6 +135,7 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
     let contradicted = AtomicUsize::new(0);
     let cells = AtomicUsize::new(0);
     let report = Mutex::new(0usize);
+    let np_stats = Mutex::new(([0u64; 9], [0u64; 9]));
     let start = Instant::now();
 
     std::thread::scope(|scope| {
@@ -175,11 +176,27 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
                     }
                 }
                 cells.fetch_add(s.cells as usize, Ordering::Relaxed);
+                let mut agg = np_stats.lock().unwrap();
+                for np in 0..9 {
+                    agg.0[np] += s.cells_by_np[np];
+                    agg.1[np] += s.descends_by_np[np];
+                }
             });
         }
     });
 
     let wall = start.elapsed().as_secs_f64();
+    {
+        let agg = np_stats.lock().unwrap();
+        for np in 1..9 {
+            if agg.0[np] > 0 || agg.1[np] > 0 {
+                println!(
+                    "STATS_NP k={k} np={np} cells={} descends={}",
+                    agg.0[np], agg.1[np]
+                );
+            }
+        }
+    }
     let v = verified.load(Ordering::Relaxed) as u64;
     let g = gaps.load(Ordering::Relaxed) as u64;
     let c = cells.load(Ordering::Relaxed) as u64;

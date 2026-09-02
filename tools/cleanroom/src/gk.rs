@@ -74,34 +74,43 @@ impl GTables {
     /// (mass, n, m) as State::canon produces; the star widths n_i then need a re-sort by
     /// width alone, done here on the stack.
     pub fn star_refutes(&self, parts: &[Part], k: usize) -> bool {
+        let mut runs = Vec::new();
+        self.star_refutes_with(parts, k, &mut runs)
+    }
+
+    /// star_refutes with a caller-provided scratch buffer (the hot path calls this once
+    /// per candidate child; a fresh stack buffer's zero-init was measurable).
+    pub fn star_refutes_with(
+        &self,
+        parts: &[Part],
+        k: usize,
+        runs: &mut Vec<(u64, u64)>,
+    ) -> bool {
         if parts.is_empty() {
             return false;
         }
         // Runs of the star expansion: width n_i occurring m_i times, widths sorted desc.
         // Checking each run's endpoint is exact (module comment); checking additional
         // interior points would also be sound (every prefix inequality is necessary), so
-        // runs of equal width from different parts need no merging. Stack buffer: states
-        // never exceed the certificate's 40-part bound by construction of the callers.
-        let mut buf = [(0u64, 0u64); 96];
-        assert!(parts.len() <= buf.len());
-        let runs = &mut buf[..parts.len()];
-        for (i, p) in parts.iter().enumerate() {
+        // runs of equal width from different parts need no merging.
+        runs.clear();
+        for p in parts {
             // insertion sort by width descending
             let it = (p.n as u64, p.m as u64);
-            let mut j = i;
+            let mut j = runs.len();
+            runs.push(it);
             while j > 0 && runs[j - 1].0 < it.0 {
                 runs[j] = runs[j - 1];
                 j -= 1;
             }
             runs[j] = it;
         }
-        let runs = &buf[..parts.len()];
 
         let gp = &self.prefix[k];
         let glen = (gp.len() - 1) as u64; // 2^k
         let mut t = 0u64; // expanded prefix length so far
         let mut phi_sum = 0u64;
-        for &(w, c) in runs {
+        for &(w, c) in runs.iter() {
             let end = t + c;
             let checked_end = end.min(glen);
             if checked_end > t {
