@@ -335,24 +335,43 @@ impl Scratch {
 impl Auditor {
     /// Build the audit context for one level: claims at `k`, facts at `k - 1`.
     /// `claim_parts` must contain every distinct part occurring in any claim.
-    pub fn build(k: usize, claim_parts: &[Part], facts: &[State]) -> Auditor {
+    pub fn build(
+        k: usize,
+        claim_parts: &[Part],
+        facts: &[State],
+        max_claim_np: usize,
+    ) -> Auditor {
         assert!(k >= 1);
         let g = GTables::build(k.max(1));
-        let n_max = claim_parts.iter().map(|p| p.n).max().unwrap_or(1);
         let cap = pow3(k as u32 - 1);
-        let uni = PartUniverse::build(n_max, cap);
+        // The universe is bounded by what can actually be asked of it: query parts are
+        // pieces of splits of these claim parts, so componentwise below one of them, and
+        // INFO caps their mass. See PartUniverse::build for why that also lets unusable
+        // support facts be dropped outright.
+        let uni = PartUniverse::build(claim_parts, cap);
+        // A stored tuple must be a sub-multiset of some query, and closure growth preserves
+        // length, so a fact with more parts than the longest possible query is unusable.
+        // Outcome 1 doubles the part count, hence 2x.
+        let max_query_parts = 2 * max_claim_np.max(1);
         let mut builder = ClosureIndex::new();
         // Ascending (mass, parts) so a fact's potential dominators are already in the index
         // when it is considered - that is what makes the antichain reduction in
         // insert_closure valid. F' injecting into F forces mass(F') <= mass(F) and
         // |F'| <= |F|, with equality only when F' == F.
-        let mut order: Vec<&State> = facts.iter().collect();
+        let mut order: Vec<&State> = facts
+            .iter()
+            .filter(|f| f.parts.len() <= max_query_parts)
+            .collect();
         order.sort_by_key(|f| (f.mass_stripped(), f.parts.len()));
+        // The antichain pre-check costs one index walk per fact and pays only if facts are
+        // actually redundant. Diagnostic toggle so that trade can be measured per level
+        // rather than assumed; see docs/tools.md.
+        let antichain = std::env::var("RADIO_CLEANROOM_NO_ANTICHAIN").is_err();
         let mut kept = 0u64;
         for f in order {
             // A fact with units stripped is what refutes (UNIT); mass screening of queries
             // is INFO's job, not the index's.
-            if builder.insert_closure(f, k - 1, &uni, &g) {
+            if builder.insert_closure(f, k - 1, &uni, &g, antichain) {
                 kept += 1;
             }
         }
@@ -728,7 +747,7 @@ mod tests {
         // Support: empty (INFO alone must do it... a (1:1) child has mass 1 <= 1 and is
         // solvable; children (2:1)... let's just check the verdicts are sane).
         let claim = State::canon([(3, 1)]);
-        let aud = Auditor::build(1, &claim.parts, &[]);
+        let aud = Auditor::build(1, &claim.parts, &[], claim.parts.len());
         let mut s = Scratch::new();
         match aud.audit_claim(&claim.parts, claim.mass_full, &mut s) {
             Verdict::Verified => {}
@@ -737,7 +756,7 @@ mod tests {
         // Claim Sb(2:1) unsolvable in 1 is FALSE; with no support the audit must expose a
         // gap (it cannot prove solvability, but it must refuse to verify).
         let bad = State::canon([(2, 1)]);
-        let aud = Auditor::build(1, &bad.parts, &[]);
+        let aud = Auditor::build(1, &bad.parts, &[], bad.parts.len());
         match aud.audit_claim(&bad.parts, bad.mass_full, &mut s) {
             Verdict::Gap { .. } => {}
             v => panic!("Sb(2:1)@1 must not verify: {v:?}"),
@@ -747,7 +766,7 @@ mod tests {
     #[test]
     fn units_only_claim_is_contradicted() {
         let c = State::canon([(1, 1), (1, 1)]);
-        let aud = Auditor::build(2, &c.parts, &[]);
+        let aud = Auditor::build(2, &c.parts, &[], c.parts.len().max(1));
         let mut s = Scratch::new();
         match aud.audit_claim(&c.parts, c.mass_full, &mut s) {
             Verdict::Contradicted => {}

@@ -119,11 +119,14 @@ fn audit_level(k: usize, support: &[State], claims: &[State], args: &Args) -> (u
     let mut claim_parts: Vec<Part> = claims.iter().flat_map(|c| c.parts.iter().copied()).collect();
     claim_parts.sort_unstable();
     claim_parts.dedup();
-    let aud = Auditor::build(k, &claim_parts, support);
+    let max_np = claims.iter().map(|c| c.parts.len()).max().unwrap_or(1);
+    let aud = Auditor::build(k, &claim_parts, support, max_np);
     println!(
-        "BUILD k={k} facts={} redundant={} closure_tuples={} closure_nodes={} dead_options={}/{} wall_s={:.3}",
+        "BUILD k={k} facts={} redundant={} uni={}/+{} closure_tuples={} closure_nodes={} dead_options={}/{} wall_s={:.3}",
         support.len(),
         aud.redundant_facts,
+        aud.uni.parts.len(),
+        aud.uni.excluded_unreachable,
         aud.dom.inserted_tuples,
         aud.dom.node_count,
         aud.dead_options,
@@ -416,7 +419,8 @@ fn selftest() {
             claims.iter().flat_map(|c| c.parts.iter().copied()).collect();
         claim_parts.sort_unstable();
         claim_parts.dedup();
-        let aud = Auditor::build(k, &claim_parts, &support);
+        let max_np = claims.iter().map(|c| c.parts.len()).max().unwrap_or(1);
+        let aud = Auditor::build(k, &claim_parts, &support, max_np);
         let mut s = Scratch::new();
         let mut n_claims = 0u64;
         for claim in &claims {

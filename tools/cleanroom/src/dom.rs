@@ -76,6 +76,9 @@ pub fn dominates_naive(fact: &[Part], query: &[Part]) -> bool {
 /// descending part_key order, so id order == canonical state order.
 pub struct PartUniverse {
     pub parts: Vec<Part>,            // id -> part, descending part_key
+    /// Parts that passed the INFO mass cap but were excluded as unreachable. Diagnostic:
+    /// it says how much the claim-set bound is actually buying at this level.
+    pub excluded_unreachable: usize,
     id_of: Vec<u32>,                 // (n-1) * m_stride + (m-1) -> id + 1, 0 = absent
     m_stride: usize,
     /// For each id, ids of all parts >= it componentwise (its up-set), ascending id.
@@ -85,13 +88,36 @@ pub struct PartUniverse {
 pub const NO_ID: u32 = 0;
 
 impl PartUniverse {
-    pub fn build(n_max: u16, mass_cap: u32) -> PartUniverse {
+    /// Parts that can appear in a query, and nothing else.
+    ///
+    /// Every query this index serves is a partial child of a level-k claim, so every query
+    /// part is a piece of a split of some claim part: for a claim part (n,m) the pieces are
+    /// (a,b), (n-a,m-b), (a,m-b), (n-a,b), all with first coordinate <= n and second <= m.
+    /// After canonical orientation that means every query part is componentwise <= some
+    /// claim part. INFO bounds it further: a query part cannot outweigh its query, so its
+    /// mass is at most 3^(k-1).
+    ///
+    /// Restricting the universe to that set is what keeps the closure honest. The set is a
+    /// DOWNSET - if P <= C and P' <= P then P' <= C - so its complement is upward closed,
+    /// and since closure growth only moves parts up, a part outside it can never come back
+    /// in. That is why growth targets can be restricted to this set, and why a support fact
+    /// with any part outside it is genuinely useless rather than merely inconvenient: every
+    /// state that fact could refute is likewise outside, so nothing is lost by dropping it.
+    pub fn build(claim_parts: &[Part], mass_cap: u32) -> PartUniverse {
+        let n_max = claim_parts.iter().map(|p| p.n).max().unwrap_or(1);
+        let reachable = |p: Part| claim_parts.iter().any(|c| p.n <= c.n && p.m <= c.m);
         let mut parts = Vec::new();
+        let mut excluded_unreachable = 0usize;
         for n in 1..=n_max {
             for m in 1..=n {
                 let p = Part { n, m };
-                if p.mass() <= mass_cap {
+                if p.mass() > mass_cap {
+                    continue;
+                }
+                if reachable(p) {
                     parts.push(p);
+                } else {
+                    excluded_unreachable += 1;
                 }
             }
         }
@@ -109,7 +135,7 @@ impl PartUniverse {
                 }
             }
         }
-        PartUniverse { parts, id_of, m_stride, up }
+        PartUniverse { parts, excluded_unreachable, id_of, m_stride, up }
     }
 
     /// id of a canonical part, or None when outside the universe (such a part can never
@@ -231,6 +257,7 @@ impl ClosureIndex {
         k: usize,
         uni: &PartUniverse,
         g: &GTables,
+        antichain: bool,
     ) -> bool {
         // Fact parts as ids; a fact part outside the universe cannot be grown into any
         // query part either, but the fact itself may still refute queries containing it
@@ -247,7 +274,7 @@ impl ClosureIndex {
         // Antichain reduction. Callers insert in nondecreasing (mass, parts) order, so any
         // F' that injects into this fact has already been inserted; if one has, this fact's
         // whole closure is redundant.
-        if self.refuted_by_existing(&ids) {
+        if antichain && self.refuted_by_existing(&ids) {
             return false;
         }
         self.min_fact_mass = self.min_fact_mass.min(fact.mass_stripped());
@@ -257,29 +284,35 @@ impl ClosureIndex {
     }
 
     fn grow(&mut self, ids: &mut Vec<u32>, k: usize, cap: u64, uni: &PartUniverse, g: &GTables) {
-        let mut next = Vec::with_capacity(ids.len() + 1);
-        let mut runs = Vec::with_capacity(ids.len() + 1);
-        self.grow_inner(ids, k, cap, uni, g, &mut next, &mut runs);
+        let mut pool: Vec<(Vec<u32>, Vec<(u64, u64)>)> = Vec::new();
+        self.grow_inner(ids, 0, k, cap, uni, g, &mut pool);
     }
 
-    /// Scratch-carrying body. The two buffers are reused down the whole recursion: cloning
-    /// the id vector and collecting a Vec<Part> per CANDIDATE replacement - before the STAR
-    /// test rejected most of them - was the bulk of this build's cost.
+    /// Scratch-carrying body. Cloning the id vector and collecting a Vec<Part> per CANDIDATE
+    /// replacement - before STAR rejected most of them - was the original cost. The buffers
+    /// are pooled BY DEPTH: an earlier attempt reused them only within one node and then
+    /// recursed through `grow`, which allocated a fresh pair per node and was slower than
+    /// what it replaced at k=8 (432 s against 386 s). Measure, do not assume.
+    #[allow(clippy::too_many_arguments)]
     fn grow_inner(
         &mut self,
         ids: &mut Vec<u32>,
+        depth: usize,
         k: usize,
         cap: u64,
         uni: &PartUniverse,
         g: &GTables,
-        next: &mut Vec<u32>,
-        runs: &mut Vec<(u64, u64)>,
+        pool: &mut Vec<(Vec<u32>, Vec<(u64, u64)>)>,
     ) {
         if self.insert_tuple(ids) {
             self.revisits += 1;
             return; // already present: its closure was already expanded
         }
         self.inserted_tuples += 1;
+        while pool.len() <= depth {
+            pool.push((Vec::new(), Vec::new()));
+        }
+        let (mut next, mut runs) = std::mem::take(&mut pool[depth]);
         for i in 0..ids.len() {
             // SYM-E analog for closure: growing either of two equal parts produces the
             // same multiset; expand only the first of an equal run.
@@ -293,15 +326,14 @@ impl ClosureIndex {
                 .filter(|&(j, _)| j != i)
                 .map(|(_, &id)| uni.parts[id as usize].mass() as u64)
                 .sum();
-            // Clone the up-set list handle; iterate replacements.
-            let ups = &uni.up[orig as usize];
-            for &w in ups {
+            for w in 0..uni.up[orig as usize].len() {
+                let w = uni.up[orig as usize][w];
                 if w == orig {
                     continue;
                 }
-                // Necessary-region bound: prune replacement states that INFO- or
-                // STAR-fail at level k (docs/status.md: "Bound negative cache closure by
-                // the same necessary region as search").
+                // Necessary-region bound: prune replacements that INFO- or STAR-fail at
+                // level k (docs/status.md: "Bound negative cache closure by the same
+                // necessary region as search").
                 if base_mass + uni.parts[w as usize].mass() as u64 > cap {
                     continue;
                 }
@@ -309,15 +341,13 @@ impl ClosureIndex {
                 next.extend_from_slice(ids);
                 next[i] = w;
                 next.sort_unstable();
-                if g.star_refutes_ids(next, &uni.parts, k, runs) {
+                if g.star_refutes_ids(&next, &uni.parts, k, &mut runs) {
                     continue;
                 }
-                // The recursion needs its own buffers; `next` is this level's.
-                let mut child = std::mem::take(next);
-                self.grow(&mut child, k, cap, uni, g);
-                *next = child;
+                self.grow_inner(&mut next, depth + 1, k, cap, uni, g, pool);
             }
         }
+        pool[depth] = (next, runs);
     }
 
     /// Freeze into the flat query-time form. Consumes the builder.
@@ -481,7 +511,9 @@ mod tests {
     fn closure_index_matches_naive_exhaustively() {
         let k = 4usize; // cap 81
         let g = GTables::build(k);
-        let uni = PartUniverse::build(14, 81);
+        // Claim parts for the differential: anything the test queries must sit below one.
+        let claim_parts = vec![Part { n: 14, m: 5 }, Part { n: 9, m: 9 }, Part { n: 5, m: 4 }];
+        let uni = PartUniverse::build(&claim_parts, 81);
         // Facts: a deliberately awkward set, including equal parts and the crossing shape.
         let facts: Vec<State> = vec![
             State::canon([(4, 4), (5, 1)]),
@@ -493,7 +525,7 @@ mod tests {
         ];
         let mut builder = ClosureIndex::new();
         for f in &facts {
-            builder.insert_closure(f, k, &uni, &g);
+            builder.insert_closure(f, k, &uni, &g, true);
         }
         let idx = builder.seal(&uni);
         // All queries with up to 3 parts drawn from a small pool, within INFO and STAR at
