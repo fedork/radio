@@ -86,7 +86,7 @@ report_once() {
     [[ -n "$verify" ]] || verify=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/k7-verify.out" - \
         --no-progress 2>/dev/null || true)
     if [[ -n "$verify" ]]; then
-        echo '  VERIFY (last upload, refreshed every 10 min)'
+        echo '  VERIFY (last upload; the host re-uploads every 5 min)'
         grep -E '^(BUILD|PROGRESS|STATS_NP|RESULT_LEVEL|TOTAL|GAP|# started_utc|# finished_utc|# host|Elapsed|Maximum resident)' \
             <<<"$verify" | tail -n 20 | sed 's/^/    /' || true
         if ! grep -q '^BUILD' <<<"$verify"; then

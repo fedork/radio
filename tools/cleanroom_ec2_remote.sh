@@ -31,6 +31,9 @@ RUN_ID=
 SOURCE_COMMIT=
 SOURCE_SHA256=
 LEVELS=
+# Progress cadence. The S3 heartbeat matches it: uploading half as often as the checker
+# reports left the watcher one or two lines behind and looking stalled.
+PROGRESS_SECONDS=300
 EXPECT_TOP_SUM=193
 EXPECT_TOTAL_CLAIMS=2846568
 SOURCE_DIR=/root/source
@@ -170,16 +173,16 @@ stage VERIFY
     else
         echo "# structure=skipped (partial level set)"
     fi
-    echo "# command=radio_cleanroom audit --threads $threads --progress 300 ${certs[*]}"
+    echo "# command=radio_cleanroom audit --threads $threads --progress $PROGRESS_SECONDS ${certs[*]}"
     echo "# started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "# radio-cleanroom-provenance-v1 end"
 } > verify.out
 upload verify.out verify.out
 
-( while sleep 600; do upload verify.out verify.out; done ) &
+( while sleep "$PROGRESS_SECONDS"; do upload verify.out verify.out; done ) &
 heartbeat=$!
 
-/usr/bin/time -v "$binary" audit --threads "$threads" --progress 300 "${certs[@]}" \
+/usr/bin/time -v "$binary" audit --threads "$threads" --progress "$PROGRESS_SECONDS" "${certs[@]}" \
     >> verify.out 2>&1 \
     || { kill "$heartbeat" || true; upload verify.out verify.out; fail "verify"; }
 kill "$heartbeat" 2>/dev/null || true
