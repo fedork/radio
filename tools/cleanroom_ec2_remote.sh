@@ -196,6 +196,9 @@ if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
 else
     grep -q ', gaps 0,' verify.out || { upload verify.out verify.out; fail "verify gaps"; }
 fi
+# Upload the plain log too, not just the compressed one: the status script reads the plain
+# file, and leaving it at the last heartbeat made a finished run look stuck mid-audit.
+upload verify.out verify.out
 zstd -q -19 -f verify.out
 upload verify.out.zst verify.out.zst
 sha256sum verify.out verify.out.zst chain-structure.out > final.sha256
