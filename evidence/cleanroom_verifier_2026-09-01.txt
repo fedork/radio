@@ -140,3 +140,46 @@ This is a data point, NOT a resolution, and it should not be used to promote tha
     boundary mismatch would surface as a false gap.  That is a testable hypothesis about the
     refuter, and the direct experiment is to ask which rule discharges `Sb(15:8,8:5,8:5)@5` in
     each of the three implementations.
+
+The colored-bundle gap is spurious: a citation the refuter did not make
+---------------------------------------------------------------------
+Followed up with the trace build (`-DRADIO_FROZEN_REFUTE_TRACE`). On the colored bundle the
+refuter reports two k=5 gaps, the documented one among them:
+
+  FROZEN_REFUTE_GAP root=Sb(15:8,8:5,8:5)[200,49] k=5
+    split=Sb(7:3,8:5,3:2) Sb(7:5,8:3,0:0,0:0,5:2,3:3) Sb(8:5,0:0,5:3)
+    child_verdicts=2,2,2          (2 = MAYBE: none of the three discharged)
+
+That is the split with take vector [(8,5),(0,0),(5,3)].  Its three children at k=4, canonical:
+
+  outcome 0  Sb(7:3,8:5,3:2)        mass 67
+  outcome 1  Sb(8:3,7:5,5:2,3:3)    mass 78
+  outcome 2  Sb(8:5,5:3)            mass 55
+
+All are within the k=4 information bound of 81, and STAR refutes none of them (checked by
+hand against G_4 prefix sums 16,31,42,53,58,63,68,73,74,...: the tightest is outcome 1, whose
+star prefix reaches 78 against 78 at t=13 - equal, not exceeding).  So a citation is required,
+and one is available:
+
+  colored.cert line 70609:  fact 4 Sb(8:3,7:5,3:3)
+
+`Sb(8:3,7:5,3:3)` is a literal SUB-MULTISET of the outcome-1 child `Sb(8:3,7:5,5:2,3:3)` - no
+componentwise growth needed, the three parts appear exactly and the child carries one extra
+part `5:2`.  By Subgraph Monotonicity corollary 1 (deleting parts yields a subgraph) the child
+is unsolvable in 4, so the split IS covered and the refuter's `child_verdicts=2,2,2` is wrong
+on its middle entry.  The same fact is present in the complete normalized corpus, which the
+refuter closes.
+
+Conclusion, stated at the strength the evidence supports: **this particular gap is spurious,
+and the trap's premise - that the colored subset lacks needed support - is wrong for it.**
+The suspicion therefore belongs with the refuter's citation lookup, not with `radio_verify.c`,
+and my earlier guess that `radio_verify.c`'s strict equal-part quotient explained the
+discrepancy is superseded: over-refutation there would produce false closure, but here the
+closure is correct and it is the refuter that misses a real citation.
+
+NOT established: the mechanism inside `radiobase.c`.  The fact is present in both inputs, so
+presence is not the variable; something about the cache state under the thinned support set
+is.  Isolating it needs instrumentation of the dominance trie, which is work on the other
+verifier and was not attempted here.  A minimal one-fact certificate does not isolate it,
+because the refuter returns at its FIRST uncovered split and with one support fact that is a
+different split.  The remaining eight gaps were not examined individually.
