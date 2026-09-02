@@ -133,7 +133,13 @@ grep -q 'SELFTEST PASSED' "$WORK/selftest.out" || fail "selftest output"
 if "$binary" audit "$SOURCE_DIR/tools/testdata/radio_refute_gap_v1.cert" \
     > "$WORK/fixture-gap.out" 2>&1; then fail "gap fixture did not fail closed"; fi
 cd "$WORK"
-smoke_level=$(tr ' ' '\n' <<<"$LEVELS" | sort -n | tail -1)
+# Smoke the most EXPENSIVE level, not the highest-numbered one: k=9 has 16 claims and would
+# gate nothing, while k=7 is ~99% of the work. Certificate size is the available proxy for
+# cost here, and it picks k=7 for the full chain.
+smoke_level=$(for k in $LEVELS; do
+    printf '%s %s\n' "$(wc -c < "sa193-k$k.cert")" "$k"
+done | sort -rn | head -1 | awk '{print $2}')
+echo "smoke level: k=$smoke_level" >> "$WORK/run.log"
 "$binary" audit --threads "$threads" --stride 5000 "sa193-k$smoke_level.cert" \
     > "$WORK/smoke.out" 2>&1 || fail "smoke"
 grep -q ', gaps 0,' "$WORK/smoke.out" || fail "k7 smoke gaps"
