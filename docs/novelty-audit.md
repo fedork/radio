@@ -78,8 +78,35 @@ queried subset.
 > So the framing is sound: Aigner states the converse, calls the characterization it would give
 > "beautiful", and says only partial results were known. The `K=6` counterexample refutes
 > exactly this conjecture, and the `K<=5` result is exactly the "partial results" boundary made
-> sharp. **Still to do:** whether anyone resolved it between 1988 and now - forward citations,
-> and the nice-graph literature, since the counterexample is equivalent to `Q_6` not being nice.
+> sharp.
+>
+> **VERDICT 2026-09-02, part 2: the ACM forward-citation list for the book contains no
+> resolution.** All 43 entries of `dl.acm.org/action/ajaxShowCitedBy?doi=10.5555/61992` were
+> reviewed. They are overwhelmingly other search models - alphabetic codes, plurality, majority,
+> k-equal, two-sided search, weighted-graph reconstruction, competitive group testing. The three
+> nearest are all a different oracle or a different problem:
+>
+> - **Gerzen 2009a/2009b**, "Searching for an edge in a graph with restricted test sets" and
+>   "Edge search in graphs with restricted test sets" (*Discrete Math* 309:6, 309:20). These are
+>   Aigner's section 3.4, the *restricted* test-set variant, not the unrestricted ternary
+>   question of 3.3.
+> - **Gerzen 2011**, "On a group testing problem: characterization of graphs with 2-complexity
+>   c_2 and maximum number of edges" (*DAM* 159:17, `10.1016/j.dam.2011.06.026`). Binary group
+>   testing - a test reports whether a subset contains at least one defective - not the counting
+>   oracle.
+> - **Liu--Zhang--Nie 2005 and Wen-An--Zan-Kan 2004**, "two counterfeit coins with two-arms
+>   balance" (`10.1016/j.dam.2005.03.009`, `10.1016/S0166-218X(03)00343-3`). Two defectives, but
+>   the oracle is a three-way balance comparison, not a count of defectives in the queried set.
+>   Worth a sentence in the paper's related work so the resemblance is pre-empted.
+>
+> **This is evidence, not proof: the ACM list is incomplete.** Li--Wu--Triesch 2018 certainly
+> cite Aigner and do not appear in it, so ACM is not indexing the relevant Elsevier venues
+> fully. A Google Scholar "cited by" pass on the book, and on Aigner 1986, would be the
+> conclusive check. **Still to do:** that pass, and the nice-graph literature, where the
+> equivalent statement is that `Q_6` is not nice. Note the neighbourhood is currently active -
+> the Stanley--Gasharov conjecture (every claw-free graph is Schur-positive) was disproved in
+> 2024-25 by Prajapati and independently by Matherne--Morales, with infinite counterexample
+> families following (`arXiv:2607.27166`), so someone could plausibly touch `Q_K` soon.
 
 **The claim.** Every singleton state solvable in `K` is weakly majorized by `G_K` (necessity;
 this is Aigner's, Prop. 3.25). The converse holds for `K <= 5` (proved here, exhaustively) and
