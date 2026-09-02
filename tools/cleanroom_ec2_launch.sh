@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Launch one dedicated, on-demand c8a host to verify the full sa193 k=7 level with the
+# Launch one dedicated, on-demand c8a host to verify the sa193 certificate of record with the
 # cleanroom Rust checker (tools/cleanroom). Modeled on tools/run9_refute_ec2_launch.sh.
+#
+# Default is the COMPLETE chain, all eight levels: structural closure via
+# tools/check_level_chain.py plus a semantic audit of every level. k=7 is ~99% of the cost, so
+# the other seven levels are nearly free and a partial attestation is not worth the ambiguity.
+# --levels restricts the set for a cheap probe (e.g. --levels "2 3 4 5 6 8 9").
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -12,14 +17,16 @@ SECURITY_GROUP=sg-085e171bf6e1381b6
 PROFILE=radio-sa193-ec2
 RUN_ID=$(date -u +%Y%m%dT%H%M%SZ)
 DRY=0
-CERT_LOCAL=.artifacts/cert/sa193-k7.cert.zst
-CERT_ZST_SHA256=5171ae78d2dd8a9ddb060f792e378a153d10df38c0b2e2bf0d2a158321459d7e
+CERT_DIR=.artifacts/cert
+LEVELS="2 3 4 5 6 7 8 9"
 
 while (( $# )); do
     case "$1" in
         --dry-run) DRY=1; shift ;;
         --type) TYPE=$2; shift 2 ;;
-        *) echo "usage: $0 [--dry-run] [--type INSTANCE_TYPE]" >&2; exit 64 ;;
+        --levels) LEVELS=$2; shift 2 ;;
+        --certs) CERT_DIR=$2; shift 2 ;;
+        *) echo "usage: $0 [--dry-run] [--type TYPE] [--levels \"2 3 ...\"] [--certs DIR]" >&2; exit 64 ;;
     esac
 done
 
@@ -33,7 +40,7 @@ sha256_file() {
 }
 
 # The trusted checker and this pipeline must be exactly what is committed.
-required=(tools/cleanroom_k7_ec2_remote.sh tools/testdata/radio_verify_v1.cert \
+required=(tools/cleanroom_ec2_remote.sh tools/testdata/radio_verify_v1.cert \
           tools/testdata/radio_refute_gap_v1.cert)
 while IFS= read -r f; do required+=("$f"); done < <(git ls-files tools/cleanroom)
 (( ${#required[@]} > 10 )) || { echo 'cleanroom sources missing from git' >&2; exit 65; }
@@ -43,9 +50,16 @@ if ! git diff --quiet HEAD -- "${required[@]}" || ! git diff --cached --quiet HE
     exit 65
 fi
 
-[[ -f "$CERT_LOCAL" ]] || { echo "missing $CERT_LOCAL (pull sa193-certificate-2026-08-19)" >&2; exit 66; }
-actual=$(sha256_file "$CERT_LOCAL")
-[[ "$actual" == "$CERT_ZST_SHA256" ]] || { echo 'k7 certificate hash mismatch' >&2; exit 66; }
+# Every level must be present and match the released manifest before anything is launched.
+manifest=$CERT_DIR/MANIFEST.sha256
+[[ -f "$manifest" ]] || { echo "missing $manifest (pull sa193-certificate-2026-08-19)" >&2; exit 66; }
+for k in $LEVELS; do
+    f=$CERT_DIR/sa193-k$k.cert.zst
+    [[ -f "$f" ]] || { echo "missing $f" >&2; exit 66; }
+    want=$(awk -v n="sa193-k$k.cert.zst" '$2 == n {print $1}' "$manifest")
+    [[ -n "$want" ]] || { echo "no manifest entry for sa193-k$k.cert.zst" >&2; exit 66; }
+    [[ "$(sha256_file "$f")" == "$want" ]] || { echo "sa193-k$k.cert.zst hash mismatch" >&2; exit 66; }
+done
 
 active=$("${aws_cmd[@]}" ec2 describe-instances --region "$REGION" \
     --filters Name=tag:Purpose,Values=cleanroom-verify \
@@ -65,7 +79,6 @@ git archive --format=tar "$commit" | zstd -T0 -10 -f -o "$bundle"
 bundle_sha=$(sha256_file "$bundle")
 prefix="cleanroom-verify/$RUN_ID"
 source_key="$prefix/source-radio-$short.tar.zst"
-cert_key="$prefix/sa193-k7.cert.zst"
 
 cat > "$userdata" <<EOF
 #!/bin/bash
@@ -81,20 +94,25 @@ mkdir -p source
 zstd -dc source.tar.zst | tar -xf - -C source
 chmod +x source/tools/*.sh
 trap - EXIT
-exec source/tools/cleanroom_k7_ec2_remote.sh \
+exec source/tools/cleanroom_ec2_remote.sh \
   --run-id '$RUN_ID' --work '/root/cleanroom-verify-$RUN_ID' \
-  --prefix '$prefix' --source-commit '$commit' --source-sha256 '$bundle_sha'
+  --prefix '$prefix' --source-commit '$commit' --source-sha256 '$bundle_sha' \
+  --levels '$LEVELS'
 EOF
 
 if (( DRY )); then
-    printf 'run_id=%s\ncommit=%s\nsource_sha256=%s\nsource_bytes=%s\ninstance_type=%s\n' \
-        "$RUN_ID" "$commit" "$bundle_sha" "$(wc -c < "$bundle" | tr -d ' ')" "$TYPE"
+    printf 'run_id=%s\ncommit=%s\nsource_sha256=%s\nsource_bytes=%s\ninstance_type=%s\nlevels=%s\n' \
+        "$RUN_ID" "$commit" "$bundle_sha" "$(wc -c < "$bundle" | tr -d ' ')" "$TYPE" "$LEVELS"
     bash -n "$userdata"
     exit 0
 fi
 
 "${aws_cmd[@]}" s3 cp "$bundle" "s3://$BUCKET/$source_key" --no-progress
-"${aws_cmd[@]}" s3 cp "$CERT_LOCAL" "s3://$BUCKET/$cert_key" --no-progress
+for k in $LEVELS; do
+    "${aws_cmd[@]}" s3 cp "$CERT_DIR/sa193-k$k.cert.zst" \
+        "s3://$BUCKET/$prefix/sa193-k$k.cert.zst" --no-progress
+done
+"${aws_cmd[@]}" s3 cp "$manifest" "s3://$BUCKET/$prefix/MANIFEST.sha256" --no-progress
 ami=$("${aws_cmd[@]}" ssm get-parameter --region "$REGION" \
     --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
     --query Parameter.Value --output text)
@@ -111,5 +129,6 @@ instance=$("${aws_cmd[@]}" ec2 run-instances --region "$REGION" \
       "ResourceType=volume,Tags=[{Key=Project,Value=radio-sa193},{Key=Purpose,Value=cleanroom-verify},{Key=RunId,Value=$RUN_ID}]" \
     --query 'Instances[0].InstanceId' --output text)
 
-printf 'launched instance=%s type=%s run_id=%s commit=%s\n' "$instance" "$TYPE" "$RUN_ID" "$commit"
+printf 'launched instance=%s type=%s run_id=%s commit=%s levels=%s\n' \
+    "$instance" "$TYPE" "$RUN_ID" "$commit" "$LEVELS"
 printf 's3=s3://%s/%s/\n' "$BUCKET" "$prefix"

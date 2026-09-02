@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# One-shot status for the dedicated cleanroom k=7 verification host.
+# One-shot status for the dedicated cleanroom certificate-verification host.
 #
-#   tools/cleanroom_k7_status.sh [RUN_ID] [--follow [SECONDS]]
+#   tools/cleanroom_ec2_status.sh [RUN_ID] [--follow [SECONDS]]
 #
 # With no RUN_ID it reports the most recently launched cleanroom-verify instance.
 # --follow re-polls until the run reaches DONE or FAILED (default every 300 s).
@@ -62,7 +62,7 @@ report_once() {
         [[ "$rate" == 0 ]] || cost=$(awk -v s="$secs" -v r="$rate" 'BEGIN{printf "$%.2f", s/3600*r}')
     fi
 
-    printf 'cleanroom k=7 verification  run_id=%s\n' "$RUN_ID"
+    printf 'cleanroom certificate verification  run_id=%s\n' "$RUN_ID"
     printf '  instance=%s state=%s type=%s launched=%s' "$instance" "$state" "$itype" "$launched"
     [[ -z "$elapsed" ]] || printf ' elapsed=%s' "$elapsed"
     [[ -z "$cost" ]] || printf ' on_demand_cost~%s' "$cost"
@@ -80,13 +80,13 @@ report_once() {
     # The verify log carries the provenance header, then BUILD/RESULT_LEVEL/TOTAL as they land.
     # It is re-uploaded every 600 s while the audit runs, so this tail is the progress view.
     local verify
-    verify=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/k7-verify.out" - --no-progress 2>/dev/null || true)
+    verify=$("${aws_cmd[@]}" s3 cp "s3://$BUCKET/$prefix/verify.out" - --no-progress 2>/dev/null || true)
     if [[ -n "$verify" ]]; then
         echo '  VERIFY (last upload, refreshed every 10 min)'
         grep -E '^(BUILD|PROGRESS|STATS_NP|RESULT_LEVEL|TOTAL|GAP|# started_utc|# finished_utc|# host|Elapsed|Maximum resident)' \
             <<<"$verify" | tail -n 20 | sed 's/^/    /' || true
         if ! grep -q '^BUILD' <<<"$verify"; then
-            echo '    (index build in progress: ~6 min single-threaded before the parallel audit)'
+            echo '    (index build in progress: minutes, single-threaded, before the parallel audit)'
         fi
     fi
 

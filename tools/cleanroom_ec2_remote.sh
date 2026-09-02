@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Full sa193 k=7 verification with the cleanroom Rust checker on a dedicated EC2 host.
-# Started by tools/cleanroom_k7_ec2_launch.sh via user data; the exact source is /root/source.
+# Full sa193 certificate verification with the cleanroom Rust checker on a dedicated EC2 host.
+# Started by tools/cleanroom_ec2_launch.sh via user data; the exact source is /root/source.
+#
+# Both halves of acceptance run here, so one retained artifact answers both questions:
+#   structure - tools/check_level_chain.py: counts, inductive closure (level k's support is
+#               exactly level k-1's claims as resolved states), empty base, expected roots;
+#   semantics - the cleanroom checker audits every claim of every level.
 #
 # Gates before the long run, in order: cargo test, the built-in exhaustive selftest against
 # the unquotiented naive oracle, the closed and gap fixtures (the latter must FAIL), and a
@@ -25,8 +30,9 @@ PREFIX=
 RUN_ID=
 SOURCE_COMMIT=
 SOURCE_SHA256=
-CERT_ZST_SHA256=5171ae78d2dd8a9ddb060f792e378a153d10df38c0b2e2bf0d2a158321459d7e
-CERT_SHA256=41a233f73eea36012aa325eb1d61d1e3ca5bc857d6a7b30418c112cec6e8a9a6
+LEVELS=
+EXPECT_TOP_SUM=193
+EXPECT_TOTAL_CLAIMS=2846568
 SOURCE_DIR=/root/source
 TOOLCHAIN=1.98.0
 
@@ -43,6 +49,7 @@ while (( $# )); do
         --prefix) PREFIX=$2; shift 2 ;;
         --source-commit) SOURCE_COMMIT=$2; shift 2 ;;
         --source-sha256) SOURCE_SHA256=$2; shift 2 ;;
+        --levels) LEVELS=$2; shift 2 ;;
         *) usage ;;
     esac
 done
@@ -52,6 +59,7 @@ done
 [[ "$PREFIX" == "cleanroom-verify/$RUN_ID" ]] || usage
 [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || usage
 valid_sha "$SOURCE_SHA256" || usage
+[[ "$LEVELS" =~ ^[2-9]( [2-9])*$ ]] || usage
 
 mkdir -p "$WORK"
 cd "$WORK"
@@ -98,10 +106,14 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain "$TOOLCHAIN" >> run.log 2>&1
 export PATH="$HOME/.cargo/bin:$PATH"
 
-aws s3 cp "s3://$BUCKET/$PREFIX/sa193-k7.cert.zst" sa193-k7.cert.zst --no-progress
-printf '%s  sa193-k7.cert.zst\n' "$CERT_ZST_SHA256" | sha256sum -c -
-zstd -d -q -o sa193-k7.cert sa193-k7.cert.zst
-printf '%s  sa193-k7.cert\n' "$CERT_SHA256" | sha256sum -c -
+aws s3 cp "s3://$BUCKET/$PREFIX/MANIFEST.sha256" MANIFEST.sha256 --no-progress
+certs=()
+for k in $LEVELS; do
+    aws s3 cp "s3://$BUCKET/$PREFIX/sa193-k$k.cert.zst" "sa193-k$k.cert.zst" --no-progress
+    grep " sa193-k$k.cert.zst\$" MANIFEST.sha256 | sha256sum -c -
+    zstd -d -q -o "sa193-k$k.cert" "sa193-k$k.cert.zst"
+    certs+=("sa193-k$k.cert")
+done
 
 stage BUILD
 cd "$SOURCE_DIR/tools/cleanroom"
@@ -118,11 +130,27 @@ grep -q 'SELFTEST PASSED' "$WORK/selftest.out" || fail "selftest output"
 if "$binary" audit "$SOURCE_DIR/tools/testdata/radio_refute_gap_v1.cert" \
     > "$WORK/fixture-gap.out" 2>&1; then fail "gap fixture did not fail closed"; fi
 cd "$WORK"
-"$binary" audit --threads "$threads" --stride 5000 sa193-k7.cert > "$WORK/smoke.out" 2>&1 \
-    || fail "k7 smoke"
+smoke_level=$(tr ' ' '\n' <<<"$LEVELS" | sort -n | tail -1)
+"$binary" audit --threads "$threads" --stride 5000 "sa193-k$smoke_level.cert" \
+    > "$WORK/smoke.out" 2>&1 || fail "smoke"
 grep -q ', gaps 0,' "$WORK/smoke.out" || fail "k7 smoke gaps"
 upload smoke.out smoke.out
 upload selftest.out selftest.out
+
+# Inductive closure and the expected roots are properties of the WHOLE chain; on a --levels
+# subset the support of the lowest level is legitimately absent, so the check is skipped
+# rather than run in a form that cannot pass.
+if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
+    stage STRUCTURE
+    python3 "$SOURCE_DIR/tools/check_level_chain.py" --expect-top-sum "$EXPECT_TOP_SUM" \
+        "${certs[@]}" > "$WORK/chain-structure.out" 2>&1 || fail "level chain structure"
+    grep -q 'chain is internally consistent, inductively closed and terminating' \
+        "$WORK/chain-structure.out" || fail "level chain structure verdict"
+    upload chain-structure.out chain-structure.out
+else
+    stage "STRUCTURE skipped (partial --levels)"
+    echo 'skipped: partial level set' > "$WORK/chain-structure.out"
+fi
 
 stage VERIFY
 {
@@ -135,25 +163,39 @@ stage VERIFY
     echo "# toolchain=$(rustc --version) / $(cargo --version)"
     echo "# host=$instance_id type=$instance_type threads=$threads"
     echo "# uname=$(uname -a)"
-    echo "# input=sa193-k7.cert sha256=$CERT_SHA256 (zst $CERT_ZST_SHA256)"
-    echo "# command=radio_cleanroom audit --threads $threads --progress 300 sa193-k7.cert"
+    echo "# levels=$LEVELS"
+    sed 's/^/# input=/' MANIFEST.sha256
+    if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
+        echo "# structure=tools/check_level_chain.py --expect-top-sum $EXPECT_TOP_SUM (passed)"
+    else
+        echo "# structure=skipped (partial level set)"
+    fi
+    echo "# command=radio_cleanroom audit --threads $threads --progress 300 ${certs[*]}"
     echo "# started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "# radio-cleanroom-provenance-v1 end"
-} > k7-verify.out
-upload k7-verify.out k7-verify.out
+} > verify.out
+upload verify.out verify.out
 
-( while sleep 600; do upload k7-verify.out k7-verify.out; done ) &
+( while sleep 600; do upload verify.out verify.out; done ) &
 heartbeat=$!
 
-/usr/bin/time -v "$binary" audit --threads "$threads" --progress 300 sa193-k7.cert >> k7-verify.out 2>&1 \
-    || { kill "$heartbeat" || true; upload k7-verify.out k7-verify.out; fail "k7 verify"; }
+/usr/bin/time -v "$binary" audit --threads "$threads" --progress 300 "${certs[@]}" \
+    >> verify.out 2>&1 \
+    || { kill "$heartbeat" || true; upload verify.out verify.out; fail "verify"; }
 kill "$heartbeat" 2>/dev/null || true
-echo "# finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> k7-verify.out
+echo "# finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> verify.out
 
-grep -q 'TOTAL verified 2508278, gaps 0,' k7-verify.out || { upload k7-verify.out k7-verify.out; fail "k7 totals"; }
-zstd -q -19 -f k7-verify.out
-upload k7-verify.out.zst k7-verify.out.zst
-sha256sum k7-verify.out k7-verify.out.zst > final.sha256
+# A complete run must account for every claim in the certificate of record; a --levels subset
+# only has to be gap-free.
+if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
+    grep -q "TOTAL verified $EXPECT_TOTAL_CLAIMS, gaps 0," verify.out \
+        || { upload verify.out verify.out; fail "chain totals"; }
+else
+    grep -q ', gaps 0,' verify.out || { upload verify.out verify.out; fail "verify gaps"; }
+fi
+zstd -q -19 -f verify.out
+upload verify.out.zst verify.out.zst
+sha256sum verify.out verify.out.zst chain-structure.out > final.sha256
 upload final.sha256 final.sha256
 upload run.log run.log
 stage DONE
