@@ -38,6 +38,7 @@ certify a frontier cell:
 | `verifier_product_index_2026-08-17.txt` | packed product-profile verifier index: soundness, hard-root A/B, full Sa(113) control and rejected diagnostics |
 | `verifier_block_pareto_2026-08-17.txt` | adaptive fixed-block Pareto summaries over the packed verifier index: failed first layout, tuning, 3.35x hard-root speedup and small-level guard |
 | `verifier_kd_index_2026-08-18.txt` | immutable kd dominance hierarchy and bounded wider pair pruning: exact hard/sample controls, complete k=6/k=7 antichains, Sa(113) guard and full-audit launch gate |
+| `pareto9_frontier_aws_2026-09-02.md` | exact frozen cache identity, build provenance, safeguards and live AWS coordinates for the unbounded full K=9 frontier walk |
 
 ## Regenerating and auditing
 

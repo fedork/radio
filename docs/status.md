@@ -159,6 +159,15 @@ The stopped singleton survey remains under `run10/k6-main-survey`; use
 desired/minimum capacity zero, has no worker, and cannot replace one until deliberately scaled up.
 The old Sa host's scoped census service remains inactive, and Sa continues alone.
 
+An independent full `K=9` Pareto walk is also live. Run `20260903T011520Z` starts from the verified
+diagonal seed `Sb(55:55)`, uses a frozen 2,266,369-fact current-semantics revision of the run10
+cache, and will bracket the diagonal before walking the complete staircase to `m=1`. It has no
+wall-time bound, a 24-GiB RSS cap, hourly durable checkpoints and SNS progress mail. Its on-demand
+`r7iz.xlarge` instance is `i-007f24b8cbc1fb060`; use
+`tools/pareto9_status.sh 20260903T011520Z`. The exact cache object and build hashes are in the
+[run record](../evidence/pareto9_frontier_aws_2026-09-02.md). No new CSV claim follows until a
+frontier cell has its retained exact positive/negative pair and the final artifact checks pass.
+
 This page says where things *stand*. For what happened and why, see
 [journal.md](journal.md); for what to do next, [research-plan.md](research-plan.md).
 
@@ -553,15 +562,22 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**Nothing is running.** On 2026-08-31 the only live `Project=radio-sa193` EC2 instance,
-persistent oracle `i-002cabc654b2078ed`, was terminated at 14:25:41 UTC at the user's request.
-Its build and mixed cache predated the singleton-majorization refutation and must not be reused.
-The pre-termination SSM inventory found that the oracle process and transient systemd unit were
-already gone; the last complete mutable snapshot was from 2026-08-24. Because its root disk had
-`DeleteOnTermination=false`, encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and
-`available`; EC2 compute billing has ended, while EBS storage billing continues. No other pending,
-running, stopping or stopped radio-tagged instance remained after the termination query. Exact
-commands and disk disposition are in [aws-run.md](aws-run.md).
+**Two isolated on-demand computations are running.** The `run10` cold `Sa(193)` rerun is alive on
+`i-0318c3349a0df835b`; at the 2026-09-03 01:10 UTC status it had completed 2 of 16 roots, held
+2,273,018 verdicts, used 1.04 GB RSS, and was working on `Sb(110:83)@9`. Read current state with
+`tools/sa193_status.sh`.
+
+The full K=9 Pareto run `20260903T011520Z` is alive on `i-007f24b8cbc1fb060`. It passed its remote
+regression/build/provenance gates, froze the exact current run10 cache revision documented above,
+and launched `radio_pareto_k9 --bootstrap-diagonal 9 55 55 input-sa193.cache`. Read its ten-minute
+durable status with `tools/pareto9_status.sh 20260903T011520Z`. The two solvers have separate
+instances, disks, processes, S3 prefixes and caches; launching the Pareto walk did not interrupt or
+mutate the Sa run.
+
+The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
+cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB
+volume `vol-04260ae18b515e7f5` remains unattached and `available`; exact commands and disk
+disposition are in [aws-run.md](aws-run.md).
 
 Four more unattached 50-GiB `oracle-serve` volumes from the superseded 2026-08-21 launches were
 also still present. All five volumes, 250 GiB total, were inventoried and left untouched because
@@ -576,8 +592,9 @@ artifact reproducible in 1.58 h from archived inputs, so it stays in S3 at
 store — see [data.md](data.md). Those historical performance measurements remain valid, but the
 mixed snapshot is not a safe warm start after the singleton-majorization refutation.
 
-No `Sa(193)` solver remains. Run3, run8 and run9 all completed all sixteen roots and independently
-reported UNSOLVABLE. **The k=8 Pareto-prefix census is finished, archived and its host is gone.** It
+Historical runs 3, 8 and 9 completed all sixteen `Sa(193)` roots and independently reported
+UNSOLVABLE; run10 is the live post-refutation diagnostic rerun described above. **The k=8
+Pareto-prefix census is finished, archived and its host is gone.** It
 exited 0 at 2026-08-19 22:34:43 UTC after 5.87 days on shared `r7iz.4xlarge` `i-0005d74f985c52ae1`,
 emitting a `CENSUS END` record and a self-consistent corpus: 55 roots, 817 first cuts (344 strict),
 815 second-cut blocks, 7,146 second winners, 1,688 targets, 2,435 upgrade nodes, and 1,893
@@ -1505,9 +1522,9 @@ that model to settle that case.  This formula comes from a checked 19-node relax
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
-   loop. Test it on another corpus before using it. No AWS compute remains under
-   `Project=radio-sa193`; the retired oracle's persistent volume remains available, while the old
-   replay hosts are terminated. Do not restart either retired independent-checker
+   loop. Test it on another corpus before using it. The live AWS compute is the isolated `run10`
+   Sa rerun plus Pareto run `20260903T011520Z`; the retired oracle's persistent volume remains
+   available, while the old replay hosts are terminated. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
 5. **P5 structural rewrite delivered 2026-09-02.** The paper now states `Sa(10)=192` as a proven

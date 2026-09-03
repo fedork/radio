@@ -31,8 +31,9 @@ author/venue editing and the public DOI remain publication work.
 `m=2,3,4`, Li--Wu--Triesch 2018 for `m=5`), including `n(9,5)=481`; a retained exact replay
 makes `n(9,6)=473` exact as well. Run9 adds
 proven upper bounds at `m=81..96`; legacy lower bounds remain in parts of `m=65..94`. The band
-`m=7..64` is entirely blank.
-This is the main open front.
+`m=7..64` is entirely blank. An unbounded current-main frontier walk is now live from a verified
+`Sb(55:55)` diagonal seed; it is a durable long-running experiment, not a claim that any blank cell
+has already been decided. This is the main open front.
 
 **H3 - Is `Sa = 192` maximal at k=10? Done 2026-08-16.** Proof-safe cold run9 began from an
 empty cache, passed the independently known `Sa(192)` control, and exhaustively refuted all sixteen
@@ -139,18 +140,25 @@ mentions but never wrote down, and which would let `n(9,11)` be predicted at all
 
 ### P4 - Fill the K=9 band m = 7..64
 
-Superseded in part: proof-safe run9 now decides the 16 `Sa(193)` upper bounds, and
-`parsed_260.txt` has been recovered, so `run_pareto9.sh` can restart. What remains is the blank band.
+The old `run_pareto9.sh` restart path is superseded. Run `20260903T011520Z` is live on AWS using
+`radio_pareto --bootstrap-diagonal 9 55 55`: it freezes an exact current-semantics revision of the
+live `run10/sa193.checkpoint`, brackets the frontier from the diagonal, and then walks the complete
+staircase to `m=1`. It has no wall-time bound, a 24-GiB resident-memory cap, hourly cache/raw-log
+checkpoints, a persistent encrypted volume, and SNS progress mail. Read it with
+`tools/pareto9_status.sh 20260903T011520Z`; exact deployment and input hashes are in the
+[run record](../evidence/pareto9_frontier_aws_2026-09-02.md).
 
 Note what the recovered data shows about cost: the near-diagonal walk moved from `m = 96`
 down to about `m = 81` over 14 months of wall clock across 81 chained runs, and single states
-in that region took weeks each. A frontier walk downward from the diagonal will not reach
-`m = 64` on any useful timescale. Approaching the band from small `m` upward with the
-canonical search (P2/P3) is the only cheap direction, and P2 should be read as the first step
-of P4 rather than as separate work.
+in that region took weeks each. The requested full walk should therefore be expected to run for a
+long time; launching it does not change the cost model. Approaching the band from small `m` upward
+with canonical search (P2/P3) remains the cheap complementary direction, and P2 should be read as
+the first step of P4 rather than as separate work.
 
-**Done when** there is a measured cost model for the band and a decision about whether to
-pursue it at all.
+**Done when** the full walk ends cleanly, its provenance-checked raw output supplies a retained
+positive/negative pair for every emitted cell, and the resulting claims are reconciled into the
+source-of-truth CSV. Until then, completed cells are partial results and an abort or `MAYBE` is not
+a frontier bound.
 
 ### P5 - Correct and finish the paper — structural rewrite delivered 2026-09-02
 

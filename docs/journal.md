@@ -13195,3 +13195,49 @@ After the rewrite, `tools/check_tables.py`, `tools/check_witness.py witnesses/*.
 `tools/check_docs.py` all passed. The witness checker reported only the two already documented
 arbitrary-majorization diagnostics as unsupported; every unconditional witness passed. No solver
 or background research process was started.
+
+## 2026-09-02 -- Unbounded full K=9 Pareto walk launched from `Sb(55:55)`
+
+The old hard-coded Pareto restart path was replaced with a generic, checked staircase driver.
+`radio_pareto --bootstrap-diagonal` validates a supplied diagonal seed, alternates the two shores
+until the first exact negative, and then walks every frontier row down to `m=1`. It emits a cell
+only from an exact solvable/unsolvable bracket and aborts on `MAYBE`, closing the old tri-state trap
+where a nonzero `MAYBE` could be mistaken for true. The complete walk requires `MAX_N=514`, not
+512: its last queried upper neighbor is `Sb(512:2)`. The `m=1` upper bound is exact dichotomy and
+does not need an out-of-range query. A new regression reproduces the complete K=3 frontier by both
+diagonal-bootstrap and direct-staircase paths.
+
+Run `20260903T011520Z` launched on isolated on-demand `r7iz.xlarge`
+`i-007f24b8cbc1fb060` in `us-west-2b`, from commit
+`546d9a16f0fc9defd13a07f08b5a6e0430669b65`. It has no wall-time limit and retains a 24-GiB RSS
+cap. The encrypted 50-GiB EBS volume `vol-0e3bbd1272ce7069e` is persistent. The exact frozen input
+is a stable revision of the live run10 checkpoint: 2,266,369 lines, SHA-256
+`fe85b0df45cbed0ae0d5b49a4f2c446695470d9ca5c429fd0b12a68a3577616d`, with the required
+`singleton-majorization-necessity-only-v1` marker. It is copied under the new run prefix, so later
+run10 checkpoint replacement cannot alter the experiment.
+
+The supervisor uploads ten-minute status, hourly cache and compressed raw-log checkpoints, and
+sends SNS mail at start, diagonal-bracket completion, new frontier cells, six-hour heartbeats, and
+completion or failure. Failed final upload deliberately leaves the instance and disk for recovery.
+The confirmed subscriber is `fedor@retellai.com`; CloudWatch recorded one SNS publication in the
+01:15 UTC bucket, confirming the start message reached the topic. Durable artifacts are under
+`s3://radio-sa193-393287594714/pareto9-frontier/20260903T011520Z/`; status is
+`tools/pareto9_status.sh 20260903T011520Z`. An after-launch SSM inventory found the wrapper and
+solver alive. The separate run10 `Sa(193)` job remained alive and was not touched.
+
+This launch is not itself a Pareto claim. Promote cells only after the completed raw log passes
+provenance checking and supplies the retained exact positive/negative pairs. Exact object identity,
+build IDs, operational safeguards, and the post-launch inventory are recorded in
+`evidence/pareto9_frontier_aws_2026-09-02.md`.
+
+Immediately after launch, `94:94` or perhaps `95:95` was considered as a higher seed. The run was
+deliberately kept. `55:55` is unconditional by subgraph monotonicity from the checked
+`Sb(112:80)@9` node in the `Sa(192)` witness; the apparent `95:94` lower result is only legacy and
+its source log is missing. A higher true seed would skip bootstrap queries but would not alter the
+first unsolvable bracket or any emitted cell. Restarting was therefore an optional performance
+trade rather than a correctness repair, and the already-live initialization was retained.
+
+The first ten-minute durable snapshot at 01:26:11 UTC showed the solver alive at 2.45 GiB RSS,
+with zero decisions and a 3,628-byte raw log containing the runtime provenance block. It was still
+replaying/initializing the 2,266,369-fact cache before `PARETO START`; this is startup state, not a
+frontier verdict or evidence of a stalled exact query.

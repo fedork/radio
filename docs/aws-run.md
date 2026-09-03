@@ -1,9 +1,10 @@
-# The `Sa(193)` AWS runs — final solver record, verifier replays and the closed census
+# AWS solver record — `Sa(193)`, verifier replays, censuses and the K=9 frontier
 
 This page is the operational record for the completed cold runs, the solver-core verifier replays,
-the k=8 census, and the current post-refutation cold rerun; the findings go to
-[journal.md](journal.md) as usual. As of 2026-08-31, `run10` is live on a separate current-main
-instance. The persistent `oracle-serve` instance added on 2026-08-21 was terminated after the
+the k=8 census, the current post-refutation cold rerun, and the full K=9 frontier walk; findings go
+to [journal.md](journal.md) as usual. As of 2026-09-02 local time, `run10` and the isolated Pareto
+walk are live on separate current-main instances. The persistent `oracle-serve` instance added on
+2026-08-21 was terminated after the
 singleton-majorization refutation made its mixed warm cache unsafe; its encrypted EBS volume was
 deliberately retained. See
 [Persistent oracle-serve instance](#persistent-oracle-serve-instance-2026-08-21-no-fixed-end-date).
@@ -17,13 +18,45 @@ deliberately retained. See
 | uncolored level replay | terminated: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived |
 | colored level replay | terminated: `i-0901e2b2c266f7db2`, volume `vol-0bdc1e36eea39386c` confirmed deleted |
 | persistent oracle | **terminated** 2026-08-31 14:25:41 UTC: `i-002cabc654b2078ed`; encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and `available` |
-| active jobs | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone. |
+| active `Sa` job | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone on that instance. |
+| active Pareto job | run `20260903T011520Z` on on-demand `i-007f24b8cbc1fb060`, `r7iz.xlarge`; full diagonal-bootstrap K=9 walk from `Sb(55:55)`, no wall-time bound, 24-GiB RSS cap; exact record below. |
 | stopped K6 survey | stopped by request 2026-09-01 05:13:25 UTC at durable rank 34,000,000; the Spot Auto Scaling group has desired/minimum capacity zero and no instance; validated artifacts remain under `run10/k6-main-survey` |
 | retained oracle volumes | five unattached 50-GiB volumes, 250 GiB total: `vol-0053276ecc6d1adf4`, `vol-03a28c8c01ae591a1`, `vol-0621d09062d023bce`, `vol-0ef7c8664c6cab66e`, and the final instance's `vol-04260ae18b515e7f5`; not deleted because this request authorized instance termination, not data deletion |
 | account | 393287594714 (shared production — everything tagged `Project=radio-sa193`) |
 | bucket | `s3://radio-sa193-393287594714/` — unaffected by termination, and the only copy of the run3/run/run2/run4-7 raw logs |
 | notifications | SNS `radio-sa193-progress` -> fedor@retellai.com |
 | completion | every final upload and manifest was checked before each teardown; keep it that way |
+
+## Full K=9 Pareto walk (launched 2026-09-03 UTC, no fixed end date)
+
+Run `20260903T011520Z` is live on isolated on-demand `r7iz.xlarge`
+`i-007f24b8cbc1fb060` in `us-west-2b`. It runs commit
+`546d9a16f0fc9defd13a07f08b5a6e0430669b65` as
+`radio_pareto --bootstrap-diagonal 9 55 55 input-sa193.cache`. The run has no wall-time bound and
+retains the 24-GiB RSS guard. Its encrypted 50-GiB root volume
+`vol-0e3bbd1272ce7069e` has `DeleteOnTermination=false`.
+
+The frozen input is the exact 2,266,369-line revision of `run10/sa193.checkpoint` selected at
+launch, SHA-256 `fe85b0df45cbed0ae0d5b49a4f2c446695470d9ca5c429fd0b12a68a3577616d` and semantics marker
+`singleton-majorization-necessity-only-v1`. It is preserved under the run prefix even as the live
+Sa checkpoint advances. The production build ID is
+`8f56489277cf155e4c966b8fc8b7c52ad6ad67dbe14fe862cfe37ca2052c05a5`; both cache and binary
+sidecar pass `tools/check_provenance.py`.
+
+Ten-minute `STATUS` updates, hourly cache and compressed raw-log checkpoints, and six-hour SNS
+heartbeats go through the existing confirmed progress topic. Mail is also sent at bootstrap
+completion, for new frontier cells, and at completion or failure. S3 reporting failures do not
+kill a healthy solve, and teardown is withheld if the final upload cannot be verified. Use:
+
+```sh
+tools/pareto9_status.sh 20260903T011520Z
+```
+
+Durable artifacts are under
+`s3://radio-sa193-393287594714/pareto9-frontier/20260903T011520Z/`. The exact source object identity,
+build hashes, launch checks, and promotion rule are in the
+[Pareto run record](../evidence/pareto9_frontier_aws_2026-09-02.md). This running computation is not
+yet a source for `data/pareto_sb.csv`.
 
 ## Persistent oracle-serve instance (2026-08-21, no fixed end date)
 
@@ -422,15 +455,14 @@ directory — had an S3 counterpart, with the proof-critical `run9` and `run8` l
 and the census `input.tar.zst`. That bucket is now the only copy of the run3/run/run2/run4-7 raw
 logs, which were never promoted to the release store.
 
-The one remaining radio-tagged instance is stopped `i-04126f6d3016378a9` (uncolored level replay,
+At that 2026-08-20 cleanup, the one remaining radio-tagged instance was stopped
+`i-04126f6d3016378a9` (uncolored level replay,
 run `20260818T194508Z`), whose output is archived as `run9-level-replay-2026-08-18` and
 `run9-verifier-ab-2026-08-19`. Give it the same disk check before terminating.
 
-**Do not stop either active dedicated replay.** The uncolored run has no within-k7 checkpoint; the
-colored run checkpoints only between levels. Their supervisors stop the hosts after finalization,
-but a stopped instance and its root volume should be terminated only after every final checksum has
-been independently verified and any durable bundle has moved to the private GitHub release store.
-The one-shot commands are:
+While those dedicated replays were active, they could not safely be interrupted: the uncolored run
+had no within-k7 checkpoint and the colored run checkpointed only between levels. Their final
+checksums and release bundles were verified before teardown. The historical one-shot commands were:
 
 ```
 tools/run9_refute_status.sh 20260818T194508Z
