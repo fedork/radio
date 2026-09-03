@@ -37,12 +37,39 @@ def update_max(fact: dict[str, object], field: str, value: float) -> None:
         fact[field] = value
 
 
-def parse(lines: Iterable[str]) -> dict[tuple[int, str], dict[str, object]]:
+def compact_completed(line: str) -> str:
+    text = line.rstrip()
+    witness = text.find(" with ")
+    if witness < 0:
+        return text
+    took = text.find(" took ", witness)
+    tail = text[took:] if took >= 0 else ""
+    return f"{text[:witness]}  [+witness]{tail}"
+
+
+def compact_progress(line: str, k: int) -> str:
+    text = line.rstrip()
+    prefix = f"still solving in {k} "
+    if text.startswith(prefix):
+        text = text[len(prefix) :]
+    return re.sub(r" trying .*? elapsed ", "  elapsed ", text, count=1)
+
+
+def parse(
+    lines: Iterable[str],
+) -> tuple[
+    dict[tuple[int, str], dict[str, object]],
+    dict[int, dict[str, tuple[int, str]]],
+    int,
+]:
     facts: dict[tuple[int, str], dict[str, object]] = {}
-    for line in lines:
+    activities: dict[int, dict[str, tuple[int, str]]] = {}
+    line_number = 0
+    for line_number, line in enumerate(lines, 1):
         match = COMPLETED_RE.match(line)
         if match:
-            key = (int(match["k"]), match["state"])
+            k = int(match["k"])
+            key = (k, match["state"])
             fact = facts.setdefault(
                 key, {"completed": None, "elapsed": None, "verdict": None}
             )
@@ -52,16 +79,25 @@ def parse(lines: Iterable[str]) -> dict[tuple[int, str], dict[str, object]]:
             if old_verdict is not None and old_verdict != verdict:
                 raise ValueError(f"contradictory completed verdicts for {match['state']}@{match['k']}")
             fact["verdict"] = verdict
+            activities.setdefault(k, {})["done"] = (
+                line_number,
+                compact_completed(line),
+            )
             continue
 
         match = PROGRESS_RE.match(line)
         if match:
-            key = (int(match["k"]), match["state"])
+            k = int(match["k"])
+            key = (k, match["state"])
             fact = facts.setdefault(
                 key, {"completed": None, "elapsed": None, "verdict": None}
             )
             update_max(fact, "elapsed", float(match["elapsed"]))
-    return facts
+            activities.setdefault(k, {})["solving"] = (
+                line_number,
+                compact_progress(line, k),
+            )
+    return facts, activities, line_number
 
 
 def seconds(value: float | None) -> str:
@@ -74,7 +110,46 @@ def seconds(value: float | None) -> str:
     return f"{value:.3f}".rstrip("0").rstrip(".")
 
 
-def render(facts: dict[tuple[int, str], dict[str, object]], limit: int, stream: TextIO) -> None:
+def render_stack(
+    activities: dict[int, dict[str, tuple[int, str]]],
+    total_lines: int,
+    stream: TextIO,
+) -> None:
+    picked: dict[int, tuple[int, str, str]] = {}
+    for k, kinds in activities.items():
+        kind, (line_number, text) = max(kinds.items(), key=lambda item: item[1][0])
+        picked[k] = (line_number, kind, text)
+    if not picked:
+        print("  current stack       unavailable (no solver activity lines)", file=stream)
+        return
+
+    current_k = max(picked.items(), key=lambda item: item[1][0])[0]
+    root_k = max(picked)
+    print(
+        f"  current stack       latest activity per level, current k={current_k} up to root k={root_k}",
+        file=stream,
+    )
+    print(
+        "  stack note          newest progress or completed line at each level; old enclosing lines may be stale",
+        file=stream,
+    )
+    for k in range(root_k, current_k - 1, -1):
+        if k not in picked:
+            continue
+        line_number, kind, text = picked[k]
+        stale = " (stale)" if total_lines - line_number > 200_000 else ""
+        print(f"    k={k} [{kind}]{stale} {text}", file=stream)
+
+
+def render(
+    facts: dict[tuple[int, str], dict[str, object]],
+    activities: dict[int, dict[str, tuple[int, str]]],
+    total_lines: int,
+    limit: int,
+    stream: TextIO,
+) -> None:
+    render_stack(activities, total_lines, stream)
+    print(file=stream)
     ranked = []
     for (k, state), fact in facts.items():
         completed = fact["completed"]
@@ -103,6 +178,24 @@ def render(facts: dict[tuple[int, str], dict[str, object]], limit: int, stream: 
             file=stream,
         )
 
+    completed_ranked = [
+        (fact["completed"], k, state, fact)
+        for (k, state), fact in facts.items()
+        if fact["completed"] is not None
+    ]
+    completed_ranked.sort(key=lambda row: (-row[0], -row[1], row[2]))
+    print(file=stream)
+    print(
+        "  slowest completed   rank=final took only; inclusive process CPU seconds",
+        file=stream,
+    )
+    for rank, (took, k, state, fact) in enumerate(completed_ranked[:limit], 1):
+        print(
+            f"    {rank:2d}. {seconds(took):>7}s {fact['verdict']:<16} "
+            f"{state}@{k} (highest_elapsed={seconds(fact['elapsed'])})",
+            file=stream,
+        )
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -114,11 +207,11 @@ def main() -> int:
     if args.limit < 1:
         parser.error("--limit must be positive")
     try:
-        facts = parse(input_lines(args.paths))
+        facts, activities, total_lines = parse(input_lines(args.paths))
     except (OSError, ValueError) as error:
         print(f"pareto_slowest_facts: {error}", file=sys.stderr)
         return 1
-    render(facts, args.limit, sys.stdout)
+    render(facts, activities, total_lines, args.limit, sys.stdout)
     return 0
 
 

@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-09-02**.
+don't know it. Last refreshed **2026-09-03**.
 
 The central singleton question is now resolved negatively.  Necessity remains proved, but weak
 majorization by `G_K` is not sufficient.  The exact-support, full-mass state
@@ -572,11 +572,14 @@ regression/build/provenance gates, froze the exact current run10 cache revision 
 and launched `radio_pareto_k9 --bootstrap-diagonal 9 55 55 input-sa193.cache`. Read its ten-minute
 durable status with `tools/pareto9_status.sh 20260903T011520Z`. The two solvers have separate
 instances, disks, processes, S3 prefixes and caches; launching the Pareto walk did not interrupt or
-mutate the Sa run. As of the 2026-09-03 06:56:58 UTC snapshot it had completed 80 bootstrap
+mutate the Sa run. As of the 2026-09-03 12:48:03 UTC snapshot it had completed 80 bootstrap
 decisions through `Sb(95:94)=SOLVABLE` and was still resolving `Sb(95:95)`, at 9.78 GiB RSS. The
-status helper now appends a live top-ten slow-fact ranking using the maximum of each fact's final
-`took` time and highest printed progress `elapsed`; its labels distinguish completed verdicts from
-progress records with no final verdict.
+status helper now appends a live level stack, a top-ten slow-fact ranking using the maximum of each
+fact's final `took` time and highest printed progress `elapsed`, and a separate completed-only top
+ten ranked strictly by final `took`. Its labels distinguish completed verdicts from progress
+records with no final verdict. The live stack at that snapshot was the K=9 parent
+`Sb(95:95)`, K=8 child `Sb(56:40,55:39)`, and K=7 child
+`Sb(28:19,28:18,37:12,37:11)`.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB

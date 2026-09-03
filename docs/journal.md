@@ -13263,3 +13263,22 @@ from process `clock()`; the deterministic production scheduler's progress `elaps
 split-prefix work divided by 20,000,000. Both include recursive descendants, which is the desired
 bottleneck measure, but mixing their labels or calling either exact wall time would overstate what
 the raw log records.
+
+## 2026-09-03 -- Pareto status adds completed-only timing and a live solver stack
+
+Long open parents had crowded every resolved fact out of the mixed slow-fact list. The status path
+now follows it with a separate completed-only top ten, ranked strictly by final `took`. At the
+12:38:02 UTC snapshot that list began with the inclusive 43-second `Sb(95:94)@9` construction and
+its K=8/K=7 child chain. Its slowest completed negative was
+`Sb(20:7,12:11,16:8,11:11,20:6,15:3,26:1)@6` at 36 process-CPU seconds, followed by negatives at
+35 and 31 seconds. These are time-stamped operational measurements, not frontier claims.
+
+The live scan now also presents a solver stack by the same rule as the Sa(193) watchdog: at each
+level, retain whichever appeared later in the log, the most recent progress line or completed
+verdict; identify the level of the globally newest such line as the current level; and display that
+level through the root. Positive witness bodies are elided while timing and split-count tails are
+kept, and progress lines omit the three verbose proposed children. At the 12:48:03 UTC durable
+snapshot, a subsequent live scan showed the current path as `Sb(95:95)@9`,
+`Sb(56:40,55:39)@8`, and `Sb(28:19,28:18,37:12,37:11)@7`. This is current search context, not a
+claim about any state's verdict. The synthetic regression now locks the stack selection and
+compaction as well as both timing orderings.

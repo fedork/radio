@@ -795,14 +795,20 @@ heartbeats, completion, and failure. `tools/pareto9_status.sh` is the one-shot s
 start an unnecessary local watch loop.
 
 While the instance is live, that status command also runs `tools/pareto_slowest_facts.py` against
-the uncompressed remote log and prints the ten slowest distinct facts. A fact's ranking time is
-`max(completed took, highest progress elapsed)`: this retains completed SOLVABLE/UNSOLVABLE calls
-and long attempts that have printed progress but no final verdict. The labels are deliberately
-separate. `NO_FINAL_VERDICT` does not mean unsolvable or even currently active; a finite child probe
-can return `MAYBE` after printing progress. The clocks are also not literal per-fact wall time:
-`took` is inclusive process CPU from `clock()`, while this production build's `elapsed` is the
-deterministic accepted-prefix count divided by 20,000,000. Both include descendant work. The helper
-has a synthetic parser/order regression in `tools/pareto_slowest_facts_regression.sh`.
+the uncompressed remote log. It first prints the latest activity stack from the current solver
+level through the root, choosing the newer of the progress and completed line at each level and
+eliding large positive witness bodies and proposed-child triples. This mirrors the Sa(193) status
+rule; it is log-derived context, and an old enclosing line can be stale. The helper then prints two
+rankings. The first lists the ten slowest distinct facts
+by `max(completed took, highest progress elapsed)`; this retains completed calls and long attempts
+that have printed progress but no final verdict. The second is an independent completed-only top
+ten ranked strictly by final `took`, so progress-only parents cannot crowd resolved facts out. The
+labels remain separate: `NO_FINAL_VERDICT` does not mean unsolvable or even currently active; a
+finite child probe can return `MAYBE` after printing progress. The clocks are also not literal
+per-fact wall time: `took` is inclusive process CPU from `clock()`, while this production build's
+`elapsed` is the deterministic accepted-prefix count divided by 20,000,000. Both include descendant
+work. The helper has a synthetic parser/order regression in
+`tools/pareto_slowest_facts_regression.sh`.
 
 ## Verification tools
 

@@ -91,13 +91,18 @@ Read durable progress with:
 tools/pareto9_status.sh 20260903T011520Z
 ```
 
-The status helper also performs a read-only SSM scan of the live raw log and prints ten distinct
-slow facts, ranked by `max(completed took, highest progress elapsed)`. Completed verdicts and
-progress-only records are labelled separately: `NO_FINAL_VERDICT` must not be read as a negative.
-The units are the clocks actually present in the log, not reconstructed wall time. `took` is
-inclusive process CPU; under the production work-budget build, `elapsed` is accepted split-prefix
-work divided by 20,000,000. Both include recursive descendant work. The parser and ordering are
-locked by `tools/pareto_slowest_facts_regression.sh`.
+The status helper also performs a read-only SSM scan of the live raw log. It prints the newest
+progress-or-completion activity at each level from the current level through K=9, compacting away
+positive witness bodies and proposed-child triples. This mirrors the Sa(193) stack display and is
+search context, not a verdict. It then prints two top-ten views: one ranked by
+`max(completed took, highest progress elapsed)`, and a completed-only list
+ranked strictly by final `took`. The second keeps resolved facts visible when long progress-only
+parents dominate the combined view. Completed verdicts and progress-only records are labelled
+separately: `NO_FINAL_VERDICT` must not be read as a negative. The units are the clocks actually
+present in the log, not reconstructed wall time. `took` is inclusive process CPU; under the
+production work-budget build, `elapsed` is accepted split-prefix work divided by 20,000,000. Both
+include recursive descendant work. The parser and both orderings are locked by
+`tools/pareto_slowest_facts_regression.sh`.
 
 Do not promote a cell from the progress display alone. After completion, require the final raw log
 to pass `tools/check_provenance.py`, retain its exact positive/negative line pair for every cell,
