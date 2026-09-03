@@ -74,6 +74,14 @@ Python version needed 5 GB RSS and stalled on `out_k8.txt`'s 11.2M negatives. It
 [status.md](status.md#active-traps) for why stripping `(1:1)` yourself is unsound. Audit the low
 levels first: closure is cheap to disprove and a cache-seeded log will not close.
 
+For the *positive* side out of the same log, `tools/log_to_numbered_tree.py` emits the numbered
+format `tools/check_witness.py` verifies, discharging each child with `(line M)` whenever line M's
+state dominates it after unit-group deletion. That domination is why it works where canonical
+search does not: most children are never logged in their own right because something already
+logged embeds them. `--frontier-csv data/pareto_sb.csv --m 6-55 --outdir DIR` does a whole
+frontier in one index pass. `tools/test_log_to_tree.sh` is the 6-check regression for both tools
+(domination reuse, the missing-domination gap, child-mismatch rejection, unit preservation).
+
 **It has no positive mode.** `audit` and `selftest` are the only subcommands, and nothing in
 `src/` verifies a witness tree, so there is no such thing as "a tree compatible with the
 cleanroom". Trees go through `tools/check_witness.py`, a separate checker with its own trust base.
