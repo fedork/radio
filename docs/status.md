@@ -154,6 +154,11 @@ The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`.
 binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the
 193 search. The on-demand `r7iz.xlarge` instance is `i-0318c3349a0df835b`; use
 `tools/sa193_status.sh` (now defaulting to `run10`) rather than the terminated historical instance.
+Its first three top-level states cost 207,148 CPU seconds against run9's 291,204, 28.9% less for the
+same search volume and one pass fewer per root; the earlier impression that run10 was slower came
+from a matched split index inside a pass, where its roughly 1.7x larger real-CPU pass budget puts it
+behind before it finishes ahead. Measurements and the hardware confound are in the
+[2026-09-03 journal entry](journal.md).
 The stopped singleton survey remains under `run10/k6-main-survey`; use
 `tools/singleton_k6_survey_status.sh` to read its final S3 status. The Auto Scaling group is at
 desired/minimum capacity zero, has no worker, and cannot replace one until deliberately scaled up.

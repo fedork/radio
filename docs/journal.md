@@ -12760,9 +12760,13 @@ root while run10 reported `cpu=5014`. The slowdown was not concentrated in a few
 refutations. Across 20,029 matching exact `K=7` negatives, run10's final activations took 3,116
 seconds versus 3,762 in run9. Instead, run10 had explored 44,988 `K=7` and 238,467 `K=6` verdicts,
 against roughly 24,900 and 189,100 in run9 at the same root position. `K=7` self time accounted for
-about 1,757 of the roughly 1,880 extra lower-level seconds. The necessity-only production policy
-therefore explains the dominant cost through additional exact exploration; hardware contention
-remained a possible secondary effect.
+about 1,757 of the roughly 1,880 extra lower-level seconds.
+
+**Superseded 2026-09-03:** the position measurement stands, but the conclusion drawn from it does
+not. run10 is behind run9 at matched split indices inside a pass and still finishes each root well
+ahead, because its nominal pass budget is roughly 1.7x larger in real CPU. Over three completed
+roots run10 is 28.9% cheaper than run9, and the extra necessity-only exploration costs about 1.4%
+of root one. See the topline comparison entry below.
 
 For isolation, the production K6 shell census moved off the unique cold Sa host. Its scoped service
 was stopped with Sa still alive; the uncommitted beginning of the 19M--22M stage was discarded, and
@@ -13282,3 +13286,59 @@ snapshot, a subsequent live scan showed the current path as `Sb(95:95)@9`,
 `Sb(56:40,55:39)@8`, and `Sb(28:19,28:18,37:12,37:11)@7`. This is current search context, not a
 claim about any state's verdict. The synthetic regression now locks the stack selection and
 compaction as well as both timing orderings.
+
+## 2026-09-03 -- run10 vs run9 topline: same search, one fewer pass, 28.9% cheaper
+
+The open question was whether run10's extra passes waste a lot of work. They do not. Measured
+against run9's archived cold log (`sa193-cold-2026-08-16/raw/run9_out_sa193.txt`, 365,340,502
+bytes, complete) and the run10 segment snapshot pulled from
+`s3://radio-sa193-393287594714/run10/seg-20260831T232959Z/out_sa193.txt.zst` (372,947,893 bytes
+uncompressed, written 06:11 UTC, three roots done plus part of the fourth).
+
+Per top-level state, `took` in process CPU seconds, with the final pass number and root split count:
+
+    Sb(112:81)   run9 140,577  pass 6  974   |  run10 100,723  pass 5  903   -28.4%
+    Sb(111:82)   run9  92,970  pass 6  887   |  run10  64,173  pass 5  790   -31.0%
+    Sb(110:83)   run9  57,657  pass 5  860   |  run10  42,252  pass 4  781   -26.7%
+    roots 1-3    run9 291,204                |  run10 207,148                -28.9%
+    Sb(109:84)   run9  38,415  pass 5  779   |  run10 in progress, cpu 15,034 at pass 3
+
+run10 uses *fewer* top-level passes, not more, and does the same amount of searching. Over the
+2,224,492 exact states common to roots 1-3 of both logs, run10's summed `totalsplits` is 0.982x
+(k=8), 0.992x (k=7), 1.001x (k=6) and 0.997x (k=5) of run9's, while its summed `took` is 0.669x,
+0.723x, 0.803x and 0.904x. On the subsets where the two runs recorded byte-identical split counts
+run10 is 1.53x, 1.22x, 1.26x and 1.11x faster. The topline gain is throughput per split.
+
+Pass overhead, measured as root CPU minus the summed final k=8 activation time -- abandoned
+activations plus root enumeration -- is flat in absolute seconds and rises only as a percentage
+because the denominator shrank: 15,131s/10.8% -> 16,040s/15.9%, 12,711s/13.7% -> 11,712s/18.3%,
+6,328s/11.0% -> 7,554s/17.9%. Re-passes are cheap in both runs because cached facts survive them.
+Pass histograms match at the levels that matter (root 1 k=7: run9 0.9% p1 / 99.1% p2, run10 1.0% /
+99.0%); run10's only genuinely extra passes are eleven k=6 states at pass 3-5 costing 235 seconds
+in total. No state received a second verdict in either run.
+
+The necessity-only policy does buy more low-level exploration, and it is confined to the cold
+first root: k=6 verdicts 387,913 -> 530,401 (1.37x), k=6 splits 1.79x, k=5 splits 2.36x, k=4
+verdicts 1.76x, for a k<=6 inclusive cost of 2,395 -> 3,827 seconds. That is +1.4k of 100.7k CPU
+seconds, 1.4% of root one, and negligible in roots two and three.
+
+The pass-count difference is a budget-currency effect, and it is worth remembering when reading any
+live run10 progress line. Across 1,305 root-level progress lines the ratio of real `cpu=` to
+work-equivalent `elapsed` averages **1.71** and ranges 1.27 to 1.99: this machine delivers about
+11.7M accepted-prefix units per real CPU second against the 20,000,000 nominal calibration. Each
+nominal pass is therefore about 1.7x larger in real CPU than its label, so run10 reaches the same
+total exploration in one fewer doubling. That is also why run10 looks behind at matched
+(pass, split index) checkpoints -- at Sb(109:84) pass 3 split 14 it is at 14,499s against run9's
+12,497s -- while finishing each root ahead. The 2026-09-01 entry measured exactly such a checkpoint
+and read it as a net slowdown; that reading is superseded in place there.
+
+Hardware is the standing confound and the CPU ratios are not clean. Both hosts are Xeon Gold 6455B,
+but run9 ran on the 16-vCPU `r7iz.4xlarge` sharing with the run8 comparator while run10 is alone on
+a 4-vCPU `r7iz.xlarge`. run9's CPU/wall was 99.9%, so it was never starved of cores, but shared LLC
+and memory bandwidth could account for part of the 1.1-1.5x per-split gain. The split, verdict and
+pass counts above are hardware-independent; the second counts are not.
+
+Straight scaling of the 0.711 root-1-to-3 ratio against run9's 419,353.1 CPU seconds projects run10
+at roughly 298k CPU seconds, about 3.45 days against run9's 4.85. That is an estimate only: the
+extra necessity-only work is front-loaded, and so is its cache payoff. No new claim follows from any
+of this -- it is operational measurement of a run that has not reached a verdict.
