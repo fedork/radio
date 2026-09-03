@@ -6,9 +6,11 @@ Everything below is either already committed or explicitly flagged as undone.
 
 ## The one-line state
 
-The mathematics and the verification are done and independently checked. **What blocks
-submission is closing four explicit access gaps, making a public deposit, and revising the
-paper's priority language—not proving or computing anything.**
+The mathematics and the verification are done and independently checked. **The Google Scholar
+citation pass and Hwang 1989 are closed. What still blocks submission is making a public deposit
+and revising the paper's priority language—not proving or computing anything.** The inaccessible
+Christen originals and seven missing Du--Hwang pages remain documented follow-up, but are no
+longer treated as submission blockers.
 
 ## What the paper is, and the reframing that happened
 
@@ -69,22 +71,29 @@ explicitly, since it connects the computation to his framework.
      false last value 37. Gargano 1992's `Sb(21:17)@6` already implies 38-achievability;
      the repository independently certifies it and proves the missing upper boundary. Gargano's
      `Sb(32:32)@7` similarly gives the prior eight-test lower bound 64. The official OEIS Git
-     export has no match, and searchable Du--Hwang text exposed no table. **Outstanding:** a
-     Scholar export and page-by-page Du--Hwang copy. Reproducible searches are in
+     export has no match. The in-app Scholar pass exhausted 264 displayed rows (227 after
+     normalized-title deduplication), and the available Du--Hwang target subsection and
+     bibliography exposed only the known asymptotic chain. No additional finite threshold was
+     found. The seven unavailable Du--Hwang pages remain a lower-priority completeness check.
+     Reproducible searches are in
      [the audit record](../evidence/publication_prior_art_2026-09-02.md).
    - **Q2 (is the converse still open?)** Aigner poses it as a conjecture (quote above). The
      complete ACM forward-citation list for the book was reviewed: **no resolution**, nearest
      neighbours all a different oracle. But that list is demonstrably incomplete — Li--Wu--Triesch
      2018 cite Aigner and are absent. OpenAlex and Semantic Scholar forward citations, plus two
      current nice/strongly-nice papers, have now been searched and expose no resolution.
-     **Outstanding:** a Scholar export for independent database coverage and a broader
-     nice-graph check before an unqualified priority claim.
+     The Scholar cited-by pages are now exhausted as far as Scholar exposed them; the Aigner-book
+     result stopped at 180 displayed records despite an approximate count near 350. A broader
+     nice-graph check remains advisable before an unqualified priority claim.
    - **Q3 (`Sb` frontier).** Exact formulas for `m=2,3,4` are already Aigner 1986; `m=5` is
      Li--Wu--Triesch 2018. Aigner Figure 4 also publishes `n(4,6)=7`. Zhang--Berger--Massey
      and Gargano publish individual finite constructions, notably `Sb(21:17)@6` and the full
      `Sb(32:32)@7` tree, without supplying the neighboring negatives needed for a frontier.
-     **Outstanding:** page-by-page Du--Hwang, Hwang 1989, the older Christen report/talk, and
-     a Scholar export. Treat every older endpoint construction as prior even when maximality is local.
+     Hwang 1989 has now been read in full: its exact-count Model Q section reports asymptotic
+     constructions and restricted-class optima, not an exact finite maximum. The Scholar pass
+     found no additional finite frontier. The older Christen report/talk remain unavailable,
+     and seven interleaved Du--Hwang pages remain missing. Treat every older endpoint construction
+     as prior even when maximality is local.
    - **Q4 (attribution spot-checks).** The `G_k` closed form is **Aigner's definition** (3.12) —
      cite, do not claim. A scoped check found no general Unit-Group Elimination or Vertex-Splitting
      Pullback statement in Aigner 1986/1988 or Andreae 1989, but broader literature checking is
@@ -138,10 +147,9 @@ retained source output; and the asymptotic constant, which Florin--Ho--Jiang set
 
 ## Suggested order
 
-1. Close the four access tasks listed in the audit: full Du--Hwang pp. 211--230, Hwang 1989,
-   Christen 1980/1986, and a Google Scholar cited-by export. The public citation graph and broad
-   database search are otherwise complete.
-2. Deposit the package; get the DOI.
-3. Restructure the paper around the counterexample. This is a framing decision and was
+1. Deposit the package; get the DOI. This is now the only external-access submission blocker.
+2. Restructure the paper around the counterexample. This is a framing decision and was
    deliberately left to a human — the draft header records the gap rather than guessing.
-4. P5 cleanup finishes with the remaining `<TODO>` sections.
+3. P5 cleanup finishes with the remaining `<TODO>` sections.
+4. In parallel if convenient, pursue Christen 1980/1986 and the seven missing Du--Hwang pages;
+   keep claims corpus-scoped whether or not those copies are found.

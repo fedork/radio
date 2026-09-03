@@ -11,7 +11,8 @@ they are not the first published achievability proofs.
 No finite source located in the corpus below states or implies `Sa(65)`, `Sa(112)`, or `Sa(192)`,
 and none proves the upper boundary `Sa(38) <= 7`. That is a **corpus-scoped conclusion**, not a
 proof that an unindexed or inaccessible publication does not exist. The remaining access gaps
-are listed explicitly at the end.
+are listed explicitly at the end. The Google Scholar cited-by pass and Hwang 1989 are now closed;
+the surviving gaps are incomplete book-page access and the two unavailable Christen originals.
 
 ## Finite results found in primary sources
 
@@ -136,6 +137,18 @@ The following same-model sources were read in full or through the relevant compl
 - F. K. Hwang, “A Tale of Two Coins” (1987),
   [DOI 10.2307/2322412](https://doi.org/10.2307/2322412): the model-Q Fibonacci construction,
   but no later finite threshold table.
+- F. K. Hwang, “Updating a Tale of Two Coins” (1989), pp. 259--265,
+  [DOI 10.1111/j.1749-6632.1989.tb16406.x](https://doi.org/10.1111/j.1749-6632.1989.tb16406.x):
+  the complete seven-page article was obtained through Oxford and inspected page by page. Model Q
+  on pp. 264--265 is exactly the unrestricted adaptive two-irregular model with feedback equal to
+  0, 1, or 2 irregulars in the tested set. Page 265 calls the halving procedure best only in the
+  one-pair class and Christen's Fibonaccian procedure best only in the two-pair class. It then
+  attributes to Christen's 1986 talk cardinality-reduction constructions by factors 7, 12, 20,
+  and 33 in 4, 5, 6, and 7 tests, respectively, and reports “the best result so far for model Q”
+  as the asymptotic upper bound `T_Q(n) <= 1.3877 log_2 n`. These are constructions and
+  restricted-class optima, not exact finite `Sa` or `Sb` maxima. The inspected PDF has SHA-256
+  `f2a6bc3359266635d8d3be8f917fc3f5639bc34a5dd57f7bd30655375a8e9d4f` and is retained outside
+  the repository.
 - F. H. Hao, “The optimal procedures for quantitative group testing” (1990),
   [DOI 10.1016/0166-218X(90)90022-5](https://doi.org/10.1016/0166-218X(90)90022-5): product
   inequalities and limit existence; its finite input `T(15,22)=6` is cited from Aigner.
@@ -214,9 +227,42 @@ https://api.semanticscholar.org/graph/v1/paper/DOI:10.1016%2F0166-218X%2886%2990
 
 The complete ACM forward-citation list for Aigner's book (43 entries) was separately reviewed.
 It contains no resolution of the singleton-majorization converse, but is known to be incomplete:
-Li--Wu--Triesch cite the book and do not appear there. Google Scholar could not be queried because
-the in-app browser had no available session; a Scholar export remains the best independent
-coverage check.
+Li--Wu--Triesch cite the book and do not appear there.
+
+### Google Scholar cited-by pages
+
+The signed-in in-app Google Scholar UI was used on 2026-09-02. Every accessible cited-by page was
+walked to its terminal page and every displayed title was screened:
+
+| seed | pages inspected | raw records | terminal condition |
+|---|---:|---:|---|
+| Aigner, “Search problems on graphs” (1986) | 1--6 | 54 | page 6 had four records and no next page |
+| Aigner, *Combinatorial Search* (1988) | 1--18 | 180 | page 19 was empty and no next page was exposed |
+| Gargano et al. (1992) | 1--3 | 30 | no next page after page 3 |
+| Li--Wu--Triesch (2018) | 0 | 0 | the exact record exposed no cited-by link |
+
+Scholar displayed an approximate count near 350 for the Aigner book while exposing only 180
+records. The 180-record result is therefore exhaustive only for the pages Scholar made
+navigable, not a claim that every item behind the approximate count was returned. The four
+walks produced 264 raw rows and 227 records after normalized-title deduplication. The complete
+deduplicated title, bibliographic-line, and source-page manifest is retained in
+[`google_scholar_cited_by_2026-09-02.tsv`](google_scholar_cited_by_2026-09-02.tsv).
+
+Every title in that manifest was screened. Works possibly touching the target model were then
+checked against primary text already gathered in this audit: Aigner, Andreae, Hao, Gargano,
+Christen 1994, Bshouty, Karimi et al., Jiang--Polyanskii--Vorobyev, Florin--Ho--Jiang,
+Hwang--Lee, Li--Wu--Triesch, and the feedback-coding papers. Damaschke 1994 was additionally
+checked at its primary-text abstract on p. 101 and uses binary defective-edge feedback, not a
+0/1/2 count. Nested-only, nonadaptive, noisy, probabilistic, parity, balance, underweight,
+binary-edge, and general graph-reconstruction titles were excluded on their stated model.
+No newly surfaced work supplies an exact finite `Sa` or `Sb` maximum or a construction beyond
+those already credited above.
+
+Two exact-title Scholar checks were also used to pursue the inaccessible Christen sources.
+Christen's 1980 Publication 341 record had 16 cited-by results; both pages were screened and no
+hidden report copy appeared. The 1986 SIAM-talk record had three cited-by results--Hwang 1989,
+Gargano 1992, and Christen 1994--and no program, abstract, manuscript, or proceedings copy.
+These checks strengthen the trail but do not substitute for the originals.
 
 ## Exact-string, OEIS and book searches
 
@@ -226,19 +272,33 @@ tails `22,38,65,112,192`, `38,65,112,192`, or `65,112,192`. A broad web search f
 `3,5,8,13,22,38` does find OEIS A297497, but that is an unrelated recursively generated triangle;
 it is not this search threshold.
 
-The searchable text of Du and Hwang, *Combinatorial Group Testing and Its Applications*, second
-edition (2000), was queried through its
-[Google Books record](https://books.google.com/books?id=nD5kDQAAQBAJ). Section 11.2's indexed
-text cites Aigner, Christen, Hao and Gargano. Queries for the complete sequence and its tails,
-`T(32,32)`, `32,32`, `21,17`, `14,9`, `K32,32`, `Gargano`, and `threshold function` exposed
-the asymptotic discussion and references but no finite threshold table. Reproduce by replacing
+Du and Hwang, *Combinatorial Group Testing and Its Applications*, second edition (2000), was
+checked through the publisher's [DOI 10.1142/4252](https://doi.org/10.1142/4252) reader and its
+[Google Books record](https://books.google.com/books?id=nD5kDQAAQBAJ). The publisher reader
+required a personal or institutional entitlement. Its UK federation offered no usable Oxford
+institution entry, and the US InCommon list did not include Las Positas College.
+
+Google Books exposed pp. 211, 214, 217--218, 220, 222--224, and 226--231; pp. 212--213,
+215--216, 219, 221, and 225 remained unavailable. Page 220 is the relevant sequential
+`(2,n)` discussion. It attributes `g(2,n) <= log_phi n` to Christen, the limiting constant at
+most approximately `2.27 log_3 n` to Hao, and the improved asymptotic upper bound to Gargano et
+al.; it gives no exact finite `Sa` or `Sb` table. Pages 217--218 concern nonadaptive detecting
+matrices, while pp. 222--230 move through other two-irregular feedback models. The bibliography
+on pp. 230--231 includes Aigner 1986, Christen 1980/1983, Gargano 1992, Hao 1990, and Hwang
+1987/1989--the same historical chain already inspected here.
+
+The searchable text was also queried for the complete sequence and its tails, `T(32,32)`,
+`32,32`, `21,17`, `14,9`, `K32,32`, `Gargano`, and `threshold function`. Reproduce by replacing
 `QUERY` here:
 
 ```text
 https://books.google.com/books?jscmd=SearchWithinVolume2&q=QUERY&vid=nD5kDQAAQBAJ
 ```
 
-This is a snippet-index result, not a page-by-page inspection.
+This is a relevant-page inspection with seven intervening pages still missing, not a complete
+page-by-page copy of pp. 211--230. Because p. 220 contains the target sequential subsection and
+only summarizes asymptotic results, the missing pages are now a residual coverage gap rather
+than a submission blocker, provided publication claims remain corpus-scoped.
 
 ## Near-misses explicitly excluded
 
@@ -246,6 +306,9 @@ This is a snippet-index result, not a page-by-page inspection.
   positive/negative group-test oracle, not the exact-count oracle.
 - Andreae's broader graph search papers are relevant context but add no located finite complete
   graph or complete-bipartite threshold.
+- Damaschke's “A tight upper bound for group testing in graphs” (1994) asks binary questions of
+  whether a tested vertex set contains the single defective edge; despite its title and citation
+  path, it is not the two-defective exact-count model.
 - The “two counterfeit coins with two-arms balance,” parity-check, complementary-weight,
   underweight, multi-arm, and unreliable-test papers have different feedback.
 - Nonadaptive quantitative group testing, nested-only plans, expected-test objectives, noisy or
@@ -264,18 +327,17 @@ audit is much stronger than the attribution audit for these elementary lemmas.
 
 ## Remaining access-dependent checks
 
-These are the only material gaps identified by the citation and bibliography closure:
+The exhaustive Scholar page walk and Hwang 1989 are closed. Two direct-source gaps and one
+lower-priority completeness check remain:
 
-1. A page-by-page copy of Du--Hwang 2000, especially pp. 211--230.
-2. Hwang, “Updating a Tale of Two Coins” (1989), pp. 259--265,
-   [DOI 10.1111/j.1749-6632.1989.tb16406.x](https://doi.org/10.1111/j.1749-6632.1989.tb16406.x).
-   Its date rules out knowledge of Gargano 1992, but it may clarify older finite results.
-3. Christen, *A Fibonaccian algorithm for the detection of two elements*, Publ. 341,
+1. Christen, *A Fibonaccian algorithm for the detection of two elements*, Publ. 341,
    Université de Montréal (1980), and the 1986 SIAM conference presentation “Adaptive versus
-   non-adaptive quantitative detection.”
-4. A Google Scholar cited-by export for Aigner 1986, Aigner's 1988 book, Gargano 1992, and
-   Li--Wu--Triesch 2018, to compare against the 69-work OpenAlex and 106-record Semantic Scholar
-   passes.
+   non-adaptive quantitative detection.” Scholar versions and all 16/3 cited-by results exposed
+   no primary copy. Hwang 1989 now states their relevant asymptotic consequences, but the
+   originals remain necessary before making a claim about everything they contain.
+2. The seven unavailable pages interleaved in Du--Hwang pp. 211--230, plus a full page-by-page
+   Chapter 2 copy if obtainable. The available target subsection and bibliography make this a
+   desirable completeness check, not a reason to hold the paper.
 
 Belokopytov's 1987/1989 papers remain desirable for asymptotic attribution, but the later full
 texts state their consequences precisely enough to show that they do not settle the small finite
@@ -289,5 +351,6 @@ values at issue here.
   independently certifying a construction already implicit in Gargano.
 - It is safe to say that Aigner 1986, not Li--Wu--Triesch 2018, first proves exact `m=4`.
 - For `Sa(65)`, `Sa(112)`, `Sa(192)`, the remaining `m>=6` maxima, and the Aigner-converse
-  counterexample, say “no prior result was located in the audited corpus,” not “first ever,”
-  until the four access-dependent checks above are closed.
+  counterexample, say “no prior result was located in the audited corpus,” not “first ever.”
+  Scholar non-discovery and the partial book inspection narrow the residual risk but never turn
+  database non-discovery into proof of worldwide priority.

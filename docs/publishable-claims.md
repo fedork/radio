@@ -6,8 +6,9 @@ checkers, both witnesses, evidence) that was extracted to a clean directory and 
 end to end - manifest verified, witness verified unconditionally, chain structure verified,
 the Rust checker built from source in 7 s with no dependencies, its selftest passed, and the
 cheap levels audited with zero gaps. What remains before submission is not engineering:
-**(a)** closing the four access-dependent gaps left by the completed public citation-graph audit,
-as briefed question-by-question in [novelty-audit.md](novelty-audit.md), and **(b)** depositing the package publicly
+**(a)** revising the paper with the completed navigable Scholar and Hwang audit,
+as briefed question-by-question in [novelty-audit.md](novelty-audit.md), and **(b)** depositing
+the package publicly
 with a DOI, since `fedork/radio-data` is private and every artifact link in this repo 404s
 for a referee.
 
@@ -31,8 +32,9 @@ certifies achievability, and the audited 2026 boundary pair proves the missing u
 Publication value: this turns the finite computation into an exact correction of the standard
 source, not a first construction. No prior upper proof or explicitly corrected threshold was
 located in the 69-work OpenAlex citation union, 106 Semantic Scholar seed records, 424 broad
-discovery records, or the sources read directly. Keep that scope explicit until the Scholar and
-three inaccessible-source checks are closed.
+discovery records, 264 Scholar rows exposed for the requested cited-by walks, or the sources read
+directly. Keep that scope explicit because Scholar capped the Aigner-book walk and the Christen
+originals remain inaccessible.
 
 ### C1 — `Sa(10)=192` exactly
 
@@ -65,7 +67,8 @@ full `Sb(32:32)@7` tree. It is best presented as the companion dataset and theor
 than as an isolated all-new table.
 
 Before submission: mark prior formulas, the isolated published exact cell, and prior endpoint
-constructions cell-honestly; close the four access gaps; include both local boundary verdicts and
+constructions cell-honestly; incorporate the completed Scholar/Hwang audit; include both local
+boundary verdicts and
 their artifact hashes in supplementary material.
 
 ### C3 — an exact `m=6` boundary, a new upper bound, and failure of the former continuation

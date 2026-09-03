@@ -24,6 +24,22 @@ F. K. Hwang, “A Tale of Two Coins,” *American Mathematical Monthly* 94(2) (1
   frontier.  A short quotation candidate from p. 121 is “immensely more difficult to search
   optimally for two objects.”
 
+### Hwang 1989
+
+F. K. Hwang, “Updating a Tale of Two Coins,” *Annals of the New York Academy of Sciences*
+576 (1989), 259--265.
+[DOI 10.1111/j.1749-6632.1989.tb16406.x](https://doi.org/10.1111/j.1749-6632.1989.tb16406.x).
+
+- The full article was obtained through Oxford access and inspected page by page. Its Model Q
+  on pp. 264--265 is exactly the unrestricted adaptive test model with two distinct irregulars
+  and feedback 0, 1, or 2.
+- Page 265 proves optimality only within the one-pair and two-pair procedure classes. It reports
+  Christen's 1986 factors 7/4, 12/5, 20/6, and 33/7 as recursive constructions, giving the
+  asymptotic upper bound `T_Q(n) <= 1.3877 log_2 n`; it does not claim an exact finite `Sa` or
+  `Sb` maximum.
+- The reference list gives precise bibliographic forms for Christen's 1980 Publication 341 and
+  1986 SIAM presentation, but does not provide a recoverable manuscript or proceedings source.
+
 ### Aigner 1986
 
 M. Aigner, “Search problems on graphs,” *Discrete Applied Mathematics* 14 (1986),
@@ -294,13 +310,10 @@ These are cited by the papers above but have not yet been checked directly here:
   Université de Montréal) and the 1986 SIAM presentation *Adaptive versus non-adaptive
   quantitative detection*. Their later summaries expose only asymptotic consequences, but the
   originals remain a finite-prior-art access gap.
-- F. K. Hwang, “Updating a Tale of Two Coins” (1989), pp. 259--265,
-  [DOI 10.1111/j.1749-6632.1989.tb16406.x](https://doi.org/10.1111/j.1749-6632.1989.tb16406.x).
-  The publisher page was checked, but the article text remains inaccessible.
 - D.-Z. Du and F. K. Hwang, *Combinatorial Group Testing and Its Applications*: its searchable
-  second-edition text was checked on 2026-09-02 and exposed the relevant additive-model summary,
-  but no exact `Sa` or fixed-`m>=6` table. A page-by-page copy remains worth obtaining because
-  snippet-index coverage is not complete; see the
+  second-edition text and available relevant pages were checked on 2026-09-02. Page 220 exposes
+  the sequential two-defective summary and pp. 230--231 its bibliography, but no exact `Sa` or
+  fixed-`m>=6` table. Seven interleaved pages in pp. 211--230 remain unavailable; see the
   [audit record](../evidence/publication_prior_art_2026-09-02.md).
 - A. Ya. Belokopytov and V. N. Luzgin, “Block transmission of information in a summing
   multiple access channel with feedback,” *Problems of Information Transmission* 23(4) (1987),
@@ -316,6 +329,7 @@ These are cited by the papers above but have not yet been checked directly here:
   study of a broader `d=k=2` weight model, which permits a weight-2 coin. It is not a comparison
   bound for this repository's two distinct-defective, worst-case model.
 
-For a defensible priority statement, the page-by-page Du--Hwang and older Christen/Hwang items
-remain worth obtaining. The exact scope and the completed OpenAlex/Semantic Scholar citation
-passes are recorded in the audit linked above.
+For a defensible priority statement, the Christen originals and missing Du--Hwang pages remain
+worth obtaining, but Hwang 1989 and every navigable Scholar cited-by page are now checked. The
+exact scope and the completed OpenAlex/Semantic Scholar/Scholar citation passes are recorded in
+the audit linked above.

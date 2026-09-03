@@ -8,7 +8,8 @@ entries. Last revised 2026-09-02.
 **H1 - Publish.** Get the two-coin quantity group testing results out: the `Sa` sequence
 proven optimal through `k=10`, the `Sb` Pareto frontier proven for `k<=8`, and the foundational
 theorems. **Entry point is [publication-handover.md](publication-handover.md).** As of
-2026-09-02 the blocking work is four access checks and a public deposit, not proving or computing:
+2026-09-02 the remaining external-access submission blocker is a public deposit, not proving or
+computing:
 the certificate is independently verified, the reproduction package is built and validated, and
 the likely headline has shifted from `Sa(10)=192` to the refutation of the converse Aigner
 conjectured after Prop. 3.25. The audit also found that Aigner's exact complete-graph threshold
@@ -17,8 +18,11 @@ seven-test construction for 38, and its full `Sb(32:32)@7` tree implies an eight
 construction for 64. The local 38/39 boundary supplies the exact correction; `Sa(65)` is the
 first complete-graph value beyond the located prior construction. The 69-work OpenAlex citation
 union, 106 Semantic Scholar seed records, 424 broad discovery records, OEIS, indexed
-Chapter 2/Du--Hwang text, and two current nice-graph papers are checked. Scholar and three
-inaccessible source groups remain. The draft in `paper/` is mechanically clean but predates the
+Chapter 2/Du--Hwang text, and two current nice-graph papers are checked. The in-app Scholar pass
+screened 264 displayed citations (227 deduplicated), Hwang 1989 was read in full, and the
+available Du--Hwang target pages were inspected. The Christen 1980/1986 originals and seven
+interleaved Du--Hwang pages remain desirable follow-up rather than submission blockers. The
+draft in `paper/` is mechanically clean but predates the
 counterexample, the `K<=5` converse and the verification architecture, and needs restructuring
 around them; the remaining `<TODO>` sections are P5.
 

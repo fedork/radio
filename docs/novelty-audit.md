@@ -12,8 +12,8 @@ success: it converts a risky claim into a citation and removes it from the paper
 surface before a referee does it for us.
 
 Known-good source map: [literature.md](literature.md) records the primary sources read directly,
-with DOIs and an explicit imported-vs-own ledger. The exhaustive indexed search and its four
-remaining access gaps are recorded in
+with DOIs and an explicit imported-vs-own ledger. The exhaustive indexed and Scholar searches,
+plus the surviving direct-source gaps, are recorded in
 [`publication_prior_art_2026-09-02.md`](../evidence/publication_prior_art_2026-09-02.md).
 
 ---
@@ -41,16 +41,17 @@ queried subset.
 >
 > **OEIS verdict:** the official `oeis/oeisdata` export dated 2026-09-02 contains neither the
 > complete sequence nor any of the long tails ending in `38,65,112,192`. **Du--Hwang verdict,
-> scoped:** searchable second-edition text exposes the relevant additive-model summary but no
-> `Sa` table or matching sequence. A page-by-page copy is still wanted. Commands, source links,
-> exact scope and limitations are retained in
+> scoped:** the accessible relevant pages, including the target sequential subsection on p. 220
+> and bibliography on pp. 230--231, expose the known asymptotic chain but no `Sa` table or
+> matching sequence. Seven interleaved pages remain unavailable. Commands, source links, exact
+> scope and limitations are retained in
 > [the prior-art search record](../evidence/publication_prior_art_2026-09-02.md).
 >
 > **Citation-corpus verdict:** all 69 unique OpenAlex forward citations to eight seed works,
-> 106 Semantic Scholar seed-citation records before cross-seed deduplication, and 424 broad
-> OpenAlex discovery records were screened. The same-model candidates were checked in primary
-> text; none states 65, 112 or 192, or supplies the 38 upper boundary. **Still to do:** a Google
-> Scholar export for independent coverage, plus the three inaccessible source groups listed below.
+> 106 Semantic Scholar seed-citation records before cross-seed deduplication, 424 broad OpenAlex
+> discovery records, and all 264 Google Scholar rows exposed for the four requested cited-by
+> walks (227 after normalized-title deduplication) were screened. The same-model candidates were
+> checked in primary text; none states 65, 112 or 192, or supplies the 38 upper boundary.
 
 1. **OEIS — checked 2026-09-02.** Exact searches of the dated official Git export found no
    match. Repeat before submission if the audit remains open long enough for the export to change.
@@ -59,10 +60,12 @@ queried subset.
 3. **Gargano et al. 1992 — checked 2026-09-02.** The paper publishes the finite constructions
    that imply 38 in seven tests and 64 in eight; it does not state the corrected `Sa` threshold.
 4. **Du & Hwang, *Combinatorial Group Testing and Its Applications*, 2nd ed. (World
-   Scientific, 2000) — searchable preview checked 2026-09-02.** No exact sequence was located;
-   retain the full-book pass as a coverage check.
-5. **Forward citations — public API pass complete.** OpenAlex and Semantic Scholar seed sets
-   are screened. A Google Scholar export remains useful because database coverage differs.
+   Scientific, 2000) — relevant available pages checked 2026-09-02.** No exact sequence was
+   located; retain the seven missing pages as a lower-priority coverage check.
+5. **Forward citations — public API and Scholar passes complete.** OpenAlex and Semantic
+   Scholar seed sets are screened. Scholar exposed 54 Aigner-1986, 180 Aigner-book, and 30
+   Gargano cited-by rows; Li--Wu--Triesch exposed no cited-by link. Its approximate Aigner-book
+   count was larger than its navigable result set, so this remains a database-bounded conclusion.
 
 **What each answer changes.**
 
@@ -71,7 +74,7 @@ queried subset.
 | the sequence later enters OEIS with references | follow them; likely resolves Q1 and Q3 both |
 | a later source already constructs 38 | **found:** cite Gargano; the local result remains the exact upper correction and an independent certificate |
 | published through `k = 9` (i.e. 112 is known) | only `Sa(10) = 192` is ours. The paper's computational claim narrows to one value plus the certified method — this is the most likely outcome and is fine |
-| no source reaches 65 or above | current corpus result: the locally new finite tail begins at the one-step improvement 64 to 65, subject to the remaining access gaps |
+| no source reaches 65 or above | current corpus result: the locally new finite tail begins at the one-step improvement 64 to 65; keep the claim corpus-scoped because direct-source gaps remain |
 | `Sa(10) = 192` already published | the computational headline is gone. The counterexample (Q2) becomes the paper, and the verification architecture becomes the methodological contribution |
 
 ---
@@ -112,9 +115,9 @@ queried subset.
 > **The wider citation pass is now complete for the public APIs.** The 69-work deduplicated
 > OpenAlex union and 106 Semantic Scholar seed records for eight core sources were screened;
 > neither exposes a resolution. The ACM list remains demonstrably incomplete because
-> Li--Wu--Triesch 2018 cite Aigner and do not appear in it. A Google Scholar export remains an
-> independent-coverage check, not a substitute for the completed public citation graph.
-> **Still to do:** that export and broader nice-graph literature, where the equivalent statement
+> Li--Wu--Triesch 2018 cite Aigner and do not appear in it. The independent Google Scholar pass
+> is now complete for all navigable cited-by pages and likewise exposes no resolution.
+> **Still to do:** broader nice-graph literature, where the equivalent statement
 > is that `Q_6` is not nice. Note the neighbourhood is currently active -
 > the Stanley--Gasharov conjecture (every claw-free graph is Schur-positive) was disproved in
 > 2024-25 by Prajapati and independently by Matherne--Morales, with infinite counterexample
@@ -194,9 +197,10 @@ restates as open the converse of Prop. 3.25.
 >   `Sb(14:9)@5` and `Sb(21:17)@6`. The last two hit locally maximal endpoints but do not prove
 >   the neighboring negative, hence do not by themselves publish those frontier maxima.
 >
-> **Corpus verdict:** no further fixed-`m>=6` maximum was exposed by the complete public-API
-> citation/discovery pass or searchable Du--Hwang text. **Still to do:** page-by-page Du--Hwang,
-> Hwang 1989, Christen 1980/1986, and a Scholar export.
+> **Corpus verdict:** no further fixed-`m>=6` maximum was exposed by the complete public-API and
+> navigable Scholar citation passes, the available Du--Hwang target pages, or Hwang 1989.
+> Hwang's exact-count Model Q section gives asymptotic constructions and restricted-class optima,
+> not finite maxima. The Christen 1980/1986 originals and seven Du--Hwang pages remain unavailable.
 
 **The claim.** `n(k,m)` complete and proven maximal for `k = 1..8`, 130 cells
 (`data/pareto_sb.csv`, evidence in `evidence/pareto_certification_k1_8.txt`).
@@ -209,9 +213,9 @@ specific**, not simply “all `m>=6` are ours.”
 
 **What to find.** Any published table or theorem giving `n(k,m)` for `m >= 6`.
 
-**Where still to look:** the page-by-page Du--Hwang book; Christen's Fibonaccian search report
-and 1986 talk; Hwang 1989; and a Google Scholar export. The public citation databases and the
-backward bibliographies of the modern same-model papers are already exhausted.
+**Where still to look:** Christen's Fibonaccian search report and 1986 talk, plus the seven
+unavailable Du--Hwang pages if obtainable. Hwang 1989, the navigable Scholar pages, the public
+citation databases, and the backward bibliographies of the modern same-model papers are checked.
 
 **Consequence.** Whatever is found converts cells from "ours" to "cited" in the same ledger
 format `literature.md` already uses. Low risk either way, but it must be done cell-honestly —

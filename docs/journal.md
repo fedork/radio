@@ -13098,3 +13098,55 @@ report and 1986 talk; and a Google Scholar cited-by export for the core seeds. T
 reported no available session, so the Scholar check could not be run. Exact queries, source links,
 counts, model exclusions, and the cell-by-cell publication ledger are in
 `evidence/publication_prior_art_2026-09-02.md`.
+
+## 2026-09-02 -- Scholar and Hwang close the publication-access audit
+
+The in-app browser became available and its signed Google Scholar session was used to exhaust
+every cited-by page Scholar exposed for the four requested seeds. Aigner 1986 returned 54 rows
+over six pages; Aigner's 1988 book returned 180 rows over eighteen pages; Gargano 1992 returned
+30 rows over three pages; Li--Wu--Triesch 2018 exposed no cited-by link. The Aigner-book walk
+stopped at an empty nineteenth page despite an approximate count near 350, so the result is
+accurately described as exhaustive over navigable Scholar pages, not over the opaque approximate
+total. The 264 displayed rows reduce to 227 normalized-title records. Every title was screened,
+and the complete deduplicated title/bibliographic-line/source-page manifest is committed as
+`evidence/google_scholar_cited_by_2026-09-02.tsv`.
+
+Possibly relevant Scholar hits were checked against the primary texts already gathered in the
+audit. The one newly inspected ambiguity, Damaschke 1994, defines a binary test for a single
+defective edge and is outside the exact-count model. The same-model candidates return to Aigner,
+Hao, Gargano, Christen 1994, Hwang--Lee, Jiang--Polyanskii--Vorobyev, Florin--Ho--Jiang, and the
+feedback-coding papers already classified. No Scholar hit added an exact finite `Sa` or `Sb`
+maximum or a construction beyond the ones already credited.
+
+Exact Scholar records were also followed for Christen's 1980 Publication 341 and 1986 SIAM talk.
+All sixteen cited-by results for the report and all three for the talk were screened. No report,
+abstract, program entry, manuscript, or proceedings copy appeared; the talk's three citations are
+Hwang 1989, Gargano 1992, and Christen 1994. These originals remain unavailable, but the search
+trail now distinguishes non-discovery from proof of nonexistence.
+
+The user obtained Hwang's “Updating a Tale of Two Coins” through Oxford. The seven-page PDF,
+retained outside the repository, has SHA-256
+`f2a6bc3359266635d8d3be8f917fc3f5639bc34a5dd57f7bd30655375a8e9d4f`. Its Model Q on pp. 264--265
+is exactly unrestricted adaptive testing with two distinct irregulars and 0/1/2 feedback. Page
+265 calls the halving and Fibonaccian procedures best only inside one-pair and two-pair classes,
+then reports Christen's 1986 factor-7/12/20/33 recursive constructions and the asymptotic upper
+bound `T_Q(n) <= 1.3877 log_2 n`. It contains no exact finite `Sa`/`Sb` frontier; constructions
+and restricted-class optima are now recorded separately from proved global maxima.
+
+World Scientific's full-book reader for Du--Hwang DOI `10.1142/4252` required an entitlement;
+its UK federation did not offer a usable Oxford entry and its US InCommon list omitted Las
+Positas. Google Books nevertheless exposed pp. 211, 214, 217--218, 220, 222--224, and 226--231.
+The target sequential `(2,n)` subsection on p. 220 gives the known Christen--Hao--Gargano
+asymptotic chain and no finite table; the bibliography on pp. 230--231 points back to the same
+sources. Seven interleaved pages remain missing. Because the directly relevant subsection is in
+hand, this is now a residual completeness check rather than a submission blocker.
+
+The access audit therefore closes two of its four former tasks and substantially narrows a third.
+Only the Christen originals and seven Du--Hwang pages remain as direct-source follow-up. The
+public DOI and revision of the paper's corpus-scoped priority language are the actual submission
+blockers. Database non-discovery is not promoted to an unqualified “first ever” claim.
+
+After the documentation update, `tools/check_tables.py`,
+`tools/check_witness.py witnesses/*.tree`, and `tools/check_docs.py` all passed. The witness check
+again reported only the two already-labeled arbitrary-majorization files as structurally sound
+with unsupported terminals; every unconditional witness passed.
