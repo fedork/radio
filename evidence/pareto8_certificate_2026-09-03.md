@@ -85,8 +85,8 @@ the release should carry the audit logs for every level.
 | k=2 | 9 | 1 | 9 | **0** | |
 | k=3 | 633 | 9 | 633 | **0** | |
 | k=4 | 842,545 | 633 | 842,545 | **0** | 1.787e9 cells, 17.2 s |
-| k=5 | 7,845,253 | 842,545 | *not yet run* | **0** in first 7,786 | see cost below |
-| k=6 | 2,520,118 | 7,845,253 | 2,521 sampled | **0** | uniform 1/1000, see below |
+| k=5 | 7,845,253 | 842,545 | *running on AWS* | **0** in first 7,786 | see cost below |
+| k=6 | 2,520,118 | 7,845,253 | 2,520,118 | **0** | build 362.7 s, audit 886.4 s, 92.6e9 cells |
 | k=7 | 6,852 | 2,520,118 | 6,852 | **0** | build 83.2 s, audit 0.41 s |
 | **k=8** | **54** | 6,852 | **54** | **0** | `dead_options=148018/148018` |
 
@@ -105,21 +105,21 @@ split of *every* root is discharged by the `k=7` support. The `k<=4` block close
 `k=3` facts. `k=7` closes against `k=6`. So `out_k8.txt` is genuinely closed wherever it has been
 checked, and no gap or contradiction has appeared anywhere.
 
-Two levels remain: `k=5` and `k=6`. Verifying them is what upgrades the chain from "top and bottom
-verified" to a complete induction. Of the two, only `k=5` is expensive.
+Only `k=5` remains, and it is the one expensive level.
 
-### `k=6` is cheap, and its sample is clean
+### `k=6` closed locally, complete and clean
 
-A uniform 1/1000 claim sample against the complete `k=5` support:
+A uniform 1/1000 sample first (2,478 claims/s, 0 gaps), then the whole level:
 
 ```
-BUILD  k=6 facts=7845253 redundant=2188688 closure_tuples=80764271 closure_nodes=103644156 wall_s=378.889
-RESULT_LEVEL k=6 completed=2521 verified=2521 gaps=0 contradicted=0 cells=90654153 wall_s=1.017 rate=2478/s
+BUILD  k=6 facts=7845253 redundant=2188688 closure_tuples=80764271 closure_nodes=103644156 wall_s=362.696
+RESULT_LEVEL k=6 completed=2520118 verified=2520118 gaps=0 contradicted=0 cells=92620060382 wall_s=886.413 rate=2843/s
 ```
 
-2,478 claims/s, so the full level projects to 379 s of support build plus ~1,017 s of audit — about
-**23 minutes at 10 threads**, peak RSS 3.50 GB. 2,188,688 of the 7,845,253 `k=5` support facts are
-discarded as redundant at load. Zero gaps on the sample.
+**All 2,520,118 claims verified, zero gaps**, in 362.7 s of support build plus 886.4 s of audit at
+10 threads, peak RSS 3.50 GB. 2,188,688 of the 7,845,253 `k=5` support facts are discarded as
+redundant at load, which is why a level with three times `k=5`'s support is a hundred times
+cheaper per claim.
 
 ### `k=5` is the cost centre
 
@@ -174,9 +174,35 @@ A `target_k=3` sweep over `m=1,…,10,15,20,30,40,55` under a 120 CPU-second per
   (`Sb(56:55)`) under a separate 900-second cap, `REACH: 1759897 tested, 962372 pruned`
 - hit the cap, therefore **unknown**: `m=7,9,10,15,20,30,40`
 
-A CPU cap is not evidence of absence, any more than `out of nodes` is. So `K=8` canonical coverage
-stops at `m=5` with three proved holes above it and seven undecided cells. This mirrors `K=9`,
-where trees exist only for `m=4,5,6`.
+A CPU cap is not evidence of absence, any more than `out of nodes` is. So canonical coverage stops
+at `m=5` with three proved holes above it, mirroring `K=9` where trees exist only for `m=4,5,6`.
+
+### Domination closes the other fifty cells, with no solver run
+
+The numbered format needs no `G_k` leaf. It discharges a child with `(line M)` whenever line M's
+state **dominates** it after unit-group deletion — Subgraph Monotonicity plus Unit-Group
+Elimination — and that is how a solver log already carries the evidence. Most children are never
+logged in their own right because something already logged embeds them: `Sb(109:2)@7` appears
+nowhere in `out_k8.txt` while `Sb(109:5)@7` does, and `109<=109, 2<=5`.
+
+`tools/log_to_numbered_tree.py` exploits exactly that, resolving each child as (1) trivial when
+unit-only, (2) an exact logged positive, or (3) a logged positive that dominates it. Run over
+`out_k8.txt` for the fifty cells `m=6..55`:
+
+```
+indexed 184649 distinct logged positives (0 child-mismatch lines rejected)
+built 50, gaps 0
+```
+
+Every cell resolved, in **87–183 lines** each, and `tools/check_witness.py` verifies all fifty
+unconditionally. **No solver fill-in was needed.** The tool re-derives split semantics from
+`docs/problem.md` rather than importing them from the checker, so running the checker afterwards is
+a genuine cross-check; as a second guard it compares every derived child triple against the child
+states the solver printed on the same line, and all 184,649 logged positives agreed.
+
+The `K=8` frontier therefore has an unconditional achievability witness for **every** cell
+`m=1..55`, and the standing lesson is: when a positive looks absent from a log, check domination
+before starting a solver.
 
 Because `Sb(256:1)@8` now has a tree, the `8,1,256` row's note in `data/pareto_sb.csv` was changed
 in place from "achievability logged in out_k8.txt" to cite the witness instead.
@@ -189,21 +215,23 @@ in place from "achievability logged in out_k8.txt" to cite the witness instead.
    exist as a thing: trees are checked by `tools/check_witness.py`, a separate Python checker with
    its own trust base. Making the cleanroom cover both sides means adding a `tree` subcommand — the
    `G_k`/`U_k` terminal logic it would need is already in `src/gk.rs`.
-2. **The log route to trees is broken end to end.** `tools/extract_witness_tree.py` renders
-   `- #N <state> in k: <status>` plus `source:` lines. `tools/check_witness.py` auto-detects only
-   the canonical (`<state> @k --[split]-->`) and `radio_print` numbered (`N. (in k) (used r)`)
-   formats, so its output is verifiable by nothing. Even if it parsed, such a tree bottoms out on
-   arbitrary logged states rather than unconditional `[canonical U_k]` / `[embedded G_k]`
-   terminals, so it would not be a certificate. Either teach it to emit the numbered format — its
-   `see node #N` back-references are already close to `(line M)` semantics — or accept canonical
-   search as the only tree source and say so in the tool's docstring.
-3. **`k=5` of the chain is unverified** — a ~853 thread-hour job, the single remaining obstacle to a
-   complete induction. `k=6` is a ~23-minute local job and its 1/1000 sample is already clean.
-4. **Seven `K=8` frontier cells have no achievability witness and no refutation of one**
-   (`m=7,9,10,15,20,30,40`), plus three proved holes at `m=6,8,55`.
-5. **No provenanced raw `K=8` log exists.** `out_k8.txt` cannot be archived under the current rule.
+2. **`tools/extract_witness_tree.py` output is verifiable by nothing** — it renders a third format
+   (`- #N <state> in k: <status>` plus `source:` lines) that `check_witness.py` does not parse.
+   Its docstring now says so and points at `tools/log_to_numbered_tree.py`. Navigation tool, not
+   evidence.
+3. **`k=5` of the chain is unverified** — running on AWS as of this record
+   (`tools/cleanroom_ec2_status.sh`, run `20260903T163559Z`, `c8a.24xlarge`, ~10.4 h projected,
+   zero gaps through the first 108,420 claims). It is the single remaining obstacle to a complete
+   induction; every other level is closed.
+4. **No provenanced raw `K=8` log exists.** `out_k8.txt` cannot be archived under the current rule.
    The certificate can be, and is the more useful artifact, but a clean re-run is the only way to
    get an archivable raw log.
+5. **`radio_print.c` cannot use domination through the cache.** Given the positives-only cache it
+   reported `found no solutions` for `Sb(225:6)@8`, because its `CACHE_ONLY` child check wants an
+   exact cached positive and `Sb(109:2)@7` is only present by embedding in `Sb(109:5)@7`. Its own
+   `is_inferior` does domination between *lines*, but not against the cache. Its bounds are now
+   `-D` overridable and it takes an Sb target (`<cache> k n1 m`), so the remaining gap is the
+   cache lookup itself; `tools/log_to_numbered_tree.py` sidesteps it entirely.
 
 ## Sizing a clean `K=8` solver re-run, for comparison
 

@@ -19,6 +19,7 @@ tools/check_witness.py witnesses/*.tree
 | `canon_248_3_at8.tree` | `Sb(248:3)` solvable in 8 | proof |
 | `canon_242_4_at8.tree` | `Sb(242:4)` solvable in 8 | proof |
 | `canon_231_5_at8.tree` | `Sb(231:5)` solvable in 8 | proof |
+| `numbered_*_at8.tree` (50 files) | the `K=8` frontier maxima `m=6..55`, `Sb(225:6)` … `Sb(56:55)`, solvable in 8 | proof |
 | `canon_496_4_at9.tree` | `Sb(496:4)` solvable in 9 | proof |
 | `canon_480_5_at9.tree` | `Sb(480:5)` solvable in 9 | proof |
 | `canon_480_5_at9_twosided.tree` | `Sb(480:5)` solvable in 9 with two-sided splits | proof |
@@ -32,16 +33,24 @@ tools/check_witness.py witnesses/*.tree
 Each unconditional tree by itself proves *achievability*.  Maximality, where known, comes from a
 separate upper-bound theorem or exhaustive rejection.
 
-The five `at8` trees are exactly the `K=8` Pareto frontier maxima for `m=1..5`
-(`data/pareto_sb.csv` rows `8,1,256` through `8,5,231`), so the achievability half of those five
-cells now rests on an unconditional witness rather than on a solver log line.  Coverage stops
-there.  A `target_k=3` sweep on 2026-09-03 gave genuine `NO_CANONICAL_TREE` exhaustions at
-`m=6` and `m=8` under a 120 CPU-second cap, and at `m=55` under a separate 900-second cap.
-Those three are real absences at this stopping depth.  The cells `m=7,9,10,15,20,30,40` only
-hit the 120-second cap and are therefore **unknown**, not refuted — a cap is not evidence of
-absence, exactly as `out of nodes` is not.  So `K=8` canonical coverage stops at `m=5` with
-three known holes above it, which mirrors `K=9`, where trees exist only for `m=4,5,6`.
-Extending coverage means a deeper `target_k` at much greater cost, not simply more time.
+**The `K=8` Pareto frontier is completely covered**: every cell `m=1..55` of
+`data/pareto_sb.csv` has an unconditional achievability witness here, in two formats for two
+different reasons.
+
+`m=1..5` are `canon_*_at8.tree`, canonical trees with `[canonical U_k]` leaves — the strongest
+form, self-contained in Aigner's explicit `G_k` strategy. Canonical search stops there and not
+for want of budget: a `target_k=3` sweep on 2026-09-03 gave genuine `NO_CANONICAL_TREE`
+exhaustions at `m=6` and `m=8` under a 120 CPU-second cap and at `m=55` under 900 seconds, with
+`m=7,9,10,15,20,30,40` merely hitting the cap (unknown, not refuted — a cap is no more evidence
+of absence than `out of nothing` nodes).
+
+`m=6..55` are `numbered_*_at8.tree`, built by `tools/log_to_numbered_tree.py` straight out of
+`out_k8.txt`. These need no `G_k` leaf: the numbered format discharges a child with `(line M)`
+whenever line M's state **dominates** it after unit-group deletion, so the log's own positives
+suffice. That is the whole trick, and it is why near-diagonal cells that defeat canonical search
+fall out in 87–183 lines: most children were never logged in their own right because something
+already logged embeds them. `Sb(109:2)@7` appears nowhere in `out_k8.txt`, while `Sb(109:5)@7`
+does, and `109<=109, 2<=5`. All fifty resolved with zero gaps — no solver fill-in was needed.
 
 A tree is tied to the tool version that produced it. `canon_248_3_at8.tree` was generated
 before `radio_canon_search_generic.c` changed on 2026-04-16, and rerunning that command
@@ -82,8 +91,9 @@ only be weakly majorized by `G_k`.  The checker verifies that prefix condition, 
 majorization is not sufficient.  Trees using this broader stopping rule—including the compact 481
 and 973 files—are therefore unsupported diagnostic derivations, not self-contained proofs.
 
-**Numbered** - produced by `radio_print.c`. Each distinct state gets a line number and is
-proved once:
+**Numbered** - produced by `radio_print.c` (solver-driven, from a loaded cache) or by
+`tools/log_to_numbered_tree.py` (from a raw log's `can solve ... with [...]` lines). Each
+distinct state gets a line number and is proved once:
 
 ```
 1. (in 10) (used 0) Sa(192)[18336,192] take[112]:

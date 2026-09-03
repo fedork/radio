@@ -293,9 +293,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   text now supplies the matching `Sa` definition and Figure 2.13, while a full Chapter 2 copy
   remains unobtained. See
   [aigner-1988-scan.md](aigner-1988-scan.md).
-- **22 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
-  the five `K=8` frontier maxima `Sb(256:1)@8`, `Sb(255:2)@8`, `Sb(248:3)@8`, `Sb(242:4)@8` and
-  `Sb(231:5)@8`, then `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
+- **72 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, the **complete `K=8`
+  `Sb` Pareto frontier** (all 55 cells `m=1..55`: canonical trees for `m=1..5`, numbered
+  domination trees for `m=6..55`), then `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
   `Sb(473:6)@9`, their two-sided variants where available, and the unsupported
   singleton-majorized derivation for `Sb(973:6)@10`, plus the exact three-level atomization of
   the decisive `m=5` majorized leaf at `P_7`. All pass structural checking; the two
@@ -1109,19 +1109,21 @@ exactly `Sb(57:55) … Sb(256:2)`, one per `m=2..55`, each `n1+1` for the matchi
 `proven-exhaustive` row of `data/pareto_sb.csv`. `tools/log_to_v1_cert.sh` reduces it to a v1
 certificate of 11,215,465 claims (443,851,829 bytes).
 
-Cleanroom results so far, all **zero gaps, zero contradictions**: `k=1..4` complete (843,188
-claims, closing on only 633 `k=3` facts), `k=7` complete (6,852 claims), and the load-bearing
-`k=8` level complete — all **54** frontier refutations verified with
-`dead_options=148018/148018`, so every legal first split of every root is discharged. `k=6` is
-clean on a uniform 1/1000 sample. The `k=8` level certificate is committed as
+Cleanroom results, all **zero gaps, zero contradictions**: `k=1..4` complete (843,188 claims,
+closing on only 633 `k=3` facts), `k=6` complete (2,520,118 claims), `k=7` complete (6,852
+claims), and the load-bearing `k=8` level complete — all **54** frontier refutations verified
+with `dead_options=148018/148018`, so every legal first split of every root is discharged.
+Only `k=5` is outstanding; it is running on AWS (`tools/cleanroom_ec2_status.sh`, run
+`20260903T163559Z`, `c8a.24xlarge`) as a single flat-certificate audit that must report
+`TOTAL verified 11215465, gaps 0`. The `k=8` level certificate is committed as
 [`../evidence/pareto8_level8_2026-09-03.cert`](../evidence/pareto8_level8_2026-09-03.cert), so the
 frontier refutations re-check from the repository alone in under a second.
 
 **`k=5` is the only expensive level and the only thing still missing.** It runs at 25.51 claims/s
 (~853 thread-hours; 3.6 days wall at 10 threads) because 6.9M of its 7.85M claims have 6–8 parts,
-giving 2.66M cells per claim against 2,121 at `k=4`. `k=6` by contrast is ~23 minutes locally. Ship
-`k=5` to a `c8a` host with `tools/cleanroom_ec2_launch.sh`, which already smoke-tests the heaviest
-level at `--stride 5000` first; `--stride`/`--offset` also shards it across hosts.
+giving 2.66M cells per claim against 2,121 at `k=4`. `k=6`, with three times the support, closed
+in 21 minutes locally. `tools/cleanroom_ec2_launch.sh --flat-cert FILE.cert.zst --expect-claims N`
+ships the whole certificate to a `c8a` host; `--stride`/`--offset` also shards `k=5` across hosts.
 
 Two things not to re-derive. **Do not re-run the `K=8` solver for this**: the `k=8` verdict lines in
 `out_k8.txt` sum to 950,852 CPU s = 11.01 days, 2.3x the entire `Sa(193)` cold run9, because it is a
@@ -1135,10 +1137,16 @@ evidence — but that does not weaken the certificate, since the cleanroom share
 re-derives every split from the four theorems. Wanting an archivable *raw* log is the only honest
 reason for the 11-day re-run.
 
-On the positive side, `Sb(256:1)`, `Sb(255:2)`, `Sb(248:3)`, `Sb(242:4)` and `Sb(231:5)` at `k=8`
-have unconditional canonical trees in `witnesses/`. Coverage stops at `m=5`: `m=6`, `m=8` and
-`m=55` give genuine `NO_CANONICAL_TREE` exhaustions, and `m=7,9,10,15,20,30,40` are undecided
-(CPU cap, which is not evidence of absence).
+On the positive side the frontier is now **completely covered**: all 55 cells `m=1..55` have an
+unconditional witness in `witnesses/`. `m=1..5` are canonical (`[canonical U_k]` leaves);
+canonical search genuinely exhausts at `m=6`, `m=8` and `m=55` and merely hits the CPU cap at
+`m=7,9,10,15,20,30,40`. `m=6..55` are instead **numbered domination trees** built by
+`tools/log_to_numbered_tree.py` from `out_k8.txt`: the numbered format discharges a child with
+`(line M)` whenever line M's state dominates it after unit-group deletion, so no `G_k` leaf is
+needed and the log's own positives suffice. All fifty resolved with zero gaps in 87–183 lines,
+because most children were never logged in their own right — something already logged embeds
+them. This is the general lesson: **when a positive looks absent from a log, check domination
+before running a solver.**
 
 ## The Sa(193) certificate
 

@@ -1,6 +1,20 @@
+/* Emits `numbered`-format witness trees (see witnesses/README.md), the only log/cache-driven
+   tree form tools/check_witness.py can verify: each distinct state gets a line, and a child is
+   discharged by `(line M)` whenever line M's state dominates it after unit-group deletion.
+   That domination reuse is what keeps a k=10 tree at ~150 lines.
+
+   The bounds below are -D overridable so one source can serve Sa(38)@7 and the K=8 Sb frontier.
+   MAX_LEN bounds parts per state and must exceed the widest state reached: splits can double the
+   part count at every level, so a deep Sb target needs far more than the Sa(38) default. */
+#ifndef MAX_K
 #define MAX_K 7
+#endif
+#ifndef MAX_N
 #define MAX_N 40
+#endif
+#ifndef START_N
 #define START_N 38
+#endif
 
 #include "radiobase.c"
 #include <math.h>
@@ -9,7 +23,12 @@
 #define NEW_LINE -2
 
 #define MAX_SOLUTIONS 10
+#ifndef MAX_LEN
 #define MAX_LEN 40
+#endif
+#ifndef MAX_LINES
+#define MAX_LINES 500
+#endif
 
 typedef struct {
     int k;
@@ -21,7 +40,7 @@ typedef struct {
     int l[3];
 } sol;
 
-sol solutions[500];
+sol solutions[MAX_LINES];
 int next_sol = 1;
 
 int normalize(int sb[], int size, int dest[]) {
@@ -60,11 +79,33 @@ int main(int argc, char **argv){
     //    int k = 9;
     //    int size = 1;
     
+    /* Target selection. With no extra arguments this keeps the historical behaviour, an
+       Sa(START_N) tree at MAX_K. `<cache> k n1 m` instead roots the tree at Sb(n1:m)@k, which
+       is what the K=8 Pareto frontier cells need. */
     sol *s = &solutions[next_sol++];
-    s->k = MAX_K;
-    s->refs=0;
-    s->size = -1;
-    s->init[0] = START_N;
+    s->refs = 0;
+    if (argc > 4) {
+        int tk = atoi(argv[2]);
+        int tn1 = atoi(argv[3]);
+        int tm = atoi(argv[4]);
+        if (tk < 1 || tk > MAX_K) {
+            fprintf(stderr, "k must be in 1..%d (compiled MAX_K)\n", MAX_K);
+            return 2;
+        }
+        if (tn1 < 1 || tm < 1 || tn1 + tm > MAX_N) {
+            fprintf(stderr, "n1+m must be in 2..%d (compiled MAX_N)\n", MAX_N);
+            return 2;
+        }
+        s->k = tk;
+        s->size = 1;
+        s->init[0] = getSbb(tn1, tm);
+        printf("target Sb(%d:%d) in %d\n", tn1, tm, tk);
+        fflush(stdout);
+    } else {
+        s->k = MAX_K;
+        s->size = -1;
+        s->init[0] = START_N;
+    }
     
     int next_level_start;
     

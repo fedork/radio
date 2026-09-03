@@ -13420,3 +13420,65 @@ end to end**: `tools/extract_witness_tree.py` renders `- #N <state> in k: <statu
 lines, a third format `check_witness.py` cannot parse, and such trees would bottom out on arbitrary
 logged states rather than unconditional terminals even if it could. Canonical search is the only
 tree source today; the extractor's docstring should say so.
+
+## 2026-09-03 -- The whole K=8 frontier gets witnesses via domination, and k=5 goes to AWS
+
+Two follow-ups to the certificate entry above: run every audit, and get trees for the cells
+canonical search could not reach. Both done; the tree half needed no solver time at all.
+
+**Domination was the answer, and it was already in the log.** The insight is that the `numbered`
+witness format needs no `G_k` leaf rule. It discharges a child with `(line M)` whenever line M's
+state dominates it after unit-group deletion -- Subgraph Monotonicity plus Unit-Group Elimination
+-- and that is precisely how a solver log carries positive evidence. Most children never appear in
+their own right because something already logged embeds them: `Sb(109:2)@7` occurs nowhere in
+`out_k8.txt`, while `Sb(109:5)@7` does, and `109<=109, 2<=5`.
+
+`tools/log_to_numbered_tree.py` resolves each child as trivial (unit-only), an exact logged
+positive, or a logged positive that dominates it. One pass over `out_k8.txt` indexed 184,649
+distinct positives and built all fifty frontier cells `m=6..55`: `built 50, gaps 0`, 87-183 lines
+each, every one verified unconditionally by `tools/check_witness.py`. So the `K=8` `Sb` Pareto
+frontier now has an unconditional achievability witness for **every** cell `m=1..55` -- canonical
+`[canonical U_k]` trees for `m=1..5`, numbered domination trees above. `witnesses/` holds 72 trees,
+70 unconditional plus the two known `majorized_*` diagnostics.
+
+The generator deliberately re-derives split semantics from `docs/problem.md` instead of importing
+them from `check_witness.py`, so running the checker afterwards is a real cross-check rather than a
+tautology. As a second guard it compares every derived child triple against the children the solver
+printed on the same line: all 184,649 logged positives agreed, zero mismatches. That agreement is
+worth more than the trees themselves -- it independently confirms the split semantics implemented
+in `radiobase.c` against a from-scratch reading of the problem statement.
+
+**`radio_print.c` was the wrong tool and now says why.** It is the historical numbered-format
+generator, so it was tried first: bounds made `-D` overridable, `#ifndef` guards added, and an Sb
+target accepted as `<cache> k n1 m`. Two failures followed. Loading the full 503 MB distilled cache
+never finished in ten minutes, because 11.2M negatives each go through exact upward-closure
+insertion; only the 184,649 positives matter for a positive tree, and that cache loads instantly.
+Then with positives only it reported `found no solutions for Sb(225:6)` -- its `CACHE_ONLY` child
+test demands an exact cached positive, and `Sb(109:2)@7` exists only by embedding. Its own
+`is_inferior` does domination between emitted lines but not against the cache. The improvements are
+kept because they are real, but the working path is the Python tool.
+
+**Every audit is now run or running, all zero gaps.** `k=6` closed locally: all 2,520,118 claims
+verified, 362.7 s support build plus 886.4 s audit at 10 threads, 92.6e9 cells, 3.50 GB peak RSS.
+With three times `k=5`'s support it is a hundred times cheaper per claim, because 2,188,688 of the
+7,845,253 `k=5` facts are discarded as redundant at load.
+
+`k=5` -- the only expensive level -- is on AWS: instance `i-0f000d13c1fe92cf1`, on-demand
+`c8a.24xlarge` (96 vCPU), run `20260903T163559Z`, 20 h hard stop, auditing the flat certificate so
+the run must report `TOTAL verified 11215465, gaps 0`. Early numbers: `k=4` finished in 2.201 s
+against 17.243 s locally (7.8x, identical 1,787,253,880 cells, so the work is deterministic and only
+the thread count changed), and `k=5` is running at ~206 claims/s for a ~10.4 h projection, zero gaps
+through the first 108,420. Read it with `tools/cleanroom_ec2_status.sh`.
+
+Getting there needed a pipeline change. `tools/cleanroom_ec2_{launch,remote}.sh` only knew
+`sa193-k$k.cert.zst` against a released manifest, so `--flat-cert` was added rather than
+duplicating 350 lines of AWS plumbing for a second certificate; defaults are untouched and the
+sa193 path is unchanged. Two latent bugs surfaced while doing it: the provenance block `sed`s
+`MANIFEST.sha256` unconditionally, which under `set -e` would have aborted a flat run outright, and
+the totals gate would have accepted any gap-free flat result without accounting for every claim
+(hence `--expect-claims`). `--hard-stop` replaces a hardcoded 12h shutdown that would have killed
+`k=5` mid-audit on the launcher's own default instance type.
+
+Cost note for planning: nothing here required re-solving anything. The trees came out of an existing
+log and the audits out of an existing certificate. The 11.01 CPU-day `K=8` re-run remains
+unnecessary except to obtain an archivable *provenanced* raw log, which `out_k8.txt` is not.

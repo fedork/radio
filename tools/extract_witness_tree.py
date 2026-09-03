@@ -17,14 +17,17 @@ therefore expanded from logged evidence instead of being accepted as a terminal.
 
 WHAT THIS IS NOT (measured 2026-09-03).  Its rendered output is a *third* format --
 `- #N <state> in k: <status>` with `source:` lines -- and `tools/check_witness.py` auto-detects
-only the canonical (`<state> @k --[split]-->`) and `radio_print` numbered (`N. (in k) (used r)`)
-forms.  So nothing in the repo can verify what this script prints.  Worse, a log-derived tree
-bottoms out on arbitrary logged states rather than on unconditional `[canonical U_k]` /
-`[embedded G_k]` terminals, so it would not be a certificate even if it parsed.  Use this to
-*navigate* a log and see why the solver believed a state was solvable; to obtain a checkable
-proof run `radio_canon_search_generic` and convert with `tools/canon_out_to_tree.py`.  Emitting
-the numbered format from here would close the gap -- the `see node #N` back-references are
-already close to `(line M)` semantics -- and is not done yet.
+only the canonical (`<state> @k --[split]-->`) and numbered (`N. (in k) (used r)`) forms.  So
+nothing in the repo can verify what this script prints.  Use it to *navigate* a log and see why
+the solver believed a state was solvable, never as evidence.
+
+For a checkable log-derived proof use **tools/log_to_numbered_tree.py**, which emits the numbered
+format that `check_witness.py` verifies: it discharges each child with `(line M)` whenever line
+M's state dominates it after unit-group deletion, which is how a log actually carries the
+evidence -- most children are never logged in their own right because something already logged
+embeds them.  That tool built unconditional trees for all fifty `K=8` frontier cells `m=6..55`
+straight out of `out_k8.txt`.  For a self-contained `G_k`-terminal proof instead, run
+`radio_canon_search_generic` and convert with `tools/canon_out_to_tree.py`.
 """
 from __future__ import annotations
 
