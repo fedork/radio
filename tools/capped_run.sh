@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run a command under a wall-clock cap and a resident-memory cap, and report what happened.
+# Run a command under a resident-memory cap and an optional wall-clock cap, and report what
+# happened. Pass --seconds 0 when the job is intentionally unbounded in time.
 #
 # macOS has neither `timeout` nor a working `ulimit -v` (the latter fails silently, which is
 # worse). AGENTS.md requires every long run to be capped and every process accounted for;
@@ -7,6 +8,7 @@
 #
 # Usage:
 #   tools/capped_run.sh --seconds 3600 --rss-gb 16 [--label NAME] -- ./radio_k9
+#   tools/capped_run.sh --seconds 0 --rss-gb 24 -- ./radio_pareto  # memory-only, no time bound
 #
 # Exits with the command's own status, or 124 on timeout / 137 on memory kill, matching
 # GNU timeout's convention. Peak RSS and wall time go to stderr so they survive a redirect
@@ -34,6 +36,19 @@ if (( $# == 0 )); then
     exit 2
 fi
 
+[[ "$SECONDS_CAP" =~ ^[0-9]+$ ]] || {
+    echo "capped_run.sh: --seconds must be a nonnegative integer (0 means unlimited)" >&2
+    exit 2
+}
+[[ "$RSS_GB_CAP" =~ ^[1-9][0-9]*$ ]] || {
+    echo "capped_run.sh: --rss-gb must be a positive integer" >&2
+    exit 2
+}
+[[ "$POLL" =~ ^[1-9][0-9]*$ ]] || {
+    echo "capped_run.sh: --poll must be a positive integer" >&2
+    exit 2
+}
+
 RSS_KB_CAP=$(( RSS_GB_CAP * 1024 * 1024 ))
 [[ -n "$LABEL" ]] || LABEL="$(basename "$1")"
 RUN_CONTEXT="capped_run_poll_seconds=$POLL"
@@ -43,7 +58,7 @@ fi
 
 RADIO_RUNNER=capped_run \
 RADIO_RUN_LABEL="$LABEL" \
-RADIO_LIMIT_WALL_SECONDS="$SECONDS_CAP" \
+RADIO_LIMIT_WALL_SECONDS="$([[ "$SECONDS_CAP" == 0 ]] && echo none || echo "$SECONDS_CAP")" \
 RADIO_LIMIT_RSS_GIB="$RSS_GB_CAP" \
 RADIO_RUN_CONTEXT="$RUN_CONTEXT" \
     "$@" <&0 &
@@ -66,7 +81,7 @@ while kill -0 "$PID" 2>/dev/null; do
     [[ -n "${RSS_KB:-}" ]] && (( RSS_KB > PEAK_KB )) && PEAK_KB=$RSS_KB
     NOW=$(date +%s)
     ELAPSED=$(( NOW - START ))
-    if (( ELAPSED >= SECONDS_CAP )); then
+    if (( SECONDS_CAP > 0 && ELAPSED >= SECONDS_CAP )); then
         REASON="TIMEOUT after ${SECONDS_CAP}s"; cleanup; STATUS=124; break
     fi
     if [[ -n "${RSS_KB:-}" ]] && (( RSS_KB >= RSS_KB_CAP )); then

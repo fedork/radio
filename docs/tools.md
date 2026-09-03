@@ -595,7 +595,7 @@ Two behaviours to be aware of:
 | `radio_canon_search_generic.c` | **Prefer this for new `k=9` results.** Finds a tree that terminates in canonical `U_k` singleton states, which is a self-contained proof. Produced the `473:6`, `480:5`, `496:4` trees. | minutes |
 | `radio_oracle.c` | **Prefer this whenever you want more than a handful of verdicts.** A persistent warm-cache oracle: pays `init()` and cache replay once, then answers `<k> <n1> <m1> ...` from stdin until told to `quit`, keeping every fact it learns. Also answers `enumerate <k> <n1> <m1> ...` (2026-08-21): every winning top-level split of the state, exactly, via a sound `R_0` pre-filter before ever calling `canSolveB` — seconds to minutes through 3-4 parts, not scoped past that (raw-space cost; see [../evidence/oracle_enumerate_2026-08-21.txt](../evidence/oracle_enumerate_2026-08-21.txt)). Start it with `./run_radio_oracle.sh`; drive it from `tools/oracle_client.py`, or over the network from `tools/oracle_server.py` (a persistent AWS-hosted instance, `tools/oracle_serve_ec2_launch.sh`/`oracle_serve_status.sh`, survives local disconnection). | seconds to start, then sub-millisecond per cached query |
 | `radio_one.c` | One question: is this state solvable in `k`? Pays full `init()` per process, so use `radio_oracle.c` for batches. | varies wildly |
-| `radio_pareto.c` | Walk the Sb frontier for any `k` as a staircase: `<k> <n1> <n2> [cache]`. Generic replacement for `radioSbPareto.c`. Reproduces the proven k=6 column exactly; a k=8 walk is the standard heavy benchmark. | minutes to days |
+| `radio_pareto.c` | Walk the Sb frontier for any `k` as a staircase: `<k> <n1> <n2> [cache]`. `--bootstrap-diagonal` first advances from a known solvable diagonal seed, then walks the complete frontier to `m=1`; this is the production K=9 mode from `Sb(55:55)`. A `MAYBE` aborts instead of being mistaken for a positive. Generic replacement for `radioSbPareto.c`. Reproduces the proven k=3 and k=6 columns exactly; a k=8 walk is the standard heavy benchmark. | minutes to months |
 | `radio_full.c` | Every top-level split plus a solvability matrix. Thorough and **much** more expensive than `radio_one` - the killed `k=9` runs used this. | hours to never |
 | `radio.c` | Walks the `Sa` ladder upward, printing `can/can't solve Sa(n) in k`. Produced `out_radio_1.txt`. | days |
 | `radioR.c` | Same, downward from `MAX_N`. | |
@@ -759,9 +759,40 @@ Note that `parse_out.sh` keeps only the verdict, **discarding the `with [...]` s
 witness**. It is enough to warm the cache but not to reconstruct a witness tree. If you may
 want trees later, archive the raw output instead - see [data.md](data.md).
 
-`run_pareto9.sh` chains runs this way, but it depends on `parsed_260.txt` and a
-`pareto9_N.txt` sequence that no longer exist, so it cannot currently restart. Fixing this
-is item P4 in the [research plan](research-plan.md).
+The historical `run_pareto9.sh` still depends on the missing local `parsed_260.txt` and
+`pareto9_N.txt` sequence and must not be used. The durable AWS replacement is below.
+
+### The unbounded K=9 frontier walk
+
+The current replacement for the broken historical chain is:
+
+```
+tools/pareto_walk_regression.sh
+tools/pareto9_ec2_launch.sh [--dry-run]
+tools/pareto9_status.sh [RUN_ID]
+```
+
+The driver starts with `--bootstrap-diagonal 9 55 55`, checks that seed, advances alternately on
+the two shores until the first exact negative, and then follows the staircase through `m=1`.
+The full build needs `MAX_N=MAX_PART_N=514`: the largest state actually queried is the first
+negative `Sb(512:2)`, while the `m=1` upper neighbor is discharged directly by dichotomy. The
+guard in `radio_pareto.c` enforces this; the previous `513` guard was one too small and could abort
+only near the end of a long run.
+
+The AWS launcher is intentionally On-Demand and has **no wall-time limit**. It does retain a
+24-GiB RSS cap by default, because unbounded time is not permission for unbounded memory. At
+bootstrap it downloads one stable object revision of the current
+`run10/sa193.checkpoint`, verifies both its provenance and the
+`singleton-majorization-necessity-only-v1` marker, hashes it, and copies that exact compressed
+input beneath the new run prefix before solving. It never restores the unsafe historical mixed
+oracle snapshot.
+
+Every ten minutes the remote supervisor writes `STATUS`; every hour it folds the growing raw log
+through `parse_out.sh`, uploads the resumable cache and a compressed raw-log prefix, and retains the
+uncompressed originals on an encrypted persistent EBS volume. SNS mail goes to the confirmed
+subscriber on start, diagonal-bootstrap completion, newly resolved frontier cells, six-hour
+heartbeats, completion, and failure. `tools/pareto9_status.sh` is the one-shot status path; do not
+start an unnecessary local watch loop.
 
 ## Verification tools
 
