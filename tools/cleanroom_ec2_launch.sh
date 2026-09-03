@@ -19,6 +19,12 @@ RUN_ID=$(date -u +%Y%m%dT%H%M%SZ)
 DRY=0
 CERT_DIR=.artifacts/cert
 LEVELS="2 3 4 5 6 7 8 9"
+# --flat-cert switches to a single self-contained radio-negative-certificate-v1.zst, which
+# carries every level in one file. Used for the K=8 frontier certificate; the sa193 level-chain
+# path is the default and is unchanged.
+FLAT_CERT=
+FLAT_EXPECT_CLAIMS=
+HARD_STOP=12h
 
 while (( $# )); do
     case "$1" in
@@ -26,9 +32,22 @@ while (( $# )); do
         --type) TYPE=$2; shift 2 ;;
         --levels) LEVELS=$2; shift 2 ;;
         --certs) CERT_DIR=$2; shift 2 ;;
-        *) echo "usage: $0 [--dry-run] [--type TYPE] [--levels \"2 3 ...\"] [--certs DIR]" >&2; exit 64 ;;
+        --flat-cert) FLAT_CERT=$2; shift 2 ;;
+        --expect-claims) FLAT_EXPECT_CLAIMS=$2; shift 2 ;;
+        --hard-stop) HARD_STOP=$2; shift 2 ;;
+        *) echo "usage: $0 [--dry-run] [--type TYPE] [--levels \"2 3 ...\"] [--certs DIR]" \
+                "[--flat-cert FILE.cert.zst] [--expect-claims N] [--hard-stop 12h]" >&2; exit 64 ;;
     esac
 done
+
+if [[ -n "$FLAT_CERT" ]]; then
+    [[ -f "$FLAT_CERT" ]] || { echo "missing $FLAT_CERT" >&2; exit 66; }
+    [[ "$(basename "$FLAT_CERT")" =~ ^[A-Za-z0-9._-]+\.cert\.zst$ ]] \
+        || { echo 'flat certificate must be named *.cert.zst' >&2; exit 64; }
+    [[ -z "$FLAT_EXPECT_CLAIMS" || "$FLAT_EXPECT_CLAIMS" =~ ^[0-9]+$ ]] \
+        || { echo 'bad --expect-claims' >&2; exit 64; }
+fi
+[[ "$HARD_STOP" =~ ^[0-9]+[mh]$ ]] || { echo 'bad --hard-stop' >&2; exit 64; }
 
 aws_cmd=(aws-vault exec --server default -- aws)
 commit=$(git rev-parse HEAD)
@@ -51,15 +70,22 @@ if ! git diff --quiet HEAD -- "${required[@]}" || ! git diff --cached --quiet HE
 fi
 
 # Every level must be present and match the released manifest before anything is launched.
-manifest=$CERT_DIR/MANIFEST.sha256
-[[ -f "$manifest" ]] || { echo "missing $manifest (pull sa193-certificate-2026-08-19)" >&2; exit 66; }
-for k in $LEVELS; do
-    f=$CERT_DIR/sa193-k$k.cert.zst
-    [[ -f "$f" ]] || { echo "missing $f" >&2; exit 66; }
-    want=$(awk -v n="sa193-k$k.cert.zst" '$2 == n {print $1}' "$manifest")
-    [[ -n "$want" ]] || { echo "no manifest entry for sa193-k$k.cert.zst" >&2; exit 66; }
-    [[ "$(sha256_file "$f")" == "$want" ]] || { echo "sa193-k$k.cert.zst hash mismatch" >&2; exit 66; }
-done
+if [[ -n "$FLAT_CERT" ]]; then
+    flat_base=$(basename "$FLAT_CERT")
+    flat_sha=$(sha256_file "$FLAT_CERT")
+    manifest=
+    LEVELS=
+else
+    manifest=$CERT_DIR/MANIFEST.sha256
+    [[ -f "$manifest" ]] || { echo "missing $manifest (pull sa193-certificate-2026-08-19)" >&2; exit 66; }
+    for k in $LEVELS; do
+        f=$CERT_DIR/sa193-k$k.cert.zst
+        [[ -f "$f" ]] || { echo "missing $f" >&2; exit 66; }
+        want=$(awk -v n="sa193-k$k.cert.zst" '$2 == n {print $1}' "$manifest")
+        [[ -n "$want" ]] || { echo "no manifest entry for sa193-k$k.cert.zst" >&2; exit 66; }
+        [[ "$(sha256_file "$f")" == "$want" ]] || { echo "sa193-k$k.cert.zst hash mismatch" >&2; exit 66; }
+    done
+fi
 
 # Not in dry-run mode: checking the plan while another run is in flight is a normal thing to do.
 if (( ! DRY )); then
@@ -83,12 +109,20 @@ bundle_sha=$(sha256_file "$bundle")
 prefix="cleanroom-verify/$RUN_ID"
 source_key="$prefix/source-radio-$short.tar.zst"
 
+if [[ -n "$FLAT_CERT" ]]; then
+    remote_mode_args="--flat-cert '$flat_base' --flat-sha256 '$flat_sha'"
+    [[ -n "$FLAT_EXPECT_CLAIMS" ]] \
+        && remote_mode_args="$remote_mode_args --flat-expect-claims '$FLAT_EXPECT_CLAIMS'"
+else
+    remote_mode_args="--levels '$LEVELS'"
+fi
+
 cat > "$userdata" <<EOF
 #!/bin/bash
 exec > >(tee -a /var/log/cleanroom-verify-bootstrap.log) 2>&1
 set -euo pipefail
 trap 'rc=\$?; aws s3 cp /var/log/cleanroom-verify-bootstrap.log s3://$BUCKET/$prefix/bootstrap-failure.log --no-progress || true; shutdown -h +2 >/dev/null 2>&1 || true; exit \$rc' EXIT
-systemd-run --unit=cleanroom-verify-hard-stop --on-active=12h /sbin/shutdown -h now
+systemd-run --unit=cleanroom-verify-hard-stop --on-active=$HARD_STOP /sbin/shutdown -h now
 dnf install -y gcc python3 zstd tar gzip time procps-ng
 cd /root
 aws s3 cp s3://$BUCKET/$source_key source.tar.zst --no-progress
@@ -100,22 +134,34 @@ trap - EXIT
 exec source/tools/cleanroom_ec2_remote.sh \
   --run-id '$RUN_ID' --work '/root/cleanroom-verify-$RUN_ID' \
   --prefix '$prefix' --source-commit '$commit' --source-sha256 '$bundle_sha' \
-  --levels '$LEVELS'
+  $remote_mode_args
 EOF
 
+if [[ -n "$FLAT_CERT" ]]; then
+    what="flat=$flat_base sha256=$flat_sha bytes=$(wc -c < "$FLAT_CERT" | tr -d ' ')"
+    what="$what expect_claims=${FLAT_EXPECT_CLAIMS:-unset}"
+else
+    what="levels=$LEVELS"
+fi
+
 if (( DRY )); then
-    printf 'run_id=%s\ncommit=%s\nsource_sha256=%s\nsource_bytes=%s\ninstance_type=%s\nlevels=%s\n' \
-        "$RUN_ID" "$commit" "$bundle_sha" "$(wc -c < "$bundle" | tr -d ' ')" "$TYPE" "$LEVELS"
+    printf 'run_id=%s\ncommit=%s\nsource_sha256=%s\nsource_bytes=%s\ninstance_type=%s\nhard_stop=%s\n%s\n' \
+        "$RUN_ID" "$commit" "$bundle_sha" "$(wc -c < "$bundle" | tr -d ' ')" "$TYPE" \
+        "$HARD_STOP" "$what"
     bash -n "$userdata"
     exit 0
 fi
 
 "${aws_cmd[@]}" s3 cp "$bundle" "s3://$BUCKET/$source_key" --no-progress
-for k in $LEVELS; do
-    "${aws_cmd[@]}" s3 cp "$CERT_DIR/sa193-k$k.cert.zst" \
-        "s3://$BUCKET/$prefix/sa193-k$k.cert.zst" --no-progress
-done
-"${aws_cmd[@]}" s3 cp "$manifest" "s3://$BUCKET/$prefix/MANIFEST.sha256" --no-progress
+if [[ -n "$FLAT_CERT" ]]; then
+    "${aws_cmd[@]}" s3 cp "$FLAT_CERT" "s3://$BUCKET/$prefix/$flat_base" --no-progress
+else
+    for k in $LEVELS; do
+        "${aws_cmd[@]}" s3 cp "$CERT_DIR/sa193-k$k.cert.zst" \
+            "s3://$BUCKET/$prefix/sa193-k$k.cert.zst" --no-progress
+    done
+    "${aws_cmd[@]}" s3 cp "$manifest" "s3://$BUCKET/$prefix/MANIFEST.sha256" --no-progress
+fi
 ami=$("${aws_cmd[@]}" ssm get-parameter --region "$REGION" \
     --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
     --query Parameter.Value --output text)
@@ -132,6 +178,6 @@ instance=$("${aws_cmd[@]}" ec2 run-instances --region "$REGION" \
       "ResourceType=volume,Tags=[{Key=Project,Value=radio-sa193},{Key=Purpose,Value=cleanroom-verify},{Key=RunId,Value=$RUN_ID}]" \
     --query 'Instances[0].InstanceId' --output text)
 
-printf 'launched instance=%s type=%s run_id=%s commit=%s levels=%s\n' \
-    "$instance" "$TYPE" "$RUN_ID" "$commit" "$LEVELS"
+printf 'launched instance=%s type=%s run_id=%s commit=%s hard_stop=%s %s\n' \
+    "$instance" "$TYPE" "$RUN_ID" "$commit" "$HARD_STOP" "$what"
 printf 's3=s3://%s/%s/\n' "$BUCKET" "$prefix"

@@ -31,6 +31,13 @@ RUN_ID=
 SOURCE_COMMIT=
 SOURCE_SHA256=
 LEVELS=
+# Flat mode: audit one self-contained `radio-negative-certificate-v1` instead of an sa193 level
+# chain. The flat file carries every level, so the checker's own k-stratified pass is the whole
+# audit; the chain-structure and claim-total gates below are sa193 chain properties and do not
+# apply. Used for the K=8 frontier certificate (evidence/pareto8_certificate_2026-09-03.md).
+FLAT_CERT=
+FLAT_SHA256=
+FLAT_EXPECT_CLAIMS=
 # Progress cadence. The S3 heartbeat matches it: uploading half as often as the checker
 # reports left the watcher one or two lines behind and looking stalled.
 PROGRESS_SECONDS=300
@@ -53,6 +60,9 @@ while (( $# )); do
         --source-commit) SOURCE_COMMIT=$2; shift 2 ;;
         --source-sha256) SOURCE_SHA256=$2; shift 2 ;;
         --levels) LEVELS=$2; shift 2 ;;
+        --flat-cert) FLAT_CERT=$2; shift 2 ;;
+        --flat-sha256) FLAT_SHA256=$2; shift 2 ;;
+        --flat-expect-claims) FLAT_EXPECT_CLAIMS=$2; shift 2 ;;
         *) usage ;;
     esac
 done
@@ -62,7 +72,14 @@ done
 [[ "$PREFIX" == "cleanroom-verify/$RUN_ID" ]] || usage
 [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || usage
 valid_sha "$SOURCE_SHA256" || usage
-[[ "$LEVELS" =~ ^[2-9]( [2-9])*$ ]] || usage
+if [[ -n "$FLAT_CERT" ]]; then
+    [[ "$FLAT_CERT" =~ ^[A-Za-z0-9._-]+\.cert\.zst$ ]] || usage
+    valid_sha "$FLAT_SHA256" || usage
+    [[ -z "$LEVELS" ]] || usage
+    [[ -z "$FLAT_EXPECT_CLAIMS" || "$FLAT_EXPECT_CLAIMS" =~ ^[0-9]+$ ]] || usage
+else
+    [[ "$LEVELS" =~ ^[2-9]( [2-9])*$ ]] || usage
+fi
 
 mkdir -p "$WORK"
 cd "$WORK"
@@ -109,14 +126,22 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain "$TOOLCHAIN" >> run.log 2>&1
 export PATH="$HOME/.cargo/bin:$PATH"
 
-aws s3 cp "s3://$BUCKET/$PREFIX/MANIFEST.sha256" MANIFEST.sha256 --no-progress
 certs=()
-for k in $LEVELS; do
-    aws s3 cp "s3://$BUCKET/$PREFIX/sa193-k$k.cert.zst" "sa193-k$k.cert.zst" --no-progress
-    grep " sa193-k$k.cert.zst\$" MANIFEST.sha256 | sha256sum -c -
-    zstd -d -q -o "sa193-k$k.cert" "sa193-k$k.cert.zst"
-    certs+=("sa193-k$k.cert")
-done
+if [[ -n "$FLAT_CERT" ]]; then
+    aws s3 cp "s3://$BUCKET/$PREFIX/$FLAT_CERT" "$FLAT_CERT" --no-progress
+    printf '%s  %s\n' "$FLAT_SHA256" "$FLAT_CERT" | sha256sum -c -
+    flat_plain=${FLAT_CERT%.zst}
+    zstd -d -q -o "$flat_plain" "$FLAT_CERT"
+    certs+=("$flat_plain")
+else
+    aws s3 cp "s3://$BUCKET/$PREFIX/MANIFEST.sha256" MANIFEST.sha256 --no-progress
+    for k in $LEVELS; do
+        aws s3 cp "s3://$BUCKET/$PREFIX/sa193-k$k.cert.zst" "sa193-k$k.cert.zst" --no-progress
+        grep " sa193-k$k.cert.zst\$" MANIFEST.sha256 | sha256sum -c -
+        zstd -d -q -o "sa193-k$k.cert" "sa193-k$k.cert.zst"
+        certs+=("sa193-k$k.cert")
+    done
+fi
 
 stage BUILD
 cd "$SOURCE_DIR/tools/cleanroom"
@@ -136,20 +161,34 @@ cd "$WORK"
 # Smoke the most EXPENSIVE level, not the highest-numbered one: k=9 has 16 claims and would
 # gate nothing, while k=7 is ~99% of the work. Certificate size is the available proxy for
 # cost here, and it picks k=7 for the full chain.
-smoke_level=$(for k in $LEVELS; do
-    printf '%s %s\n' "$(wc -c < "sa193-k$k.cert")" "$k"
-done | sort -rn | head -1 | awk '{print $2}')
-echo "smoke level: k=$smoke_level" >> "$WORK/run.log"
-"$binary" audit --threads "$threads" --stride 5000 "sa193-k$smoke_level.cert" \
-    > "$WORK/smoke.out" 2>&1 || fail "smoke"
-grep -q ', gaps 0,' "$WORK/smoke.out" || fail "k7 smoke gaps"
+if [[ -n "$FLAT_CERT" ]]; then
+    # A flat certificate carries every level in one file, so one strided pass samples all of
+    # them - including the expensive one - and pays each level's support build exactly once.
+    echo "smoke: flat ${certs[0]} stride 5000" >> "$WORK/run.log"
+    "$binary" audit --threads "$threads" --stride 5000 "${certs[0]}" \
+        > "$WORK/smoke.out" 2>&1 || fail "smoke"
+else
+    smoke_level=$(for k in $LEVELS; do
+        printf '%s %s\n' "$(wc -c < "sa193-k$k.cert")" "$k"
+    done | sort -rn | head -1 | awk '{print $2}')
+    echo "smoke level: k=$smoke_level" >> "$WORK/run.log"
+    "$binary" audit --threads "$threads" --stride 5000 "sa193-k$smoke_level.cert" \
+        > "$WORK/smoke.out" 2>&1 || fail "smoke"
+fi
+grep -q ', gaps 0,' "$WORK/smoke.out" || fail "smoke gaps"
 upload smoke.out smoke.out
 upload selftest.out selftest.out
 
 # Inductive closure and the expected roots are properties of the WHOLE chain; on a --levels
 # subset the support of the lowest level is legitimately absent, so the check is skipped
 # rather than run in a form that cannot pass.
-if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
+if [[ -n "$FLAT_CERT" ]]; then
+    # check_level_chain.py checks a v2 level chain; a flat v1 has no per-level sections for it
+    # to relate, and the checker's own ascending k-stratified pass supplies the induction --
+    # level k is audited against level k-1's claims, which are themselves audited claims.
+    stage "STRUCTURE skipped (flat certificate)"
+    echo 'skipped: flat certificate, no level chain to relate' > "$WORK/chain-structure.out"
+elif [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
     stage STRUCTURE
     python3 "$SOURCE_DIR/tools/check_level_chain.py" --expect-top-sum "$EXPECT_TOP_SUM" \
         "${certs[@]}" > "$WORK/chain-structure.out" 2>&1 || fail "level chain structure"
@@ -172,12 +211,18 @@ stage VERIFY
     echo "# toolchain=$(rustc --version) / $(cargo --version)"
     echo "# host=$instance_id type=$instance_type threads=$threads"
     echo "# uname=$(uname -a)"
-    echo "# levels=$LEVELS"
-    sed 's/^/# input=/' MANIFEST.sha256
-    if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
-        echo "# structure=tools/check_level_chain.py --expect-top-sum $EXPECT_TOP_SUM (passed)"
+    if [[ -n "$FLAT_CERT" ]]; then
+        echo "# mode=flat"
+        echo "# input=$FLAT_SHA256  $FLAT_CERT"
+        echo "# structure=skipped (flat certificate)"
     else
-        echo "# structure=skipped (partial level set)"
+        echo "# levels=$LEVELS"
+        sed 's/^/# input=/' MANIFEST.sha256
+        if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
+            echo "# structure=tools/check_level_chain.py --expect-top-sum $EXPECT_TOP_SUM (passed)"
+        else
+            echo "# structure=skipped (partial level set)"
+        fi
     fi
     echo "# command=radio_cleanroom audit --threads $threads --progress $PROGRESS_SECONDS ${certs[*]}"
     echo "# started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -196,7 +241,10 @@ echo "# finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> verify.out
 
 # A complete run must account for every claim in the certificate of record; a --levels subset
 # only has to be gap-free.
-if [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
+if [[ -n "$FLAT_CERT" && -n "$FLAT_EXPECT_CLAIMS" ]]; then
+    grep -q "TOTAL verified $FLAT_EXPECT_CLAIMS, gaps 0," verify.out \
+        || { upload verify.out verify.out; fail "flat totals"; }
+elif [[ "$LEVELS" == "2 3 4 5 6 7 8 9" ]]; then
     grep -q "TOTAL verified $EXPECT_TOTAL_CLAIMS, gaps 0," verify.out \
         || { upload verify.out verify.out; fail "chain totals"; }
 else
