@@ -16,6 +16,48 @@ done
 [[ -z "$run_id" || "$run_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || { echo 'invalid run id' >&2; exit 2; }
 
 aws_cmd=(aws-vault exec --server default -- aws)
+script_dir=$(cd "$(dirname "$0")" && pwd)
+
+render_slowest_facts() {
+    local instance=$1 prefix=$2 resolved_run_id encoded remote ssm_parameters command_id status
+    resolved_run_id=${prefix##*/}
+    [[ "$resolved_run_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || {
+        echo '  slowest facts       unavailable (invalid run id in instance tag)'
+        return
+    }
+    [[ -f "$script_dir/pareto_slowest_facts.py" ]] || {
+        echo '  slowest facts       unavailable (local analyzer missing)'
+        return
+    }
+
+    encoded=$(base64 < "$script_dir/pareto_slowest_facts.py" | tr -d '\n')
+    remote="python3 -c 'import base64; exec(compile(base64.b64decode(\"$encoded\"), \"pareto_slowest_facts.py\", \"exec\"))' --limit 10 /root/pareto9-$resolved_run_id/seg-*.out"
+    ssm_parameters=$(python3 -c \
+        'import json,sys; print(json.dumps({"commands":[sys.stdin.read()]}))' <<<"$remote")
+    if ! command_id=$("${aws_cmd[@]}" ssm send-command --region "$region" \
+            --instance-ids "$instance" --document-name AWS-RunShellScript \
+            --comment 'rank live Pareto fact timings' --parameters "$ssm_parameters" \
+            --query 'Command.CommandId' --output text 2>/dev/null); then
+        echo '  slowest facts       unavailable (SSM command could not be sent)'
+        return
+    fi
+
+    status=Pending
+    for _ in $(seq 1 15); do
+        status=$("${aws_cmd[@]}" ssm get-command-invocation --region "$region" \
+            --command-id "$command_id" --instance-id "$instance" \
+            --query Status --output text 2>/dev/null || true)
+        case "$status" in Success|Failed|TimedOut|Cancelled) break ;; esac
+        sleep 1
+    done
+    if [[ "$status" != Success ]]; then
+        printf '  slowest facts       unavailable (SSM status %s)\n' "$status"
+        return
+    fi
+    "${aws_cmd[@]}" ssm get-command-invocation --region "$region" \
+        --command-id "$command_id" --instance-id "$instance" \
+        --query StandardOutputContent --output text
+}
 
 render() {
     local query instance prefix state modified
@@ -41,6 +83,12 @@ render() {
     fi
     printf '  instance            %s  %s\n' "$instance" "$state"
     printf '  durable prefix      s3://%s/%s/\n' "$bucket" "$prefix"
+    if [[ "$state" == running ]]; then
+        printf '\n'
+        render_slowest_facts "$instance" "$prefix"
+    else
+        echo '  slowest facts       unavailable (instance is not running)'
+    fi
 }
 
 while :; do

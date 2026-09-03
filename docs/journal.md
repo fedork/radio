@@ -13241,3 +13241,25 @@ The first ten-minute durable snapshot at 01:26:11 UTC showed the solver alive at
 with zero decisions and a 3,628-byte raw log containing the runtime provenance block. It was still
 replaying/initializing the 2,266,369-fact cache before `PARETO START`; this is startup state, not a
 frontier verdict or evidence of a stalled exact query.
+
+## 2026-09-02 -- Pareto status ranks completed and progress-only slow facts
+
+The live status path now appends a deduplicated top-ten timing view from the uncompressed AWS log.
+For each `(state,k)` it takes the larger of the final inclusive `took` value and every printed
+progress `elapsed`, then labels the row `SOLVABLE`, `UNSOLVABLE`, or `NO_FINAL_VERDICT`. The last
+label is intentionally weaker than “active”: a finite child probe can print progress and later
+return `MAYBE` without a final fact line. The parser rejects contradictory completed verdicts and
+has a synthetic regression covering ordering, deduplication, completion, and elapsed-over-complete
+replacement.
+
+The first live use at the 06:56:58 UTC durable snapshot found 80 completed bootstrap decisions,
+ending with `Sb(95:94)@9=SOLVABLE`, while `Sb(95:95)@9` remained open. Its top three timing records
+were progress-only: `Sb(95:95)@9` at 11,940 reported elapsed seconds, its
+`Sb(56:40,55:39)@8` child at 5,453, and `Sb(28:19,40:13,37:12,26:15)@7` at 811. The whole top ten
+is dynamic and should be read from `tools/pareto9_status.sh 20260903T011520Z`, not copied forward.
+
+These numbers are inclusive solver clocks, not audited per-fact wall times. Completed `took` comes
+from process `clock()`; the deterministic production scheduler's progress `elapsed` is accepted
+split-prefix work divided by 20,000,000. Both include recursive descendants, which is the desired
+bottleneck measure, but mixing their labels or calling either exact wall time would overstate what
+the raw log records.

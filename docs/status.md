@@ -572,7 +572,11 @@ regression/build/provenance gates, froze the exact current run10 cache revision 
 and launched `radio_pareto_k9 --bootstrap-diagonal 9 55 55 input-sa193.cache`. Read its ten-minute
 durable status with `tools/pareto9_status.sh 20260903T011520Z`. The two solvers have separate
 instances, disks, processes, S3 prefixes and caches; launching the Pareto walk did not interrupt or
-mutate the Sa run.
+mutate the Sa run. As of the 2026-09-03 06:56:58 UTC snapshot it had completed 80 bootstrap
+decisions through `Sb(95:94)=SOLVABLE` and was still resolving `Sb(95:95)`, at 9.78 GiB RSS. The
+status helper now appends a live top-ten slow-fact ranking using the maximum of each fact's final
+`took` time and highest printed progress `elapsed`; its labels distinguish completed verdicts from
+progress records with no final verdict.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB
