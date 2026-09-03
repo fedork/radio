@@ -121,6 +121,30 @@ RESULT_LEVEL k=6 completed=2520118 verified=2520118 gaps=0 contradicted=0 cells=
 redundant at load, which is why a level with three times `k=5`'s support is a hundred times
 cheaper per claim.
 
+### The `k=5` audit run
+
+| field | value |
+|---|---|
+| run ID | `20260903T163559Z` |
+| instance | `i-0f000d13c1fe92cf1`, on-demand `c8a.24xlarge` (96 vCPU), `us-west-2b` |
+| launched | 2026-09-03 16:36:31 UTC, 20 h hard stop |
+| source commit | `42ce13d97cf379a56cf0ec77aacfadbeddf49f41` |
+| source bundle SHA-256 | `3c850d665f1100ff19e34be0b6554fce892db5f69fd5c2507888d6d7f3908afb` |
+| audited artifact | `pareto8-k1to8.cert.zst`, 47,157,311 bytes |
+| artifact SHA-256 | `f335c6b4b21e696e6a936b8166c6474a7bdeaa35904162dba3116e16f9e2abda` |
+| gate | `--expect-claims 11215465`, so the run fails unless it accounts for every claim |
+| S3 prefix | `s3://radio-sa193-393287594714/cleanroom-verify/20260903T163559Z/` |
+
+It audits the flat certificate end to end, so it re-derives `k=1..4` and `k=6..8` as well as `k=5`.
+That makes it an independent replay of the local results on different hardware, and the shared
+levels agree exactly: `k=4` reported the identical 1,787,253,880 cells in 2.201 s against 17.243 s
+locally (7.8x on 96 vs 10 threads). Cell counts are hardware-independent; the seconds are not.
+
+Read progress with `tools/cleanroom_ec2_status.sh`. One operational note: the `eta_s` field is
+computed from the last 300-second window and swings between about 4,000 and 38,000 depending on
+whether a few very expensive claims landed in that window. `rate_total` is the stable figure and
+climbed 155 -> 438 claims/s as the run cleared the widest claims first.
+
 ### `k=5` is the cost centre
 
 Measured directly, not estimated:
