@@ -3,10 +3,14 @@
 Task: extract certified witness trees and a refutation certificate from "the recent Pareto-8 run",
 in a form the current verifier of record — the cleanroom checker `tools/cleanroom` — accepts.
 
-Outcome in one line: the refutation certificate exists and its load-bearing top level verifies with
-zero gaps, but it comes from `out_k8.txt`, **not** from the recent census run, which cannot supply
-one at all. Certified trees do not come from any solver log; they come from canonical search, and
-the cleanroom cannot check them because it has no positive mode.
+Outcome in one line: **both exist and both are verified** — a complete cleanroom-audited refutation
+certificate for the whole frontier (`TOTAL verified 11215465, gaps 0`) and unconditional
+achievability witnesses for all 55 cells. Neither came from the recent census run, which cannot
+supply either. The certificate comes from `out_k8.txt`; the trees come from canonical search for
+`m=1..5` and, for the other fifty, from domination evidence already sitting in the same log.
+
+The cleanroom has no positive mode, so it checks only the certificate; the trees are checked by
+`tools/check_witness.py`. That split is the one thing the original request assumed away.
 
 ## The recent Pareto-8 run is not a certificate source
 
@@ -74,8 +78,9 @@ cannot recur.
 It compresses to 47,157,311 bytes at `zstd -3` (10.6x), so the natural durable home is a
 `pareto8-certificate-2026-09-03` release via `tools/artifacts.sh push` plus a
 [data.md](../docs/data.md) row — the same shape as `sa193-certificate-2026-08-19`, which held
-2,846,568 claims in 15.6 MB. Not pushed yet: the chain is not complete until `k=5` verifies, and
-the release should carry the audit logs for every level.
+2,846,568 claims in 15.6 MB. The chain is now complete, so the release is ready to make whenever
+wanted; it should carry the certificate, the AWS `verify.out` and its `final.sha256`, and the local
+per-level logs. Not pushed as of this record.
 
 ### Audit results (cleanroom `radio_cleanroom`, 10 threads, Apple M4 Pro)
 
@@ -85,7 +90,7 @@ the release should carry the audit logs for every level.
 | k=2 | 9 | 1 | 9 | **0** | |
 | k=3 | 633 | 9 | 633 | **0** | |
 | k=4 | 842,545 | 633 | 842,545 | **0** | 1.787e9 cells, 17.2 s |
-| k=5 | 7,845,253 | 842,545 | *running on AWS* | **0** in first 7,786 | see cost below |
+| k=5 | 7,845,253 | 842,545 | 7,845,253 | **0** | 12.96e12 cells, 21,065.4 s on 96 vCPU |
 | k=6 | 2,520,118 | 7,845,253 | 2,520,118 | **0** | build 362.7 s, audit 886.4 s, 92.6e9 cells |
 | k=7 | 6,852 | 2,520,118 | 6,852 | **0** | build 83.2 s, audit 0.41 s |
 | **k=8** | **54** | 6,852 | **54** | **0** | `dead_options=148018/148018` |
@@ -105,7 +110,15 @@ split of *every* root is discharged by the `k=7` support. The `k<=4` block close
 `k=3` facts. `k=7` closes against `k=6`. So `out_k8.txt` is genuinely closed wherever it has been
 checked, and no gap or contradiction has appeared anywhere.
 
-Only `k=5` remains, and it is the one expensive level.
+Every level is closed, so this is a complete induction rather than a verified top and bottom. The
+whole chain also ran end to end in one AWS process, which is the result of record:
+
+```
+TOTAL verified 11215465, gaps 0, cells 13052810819342      (exit 0, 6h01m35s of audit)
+```
+
+`k=5` carried essentially all of it: 12.96e12 of the 13.05e12 cells and 21,065 of the 21,190 audit
+seconds.
 
 ### `k=6` closed locally, complete and clean
 
@@ -142,8 +155,38 @@ locally (7.8x on 96 vs 10 threads). Cell counts are hardware-independent; the se
 
 Read progress with `tools/cleanroom_ec2_status.sh`. One operational note: the `eta_s` field is
 computed from the last 300-second window and swings between about 4,000 and 38,000 depending on
-whether a few very expensive claims landed in that window. `rate_total` is the stable figure and
-climbed 155 -> 438 claims/s as the run cleared the widest claims first.
+whether a few very expensive claims landed in that window. `rate_total` is the stable figure. It
+climbed 155 -> 445 claims/s, then sagged to 370 as the level's wide states -- the claims are
+emitted in ascending part-tuple order, so the expensive ones cluster late -- and finished at 372.
+Two ETA revisions were made from window rates during the run and both were wrong in opposite
+directions; only `rate_total` should be quoted.
+
+### Result
+
+```
+2026-09-03T16:36:57Z SETUP / BUILD / GATES
+2026-09-03T16:46:27Z STRUCTURE skipped (flat certificate)
+2026-09-03T16:46:27Z VERIFY
+2026-09-03T22:48:00Z DONE                                        exit 0
+
+RESULT_LEVEL k=1 completed=1        verified=1        gaps=0 cells=0
+RESULT_LEVEL k=2 completed=9        verified=9        gaps=0 cells=4
+RESULT_LEVEL k=3 completed=633      verified=633      gaps=0 cells=5675
+RESULT_LEVEL k=4 completed=842545   verified=842545   gaps=0 cells=1787253880       wall_s=2.201
+RESULT_LEVEL k=5 completed=7845253  verified=7845253  gaps=0 cells=12958357880287   wall_s=21065.426
+RESULT_LEVEL k=6 completed=2520118  verified=2520118  gaps=0 cells=92620060382      wall_s=122.252
+RESULT_LEVEL k=7 completed=6852     verified=6852     gaps=0 cells=45619114         wall_s=0.200
+RESULT_LEVEL k=8 completed=54       verified=54       gaps=0 cells=0                wall_s=0.200
+TOTAL verified 11215465, gaps 0, cells 13052810819342
+```
+
+Zero `GAP` lines anywhere in the 17,273-byte log, zero contradictions, and the `--expect-claims`
+gate passed, so the run accounted for every claim in the certificate. Output hashes are in
+`final.sha256`: `verify.out` `b7cf8138dc8e819b7a84b27d1c3975af2233f671e37e8220a4196f6ef70d631e`.
+
+Every level that also ran locally reports an **identical cell count** — `k=4` 1,787,253,880,
+`k=6` 92,620,060,382, `k=7` 45,619,114, `k=8` 0. Different machine, different thread count, same
+work: the audit is deterministic, and the local and AWS results are the same proof twice.
 
 ### `k=5` is the cost centre
 
@@ -243,14 +286,10 @@ in place from "achievability logged in out_k8.txt" to cite the witness instead.
    (`- #N <state> in k: <status>` plus `source:` lines) that `check_witness.py` does not parse.
    Its docstring now says so and points at `tools/log_to_numbered_tree.py`. Navigation tool, not
    evidence.
-3. **`k=5` of the chain is unverified** — running on AWS as of this record
-   (`tools/cleanroom_ec2_status.sh`, run `20260903T163559Z`, `c8a.24xlarge`, ~10.4 h projected,
-   zero gaps through the first 108,420 claims). It is the single remaining obstacle to a complete
-   induction; every other level is closed.
-4. **No provenanced raw `K=8` log exists.** `out_k8.txt` cannot be archived under the current rule.
+3. **No provenanced raw `K=8` log exists.** `out_k8.txt` cannot be archived under the current rule.
    The certificate can be, and is the more useful artifact, but a clean re-run is the only way to
    get an archivable raw log.
-5. **`radio_print.c` cannot use domination through the cache.** Given the positives-only cache it
+4. **`radio_print.c` cannot use domination through the cache.** Given the positives-only cache it
    reported `found no solutions` for `Sb(225:6)@8`, because its `CACHE_ONLY` child check wants an
    exact cached positive and `Sb(109:2)@7` is only present by embedding in `Sb(109:5)@7`. Its own
    `is_inferior` does domination between *lines*, but not against the cache. Its bounds are now

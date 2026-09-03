@@ -13482,3 +13482,51 @@ the totals gate would have accepted any gap-free flat result without accounting 
 Cost note for planning: nothing here required re-solving anything. The trees came out of an existing
 log and the audits out of an existing certificate. The 11.01 CPU-day `K=8` re-run remains
 unnecessary except to obtain an archivable *provenanced* raw log, which `out_k8.txt` is not.
+
+## 2026-09-03 -- The K=8 frontier certificate verifies completely: 11,215,465 claims, zero gaps
+
+The chain is closed. Run `20260903T163559Z` audited the flat `K=8` certificate end to end on a
+`c8a.24xlarge` and finished at 22:48:00Z with exit 0:
+
+    TOTAL verified 11215465, gaps 0, cells 13052810819342
+
+Per level, every one zero-gap and zero-contradiction: k=1 1, k=2 9, k=3 633, k=4 842,545,
+k=5 7,845,253, k=6 2,520,118, k=7 6,852, k=8 54. Zero `GAP` lines in the whole 17,273-byte log,
+and the `--expect-claims 11215465` gate passed, so the run accounted for every claim rather than
+merely failing to find a hole. This is a real induction: each level is audited against the level
+below, whose claims are themselves audited, bottoming out at k=1 against empty support. The
+`Sa(193)`-style structural check was skipped by design -- a flat certificate has no per-level v2
+sections for `check_level_chain.py` to relate, and the checker's own ascending pass supplies the
+closure instead.
+
+**The local and AWS runs are the same proof twice.** Because the flat file carries every level, the
+AWS run re-derived k=1..4 and k=6..8 as well as k=5, and every level that also ran locally reports
+an identical cell count: k=4 1,787,253,880, k=6 92,620,060,382, k=7 45,619,114, k=8 0. Different
+machine, different thread count, same work. That is a stronger statement than agreement on
+verdicts, and it is free -- worth preferring a flat certificate over a level chain for that reason
+alone when the levels are cheap enough to redo.
+
+Cost shape, for anyone sizing the next one. k=5 is not merely the expensive level, it is
+essentially the entire cost: 12.96e12 of the 13.05e12 cells and 21,065 of the 21,190 audit seconds.
+Total audit wall was 6h01m35s against a 20 h hard stop. On 96 vCPU k=6 took 122.3 s against 886.4 s
+locally on 10 threads (7.25x), and k=4 2.201 s against 17.243 s (7.8x), so thread scaling is close
+to linear and the earlier 853 thread-hour figure for k=5 was about right.
+
+**Do not quote `eta_s`.** It is computed from the last 300-second window and swung between 4,000
+and 38,000 on this run depending on whether a few very expensive claims happened to land in the
+window. `rate_total` climbed 155 -> 445 claims/s, sagged to 370 as the wide states arrived --
+claims are emitted in ascending part-tuple order, so the expensive ones cluster late -- and
+finished at 372. Two ETA revisions were made from window rates during the run and both were wrong,
+in opposite directions. Only `rate_total` is worth stating, and even that underestimates while the
+tail is still ahead.
+
+The instance stopped itself at 22:50Z via the `shutdown -h +2` that follows DONE, so nothing is
+still billing compute; its 30 GB gp3 volume survives because the launcher sets
+`instance-initiated-shutdown-behavior=stop` deliberately. Terminate it once the artifacts are
+archived.
+
+Net position: the `K=8` `Sb` Pareto frontier now has both halves independently checked. Negative --
+all 54 refutations `Sb(57:55)..Sb(256:2)`, verified inside a complete 11.2M-claim chain by a
+checker sharing no solver code. Positive -- unconditional witnesses for all 55 cells `m=1..55`.
+Neither required re-running the solver; both came out of `out_k8.txt`, which the current provenance
+rule will not let us archive as raw evidence but which was never the trust base anyway.

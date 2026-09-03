@@ -1098,10 +1098,10 @@ majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  
 majorization removes that mode strongly enough that `run3` is instead dominated by k=7.  Optimising
 only the old k=6 monsters is therefore no longer a complete plan for the current engine.
 
-## The K=8 frontier certificate (2026-09-03)
+## The K=8 frontier certificate (2026-09-03) — complete
 
-A cleanroom-checkable refutation certificate for the whole `K=8` `Sb` Pareto frontier now exists,
-with **one level left to verify**. Full record in
+A cleanroom-verified refutation certificate for the whole `K=8` `Sb` Pareto frontier now exists,
+and **every level is closed**. Full record in
 [`../evidence/pareto8_certificate_2026-09-03.md`](../evidence/pareto8_certificate_2026-09-03.md).
 
 The source is `out_k8.txt` (2026-05-12), a cold single-session sweep. Its 54 `k=8` negatives are
@@ -1109,21 +1109,34 @@ exactly `Sb(57:55) … Sb(256:2)`, one per `m=2..55`, each `n1+1` for the matchi
 `proven-exhaustive` row of `data/pareto_sb.csv`. `tools/log_to_v1_cert.sh` reduces it to a v1
 certificate of 11,215,465 claims (443,851,829 bytes).
 
-Cleanroom results, all **zero gaps, zero contradictions**: `k=1..4` complete (843,188 claims,
-closing on only 633 `k=3` facts), `k=6` complete (2,520,118 claims), `k=7` complete (6,852
-claims), and the load-bearing `k=8` level complete — all **54** frontier refutations verified
-with `dead_options=148018/148018`, so every legal first split of every root is discharged.
-Only `k=5` is outstanding; it is running on AWS (`tools/cleanroom_ec2_status.sh`, run
-`20260903T163559Z`, `c8a.24xlarge`) as a single flat-certificate audit that must report
-`TOTAL verified 11215465, gaps 0`. The `k=8` level certificate is committed as
+The complete chain is verified, end to end, in one run:
+
+```
+TOTAL verified 11215465, gaps 0, cells 13052810819342     (exit 0)
+```
+
+Per level, all **zero gaps and zero contradictions**: `k=1` 1, `k=2` 9, `k=3` 633, `k=4` 842,545,
+`k=5` 7,845,253, `k=6` 2,520,118, `k=7` 6,852, and the load-bearing `k=8` **54** frontier
+refutations with `dead_options=148018/148018`, so every legal first split of every root is
+discharged. That is a genuine induction: each level is audited against the level below, whose
+claims are themselves audited, bottoming out at `k=1` with empty support.
+
+Run `20260903T163559Z` on a `c8a.24xlarge` did the whole thing in 6h01m of audit
+(`k=5` alone 21,065 s of it). Because it re-derived every level rather than only `k=5`, it is
+also an independent replay of the local results on different hardware, and **every level's cell
+count matches the local run exactly** — `k=4` 1,787,253,880, `k=6` 92,620,060,382, `k=7`
+45,619,114. The work is deterministic; only the thread count changed. The `k=8` level
+certificate is committed as
 [`../evidence/pareto8_level8_2026-09-03.cert`](../evidence/pareto8_level8_2026-09-03.cert), so the
 frontier refutations re-check from the repository alone in under a second.
 
-**`k=5` is the only expensive level and the only thing still missing.** It runs at 25.51 claims/s
-(~853 thread-hours; 3.6 days wall at 10 threads) because 6.9M of its 7.85M claims have 6–8 parts,
-giving 2.66M cells per claim against 2,121 at `k=4`. `k=6`, with three times the support, closed
-in 21 minutes locally. `tools/cleanroom_ec2_launch.sh --flat-cert FILE.cert.zst --expect-claims N`
-ships the whole certificate to a `c8a` host; `--stride`/`--offset` also shards `k=5` across hosts.
+**`k=5` carries essentially the whole cost** — 12.96e12 of the chain's 13.05e12 cells, and 21,065
+of its 21,190 audit seconds — because 6.9M of its 7.85M claims have 6–8 parts, giving 2.66M cells
+per claim against 2,121 at `k=4`. Locally it ran at 25.51 claims/s (~853 thread-hours, 3.6 days at
+10 threads), which is why it went to AWS. Reproduce with
+`tools/cleanroom_ec2_launch.sh --flat-cert FILE.cert.zst --expect-claims N`; `--stride`/`--offset`
+shard it further if needed. Do not size a future run from `eta_s`, which is a noisy 300-second
+window that swung between 4,000 and 38,000 on this run; `rate_total` is the honest figure.
 
 Two things not to re-derive. **Do not re-run the `K=8` solver for this**: the `k=8` verdict lines in
 `out_k8.txt` sum to 950,852 CPU s = 11.01 days, 2.3x the entire `Sa(193)` cold run9, because it is a
