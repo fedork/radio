@@ -1113,7 +1113,9 @@ Cleanroom results so far, all **zero gaps, zero contradictions**: `k=1..4` compl
 claims, closing on only 633 `k=3` facts), `k=7` complete (6,852 claims), and the load-bearing
 `k=8` level complete — all **54** frontier refutations verified with
 `dead_options=148018/148018`, so every legal first split of every root is discharged. `k=6` is
-clean on a uniform 1/1000 sample.
+clean on a uniform 1/1000 sample. The `k=8` level certificate is committed as
+[`../evidence/pareto8_level8_2026-09-03.cert`](../evidence/pareto8_level8_2026-09-03.cert), so the
+frontier refutations re-check from the repository alone in under a second.
 
 **`k=5` is the only expensive level and the only thing still missing.** It runs at 25.51 claims/s
 (~853 thread-hours; 3.6 days wall at 10 threads) because 6.9M of its 7.85M claims have 6–8 parts,

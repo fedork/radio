@@ -84,6 +84,16 @@ cannot recur.
 | k=7 | 6,852 | 2,520,118 | 6,852 | **0** | build 83.2 s, audit 0.41 s |
 | **k=8** | **54** | 6,852 | **54** | **0** | `dead_options=148018/148018` |
 
+The `k=8` level certificate is committed as
+[`pareto8_level8_2026-09-03.cert`](pareto8_level8_2026-09-03.cert) — 107,590 bytes, 1,226 parts,
+6,852 support facts, 54 claims — so the frontier refutations are re-checkable from the repository
+alone:
+
+```
+tools/cleanroom/target/release/radio_cleanroom audit evidence/pareto8_level8_2026-09-03.cert
+TOTAL verified 54, gaps 0, cells 0
+```
+
 The `k=8` line is the load-bearing one: all 54 frontier refutations verify, and *every* legal first
 split of *every* root is discharged by the `k=7` support. The `k<=4` block closes on only 633
 `k=3` facts. `k=7` closes against `k=6`. So `out_k8.txt` is genuinely closed wherever it has been
