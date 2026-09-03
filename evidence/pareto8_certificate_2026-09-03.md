@@ -71,6 +71,12 @@ canonical part order. Parts are written **verbatim**; the checker applies CANON 
 recomputes every mass, so no annotation can enter the proof and the unit-stripping trap above
 cannot recur.
 
+It compresses to 47,157,311 bytes at `zstd -3` (10.6x), so the natural durable home is a
+`pareto8-certificate-2026-09-03` release via `tools/artifacts.sh push` plus a
+[data.md](../docs/data.md) row — the same shape as `sa193-certificate-2026-08-19`, which held
+2,846,568 claims in 15.6 MB. Not pushed yet: the chain is not complete until `k=5` verifies, and
+the release should carry the audit logs for every level.
+
 ### Audit results (cleanroom `radio_cleanroom`, 10 threads, Apple M4 Pro)
 
 | level | claims | support | verified | gaps | notes |
