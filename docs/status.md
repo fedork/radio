@@ -190,6 +190,8 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **Do not continue a universal transfer, repair, shuffle or splice proof.** | The final transfer in `(22-j,8^j,7^(15-j))` takes a feasible first-cut fiber at `j=13` to the empty fiber at `j=14`.  Global Robin--Hood closure and the stronger Adjacent-Fiber, Core--Blocker, canonical transport, Pascal-shuffle and two-interval-splicing claims are therefore false.  Their lower-level lemmas and censuses may still describe local structure, but they cannot prove universal sufficiency. |
 | **Do not combine an equal-row quotient with a separate left/right normalization without proving the two canonical orders are compatible.** | The first clean-room direct-split draft sorted equal-row options and also forbade the first right-pure option.  Each rule alone was sound, but together they deleted the sole representative of all-unit solutions and produced false negatives already at `K=1`.  The unquotiented oracle caught it.  The final solver quotients only the row-triple multiset and applies no side normalization; see the [verification record](../evidence/singleton_direct_split_cleanroom_2026-08-31.md). |
 | **A missing tight-band certificate is not a positive result.** | The two-anchor capacity test is a sound sufficient obstruction only.  `certificates=0` means unknown.  This remains true even though the complete `K=5` inequality census returns zero certificates on 613,689,090 eligible bands.  The 175 positive verdicts on the fixed rank-15/32 face come from the independent direct-row solver and its replay check, not from the extractor. |
+| **Never transcribe a cache or log negative with unit `(1:1)` parts stripped.** | Unit-Group Elimination gives `S = R + units` solvable in `k` iff `mass(S) <= 3^k` and `R` solvable in `k`, so "`R` unsolvable" is strictly **stronger** than "`R + units` unsolvable" — `R` can be solvable while `R + units` breaks the information bound. Rewriting `Sb(R+units)` as `Sb(R)` therefore asserts more than the source established. Emit parts **verbatim** and let the checker apply CANON/UNIT: `State::canon` keeps unit mass in `mass_full` and strips units only from `parts`. `tools/log_to_v1_cert.sh` does this; a first Python converter for the `k=8` census cache did not and was discarded on 2026-09-03. |
+| **A cache-seeded run's log is not a certificate, however expensive the run was.** | `pareto-census-k8-2026-08-19` cost 5.87 days but audits at `verified 249, gaps 28531`: it loaded a 934 MB cache and never reprinted those facts, so level `k-1` cannot support level `k`. Check closure by auditing the low levels first — it takes seconds — before planning anything on top of a log. A cold single-session run such as `out_k8.txt` is closed by construction; a resumed or cache-primed one is not. |
 | **Never warm-start a *negative* result from `cache-2025:parsed_260.txt`.** | It contains the 16 `Sa(193)` verdicts under suspicion. Loading it re-reads the old answers and "confirms" them. It cannot be filtered: the cache spans 2023–2025 and does not record which build wrote each line. Fine for *finding* solutions — a poisoned negative only slows a search, never corrupts it, because any solution found is re-verified as a tree. |
 | **Never promote a 2023-era negative above `legacy`.** | That build emits false negatives — 37 known, ~0.27%, with **no syntactic marker**. `Sb(143:17)` in 8 was declared unsolvable after 10 passes and 4 days, and is wrong. See [`../evidence/refuted_2023_negatives.txt`](../evidence/refuted_2023_negatives.txt). |
 | **A solver log without complete embedded provenance is not new durable evidence.** | Historical outputs cannot identify which bugs and optimizations their binaries contained. New builds go through `tools/build_radio.py`; every raw output must contain `radio-provenance-v1` and pass `tools/check_provenance.py`. Direct compiler builds explicitly say `provenance_complete=no`. Standalone utilities run through `tools/run_with_provenance.py`. The artifact uploader enforces this, with a conspicuous legacy-only override. |
@@ -291,8 +293,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   text now supplies the matching `Sa` definition and Figure 2.13, while a full Chapter 2 copy
   remains unobtained. See
   [aigner-1988-scan.md](aigner-1988-scan.md).
-- **18 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
-  `Sb(248:3)@8`, `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
+- **22 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
+  the five `K=8` frontier maxima `Sb(256:1)@8`, `Sb(255:2)@8`, `Sb(248:3)@8`, `Sb(242:4)@8` and
+  `Sb(231:5)@8`, then `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
   `Sb(473:6)@9`, their two-sided variants where available, and the unsupported
   singleton-majorized derivation for `Sb(973:6)@10`, plus the exact three-level atomization of
   the decisive `m=5` majorized leaf at `P_7`. All pass structural checking; the two
@@ -1094,6 +1097,46 @@ Historical lesson, retained without treating the old processes as live: before f
 majorization, almost all measured CPU was in near-saturated 8-part k=6 states.  Full-star
 majorization removes that mode strongly enough that `run3` is instead dominated by k=7.  Optimising
 only the old k=6 monsters is therefore no longer a complete plan for the current engine.
+
+## The K=8 frontier certificate (2026-09-03)
+
+A cleanroom-checkable refutation certificate for the whole `K=8` `Sb` Pareto frontier now exists,
+with **one level left to verify**. Full record in
+[`../evidence/pareto8_certificate_2026-09-03.md`](../evidence/pareto8_certificate_2026-09-03.md).
+
+The source is `out_k8.txt` (2026-05-12), a cold single-session sweep. Its 54 `k=8` negatives are
+exactly `Sb(57:55) … Sb(256:2)`, one per `m=2..55`, each `n1+1` for the matching
+`proven-exhaustive` row of `data/pareto_sb.csv`. `tools/log_to_v1_cert.sh` reduces it to a v1
+certificate of 11,215,465 claims (443,851,829 bytes).
+
+Cleanroom results so far, all **zero gaps, zero contradictions**: `k=1..4` complete (843,188
+claims, closing on only 633 `k=3` facts), `k=7` complete (6,852 claims), and the load-bearing
+`k=8` level complete — all **54** frontier refutations verified with
+`dead_options=148018/148018`, so every legal first split of every root is discharged. `k=6` is
+clean on a uniform 1/1000 sample.
+
+**`k=5` is the only expensive level and the only thing still missing.** It runs at 25.51 claims/s
+(~853 thread-hours; 3.6 days wall at 10 threads) because 6.9M of its 7.85M claims have 6–8 parts,
+giving 2.66M cells per claim against 2,121 at `k=4`. `k=6` by contrast is ~23 minutes locally. Ship
+`k=5` to a `c8a` host with `tools/cleanroom_ec2_launch.sh`, which already smoke-tests the heaviest
+level at `--stride 5000` first; `--stride`/`--offset` also shards it across hosts.
+
+Two things not to re-derive. **Do not re-run the `K=8` solver for this**: the `k=8` verdict lines in
+`out_k8.txt` sum to 950,852 CPU s = 11.01 days, 2.3x the entire `Sa(193)` cold run9, because it is a
+54-cell frontier sweep. And **do not try to certify the recent `pareto-census-k8-2026-08-19` run** —
+it is a prefix *choice* census whose verdicts stop at `k=6`, has zero `k=7`/`k=8` negatives, and
+audits at `verified 249, gaps 28531` because it ran from a preloaded cache whose facts were never
+reprinted. Its seed cache is not a substitute either; see the unit-part trap in the trap list.
+
+`out_k8.txt` fails `tools/check_provenance.py` (pre-banner), so it cannot be archived as raw
+evidence — but that does not weaken the certificate, since the cleanroom shares no solver code and
+re-derives every split from the four theorems. Wanting an archivable *raw* log is the only honest
+reason for the 11-day re-run.
+
+On the positive side, `Sb(256:1)`, `Sb(255:2)`, `Sb(248:3)`, `Sb(242:4)` and `Sb(231:5)` at `k=8`
+have unconditional canonical trees in `witnesses/`. Coverage stops at `m=5`: `m=6`, `m=8` and
+`m=55` give genuine `NO_CANONICAL_TREE` exhaustions, and `m=7,9,10,15,20,30,40` are undecided
+(CPU cap, which is not evidence of absence).
 
 ## The Sa(193) certificate
 

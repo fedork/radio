@@ -61,6 +61,25 @@ tools/cleanroom_ec2_status.sh [--follow]                   # progress of the run
 tools/test_cleanroom.sh                                    # 19-check regression, ~30 s
 ```
 
+Feeding it a raw solver log takes one pass:
+
+```
+tools/log_to_v1_cert.sh out_k8.txt k8_full.cert 8 /path/to/tmp    # 8 = the root level
+tools/make_refute_level_certificate.py k8_78.cert --level 8 -o k8-level8.cert
+```
+
+`tools/log_to_v1_cert.sh` streams `grep | sed | sort -u` rather than building a Python set — the
+Python version needed 5 GB RSS and stalled on `out_k8.txt`'s 11.2M negatives. It emits parts
+**verbatim** so the checker applies CANON/UNIT and recomputes masses; see the unit-part trap in
+[status.md](status.md#active-traps) for why stripping `(1:1)` yourself is unsound. Audit the low
+levels first: closure is cheap to disprove and a cache-seeded log will not close.
+
+**It has no positive mode.** `audit` and `selftest` are the only subcommands, and nothing in
+`src/` verifies a witness tree, so there is no such thing as "a tree compatible with the
+cleanroom". Trees go through `tools/check_witness.py`, a separate checker with its own trust base.
+If the two sides should ever share one checker, a `tree` subcommand is the shape, and the `G_k`/
+`U_k` terminal logic it needs is already in `src/gk.rs`.
+
 It reads both `radio-negative-level-certificate-v2` and flat `radio-negative-certificate-v1`, and
 fails closed: a claim whose split space is not covered prints `GAP verdict=uncovered` with the
 witnessing take vector, and a claim that is solvable outright prints `GAP verdict=contradicted`.

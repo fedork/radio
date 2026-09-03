@@ -1,0 +1,9 @@
+# Canonical witness tree, produced by radio_canon_search_generic.
+# command : ./canon8n 3 8 256 1
+# source  : /Users/fedor/.claude/jobs/6d3fea6b/tmp/p8/canon_256_1_at8.out
+# build_id: 0f432ae6a5b5e2a3a22ef76391dc796d85ee8e01b9f4f47a89ca1b164d019e1e
+# note    : K=8 Pareto frontier maximum at m=1 (data/pareto_sb.csv 8,1,256)
+# format  : indented '<state> @k --[split]-->' / '<state> @k [canonical U_k]'
+# checked : tools/check_witness.py
+#
+256:1 @8 [canonical U_8]

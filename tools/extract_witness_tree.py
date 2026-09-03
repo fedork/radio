@@ -14,6 +14,17 @@ state using:
 It deliberately does NOT rewrite `Sb(a:2)` as two copies of `Sb(a:1)`.
 An arbitrary weak-majorization terminal is not a proof: the converse is false.  Such a state is
 therefore expanded from logged evidence instead of being accepted as a terminal.
+
+WHAT THIS IS NOT (measured 2026-09-03).  Its rendered output is a *third* format --
+`- #N <state> in k: <status>` with `source:` lines -- and `tools/check_witness.py` auto-detects
+only the canonical (`<state> @k --[split]-->`) and `radio_print` numbered (`N. (in k) (used r)`)
+forms.  So nothing in the repo can verify what this script prints.  Worse, a log-derived tree
+bottoms out on arbitrary logged states rather than on unconditional `[canonical U_k]` /
+`[embedded G_k]` terminals, so it would not be a certificate even if it parsed.  Use this to
+*navigate* a log and see why the solver believed a state was solvable; to obtain a checkable
+proof run `radio_canon_search_generic` and convert with `tools/canon_out_to_tree.py`.  Emitting
+the numbered format from here would close the gap -- the `see node #N` back-references are
+already close to `(line M)` semantics -- and is not done yet.
 """
 from __future__ import annotations
 

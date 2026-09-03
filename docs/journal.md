@@ -13342,3 +13342,81 @@ Straight scaling of the 0.711 root-1-to-3 ratio against run9's 419,353.1 CPU sec
 at roughly 298k CPU seconds, about 3.45 days against run9's 4.85. That is an estimate only: the
 extra necessity-only work is front-loaded, and so is its cache payoff. No new claim follows from any
 of this -- it is operational measurement of a run that has not reached a verdict.
+
+## 2026-09-03 -- A cleanroom-checkable K=8 frontier certificate; the Pareto-8 census cannot supply one
+
+Asked to extract certified trees and a refutation certificate from "the recent Pareto-8 run" in a
+form the cleanroom checker accepts. Full record in
+[`../evidence/pareto8_certificate_2026-09-03.md`](../evidence/pareto8_certificate_2026-09-03.md).
+
+The recent `k=8` run is the Pareto-*prefix choice census* (`pareto-census-k8-2026-08-19`), and it
+cannot be a certificate source. Its solver verdicts stop at `k=6` -- 552,120 negatives across
+`k=3..6`, and **zero** at `k=7` or `k=8` -- so it contains no frontier maximality claim at all. It
+is also not closed: normalized to v1 it gives 552,120 facts and 0 roots, and auditing `k<=4` yields
+`verified 249, gaps 28531`, because the census ran from a preloaded 934 MB cache whose facts were
+never reprinted. Its seed cache survives locally (11,476,223 negatives) but is not a substitute:
+converting the distilled `- b ... t pairs n k` records requires a decision about unit `(1:1)` parts,
+and dropping them is **unsound** -- Unit-Group Elimination makes "R unsolvable" strictly stronger
+than "R + units unsolvable", since R can be solvable while R + units breaks the information bound. A
+first conversion attempt was discarded for exactly that reason, and `tools/log_to_v1_cert.sh` now
+emits parts verbatim so the checker applies CANON/UNIT itself.
+
+The run that does carry the frontier is `out_k8.txt` (2026-05-12, 1.33 GB), a cold single-session
+sweep with no cache-load line that terminates normally on `can solve Sb(256:1) ... in 8`. Its 54
+`k=8` negatives are exactly `Sb(57:55) ... Sb(256:2)`, one per `m=2..55`, and every one is `n1+1`
+for the matching `proven-exhaustive` row of `data/pareto_sb.csv`. It carries 11,215,465 negatives
+over `k=1..8` and 184,649 positives all bearing `with [...]`.
+
+`tools/log_to_v1_cert.sh` reduces it to a v1 certificate in one streaming pass: 443,851,829 bytes,
+11,215,465 claims, `sort -u` removing nothing (the solver had already emitted each state once). An
+earlier Python implementation was abandoned after 25 minutes at 5 GB RSS and ~40% CPU; the streaming
+pipeline does the same work in minutes.
+
+Cleanroom audit results, 10 threads on an M4 Pro, **zero gaps and zero contradictions everywhere
+checked**: `k=1..4` complete (843,188 claims, 1.787e9 cells, 17.2 s, closing on only 633 `k=3`
+facts); `k=7` complete (6,852 claims against 2,520,118 support, build 83.2 s, audit 0.41 s); and
+the load-bearing `k=8` level complete -- all **54** frontier refutations verified with
+`dead_options=148018/148018`, i.e. every legal first split of every root discharged. A uniform
+1/1000 sample of `k=6` also closes clean.
+
+The cost is concentrated in one level, measured not estimated. `k=5` runs at 25.51 claims/s
+(`eta_s=307270`, about 3.6 days wall at 10 threads, ~853 thread-hours) because 6.9M of its 7.85M
+claims have 6-8 parts, giving 2.66M cells per claim against 2,121 at `k=4` -- a 1,250x jump. `k=6`,
+by contrast, runs at 2,478 claims/s: 379 s of support build plus ~1,017 s of audit, about 23 minutes
+locally at 3.50 GB peak RSS. So the remaining obstacle to a complete induction is `k=5` alone. There
+is no cheap trim: the reachable-set restriction needs citation tracing, which only the retired
+coloring path provides, and the `Sa(193)` measurements put that at +8.0% cost for -4.14% claims.
+
+**Do not re-run the `K=8` solver to get this.** Summing `took` over the `k=8` verdict lines in
+`out_k8.txt` gives **950,852 CPU s = 11.01 days**, which is 2.3x the entire proof-safe `Sa(193)`
+cold run9 (419,353.1 s), because this is a 54-cell frontier sweep and not 16 roots. Auditing the
+certificate we already have is far cheaper: scaling the local `k=5` rate gives ~26.7 h on the
+`c8a.8xlarge` that `tools/cleanroom_ec2_launch.sh` already defaults to, ~8.9 h on 96 vCPU and
+~4.4 h on 192. Those are scalings of one local measurement, not `c8a` measurements;
+`tools/cleanroom_ec2_remote.sh` already smoke-tests the heaviest level at `--stride 5000` first,
+which is the way to calibrate, and `--stride`/`--offset` lets `k=5` be sharded across hosts.
+
+`out_k8.txt` **fails** `tools/check_provenance.py`, predating the provenance banner, so it cannot be
+archived as durable raw evidence. That does not weaken the certificate: the cleanroom shares no
+solver code and re-derives every split from the four theorems, so the seed log is a hint list and
+the certificate plus its zero-gap audit is the evidence. Wanting an archivable *raw* `K=8` log is
+the one honest argument for the 11-day re-run.
+
+On the positive side, five `K=8` frontier maxima now have unconditional canonical trees verified by
+`tools/check_witness.py` with no majorization terminals: `Sb(256:1)`, `Sb(255:2)`, `Sb(248:3)`
+(already committed), `Sb(242:4)` and `Sb(231:5)`. A `target_k=3` sweep under a 120 CPU-second cap
+found genuine `NO_CANONICAL_TREE` exhaustions at `m=6` and `m=8`, and at `m=55` under 900 s; the
+cells `m=7,9,10,15,20,30,40` only hit the cap and are **unknown**, not refuted. Coverage therefore
+stops at `m=5`, mirroring `K=9` where trees exist only for `m=4,5,6`. Because `Sb(256:1)@8` now has
+a tree, the `8,1,256` note in `data/pareto_sb.csv` was superseded in place to cite the witness
+instead of the log.
+
+Two gaps in the tooling are worth recording as work, not as complaints. First, **the cleanroom has
+no positive mode**: `radio_cleanroom` exposes only `audit` and `selftest`, and nothing in `src/`
+checks a tree, so "trees compatible with the cleanroom" does not exist -- trees go through
+`tools/check_witness.py`, a separate checker with its own trust base. The `G_k`/`U_k` terminal logic
+a `tree` subcommand would need is already in `src/gk.rs`. Second, **the log route to trees is broken
+end to end**: `tools/extract_witness_tree.py` renders `- #N <state> in k: <status>` plus `source:`
+lines, a third format `check_witness.py` cannot parse, and such trees would bottom out on arbitrary
+logged states rather than unconditional terminals even if it could. Canonical search is the only
+tree source today; the extractor's docstring should say so.

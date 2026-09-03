@@ -14,7 +14,11 @@ tools/check_witness.py witnesses/*.tree
 
 | file | claim | strength |
 |---|---|---|
+| `canon_256_1_at8.tree` | `Sb(256:1)` solvable in 8 | proof |
+| `canon_255_2_at8.tree` | `Sb(255:2)` solvable in 8 | proof |
 | `canon_248_3_at8.tree` | `Sb(248:3)` solvable in 8 | proof |
+| `canon_242_4_at8.tree` | `Sb(242:4)` solvable in 8 | proof |
+| `canon_231_5_at8.tree` | `Sb(231:5)` solvable in 8 | proof |
 | `canon_496_4_at9.tree` | `Sb(496:4)` solvable in 9 | proof |
 | `canon_480_5_at9.tree` | `Sb(480:5)` solvable in 9 | proof |
 | `canon_480_5_at9_twosided.tree` | `Sb(480:5)` solvable in 9 with two-sided splits | proof |
@@ -27,6 +31,17 @@ tools/check_witness.py witnesses/*.tree
 
 Each unconditional tree by itself proves *achievability*.  Maximality, where known, comes from a
 separate upper-bound theorem or exhaustive rejection.
+
+The five `at8` trees are exactly the `K=8` Pareto frontier maxima for `m=1..5`
+(`data/pareto_sb.csv` rows `8,1,256` through `8,5,231`), so the achievability half of those five
+cells now rests on an unconditional witness rather than on a solver log line.  Coverage stops
+there.  A `target_k=3` sweep on 2026-09-03 gave genuine `NO_CANONICAL_TREE` exhaustions at
+`m=6` and `m=8` under a 120 CPU-second cap, and at `m=55` under a separate 900-second cap.
+Those three are real absences at this stopping depth.  The cells `m=7,9,10,15,20,30,40` only
+hit the 120-second cap and are therefore **unknown**, not refuted — a cap is not evidence of
+absence, exactly as `out of nodes` is not.  So `K=8` canonical coverage stops at `m=5` with
+three known holes above it, which mirrors `K=9`, where trees exist only for `m=4,5,6`.
+Extending coverage means a deeper `target_k` at much greater cost, not simply more time.
 
 A tree is tied to the tool version that produced it. `canon_248_3_at8.tree` was generated
 before `radio_canon_search_generic.c` changed on 2026-04-16, and rerunning that command

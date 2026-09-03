@@ -74,7 +74,7 @@ k,m,n1,bound,status,source,note
 7,30,35,max,proven-exhaustive,fullsolve-2026:out_k7.txt+sa-2026-04-27:out_radio_1.txt,
 7,31,34,max,proven-exhaustive,fullsolve-2026:out_k7.txt+sa-2026-04-27:out_radio_1.txt,
 7,32,33,max,proven-exhaustive,fullsolve-2026:out_k7.txt+sa-2026-04-27:out_radio_1.txt,
-8,1,256,max,proven-theorem,lemma-1,achievability logged in out_k8.txt; upper bound 2^k is the dichotomy argument
+8,1,256,max,proven-theorem,lemma-1,achievability by witnesses/canon_256_1_at8.tree; upper bound 2^k is the dichotomy argument
 8,2,255,max,proven-exhaustive,k8-2026-05-12:out_k8.txt,
 8,3,248,max,proven-exhaustive,k8-2026-05-12:out_k8.txt,
 8,4,242,max,proven-exhaustive,k8-2026-05-12:out_k8.txt,
