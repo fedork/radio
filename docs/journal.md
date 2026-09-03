@@ -13150,3 +13150,20 @@ After the documentation update, `tools/check_tables.py`,
 `tools/check_witness.py witnesses/*.tree`, and `tools/check_docs.py` all passed. The witness check
 again reported only the two already-labeled arbitrary-majorization files as structurally sound
 with unsupported terminals; every unconditional witness passed.
+
+## 2026-09-02 -- Publication search closed with disclosed residual gaps
+
+After reviewing the remaining value of the Christen hunt, the project chose not to spend more
+time on open-ended archival access. Christen's 1980 Publication 341, the 1986 SIAM talk material,
+and seven interleaved Du--Hwang pages remain unavailable. They are now recorded as limitations of
+the audited corpus rather than active tasks or submission blockers. The search should be reopened
+only for a specific bibliographic lead, a referee request, or a decision to make a broader claim.
+
+This closure does not strengthen any negative literature conclusion. Publication language must
+still say that no prior result was located in the audited corpus; it must not convert database or
+archive non-discovery into “first ever.” The active publication work is the public DOI and paper
+revision.
+
+The closure-only documentation edit passed `tools/check_tables.py`,
+`tools/check_witness.py witnesses/*.tree`, and `tools/check_docs.py`; the witness warnings are the
+same two documented arbitrary-majorization files, and all unconditional witnesses passed.

@@ -61,7 +61,7 @@ queried subset.
    that imply 38 in seven tests and 64 in eight; it does not state the corrected `Sa` threshold.
 4. **Du & Hwang, *Combinatorial Group Testing and Its Applications*, 2nd ed. (World
    Scientific, 2000) — relevant available pages checked 2026-09-02.** No exact sequence was
-   located; retain the seven missing pages as a lower-priority coverage check.
+   located; the seven missing pages are a disclosed coverage limitation.
 5. **Forward citations — public API and Scholar passes complete.** OpenAlex and Semantic
    Scholar seed sets are screened. Scholar exposed 54 Aigner-1986, 180 Aigner-book, and 30
    Gargano cited-by rows; Li--Wu--Triesch exposed no cited-by link. Its approximate Aigner-book
@@ -213,9 +213,10 @@ specific**, not simply “all `m>=6` are ours.”
 
 **What to find.** Any published table or theorem giving `n(k,m)` for `m >= 6`.
 
-**Where still to look:** Christen's Fibonaccian search report and 1986 talk, plus the seven
-unavailable Du--Hwang pages if obtainable. Hwang 1989, the navigable Scholar pages, the public
-citation databases, and the backward bibliographies of the modern same-model papers are checked.
+**Search closure:** Hwang 1989, the navigable Scholar pages, the public citation databases, and
+the backward bibliographies of the modern same-model papers are checked. The Christen originals
+and seven unavailable Du--Hwang pages are disclosed corpus limitations. The search is closed;
+reopen it only for a specific lead, referee request, or broader claim scope.
 
 **Consequence.** Whatever is found converts cells from "ours" to "cited" in the same ledger
 format `literature.md` already uses. Low risk either way, but it must be done cell-honestly —

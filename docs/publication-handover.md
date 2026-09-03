@@ -9,8 +9,8 @@ Everything below is either already committed or explicitly flagged as undone.
 The mathematics and the verification are done and independently checked. **The Google Scholar
 citation pass and Hwang 1989 are closed. What still blocks submission is making a public deposit
 and revising the paper's priority language—not proving or computing anything.** The inaccessible
-Christen originals and seven missing Du--Hwang pages remain documented follow-up, but are no
-longer treated as submission blockers.
+Christen originals and seven missing Du--Hwang pages remain documented corpus limitations. The
+access search is closed; neither is a submission blocker.
 
 ## What the paper is, and the reframing that happened
 
@@ -74,7 +74,7 @@ explicitly, since it connects the computation to his framework.
      export has no match. The in-app Scholar pass exhausted 264 displayed rows (227 after
      normalized-title deduplication), and the available Du--Hwang target subsection and
      bibliography exposed only the known asymptotic chain. No additional finite threshold was
-     found. The seven unavailable Du--Hwang pages remain a lower-priority completeness check.
+     found. The seven unavailable Du--Hwang pages remain a disclosed corpus limitation.
      Reproducible searches are in
      [the audit record](../evidence/publication_prior_art_2026-09-02.md).
    - **Q2 (is the converse still open?)** Aigner poses it as a conjecture (quote above). The
@@ -151,5 +151,6 @@ retained source output; and the asymptotic constant, which Florin--Ho--Jiang set
 2. Restructure the paper around the counterexample. This is a framing decision and was
    deliberately left to a human — the draft header records the gap rather than guessing.
 3. P5 cleanup finishes with the remaining `<TODO>` sections.
-4. In parallel if convenient, pursue Christen 1980/1986 and the seven missing Du--Hwang pages;
-   keep claims corpus-scoped whether or not those copies are found.
+
+The access search is deliberately closed. Do not restart the Christen or Du--Hwang hunt unless a
+referee identifies a specific source or the paper's claim scope changes; keep claims corpus-scoped.

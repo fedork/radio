@@ -11,8 +11,9 @@ they are not the first published achievability proofs.
 No finite source located in the corpus below states or implies `Sa(65)`, `Sa(112)`, or `Sa(192)`,
 and none proves the upper boundary `Sa(38) <= 7`. That is a **corpus-scoped conclusion**, not a
 proof that an unindexed or inaccessible publication does not exist. The remaining access gaps
-are listed explicitly at the end. The Google Scholar cited-by pass and Hwang 1989 are now closed;
-the surviving gaps are incomplete book-page access and the two unavailable Christen originals.
+are listed explicitly at the end. The Google Scholar cited-by pass and Hwang 1989 are closed;
+the inaccessible book pages and Christen originals are retained as disclosed limitations, not
+active search tasks.
 
 ## Finite results found in primary sources
 
@@ -325,19 +326,21 @@ edge-injective vertex-map pullback lemma. Aigner and Andreae use related special
 not the general statements proved here. This remains a scoped negative result; the finite-value
 audit is much stronger than the attribution audit for these elementary lemmas.
 
-## Remaining access-dependent checks
+## Disclosed inaccessible sources; search closed
 
-The exhaustive Scholar page walk and Hwang 1989 are closed. Two direct-source gaps and one
-lower-priority completeness check remain:
+The exhaustive Scholar page walk and Hwang 1989 are closed. On 2026-09-02 the project also chose
+to close the access search rather than pursue an open-ended archival hunt. The following remain
+limitations on the audited corpus, not pending work:
 
 1. Christen, *A Fibonaccian algorithm for the detection of two elements*, Publ. 341,
    Université de Montréal (1980), and the 1986 SIAM conference presentation “Adaptive versus
    non-adaptive quantitative detection.” Scholar versions and all 16/3 cited-by results exposed
    no primary copy. Hwang 1989 now states their relevant asymptotic consequences, but the
-   originals remain necessary before making a claim about everything they contain.
+   originals would be necessary before making a claim about everything they contain. No such
+   claim is made.
 2. The seven unavailable pages interleaved in Du--Hwang pp. 211--230, plus a full page-by-page
    Chapter 2 copy if obtainable. The available target subsection and bibliography make this a
-   desirable completeness check, not a reason to hold the paper.
+   disclosed completeness limitation, not a reason to hold the paper.
 
 Belokopytov's 1987/1989 papers remain desirable for asymptotic attribution, but the later full
 texts state their consequences precisely enough to show that they do not settle the small finite

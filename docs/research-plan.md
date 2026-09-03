@@ -21,7 +21,8 @@ union, 106 Semantic Scholar seed records, 424 broad discovery records, OEIS, ind
 Chapter 2/Du--Hwang text, and two current nice-graph papers are checked. The in-app Scholar pass
 screened 264 displayed citations (227 deduplicated), Hwang 1989 was read in full, and the
 available Du--Hwang target pages were inspected. The Christen 1980/1986 originals and seven
-interleaved Du--Hwang pages remain desirable follow-up rather than submission blockers. The
+interleaved Du--Hwang pages remain disclosed corpus limitations; the access search is closed and
+should not be restarted absent a specific lead or referee request. The
 draft in `paper/` is mechanically clean but predates the
 counterexample, the `K<=5` converse and the verification architecture, and needs restructuring
 around them; the remaining `<TODO>` sections are P5.

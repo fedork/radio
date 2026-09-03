@@ -299,7 +299,7 @@ unsupported relaxed-terminal tree in `witnesses/majorized_481_5_at9.tree`, and t
 `evidence/sb_m5_k9_root_transition.txt`.  The adjacent exact `m=6` boundary is in
 `evidence/sb_m6_k9_frontier.txt`.
 
-## Still worth obtaining
+## Unavailable originals and residual coverage
 
 These are cited by the papers above but have not yet been checked directly here:
 
@@ -329,7 +329,7 @@ These are cited by the papers above but have not yet been checked directly here:
   study of a broader `d=k=2` weight model, which permits a weight-2 coin. It is not a comparison
   bound for this repository's two distinct-defective, worst-case model.
 
-For a defensible priority statement, the Christen originals and missing Du--Hwang pages remain
-worth obtaining, but Hwang 1989 and every navigable Scholar cited-by page are now checked. The
-exact scope and the completed OpenAlex/Semantic Scholar/Scholar citation passes are recorded in
-the audit linked above.
+Hwang 1989 and every navigable Scholar cited-by page are checked. The Christen originals and
+missing Du--Hwang pages remain disclosed limitations, but the access search is closed rather than
+left as indefinite publication work. Reopen it only for a specific lead or referee request. The
+exact scope and completed OpenAlex/Semantic Scholar/Scholar passes are recorded in the audit.
