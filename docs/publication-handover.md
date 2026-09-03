@@ -6,11 +6,11 @@ Everything below is either already committed or explicitly flagged as undone.
 
 ## The one-line state
 
-The mathematics and the verification are done and independently checked. **The Google Scholar
-citation pass and Hwang 1989 are closed. What still blocks submission is making a public deposit
-and revising the paper's priority language—not proving or computing anything.** The inaccessible
-Christen originals and seven missing Du--Hwang pages remain documented corpus limitations. The
-access search is closed; neither is a submission blocker.
+The mathematics and verification are done and independently checked. The Google Scholar citation
+pass and Hwang 1989 are closed, and the manuscript has been restructured around the counterexample
+with corrected priority language. **The only remaining external-access submission blocker is a
+public deposit.** Final author and venue editing remains. The inaccessible Christen originals and
+seven missing Du--Hwang pages are documented corpus limitations, not active tasks.
 
 ## What the paper is, and the reframing that happened
 
@@ -56,15 +56,17 @@ explicitly, since it connects the computation to his framework.
 - **Reproduction package.** `tools/make_repro_package.sh` builds a 15.7 MB tarball — certificate,
   both checkers, both witnesses, evidence — validated by extracting to a clean directory and
   running it end to end. This is deposit-ready.
-- **Paper draft mechanics.** The hand-typed `Sb` table is now a generated block; the numbering
-  collision, dead image reference and mangled formula are fixed.
+- **Paper structure.** The manuscript now leads with the exact singleton-majorization boundary,
+  includes the `K=6` counterexample and infinite family, incorporates the corrected prior-art
+  record and independent certificate checks, and retains generated `Sa`/`Sb` tables. The imported
+  draft's placeholders, numbering collision, speculative formulas and stale framing are gone.
 - **Two record errors corrected**, both of the class that would embarrass in submission:
   Subgraph Monotonicity was claimed as never-stated when it is Aigner eq. (3.10); and the
   certificate doc said it re-checks `Sa(193)` in 9 tests rather than 10.
 
-## What blocks submission
+## Submission checklist
 
-1. **Novelty audit access closure** — [novelty-audit.md](novelty-audit.md) now records the
+1. **Novelty audit — closed.** [novelty-audit.md](novelty-audit.md) now records the
    completed 69-work OpenAlex forward-citation union, 106 Semantic Scholar seed records, 424
    broad discovery records, backward source closure, and exact-string searches. Current state:
    - **Q1 (is the `Sa` sequence published?)** Aigner published it through `k=7`, but with the
@@ -147,10 +149,12 @@ retained source output; and the asymptotic constant, which Florin--Ho--Jiang set
 
 ## Suggested order
 
-1. Deposit the package; get the DOI. This is now the only external-access submission blocker.
-2. Restructure the paper around the counterexample. This is a framing decision and was
-   deliberately left to a human — the draft header records the gap rather than guessing.
-3. P5 cleanup finishes with the remaining `<TODO>` sections.
+1. Deposit the package and insert its DOI in the manuscript. This is the only external-access
+   submission blocker.
+2. Perform final author and target-venue editing on the restructured manuscript. The theory-first
+   narrative, priority corrections, finite tables, and verification section are now present.
+3. Audit the short and infinite-family proofs independently and decide how much of the large
+   `K<=5` computational proof belongs in the main paper versus supplementary material.
 
 The access search is deliberately closed. Do not restart the Christen or Du--Hwang hunt unless a
 referee identifies a specific source or the paper's claim scope changes; keep claims corpus-scoped.

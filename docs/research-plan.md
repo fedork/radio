@@ -22,10 +22,10 @@ Chapter 2/Du--Hwang text, and two current nice-graph papers are checked. The in-
 screened 264 displayed citations (227 deduplicated), Hwang 1989 was read in full, and the
 available Du--Hwang target pages were inspected. The Christen 1980/1986 originals and seven
 interleaved Du--Hwang pages remain disclosed corpus limitations; the access search is closed and
-should not be restarted absent a specific lead or referee request. The
-draft in `paper/` is mechanically clean but predates the
-counterexample, the `K<=5` converse and the verification architecture, and needs restructuring
-around them; the remaining `<TODO>` sections are P5.
+should not be restarted absent a specific lead or referee request. The manuscript has now been
+restructured around the counterexample, the exact `K<=5/6` boundary, the finite results, and the
+independent verification architecture. It has no remaining theorem TODO sections; final
+author/venue editing and the public DOI remain publication work.
 
 **H2 - The K=9 Sb column.** Published theorems now make `m=1..5` exact (Aigner 1986 for
 `m=2,3,4`, Li--Wu--Triesch 2018 for `m=5`), including `n(9,5)=481`; a retained exact replay
@@ -152,35 +152,23 @@ of P4 rather than as separate work.
 **Done when** there is a measured cost model for the band and a decision about whether to
 pursue it at all.
 
-### P5 - Correct and finish the paper
+### P5 - Correct and finish the paper — structural rewrite delivered 2026-09-02
 
-- Replace the stale K=8 column (`m = 10..17`) with the values in `data/pareto_sb.csv`.
-- Fix lemma (10): `k(k-1)/2`, not `k(k-5)/2`.
-- Fill the `<TODO>` sections - Terminology, the Unit Group Triviality Lemma (now proved in
-  [theorems/unit-group-elimination.md](theorems/unit-group-elimination.md)), Insights,
-  Refuted lemmas.
-- Add lemma (12) for `m = 8`, and the `G_k = sum of binomials` closed form.
-- Present `Sa(10)=192` as an exact maximum: a verified witness proves achievability and the
-  proof-safe cold run9 log rejects all sixteen first-test states for 193. Keep the suspect 2023
-  result only as historical cost context.
-- Fix the numbering collision: `(7)` is currently a duplicate of `(5)`, and the sentence
-  "(7) holds true k up to 8" plainly refers to `(u1)`.
-- Replace proposed lemma (8) by Aigner 1986 Corollary 4's exact `m=4` theorem and proposed lemma (9) by
-  Li--Wu--Triesch's exact piecewise `m=5` theorem.  Record the independently replayed
-  `n(9,5)=481` / `n(9,5)<482` boundary and the `3+2` to `4+1` structural switch.
-- Add the primary-source discussion from [literature.md](literature.md): Aigner for the graph
-  model and exact `m=2,3,4`, Li--Wu--Triesch for `m=5`, Zhang--Berger--Massey for finite
-  feedback-code constructions, and Hao/Gargano et al. for scalable product constructions.
-  Credit Gargano's exact `Sb(21:17)@6` and full `Sb(32:32)@7` tree and their `Sa(38)` / `Sa(64)`
-  consequences. Also distinguish the modern asymptotic results of
-  Jiang--Polyanskii--Vorobyev and Florin--Ho--Jiang from finite fixed-`m` claims. Do not copy
-  Li et al.'s apparently inconsistent intermediate equations (69)–(70) without recomputing
-  their indices.
-- State that every `Sa` table entry through `k=10` is proven maximal, and cite the distinct
-  witness/exhaustive sources for the new last cell.
+The imported draft has been superseded in place. The current manuscript:
 
-**Done when** the draft passes `tools/check_tables.py` with no stale generated blocks and
-contains no number absent from `data/*.csv`.
+- leads with the exact singleton-majorization boundary rather than a table in isolation;
+- states the `K<=5` positive theorem, the `K=6` tight-band counterexample, and the infinite
+  counterexample family;
+- presents `Sa(10)=192` with separate witness and exhaustive-negative evidence and explains the
+  independently checked 2,846,568-claim certificate;
+- retains generated `Sa` and `Sb` tables, incorporates the corrected Aigner/Gargano attribution,
+  and separates prior constructions from prior maxima;
+- removes the unresolved terminology placeholders, duplicated numbering, conjectural profile
+  fits, and other exploratory material from the paper narrative.
+
+The manuscript passes the mechanical table and documentation checks. Remaining work is final
+author/venue editing, inserting the public artifact DOI, and deciding how much verification detail
+belongs in the main text versus supplementary material.
 
 ### P6 - Full star expansion after the singleton converse counterexample
 

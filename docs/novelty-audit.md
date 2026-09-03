@@ -1,15 +1,10 @@
 # Novelty audit: what to find, where, and what each answer changes
 
-Opened 2026-09-02. This is the blocking item for [publishable-claims.md](publishable-claims.md):
-that inventory lists candidate claims "because it has a proof object or a retained
-computational record; that is not by itself a claim of priority."  Nothing here can be settled
-from inside the repo. Each question below states what to look for, where, and — the part that
-matters — **what changes depending on the answer**, so a negative result is as useful as a
-positive one and gets recorded either way.
-
-Fill in the verdict lines as they are answered. A question answered "already published" is a
-success: it converts a risky claim into a citation and removes it from the paper's novelty
-surface before a referee does it for us.
+Opened and closed 2026-09-02. This audit governs the priority language in
+[publishable-claims.md](publishable-claims.md): a proof object or retained computational record
+establishes correctness, not priority. The questions below retain both the original search targets
+and their completed verdicts so that a positive prior-art finding, a scoped non-discovery, and an
+inaccessible-source limitation remain distinguishable.
 
 Known-good source map: [literature.md](literature.md) records the primary sources read directly,
 with DOIs and an explicit imported-vs-own ledger. The exhaustive indexed and Scholar searches,

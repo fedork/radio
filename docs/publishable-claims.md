@@ -5,17 +5,17 @@
 checkers, both witnesses, evidence) that was extracted to a clean directory and exercised
 end to end - manifest verified, witness verified unconditionally, chain structure verified,
 the Rust checker built from source in 7 s with no dependencies, its selftest passed, and the
-cheap levels audited with zero gaps. What remains before submission is not engineering:
-**(a)** revising the paper with the completed navigable Scholar and Hwang audit,
-as briefed question-by-question in [novelty-audit.md](novelty-audit.md), and **(b)** depositing
-the package publicly
-with a DOI, since `fedork/radio-data` is private and every artifact link in this repo 404s
-for a referee.
+cheap levels audited with zero gaps. The paper has now been restructured around the
+counterexample, incorporates the navigable Scholar and Hwang audit, and removes the speculative
+material from its results narrative. What remains is final author/venue editing and depositing the
+package publicly with a DOI, since `fedork/radio-data` is private and every artifact link in this
+repo 404s for a referee.
 
 This is a deliberately conservative inventory for a prospective paper. A candidate claim is
 listed here because it has a proof object or a retained computational record; that is not by
-itself a claim of priority. Before submission, each item needs a focused prior-art check and the
-stated reproducibility package.
+itself a claim of priority. The focused prior-art audit is complete and its corpus limitations
+remain part of every novelty statement; the stated reproducibility package still needs a public
+deposit.
 
 ## Recommended framing: conjecture refutation and corrected exact frontiers
 
@@ -113,9 +113,9 @@ is sufficient, resolves his stated converse question negatively, and gives both 
 counterexample and an infinite family.  The exact distance census supplies a sharp finite
 minimality statement.
 
-Before submission: independently audit the short and infinite-family proofs, package the `K=5`
-reproduction and perform a focused literature/novelty search before claiming priority.  Cite
-Aigner for the historical necessity result and question.
+Before submission: independently audit the short and infinite-family proofs and package the
+`K=5` reproduction. The focused literature search is complete; keep its corpus limitation
+explicit and cite Aigner for the historical necessity result and question.
 
 ### T2 — Exact Prefix-Cylinder Extension Lemma
 

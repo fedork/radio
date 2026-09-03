@@ -13167,3 +13167,31 @@ revision.
 The closure-only documentation edit passed `tools/check_tables.py`,
 `tools/check_witness.py witnesses/*.tree`, and `tools/check_docs.py`; the witness warnings are the
 same two documented arbitrary-majorization files, and all unconditional witnesses passed.
+
+## 2026-09-02 -- Publication manuscript restructured after access closure
+
+The two access-audit commits were independently reconciled before resuming the publication track.
+The committed Scholar manifest contains 227 deduplicated records plus its header, consistent with
+the recorded 264 displayed rows before cross-seed deduplication. The downloaded Hwang 1989 PDF has
+SHA-256 `f2a6bc3359266635d8d3be8f917fc3f5639bc34a5dd57f7bd30655375a8e9d4f`, matching the audit.
+All baseline table, witness and documentation checks passed on that handoff.
+
+The imported manuscript was then superseded in place. It now has an abstract, a precise graph and
+state model, a corpus-scoped related-work section, and a theory-first narrative centered on the
+exact singleton-majorization boundary: sufficiency through `K=5`, the tight-band counterexample at
+`K=6`, and the dyadic family for every `K>=6`. The finite section retains generated `Sa` and `Sb`
+tables, attributes the `Sb(21:17)` and `Sb(32:32)` constructions to Gargano, distinguishes endpoint
+constructions from maxima, and describes the independent 2,846,568-claim `Sa(193)` certificate
+check. The old terminology placeholders, duplicated lemma numbering, speculative `m>=7` formulas,
+and unproved antidiagonal claim were removed from the paper rather than promoted into results.
+
+The publication handover, plan, status, claim inventory, novelty-audit introduction, documentation
+map, and singleton theorem note were updated so none still says that the prior-art search or paper
+restructure is pending. P5's structural rewrite is delivered. The remaining external-access
+blocker is the public artifact DOI; final author/venue editing and proof-presentation choices remain
+normal manuscript work.
+
+After the rewrite, `tools/check_tables.py`, `tools/check_witness.py witnesses/*.tree`, and
+`tools/check_docs.py` all passed. The witness checker reported only the two already documented
+arbitrary-majorization diagnostics as unsupported; every unconditional witness passed. No solver
+or background research process was started.

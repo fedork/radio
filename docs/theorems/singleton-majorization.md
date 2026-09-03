@@ -18,9 +18,11 @@ has no legal first split into three `G_5`-majorized children and is therefore no
 tests.  The proof uses two tight Pascal ranks and one integral unit of mixed mass per intervening
 row; see [the counterexample proof](../../evidence/singleton_k6_counterexample_2026-08-30.md).
 Aigner proved the necessary direction and explicitly left the converse open in 1988; this
-counterexample answers that question negatively for the present formulation.  Publication
-priority beyond the sources surveyed here has not yet been audited.  See also
-[the scan note](../aigner-1988-scan.md).
+counterexample answers that question negatively for the present formulation. A corpus-scoped
+prior-art audit found no published resolution in the navigable citation graph or the primary
+sources it exposed; the unavailable-source limitations remain explicit, so no worldwide-first
+claim is made. See the [audit record](../../evidence/publication_prior_art_2026-09-02.md) and
+[scan note](../aigner-1988-scan.md).
 
 The failure is not isolated.  The proved
 [Dyadic Balanced-Band Family](tight-band-capacity.md#a-counterexample-at-every-k6) constructs a

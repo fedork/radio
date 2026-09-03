@@ -1,68 +1,161 @@
-<!--
-Imported 2026-08-02 from the Google Docs export, punctuation unescaped.
+# Exact adaptive quantitative group testing with two defectives
 
-KNOWN WORK REMAINING - see docs/research-plan.md item P5:
-  - <TODO> sections: Terminology, Unit Group Triviality Lemma, Insights
-  - add lemma (12) for m=8
-  - THE DRAFT PREDATES THE STRONGEST RESULTS AND DOES NOT YET CONTAIN THEM:
-      * singleton majorization by G_K is necessary but NOT sufficient - the K=6
-        counterexample and the infinite family for every K>=6, which answer negatively the
-        converse Aigner 1988 left open after Prop. 3.25;
-      * the converse IS true for K<=5 (exhaustive, 2026-08-31);
-      * the certified-verification architecture: the 2,846,568-claim certificate and its
-        independent re-verification by tools/cleanroom.
-    A restructure around these, rather than more polishing of the sections below, is the
-    remaining work. See docs/publishable-claims.md for the claim inventory and the
-    completed citation-graph audit and its explicitly listed access gaps.
-  - fixed 2026-09-02: the hand-typed Sb frontier is now a generated block; the (7)/(5)
-    numbering collision, the dead image reference and the mangled G_k formula are resolved.
-Do not treat any number in this file as authoritative; data/*.csv is.
+<!--
+Working manuscript. Numerical tables are generated from data/*.csv and must not be edited by
+hand. The remaining publication placeholder is the public artifact DOI.
 -->
 
-**Introduction**
+## Abstract
 
-A specific case of quantity group testing is considered: given a group on *n* coins, two of which are known to be defective, and a test procedure that reports the number of defective coins in a tested subset (0, 1 or 2), determine the largest *n* for which both coins can be detected with at most *k* adaptive tests. The computation proves the `Sa` sequence through *k*=10 and extends the exact and constructive record for the two-set `Sb` problem. Every computational claim is separated into a verified lower witness and, where available, an exhaustive or published upper bound.
+Exactly two of `n` items are defective. An adaptive test selects a subset and reports whether it
+contains zero, one, or two defectives. We determine the largest solvable population for every test
+budget through ten, obtaining
 
-**Relation to prior work**
+`2, 2, 3, 5, 8, 13, 22, 38, 65, 112, 192`,
 
-Aigner's graph formulation identifies `Sa(n)` with search on the complete graph `K_n` and
-`Sb(n:m)` with search on `K_{m,n}`; his canonical sequence is the predecessor of the `G_k`
-sequence used below ([Aigner 1986](https://doi.org/10.1016/0166-218X(86)90026-0)). The same
-paper defines the complete-graph threshold exactly as `Sa(k)` and prints the values through
-seven tests as `3,5,8,13,22,37`, calling 37 correct; Aigner's 1988 monograph repeats the table.
-Gargano, Montuori, Setaro and Vaccaro's later exact `Sb(21:17)@6` result, together with Aigner's
-published six-test complete-graph threshold 22, already implies that
-38 is achievable in seven tests; the verified `Sa(38)` witness below independently constructs
-it, and the local 38/39 boundary corrects Aigner's claimed maximum. Aigner 1986 Corollary 4
-also gives the exact `m=4` formula; Li, Wu and Triesch independently reprove it and establish
-the piecewise exact `m=5` result
-([2018](https://doi.org/10.1016/j.dam.2018.05.026)). Hao's product inequality
-([1990](https://doi.org/10.1016/0166-218X(90)90022-5)) and the explicit recursive algorithm of
-Gargano, Montuori, Setaro and Vaccaro
-([1992](https://doi.org/10.1016/0166-218X(92)90260-H)) provide the scalable asymptotic context.
-The latter paper publishes the full `Sb(32:32)@7` tree, which implies `Sa(64)@8`, as well as
-exact costs for `Sb(14:9)@5` and `Sb(21:17)@6`.
-Jiang, Polyanskii and Vorobyev give an explicit near-optimal mixed construction
-([2019](https://www.lebesgue.fr/sites/default/files/proceedings_WCC/WCC_2019_paper_65.pdf));
-Florin, Ho and Jiang determine the sharp leading asymptotic rate
-([2022](https://doi.org/10.1109/TIT.2021.3137965)). Neither result is a finite fixed-`m` Pareto
-maximum.
-Hwang's survey ([1987](https://doi.org/10.2307/2322412)) is a concise historical introduction
-to the two-coin quantitative model.  Full source notes and cautions are maintained in
-`../docs/literature.md`.
+and determine the complete two-set Pareto frontier through eight tests, together with the exact
+cell `n(9,6)=473`. The ten-test upper bound is represented by a finite 2,846,568-claim
+certificate that has been checked by an implementation sharing no code with the search program.
 
-**Terminology and notation**
+The structural result is sharper. Aigner proved that every solvable singleton state is weakly
+majorized by an explicit Pascal-type state `G_K` and asked whether the converse holds. We prove
+the converse for every `K<=5`, give a short integral counterexample at `K=6`, and construct a
+counterexample for every `K>=6`. Thus six tests are the exact first failure level of the
+majorization characterization.
 
-Sa, Sb, Sbb, k, zero group, unit group, etc\<TODO>
+## 1. Introduction
 
-**Results**
+The problem is a small but unusually exact instance of adaptive quantitative group testing. Each
+test has three possible answers, yet the hypotheses are pairs of items rather than independent
+ternary messages. That constraint makes the information bound `3^K` necessary but rarely
+sufficient and makes finite optimality substantially harder than construction.
 
-**Maximum solvable Sa states**
+This paper has three contributions:
 
-The following are maximum values of *n* for a given *k* such that Sa(*n*) can be solved in *k*
-tests. Every entry through *k*=10 is proven maximal. For *k*=1 through 9, retained exhaustive logs
-contain the positive boundary and the rejection immediately above it. For *k*=10, an independently
-checked witness proves Sa(192) achievable and a proof-safe cold exhaustive run rejects Sa(193).
+1. It classifies the singleton-majorization question exactly by test depth: the converse holds
+   through `K=5` and fails at every `K>=6`.
+2. It determines the complete-graph threshold through ten tests and corrects Aigner's published
+   seven-test maximum from 37 to 38. The construction for 38 was already implicit in Gargano et
+   al.; the new content at that level is the matching upper boundary.
+3. It gives the complete exact `Sb` frontier through eight tests and a separately certified
+   `Sa(193)` impossibility proof. Positive results are supplied as explicit strategy trees, while
+   negative results are tied to exhaustive records or finite certificates.
+
+The finite-value priority statements below are deliberately corpus-scoped. The search record
+includes exhaustive navigable Google Scholar walks for the core sources, complete OpenAlex and
+Semantic Scholar seed results, broad discovery searches, primary-text checks, and explicit
+unavailable-source limitations; see the
+[prior-art audit](../evidence/publication_prior_art_2026-09-02.md).
+
+## 2. Model and notation
+
+A state is a finite set of surviving unordered defective pairs. In Aigner's graph formulation,
+items are vertices and possible pairs are edges. A test selects a vertex set; an edge then returns
+the number of its endpoints in that set. A strategy is a ternary decision tree, and a state is
+*solvable in `K` tests* if every surviving edge is isolated by depth at most `K`.
+
+We use two structured state families:
+
+- `Sa(n)` is the complete graph on `n` items, with mass `binom(n,2)`.
+- `Sb(n_1:m_1, ..., n_r:m_r)` is the disjoint union of complete bipartite graphs
+  `K_{n_i,m_i}` and has mass `sum_i n_i m_i`. Orientation and part order are immaterial.
+
+One test taking `a_i` and `b_i` vertices from the two sides of part `i` has children
+
+```text
+outcome 2: Sb(a_i:b_i),
+outcome 0: Sb(n_i-a_i:m_i-b_i),
+outcome 1: Sb(a_i:m_i-b_i, n_i-a_i:b_i),
+```
+
+with empty parts removed and the contributions from all parent parts united. Any solvable state
+has mass at most `3^K`. Deleting candidate edges cannot make a state harder, so a strategy for a
+graph also solves every subgraph.
+
+Let `A(K)` be the largest `n` for which `Sa(n)` is solvable in `K` tests. Let `n(K,m)` be the
+largest `n>=m` for which `Sb(n:m)` is solvable in `K` tests. An `Sb` state is *singleton* when
+every short side equals one, and we identify it with its nonincreasing long-side sequence
+`a=(a_1,a_2,...)`. We write `a <=_w b` for weak majorization: every prefix sum of `a` is at most
+the corresponding prefix sum of `b`.
+
+## 3. Prior work
+
+[Aigner (1986)](https://doi.org/10.1016/0166-218X(86)90026-0) introduced the graph formulation,
+proved the exact fixed-`m=2,3,4` formulas, tabulated small complete bipartite cases, and published
+the complete-graph thresholds through seven tests as `3,5,8,13,22,37`. His 1988 monograph
+repeats that table and, after proving singleton-majorization necessity, explicitly asks whether
+the converse holds.
+
+[Gargano et al. (1992)](https://doi.org/10.1016/0166-218X(92)90260-H) publish exact strategies
+for `Sb(14:9)@5` and `Sb(21:17)@6` and the full seven-test `Sb(32:32)` tree. Combining the
+`21:17` strategy with Aigner's six-test complete-graph threshold constructs `Sa(38)@7`; the
+`32:32` tree constructs `Sa(64)@8`. Accordingly, our 38-coin tree is an independent certificate,
+not the first construction, while the 38/39 boundary corrects the earlier claimed maximum. The
+exact value 65 improves the located eight-test construction by one.
+
+[Zhang, Berger and Massey (1987)](https://doi.org/10.1109/TIT.1987.1057358) give finite
+full-feedback binary-adder codes equivalent to several `Sb` constructions. Hwang's
+[1987](https://doi.org/10.2307/2322412) and
+[1989](https://doi.org/10.1111/j.1749-6632.1989.tb16406.x) accounts, Hao's
+[product construction](https://doi.org/10.1016/0166-218X(90)90022-5), and
+[Christen's round survey](https://doi.org/10.1016/0012-365X(94)00106-S) describe the older
+finite inputs and asymptotic developments. [Li, Wu and Triesch
+(2018)](https://doi.org/10.1016/j.dam.2018.05.026) prove the exact piecewise `m=5` frontier.
+Later work determines the sharp asymptotic rate
+([Florin, Ho and Jiang 2022](https://doi.org/10.1109/TIT.2021.3137965)); it does not settle the
+small finite maxima considered here.
+
+## 4. The singleton-majorization boundary
+
+Set `G_0=(1)`. If `G_{K-1}=(h_1,...,h_s)`, define the zero-padded sequences
+
+```text
+L=(h_1,0,h_2,0,...,h_s,0),
+M=(h_1,...,h_s,0,...,0),
+R=(0,h_1,0,h_2,...,0,h_s),
+```
+
+and let `G_K` be the nonincreasing rearrangement of `L+M+R`. For example,
+`G_2=(4,3,1,1)` and `G_3=(8,7,4,4,1,1,1,1)`. This is Aigner's canonical singleton strategy;
+its mass is `3^K`.
+
+> **Theorem 1 (exact majorization boundary).** A singleton state solvable in `K` tests is weakly
+> majorized by `G_K`. Conversely, every `G_K`-majorized singleton state is solvable when
+> `K<=5`. The converse is false for every `K>=6`.
+
+For necessity, index the possible test transcripts by `{0,1,2}^K`. Join two transcripts when,
+at their first differing coordinate, their symbols are 0 and 2. Hypotheses belonging to one
+singleton row must form a stable set in this transcript-conflict graph. Its maximum `t`-colorable
+induced subgraph has size equal to the sum of the `t` largest entries of `G_K`, proving every
+majorization inequality.
+
+At `K=6`, using `x^r` for `r` copies of `x`, consider
+
+```text
+P = (64,63,57^2,42^4,22^7,8^15,7^2,1^32).
+```
+
+The state has 64 positive rows, mass `3^6`, and `P <=_w G_6`. It nevertheless has no legal first
+split into three `G_5`-majorized children. Tightness at prefix ranks 15 and 32 restricts the row
+color counts to two symmetric transitions. Every intervening row must contribute positive mass
+to the mixed child, after which one pure child requires 64 units from nine rows that can retain at
+most 63. Both transitions are impossible. The complete inequality argument is the
+[Tight-Band Capacity Obstruction](../docs/theorems/tight-band-capacity.md); a separate direct-row
+enumerator reproduces the failure.
+
+An explicit dyadic balanced-band construction repeats the same obstruction for every higher
+depth. At the other side of the boundary, exact prefix-cylinder certificates and an uncapped Hall
+check cover all `G_5`-majorized exact-support parents; reduction to smaller support completes the
+`K<=5` direction. Thus `K=6` is not merely the first found counterexample but the proved first
+failure level. Full statements, reductions, and verification records are collected in the
+[singleton-majorization theorem](../docs/theorems/singleton-majorization.md).
+
+## 5. Exact finite thresholds
+
+### 5.1 Complete-graph states
+
+The following are the exact values of `A(K)` through ten tests. Every bare entry is a maximum,
+not merely a construction.
 
 <!-- generated:pareto_sa -->
 | k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
@@ -72,25 +165,31 @@ checked witness proves Sa(192) achievable and a proof-safe cold exhaustive run r
 Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
 <!-- /generated -->
 
-For the last upper bound, the proven *k*=9 maximum Sa(112) reduces Sa(193) to the sixteen states
-`Sb(n1:193-n1)` with `97<=n1<=112`. Cold run9 rejected all sixteen in one uninterrupted session,
-after its Sa(192) positive control passed. It returned UNSOLVABLE in 419353.1 CPU seconds with
-1.32 GB peak RSS. The raw, fully provenanced source is archived as
-`sa193-cold-2026-08-16:run9_out_sa193.txt`; the sixteen root lines and hashes are committed in
-`../evidence/sa193_unsolvable_in_10.txt`. The matching 2023 result is not used because that build
-produced known false negatives.
+The value `A(7)=38` needs careful attribution. Aigner printed 37 as the exact value, while
+Gargano et al.'s published `Sb(21:17)@6` strategy already makes 38 achievable. Our independent
+tree proves the positive half directly, and the exhaustive rejection of 39 supplies the missing
+upper half. Similarly, Gargano et al. reach 64 at eight tests; the exact value `A(8)=65` is a
+one-item improvement over that located construction. No source in the audited corpus reaches
+65, 112, or 192.
 
-**Maximum solvable Sb states with size 1**
+For the ten-test upper bound, `A(9)=112` reduces `Sa(193)` to the sixteen possible first-test
+mixed branches
 
-Write `n(k,m)` for the largest `n1` with `Sb(n1 : m)` solvable in `k` tests, where `n1 >= m`.
-For each `k` these values form a Pareto frontier: every state on or below the line is solvable
-in `k`, every state above it is not. The frontier is complete and proven maximal for
-`k <= 8`. Aigner 1986 already publishes the isolated `m=6,k=4` frontier cell as well as
-the fixed-`m=2,3,4` formulas; older papers also contain individual lower constructions at
-other frontier endpoints. At `k = 9` only `m = 1..6` are settled, of which `m = 1..5` follow
-published formulas (Aigner 1986 for `m = 2,3,4`; Li--Wu--Triesch 2018 for `m = 5`) and `m = 6` is established
-here; the band `m = 7..64` is open. At `k = 10` only `m = 5` (published) and an upper bound at
-`m = 6` are known.
+```text
+Sb(n:193-n),  97 <= n <= 112,
+```
+
+each with nine tests remaining. A cold, proof-safe search rejected all sixteen in one session
+after passing an `Sa(192)` control. The raw run used 419,353.1 CPU seconds and 1.32 GB peak RSS;
+its provenance and root verdicts are retained in the
+[`Sa(193)` record](../evidence/sa193_unsolvable_in_10.txt). Two explicit trees independently
+prove `Sa(192)` achievable.
+
+### 5.2 Complete-bipartite states
+
+For fixed `K`, the values `n(K,m)` form a Pareto frontier. The table is complete and exact through
+`K=8`. At `K=9`, only `m=1,...,6` are settled; the band `m=7,...,64` is open. At `K=10`, the table
+contains the published exact `m=5` value and an unconditional upper bound at `m=6`.
 
 <!-- generated:pareto_sb -->
 | m\k | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
@@ -186,96 +285,95 @@ here; the band `m = 7..64` is open. At `k = 10` only `m = 5` (published) and an 
 A bare number is a proven maximum. `≥n` is a lower bound (a solution exists, maximality open), `≤n` an upper bound (exhaustively refuted above), `a–b` a two-sided bracket. Per-cell status and evidence are in `data/pareto_sb.csv`.
 <!-- /generated -->
 
-Blank means not established; `≤` marks an upper bound without a matching construction.
-Evidence per cell is in `data/pareto_sb.csv`; this block is rendered by
-`tools/check_tables.py --render` and must never be edited by hand.
+Blank cells are not established. A bare number is an exact maximum; `>=`, `<=`, and ranges denote
+lower bounds, upper bounds, and two-sided brackets respectively. The per-cell evidence is in
+[`pareto_sb.csv`](../data/pareto_sb.csv).
 
-**“Unit Group Triviality Lemma”** 
+> **Theorem 2 (finite frontiers).** The complete-graph values in the first table are exact through
+> `K=10`. Every complete-bipartite cell in the second table is exact through `K=8`, and
+> `n(9,6)=473`.
 
-Unit group (1:1) \<TODO>
+The fixed small-side formulas provide useful checks and attribution:
 
-**Insights into relative solvability of various states** 
-
-\<tables>
-
-**Special case analysis**
-
-**Sb(2^k:1) (1)**  
-For Sb(n:1), since one of the coins is already known in this case, the solution is reduced to a single-coin problem for which the optimal strategy is dichotomy. Therefore it is easy to see that maximum n is equal to 2^k for a given k. 
-
-***(2)*** **Sb(2^k:1, 2^k-1:1)**  
-***(2.1)*** For k=0 this case becomes Sb(1:1,0:1), removing zero group reduces it to Sb(1:1) which is solvable in k=0
-
-***(2.2)*** If ***(2)*** is solvable in (k-1) then it is also solvable in k with [2^(k-1) : 1, 2^(k-1)-1:0] producing Sb(2^(k-1):1) (solvable in k-1 per ***(1)***) for both 0 and 2 test results and Sb(2^(k-1):1, 2^(k-1)-1:1) **(2)**
-
-From ***(2.1)*** and ***(2.2)*** by induction it follows that ***(2)*** is true for any k>=0
-
-***(3) Sb(2^k-1:2)***   
-For Sb(n:2) the maximum n is equal to 2^k-1 for a given k and the optimally solved with [2^(k-1):1]=>  
-		Sb(2^(k-1) : 1) (solvable per ***(1)***) ,    
-Sb((2^(k-1) -1) : 1) (solvable in k-1 implied from previous) and   
-Sb(Sb(2^(k-1) : 1 , (2^(k-1) -1) : 1) (solvable per (2));
-
-***(4)*** **Sb(2^k:1, 2^k-1:1, 2^k-k-1:1)** is solvable in k with [2^(k-1):0, 2^(k-1):1, 2^(k-1)-1:1] \=>  
-Sb(2^(k-1):1, 2^(k-1):1) (solvable per (2)),  
-Sb(2^(k-1):1) (solvable per (1)) and  
-Sb(2^(k-1):1, 2^(k-1):1, 2^(k-1) - (k-1) - 1:1) (since (2^k - k -1) - (2^(k-1)-1) \= 2^(k-1) - k \= 2^(k-1) - (k - 1) - 1) which is solvable per (4) by induction.
-
-***(5)*** **Sb(2^k-1:2, 2^k-k:1)** is solvable with [2^(k-1)-1:1, 2^(k-1):1] \=>  
-	Sb(2^(k-1)-1:1, 2^(k-1):1) (solvable per (2)),  
-	Sb(2^(k-1):1) (solvable per (1)) and  
-	Sb(2^(k-1):1, 2^(k-1)-1:1, 2^(k-1) - k:1) which is solvable per (4) since 2^(k-1) - k \= 2^(k-1) - (k-1) - 1
-
-***(6)*** **Sb(2^k-k:3)** is solvable in k with [2^(k-1)-1:1] \=>  
-Sb(2^(k-1)-1:1) (solvable per (1))  
-	Sb(2^(k-1)-k:2) (solvable per (3) since 2^(k-1)-k \= 2^(k-1)-(k-1)-1 ), and  
-	Sb(2^(k-1)-1:2, 2^(k-1)-(k-1):1) solvable per (5)  
-
-(8) `n(k,4)=2^k-2k+2` exactly for `k>=3` (Li--Wu--Triesch, Corollary 3).  The local
-construction remains useful as an independent lower proof; the published theorem supplies the
-upper bound.
-
-Entries of `G_k` come in dyadic blocks of sizes `1, 1, 2, 4, ..., 2^(k-1)`, and every entry in
-block `r` (zero-indexed) equals the partial binomial sum `sum_{i=0}^{k-r} C(k, i)`; the block
-sizes double, and the total is `sum G_k = 3^k`. Verified against the defining recurrence for
-`k <= 12` in `tools/cleanroom`'s test suite.
-
-**Proposed unproven lemmas:**
-
-**(u1)** if Sb(n1 : n2) for any n1>=n2 can be solved in k then Sb( (n1+1) : (n2-1) ) can also be solved in k.
-
-**(u1)** is verified on all 130 proven cells for `k = 1..8`, and exhaustively for every
-one-part state at `k <= 5`, but no proof is known; two natural proof routes were refuted on
-2026-08-03. Its multi-part analogue is outright false: `Sb(15:2, 5:4)` is solvable in 4 while
-`Sb(15:2, 6:3)` is not, despite the lower mass.
-
-(9) The former formula `F(k)=2^k-k(k-3)/2-5` is exact only through `k=8`.
-Li--Wu--Triesch, Theorems 1--3 and Remark 1, prove
-
-```
-n(k,5) = F(k)       for 3 <= k <= 8,
-         F(k) + 1   for 9 <= k <= 10,
-         F(k) + 2   for k >= 11.
+```text
+n(K,1) = 2^K,
+n(K,2) = 2^K - 1,
+n(K,3) = 2^K - K,
+n(K,4) = 2^K - 2K + 2.
 ```
 
-In particular `n(9,5)=481`, not 480.  The published theorem proves achievability, and
-`evidence/sb_m5_k9_frontier.txt` independently records the exact rejection of 482.  The file
-`witnesses/majorized_481_5_at9.tree` is conditional on the open singleton-majorization converse.
-The observed root changes from type `3+2` through `k=8` to type `4+1` at `k=9`, matching the
-published construction.
-(11) Sb(2^k-k^2+4k-10 : 7) solvable in k
+Aigner proves the `m=2,3,4` formulas; the `m=4` formula is correct in his 1986 paper but is
+misprinted in the 1988 exercise. If `F(K)=2^K-K(K-3)/2-5`, Li--Wu--Triesch prove
 
-**Proposed and refuted lemmas:**  
+```text
+n(K,5) = F(K)       for 3 <= K <= 8,
+         F(K) + 1   for 9 <= K <= 10,
+         F(K) + 2   for K >= 11.
+```
 
-(10) `Sb(2^k-k(k-1)/2-3 : 6)` is solvable in `k`.  It matches `k=4..9` but is false at
-`k=10`: it predicts 976, whereas exhaustive search gives the unconditional upper bound 973.  See
-`../docs/theorems/special-cases.md` and `../evidence/sb_m6_k10_frontier.txt`.
+Aigner's small table also contains the exact isolated cell `n(4,6)=7`. Individual constructions
+from Zhang--Berger--Massey and Gargano et al. coincide with several other positive endpoints, but
+do not by themselves provide the adjacent negative needed for maximality.
 
-**Solution for 192 coins in 10 tests:**
+At nine tests, a canonical tree proves `Sb(473:6)` and an exact retained search rejects
+`Sb(474:6)`. The formerly proposed continuation
 
-The full witness tree is `witnesses/sa192_k10_a.tree` in the repository, with a second,
-slightly smaller witness in `witnesses/sa192_k10_b.tree`. Both are verified by
-`tools/check_witness.py`: every split is re-derived from the recorded test, every reference
-is checked to dominate its child after unit-group stripping, and the information bound is
-checked at every node. Maximality is supplied separately by the cold `Sa(193)` refutation above.
-The witness should be reproduced in an appendix for the final version.
+`n(K,6)=2^K-K(K-1)/2-3`
+
+matches `K=4,...,9` but is false at ten: it predicts 976, whereas exhaustive search proves the
+unconditional upper bound `n(10,6)<=973`. No unconditional 973 construction is presently known;
+a relaxed tree ending in arbitrary majorized singleton states is not a proof in view of Theorem 1.
+
+## 6. Certificates and independent checking
+
+The computation separates the two directions of every exact result.
+
+For achievability, a witness tree records the tested subset at every internal node. The checker
+re-derives all three children and accepts a terminal only when it is a substate of the explicit
+`G_K` strategy or has another proved base case. In particular, the trees for `Sa(38)`, `Sa(65)`,
+`Sa(112)`, and `Sa(192)` are proof objects independent of the search program. Arbitrary weak
+majorization is intentionally not accepted as a terminal rule.
+
+For the `Sa(193)` upper bound, the retained cold run was converted to an eight-level certificate
+from levels nine through two. It contains exactly 2,846,568 negative claims. At each level, every
+possible first split is rejected by the information bound or cites a child claim at the next
+level; the level-two support is empty, so the chain terminates in direct refutations. A structural
+checker verifies that adjacent levels match exactly.
+
+The semantic audit has two implementations. The frozen refuter reuses the production solver core.
+Separately, `tools/cleanroom` was written from the mathematical specification, shares no source
+with the solver, reconstructs the split space, and verified all 2,846,568 claims with zero gaps.
+The certificate format and exact level counts are documented in
+[`sa193-certificate.md`](../docs/sa193-certificate.md), and the independent run is recorded in
+[`cleanroom_verifier_2026-09-01.txt`](../evidence/cleanroom_verifier_2026-09-01.txt).
+
+The `K<=8` bipartite frontier is backed cell by cell by positive and negative boundary records.
+No negative from the unreliable 2023 solver era is used as proof. The source-of-truth CSV records
+whether each entry is a maximum, a lower bound, or an upper bound and identifies its retained or
+published source.
+
+## 7. Reproducibility and scope
+
+The reproduction package contains the trimmed negative certificate, the structural and semantic
+checkers, both `Sa(192)` witness trees, the relevant evidence records, and exact hashes. It has
+been extracted in a clean directory and exercised end to end. A public archival DOI will replace
+this sentence before submission.
+
+The literature audit found no earlier result reaching `A(8)=65`, `A(9)=112`, or `A(10)=192`, no
+published upper boundary correcting `A(7)`, and no resolution of Aigner's singleton-majorization
+question in the audited corpus. This is not asserted as proof of worldwide absence. Scholar limits
+the number of navigable results for some records, Christen's 1980 report and 1986 talk remain
+unavailable, and seven interleaved pages of the relevant Du--Hwang chapter could not be read. The
+available target subsection and the later sources expose only the already credited asymptotic
+chain. Exact search coverage and exclusions are preserved in the
+[audit record](../evidence/publication_prior_art_2026-09-02.md).
+
+## 8. Conclusion
+
+The exact-count oracle has enough structure to make weak majorization a sharp characterization
+through five tests, but not beyond. The first obstruction appears at six tests as a thin integral
+hole between two tight Pascal ranks, and the same mechanism persists at every higher depth. On the
+finite side, explicit witnesses and independently checkable negative certificates extend the
+complete-graph threshold through ten tests and the complete-bipartite frontier through eight.
+Together these results turn a finite search into a structural boundary theorem with a reproducible
+computational component.
