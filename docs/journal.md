@@ -13530,3 +13530,35 @@ all 54 refutations `Sb(57:55)..Sb(256:2)`, verified inside a complete 11.2M-clai
 checker sharing no solver code. Positive -- unconditional witnesses for all 55 cells `m=1..55`.
 Neither required re-running the solver; both came out of `out_k8.txt`, which the current provenance
 rule will not let us archive as raw evidence but which was never the trust base anyway.
+
+## 2026-09-03 -- K=8 certificate archived, audit host terminated
+
+Archived as [`pareto8-certificate-2026-09-03`](https://github.com/fedork/radio-data/releases/tag/pareto8-certificate-2026-09-03),
+two assets, round-tripped through `tools/artifacts.sh verify`:
+
+- `pareto8-k1to8.cert.zst` -- the flat certificate, 443,851,829 raw bytes to 30,388,935 at
+  `zstd -19` (6.8%), raw sha256 `ac89104e51bf964f63d1d11a004f6ce6b9dfcaada6ef038c451fc7712d2a51cf`.
+  Note the archived container is recompressed at -19 and so does not hash-match the `zstd -3` copy
+  the AWS host audited (`f335c6b4...`); the raw certificate is identical, and that is what to check.
+- `pareto8-audit-metadata.tar.zst` -- AWS `verify.out`, `final.sha256`, stage/bootstrap/smoke/
+  selftest logs, the local `k<=4`, `k=6` and `k=6`-sample audit logs, the level-v2 `k=8`
+  certificate, and a README.
+
+Two things were deliberately left out. The level-v2 packagings of `k=6` (199 M) and `k=7` (52 M)
+carry no information the flat certificate lacks and regenerate in minutes from it, so archiving
+them would have added 250 MB of derived duplicate; the exclusion and the regeneration command are
+recorded in the release README and `docs/data.md`. And `out_k8.txt` itself stays out: 1.33 GB,
+pre-banner, fails `tools/check_provenance.py`. That is not a loss of evidence -- the cleanroom
+shares no solver code and re-derives every split from the four theorems, so the certificate plus
+its audit is the evidence and the log was only ever a hint list.
+
+Instance `i-0f000d13c1fe92cf1` terminated after archival; zero `cleanroom-verify` instances remain
+in any non-terminated state. It had already stopped itself at 22:50Z via the post-DONE
+`shutdown -h +2`, so only its 30 GB gp3 volume was still outstanding.
+
+`data/artifacts.csv` and `docs/data.md` both carry the new rows and `tools/artifacts.sh
+check-index` agrees with the store. One gotcha worth knowing for the next scratch-worktree session:
+`artifacts.sh` looks for the repo-local `gh` credential at `<repo>/.gh`, which does not exist in a
+worktree, so run it from the main checkout or pass `GH_CONFIG_DIR=/Users/fedor/radio/.gh`. Running
+`check-index` from the main checkout while the CSV edit lives in the worktree reports a spurious
+`IN STORE BUT NOT INDEXED`.

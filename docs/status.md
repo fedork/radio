@@ -554,8 +554,9 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 22 tags, 60 assets plus a manifest per tag,
-about 605 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+Artifact store `fedork/radio-data` (private): 23 tags, 62 assets plus a manifest per tag,
+about 635 MB stored. `pareto8-certificate-2026-09-03` contains the complete `K=8` frontier
+certificate and its audit records; `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
 reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
 certificate and all three solver-core replay checkpoints; `run9-level-replay-2026-08-18` contains
 both finished level-v2 replays, uncolored and colored, with every manifest and certificate
