@@ -123,7 +123,11 @@ for m in \$(echo "$M_LIST" | tr ',' ' '); do
 done
 
 # Ten-minute durable snapshot. This is a convenience, NOT the archival path.
-( while pgrep -x radio_sb_walk >/dev/null; do sleep 600; upload_all; done ) &
+# Unconditional on purpose: guarding the loop with \`while pgrep -x radio_sb_walk\` raced the
+# walkers' own startup on 2026-09-04 - capped_run had not yet exec'd a solver when the first pgrep
+# ran, so the loop exited immediately and the run went 20 minutes with no durable snapshot. The
+# explicit kill after the waits below is what stops it.
+( while true; do sleep 600; upload_all; done ) &
 HEARTBEAT=\$!
 
 # Wait on the walkers by explicit pid. Deriving the list from \`jobs -p\` would also match the
