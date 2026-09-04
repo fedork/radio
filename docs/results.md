@@ -51,6 +51,14 @@ committed in
 [`evidence/sa193_unsolvable_in_10.txt`](../evidence/sa193_unsolvable_in_10.txt). Together
 with the checked `Sa(192)` witness tree, this proves the boundary.
 
+A second cold derivation reproduced the verdict on 2026-09-04: `run10`, commit `9e9e25a` with
+necessity-only cache semantics, printed `result Sa(193) in 10 = UNSOLVABLE  (301127.6 s)` with all
+sixteen roots refuted, its `Sa(192)` control passed, complete provenance and zero audit
+contradictions, for 28.19% less CPU than run9. It is archived as
+`sa193-cold-run10-2026-09-04:run10_out_sa193.txt`. This is a recomputation by a different build of
+the same engine, not an independent implementation, so it does not extend the certificate's
+independence; it does show current main reaches the same boundary from cold.
+
 The 2023 run reached the same answer after roughly 47 days, but its build produced 37 known
 false negatives. That historical evidence remains useful for cost comparison only and is
 superseded as the source of the claim.

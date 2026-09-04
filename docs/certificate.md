@@ -67,6 +67,42 @@ Cold single-session execution also avoids the other historical defect: a resumed
 on facts whose producing logs were never retained. Run9 inherited no cache, so the raw session is
 closed by construction.
 
+## A second cold derivation agrees (run10, 2026-09-04)
+
+`run10` re-derived the same boundary from cold on current post-refutation main and finished with
+
+```text
+result Sa(193) in 10 = UNSOLVABLE  (301127.6 s)
+```
+
+| property | run10 value |
+|---|---|
+| source commit | `9e9e25ae1d5063207322071b9d4d4d626fc6e965` |
+| build ID | `54419a4988bb53065d8855cd66d09e6f133896816aecdea635692c0ef33a7492` |
+| raw SHA-256 | `5622c3f39a68291138a91703f733ddffc49ee859d3ac17c66fd2d933d91215d8` |
+| raw size | 470,935,285 bytes; 3,335,084 lines |
+| solver CPU | 301,127.6 seconds (28.19% under run9) |
+| wrapper wall / peak RSS | 301,536 seconds / 1.05 GB |
+| top-level roots | 16 of 16 |
+| cache origin | none, cold |
+| audited contradictions | 0 (868 comparable lines, 859 distinct states) |
+| rb-tainted contractions | 0 suppressed |
+| positive control | `CONTROL Sa(192) in 10 = SOLVABLE  (389.9 s)` |
+| raw source | `sa193-cold-run10-2026-09-04:run10_out_sa193.txt` |
+
+**This does not make the verdict independently implemented.** run10 is the same engine lineage under
+a different build, with necessity-only cache semantics and a different cache history, so a defect in
+the shared core would be reproduced rather than exposed. Its value is threefold: current main
+reaches the same boundary from cold, the necessity-only epoch introduces no disagreement anywhere in
+3.28 million printed verdicts, and the cost fell 28.19% for the same search volume. The proof source
+of record remains run9; independent verification of the claim set is the separate frozen solver-core
+and clean-room checker work.
+
+Its own recovery history is a lesson rather than a caveat on the result: the host was powered off 63
+seconds after the verdict by a leftover shared-host watcher, and the complete log was recovered from
+the volume, hash-verified end to end and archived. See the
+[completion record](../evidence/run10_completion_2026-09-04.md).
+
 ## What was retained
 
 The `sa193-cold-2026-08-16` release contains:

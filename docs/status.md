@@ -150,21 +150,24 @@ group is retained at desired/minimum capacity zero and has no instance; all vali
 checkpoints and the final stopped status remain under `run10/k6-main-survey` in S3. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 
-The post-refutation cold `Sa(193)` rerun **stopped on 2026-09-04 at 13 of 16 top-level states**,
-about 0.8% short of the end, and is no longer running. Its current-main binary had passed the
-mandatory `Sa(192)` control as solvable in 389.9 CPU seconds, and the twelve archived roots cost
-298,515 CPU seconds against run9's matched figures -- 28.9% less on roots 1-3 for the same search
-volume and one pass fewer per root; the earlier impression that run10 was slower came from a matched
-split index inside a pass, where its roughly 1.7x larger real-CPU pass budget puts it behind before
-it finishes ahead. Measurements and the hardware confound are in the
-[2026-09-03 journal entry](journal.md). The instance `i-0318c3349a0df835b` is `stopped` by an
-`Client.InstanceInitiatedShutdown` with the solver alive and no limit near tripping, and the cause is
-still unknown: it is on the preserved volume `vol-020083ad3e3df88c4`, which must not be deleted. The
-S3 archive holds only the routine hourly snapshot from 10:35Z, so the log's last 31+ minutes --
-including the thirteenth root verdict `Sb(100:93)` -- exist nowhere else. Full account, per-root
-costs, the ~$31 measured cost and the recovery options are in the
-[2026-09-04 journal entry](journal.md). No `Sa(193)` claim depended on this run: the verdict
-`UNSOLVABLE` rests on the proof-safe cold run9 derivation.
+The post-refutation cold `Sa(193)` rerun **completed on 2026-09-04**, reproducing run9's verdict:
+`result Sa(193) in 10 = UNSOLVABLE  (301127.6 s)`, with all sixteen roots refuted, the `Sa(192)`
+control passed in 389.9 CPU seconds, complete provenance, zero audit contradictions and 1.05 GB
+peak RSS. At 301,127.6 CPU seconds against run9's 419,353.1 it is **28.19% cheaper, measured** --
+the same search volume with one pass fewer per root; the earlier impression that run10 was slower
+came from a matched split index inside a pass, where its roughly 1.7x larger real-CPU pass budget
+puts it behind before it finishes ahead. This is a second cold derivation by a different build, not
+an independent implementation: same engine lineage, commit `9e9e25a`, necessity-only cache
+semantics, different cache history. The certificate of record and its independence properties are
+unchanged. Raw log, hashes, the sixteen-root table and the forensics are in the
+[completion record](../evidence/run10_completion_2026-09-04.md); artifacts are the release
+`sa193-cold-run10-2026-09-04` and `run10/seg-20260831T232959Z/` in S3.
+
+The run *looked* stalled at 13 of 16 for five hours, and that was an archival race, not a stall:
+a leftover shared-host idle-shutdown loop polling at 60 s powered the box off 63 seconds after the
+solver printed its result, 32 seconds before the 600-second watchdog cycle that would have archived
+the complete log. The complete log was recovered from the volume, verified and archived; see the
+trap below and the [2026-09-04 journal entry](journal.md).
 The stopped singleton survey remains under `run10/k6-main-survey`; use
 `tools/singleton_k6_survey_status.sh` to read its final S3 status. The Auto Scaling group is at
 desired/minimum capacity zero, has no worker, and cannot replace one until deliberately scaled up.
@@ -204,7 +207,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a finite budget, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when budgets were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. In a proof-safe cache, a printed `can't solve` is exhaustive because it is emitted only when `!skipped_some`; the separate `rb_dead` trap explains why run3/run8 caches are not proof-safe.) |
 | **Do not restore either old budget extreme.** | `c13b5d3` could return before trying a complete child; `e648e83` required a new negative cache fact and then handed pass 2 an unbounded child. Run7 demonstrated the latter failure for 20,460 CPU seconds in a finite-parent k=5 state after 280,116,882,707 prefixes. Current policy permits zero-progress `MAYBE`, never refills an exhausted parent, keeps the reliable one/two-segment spine on the shared allowance, and probes longer states with a geometrically increasing local slice. New builds count accepted split prefixes deterministically at 20,000,000 units per nominal second; `-DRADIO_CPU_BUDGET` is the historical fallback. See [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt) and [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt). |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
-| **An hourly log snapshot is not the log, and a stopped instance is not a closed run.** | `sa193_watchdog.sh` uploads a full `-19` log and the `sa193.err`/`instance.log` pair only from its *observed* solver-GONE branch, and the user-data uploads only after `wait` returns. A whole-instance shutdown kills watchdog and solver together, so neither path runs and the newest archive is the routine hourly `-3` snapshot -- up to an hour behind, ending mid-line with no truncation marker. On 2026-09-04 `run10` stopped this way and its thirteenth root verdict `Sb(100:93)` exists only on the instance volume. Because shutdown behaviour is `stop`, the volume keeps the complete log and `/var/log`: recover them **before** terminating, since the root volume is `DeleteOnTermination=true`. Read the instance state line at the bottom of a status output, never the `solver process` line, which comes from the last `STATUS` object written while it was still alive. |
+| **A polling watchdog cannot be the only path to the final archive, and a hand-installed host watcher outlives the arrangement that needed it.** | On 2026-09-04 `run10` printed `Sa(193) = UNSOLVABLE` after 3.5 days and its host was powered off 63 seconds later by `tools/aws_shared_job_shutdown_when_idle.sh`, left running from the 2026-08-31 episode when the `K=6` census shared that instance; it polls at 60 s and nothing recorded that it had been installed, so the census teardown never removed it. `sa193_watchdog.sh` polls at 600 s and its solver-GONE branch is the **only** path that uploads the complete log, final checkpoint, stderr and FINISHED mail; user-data's own uploads sit behind `wait $SOLVER_WRAPPER`, which is behind the foreground watchdog. So the 60 s poll won by 32 seconds: no mail, and an S3 log frozen at the hourly snapshot ending 4m 37s before the verdict, with no truncation marker. Only `--instance-initiated-shutdown-behavior stop` saved it. **Read a `STATUS` object as the last snapshot, never as the outcome** -- here they differ by the entire result. Have the shell that waits on the solver upload the log itself. See the [completion record](../evidence/run10_completion_2026-09-04.md). |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **`canSolveB_ctx` is not general permission to call the mutable solver concurrently.** | The context owns the accepted-prefix clock, exact L1 and reachability scratch, but ordinary solving still mutates the dominance trie/arenas, lazy split catalog, learned `s[4]`/`s[5]`/`FAST` metadata, and `sbb_to_min_k`. `radio_refute.c` is the narrow safe exception: it prepares cache and split metadata serially, checks their frozen checksum/allocation counts, permits only root enumeration plus k-1 CACHE_ONLY reads, and publishes no results. A thread pool around ordinary solving would still have C data races; see [parallel-solver.md](parallel-solver.md). |
@@ -558,9 +561,10 @@ reachability regressions and ASan+UBSan checks pass. This deliberately stops bef
 the remaining shared mutation boundary and limited-width epoch plan are in
 [parallel-solver.md](parallel-solver.md).
 
-Artifact store `fedork/radio-data` (private): 22 tags, 60 assets plus a manifest per tag,
-about 605 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
-reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
+Artifact store `fedork/radio-data` (private): 23 tags, 63 assets plus a manifest per tag,
+about 650 MB stored. `sa193-cold-2026-08-16` contains the proof log, matched comparator and final
+reproduction metadata; `sa193-cold-run10-2026-09-04` contains the completed second cold derivation,
+its stderr and its reproduction metadata; `sa193-frozen-refute-2026-08-18` contains the complete normalized
 certificate and all three solver-core replay checkpoints; `run9-level-replay-2026-08-18` contains
 both finished level-v2 replays, uncolored and colored, with every manifest and certificate
 re-verified before archival; `pareto-census-k8-2026-08-19` and `pareto-census-k7-2026-08-13`
@@ -574,13 +578,13 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**One on-demand computation is running; the other stopped itself.** The `run10` cold `Sa(193)`
-rerun on `i-0318c3349a0df835b` is **down since 2026-09-04 ~11:10 UTC**, stopped by an
-instance-initiated shutdown at 13 of 16 roots with 3,329,514 verdicts, 301,012 CPU seconds and
-1.05 GB RSS. `tools/sa193_status.sh` still reads its last `STATUS` object, written 11:06:44Z, which
-reports the solver alive -- that snapshot predates the shutdown and is not current state; the
-instance line at the bottom of that output is the one to read. The instance is stopped, not
-terminated, so the volume, the complete on-disk log and `/var/log` survive.
+**One on-demand computation is running; the other finished.** The `run10` cold `Sa(193)` rerun on
+`i-0318c3349a0df835b` **completed 2026-09-04 11:15:15 UTC** and its host was powered off a minute
+later by a leftover watcher; the complete log has since been recovered, verified and archived, and
+the instance is stopped again with root volume `vol-020083ad3e3df88c4` and snapshot
+`snap-03f0ad37ce7ec286d` retained. `tools/sa193_status.sh` still renders its 11:06:44Z `STATUS`
+object, which says "13 of 16" and "solver process alive": that snapshot predates both the verdict
+and the shutdown, so read the instance line at the bottom of the output, not the solver line.
 
 The full K=9 Pareto run `20260903T011520Z` is alive on `i-007f24b8cbc1fb060`. It passed its remote
 regression/build/provenance gates, froze the exact current run10 cache revision documented above,
@@ -616,8 +620,9 @@ artifact reproducible in 1.58 h from archived inputs, so it stays in S3 at
 store — see [data.md](data.md). Those historical performance measurements remain valid, but the
 mixed snapshot is not a safe warm start after the singleton-majorization refutation.
 
-Historical runs 3, 8 and 9 completed all sixteen `Sa(193)` roots and independently reported
-UNSOLVABLE; run10 is the live post-refutation diagnostic rerun described above. **The k=8
+Runs 3, 8, 9 and now 10 each completed all sixteen `Sa(193)` roots and reported UNSOLVABLE; run10
+is the completed post-refutation re-derivation described above, cheaper than run9 by 28.19%. All
+four share the engine lineage, so agreement is reproducibility, not implementation independence. **The k=8
 Pareto-prefix census is finished, archived and its host is gone.** It
 exited 0 at 2026-08-19 22:34:43 UTC after 5.87 days on shared `r7iz.4xlarge` `i-0005d74f985c52ae1`,
 emitting a `CENSUS END` record and a self-consistent corpus: 55 roots, 817 first cuts (344 strict),
@@ -1547,7 +1552,7 @@ that model to settle that case.  This formula comes from a checked 19-node relax
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
    loop. Test it on another corpus before using it. The only live AWS compute is Pareto run
-   `20260903T011520Z`; the isolated `run10` Sa rerun stopped itself on 2026-09-04; the retired oracle's persistent volume remains
+   `20260903T011520Z`; the isolated `run10` Sa rerun completed on 2026-09-04; the retired oracle's persistent volume remains
    available, while the old replay hosts are terminated. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
