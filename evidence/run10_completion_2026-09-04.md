@@ -56,7 +56,9 @@ object agree, so the archived copy is byte-exact. Locations:
   at `zstd -19`), `sa193.checkpoint`, `sa193.err.txt`, `memprofile.csv`, `run10-metadata.tgz`
 - release `sa193-cold-run10-2026-09-04` — raw log, stderr, metadata bundle
 - `snap-03f0ad37ce7ec286d`, a snapshot of root volume `vol-020083ad3e3df88c4` taken before the
-  instance was restarted, while it was still the only copy
+  instance was restarted, while it was still the only copy. The instance was terminated on
+  2026-09-04 after the release verified, and the volume went with it, so this snapshot is the last
+  image of the run's working directory
 
 ## The sixteen roots
 

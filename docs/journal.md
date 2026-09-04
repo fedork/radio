@@ -13413,7 +13413,8 @@ polling watchdog noticing the exit; the shell that waits on the solver should up
 before anything can power the host off.
 
 Recovery cost about $0.10 and 25 minutes: snapshot `snap-03f0ad37ce7ec286d` of the root volume
-first (it was the only copy of the tail), then start, then SSM. The instance is stopped again.
+first (it was the only copy of the tail), then start, then SSM. The instance was terminated the
+same day once the release round-tripped, deleting its root volume; the snapshot is retained.
 Total run cost stands at 83.79 instance-hours, about $31 at the verified $0.372/h on-demand rate.
 Overwriting `run10/sa193.checkpoint` with the final 3,329,879-line version was safe: the Pareto
 walk's frozen input is stored separately as

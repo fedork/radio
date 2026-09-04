@@ -581,8 +581,9 @@ Do not run `gh auth switch`.
 **One on-demand computation is running; the other finished.** The `run10` cold `Sa(193)` rerun on
 `i-0318c3349a0df835b` **completed 2026-09-04 11:15:15 UTC** and its host was powered off a minute
 later by a leftover watcher; the complete log has since been recovered, verified and archived, and
-the instance is stopped again with root volume `vol-020083ad3e3df88c4` and snapshot
-`snap-03f0ad37ce7ec286d` retained. `tools/sa193_status.sh` still renders its 11:06:44Z `STATUS`
+the instance was **terminated** on 2026-09-04 at Fedor's request once the release round-tripped,
+taking root volume `vol-020083ad3e3df88c4` with it; snapshot `snap-03f0ad37ce7ec286d` is
+retained. `tools/sa193_status.sh` still renders its 11:06:44Z `STATUS`
 object, which says "13 of 16" and "solver process alive": that snapshot predates both the verdict
 and the shutdown, so read the instance line at the bottom of the output, not the solver line.
 
