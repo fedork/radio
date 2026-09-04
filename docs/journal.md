@@ -13571,3 +13571,25 @@ Distribution of what `out_k8.txt` adds, which tempers expectations: 11,192,667 o
 mass <=193 and only 22,798 above, while every state in this search has mass 212-330. They remain
 citable, because a cached negative discharges any query it is a sub-multiset of, and low mass makes
 that *more* likely, not less. But this is not the missing mass-330 layer; nothing is.
+
+**Addendum, same day: the status was unreadable as liveness.** Twenty-five minutes after the m=135
+search began, `STATUS` was refreshing on schedule but every line a reader would check was
+byte-identical, because the only progress it carried was the `k=10` root line -- and that reprints
+on a 20e9 work-unit threshold. The root had accumulated 0.9e9. So a run doing ten verdicts a second
+looked hung. Underneath, verdicts had gone 4,564 -> 19,536 in those 25 minutes.
+
+`STATUS` now leads with a LIVENESS block: verdict count, **rate since the previous snapshot**, the
+level histogram, and the newest verdict line at any level, with the root line kept below and
+labelled as normally-stale. Swapped onto the running instance and fixed in
+`tools/sbwalk_launch.sh` for future runs. The general lesson: **a status field that only changes
+on a coarse threshold is not a liveness signal**, and the cheapest true one here is a monotone
+counter with a rate attached.
+
+Swapping it in meant killing the old heartbeat subshell on a live host, which is worth recording
+because the obvious approach is wrong: a `( ... ) &` subshell forked from the user-data script
+shares the parent's argv, so both show as `/bin/bash /var/lib/cloud/instance/scripts/part-001` and
+`pkill -f` would have taken out the parent -- the shell that owns the final archival upload. The
+discriminator is the child count: the parent has two children (walker subshell, heartbeat
+subshell), the heartbeat subshell has exactly one (its `sleep`). Guarded on that, killed the right
+one, and verified afterwards that PID 3198 still held the walker as its child.
+

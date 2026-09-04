@@ -96,17 +96,41 @@ upload_all() {
         b=\$(basename "\$f" .txt)
         zstd -q -3 -c "\$f" | aws s3 cp - "s3://$BUCKET/$PREFIX/logs/\$b.txt.zst" >/dev/null 2>&1 || true
     done
-    { echo "run_id  $RUN_ID"
-      echo "written \$(date -u +%FT%TZ)"
-      echo "walkers $M_LIST  (k=$K n1=$N1 m_end=$M_END)"
-      echo "alive   \$(pgrep -c -x radio_sb_walk || echo 0)"
-      echo "uptime  \$(uptime)"
-      echo "rss_kb  \$(ps -o rss= -C radio_sb_walk 2>/dev/null | tr '\\n' ' ')"
+    # Liveness first. The k=$K root line reprints only on a 20e9 work-unit threshold, so it can
+    # sit byte-identical for half an hour while the solver does ten verdicts a second underneath -
+    # which reads as a hung run. Verdict count and its rate are what answer "is it moving".
+    local now verdicts prev_t prev_v rate
+    now=\$(date +%s)
+    verdicts=\$(grep -chE " in [0-9]+ took" /root/run/walk_m*.txt 2>/dev/null | paste -sd+ - | bc)
+    verdicts=\${verdicts:-0}
+    rate="n/a (first snapshot)"
+    if [ -r /root/.hb_state ]; then
+        read -r prev_t prev_v < /root/.hb_state
+        if [ "\${prev_t:-0}" -gt 0 ] && [ "\$now" -gt "\$prev_t" ]; then
+            rate="\$(( (verdicts - prev_v) * 60 / (now - prev_t) )) verdicts/min over the last \$(( (now - prev_t) / 60 )) min"
+        fi
+    fi
+    printf '%s %s\\n' "\$now" "\$verdicts" > /root/.hb_state
+
+    { echo "run_id    $RUN_ID"
+      echo "written   \$(date -u +%FT%TZ)"
+      echo "walkers   $M_LIST  (k=$K n1=$N1 m_end=$M_END)"
+      echo "alive     \$(pgrep -c -x radio_sb_walk || echo 0)"
+      echo "cpu       \$(ps -o time= -C radio_sb_walk 2>/dev/null | tr -d ' ' | tr '\\n' ' ')"
+      echo "rss_kb    \$(ps -o rss= -C radio_sb_walk 2>/dev/null | tr '\\n' ' ')"
+      echo "uptime    \$(uptime)"
       echo
-      echo "=== every WALK verdict so far ==="
+      echo "LIVENESS  verdicts \$verdicts   \$rate"
+      echo "          by level: \$(grep -ohE ' in [0-9]+ took' /root/run/walk_m*.txt 2>/dev/null \\
+                    | awk '{print \$2}' | sort -n | uniq -c | awk '{printf \"k=%s:%s  \",\$2,\$1}')"
+      echo "          newest verdict, any level:"
+      echo "            \$(grep -hE '^can' /root/run/walk_m*.txt 2>/dev/null | tail -1 | cut -c1-200)"
+      echo
+      echo "=== every WALK verdict so far (the answer of record) ==="
       grep -h '^WALK' /root/run/walk_m*.txt 2>/dev/null || echo "(none yet)"
       echo
-      echo "=== newest root progress per walker ==="
+      echo "=== newest k=$K root progress per walker ==="
+      echo "(reprints only on a 20e9 work-unit threshold; a stale line here is normal)"
       for f in /root/run/walk_m*.txt; do
           echo "--- \$(basename \$f)"
           grep '^still solving in $K' "\$f" 2>/dev/null | tail -1 | cut -c1-240
