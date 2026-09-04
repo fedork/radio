@@ -113,18 +113,22 @@ upload_all() {
     } | aws s3 cp - "s3://$BUCKET/$PREFIX/STATUS" --content-type text/plain >/dev/null 2>&1 || true
 }
 
+WALKERS=()
 for m in \$(echo "$M_LIST" | tr ',' ' '); do
     ( RADIO_RUN_CONTEXT="sbwalk m_start=\$m" \\
       tools/capped_run.sh --seconds $SECS --rss-gb $RSS_GB --label "walk_m\$m" -- \\
           ./radio_sb_walk input.cache $K $N1 "\$m" $M_END \\
           > "/root/run/walk_m\$m.txt" 2>"/root/run/walk_m\$m.err" ) &
+    WALKERS+=(\$!)
 done
 
-# Hourly durable snapshot. This is a convenience, NOT the archival path.
+# Ten-minute durable snapshot. This is a convenience, NOT the archival path.
 ( while pgrep -x radio_sb_walk >/dev/null; do sleep 600; upload_all; done ) &
 HEARTBEAT=\$!
 
-wait \$(jobs -p | grep -v "\$HEARTBEAT") 2>/dev/null || true
+# Wait on the walkers by explicit pid. Deriving the list from \`jobs -p\` would also match the
+# heartbeat and is order-dependent; the archival upload below must not be reached early.
+for pid in "\${WALKERS[@]}"; do wait "\$pid" || true; done
 kill \$HEARTBEAT 2>/dev/null || true
 
 # The archival path: this shell owns it, and it runs before anything can power the host off.
