@@ -100,7 +100,18 @@ render() {
     else
         echo "  instance            not found (terminated, or launched under a different tag)"
     fi
-    echo "  logs                aws s3 cp s3://$BUCKET/sbwalk/$run_id/logs/walk_m136.txt.zst - | zstd -dc | tail"
+    # Name the log objects that actually exist; hardcoding a walker name goes stale the moment
+    # the run starts at a different m.
+    local logs
+    logs=$("${AWS[@]}" s3 ls "s3://$BUCKET/sbwalk/$run_id/logs/" --region "$REGION" 2>/dev/null \
+           | awk '{print $4}' | grep -E '\.txt\.zst$' | tr '\n' ' ')
+    if [[ -n "${logs// /}" ]]; then
+        local one=${logs%% *}
+        echo "  logs                $logs"
+        echo "  read one            aws s3 cp s3://$BUCKET/sbwalk/$run_id/logs/$one - | zstd -dc | tail"
+    else
+        echo "  logs                none uploaded yet"
+    fi
     echo
     echo "  A WALK line is the answer of record. Its absence is UNKNOWN, never a refutation:"
     echo "  a cell is only decided when its own WALK line prints."
