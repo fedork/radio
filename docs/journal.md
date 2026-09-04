@@ -13522,3 +13522,52 @@ Expect no `WALK` line for a long time, and read its absence as unknown. A positi
 any point in a cell's split enumeration; pass-1 exhaustion without one would take an estimated
 12-24 CPU-hours per cell and still would not be a refutation, since run10's roots needed up to five
 passes.
+
+## 2026-09-04 -- the `Sa(11)` walk restarts at m=135 on a 15.5M-fact cache, and what went into it
+
+Third and current shape of the `K=10` `Sb` vertical scan: run `20260904T221247Z`,
+`i-03f8c577e8d771049`, one walker at `n1=192`, `m_start=135` ascending to 160, 7 days, 24 GiB.
+The two earlier shapes -- five walkers, then one at m=136 -- were terminated with no cell decided
+and their facts harvested first, so the only thing they cost was time.
+
+**The cache is now 15,459,274 unique facts** (sha256 `e0e24f51...`, 663 MB raw, 70 MB compressed):
+
+    run10 final checkpoint                          3,329,879
+    local probe facts, mass 194-330                   338,869
+    pareto9 live checkpoint 20260903T011520Z        2,876,554 (largely overlapping)
+    k8-2026-05-12:out_k8.txt                       11,400,114
+    harvests from the two superseded runs              47,373 + 197,168
+    unique after dedup                             15,459,274
+
+**The epoch marker is a per-file, sticky flag, and that is a trap worth knowing.**
+`parse_file` resets `cache_replay_accept_positive` to FALSE at entry and sets it TRUE if *any*
+`# radio-cache-semantics=<current>` line appears in that file (`radiobase.c:3806`, `:3825`);
+positives are refused while it is FALSE (`:1287`, `:3154`) and the load prints `trusted` or
+`negative-only`. So **concatenating a pre-refutation log behind a marked checkpoint silently
+promotes its positives to trusted** -- one file, one verdict on the whole file. `out_k8.txt`
+carries no marker of its own and would load negative-only on its own; behind
+`sa193.checkpoint` it does not.
+
+That matters here because `out_k8.txt` is from 2026-05-12, before the 2026-08-30 refutation of
+singleton-majorization sufficiency, so its 184,649 positives could in principle rest on the retired
+shortcut. Its 11,215,465 negatives are unaffected: majorization is rejection-only and necessity
+still holds. I initially took negatives only; Fedor's call was to include the positives, on the
+grounds that gaps are cheap to fill and the positives raise the chance a cell lands. Adopted, with
+the condition written into [status.md](status.md): **a `WALK ... = SOLVABLE` line from this run is a
+lead, not a claim, until its witness tree is reconstructed and passes `tools/check_witness.py`.**
+That is the same standard the repo already applies -- achievability claims stand on re-verification,
+not on the era of the log that suggested them.
+
+**Measured cost of the bigger cache**: 18m20s to load 15.28M facts, and the query it was loaded for
+answered in 0.0 s. Worth 18 minutes at the head of a seven-day run.
+
+**A clean instance of the macOS RSS trap.** `capped_run` reported peak RSS **1.57 GB** for that
+local load; the identical cache on the Linux host sits at **4.9 GB**. The local figure is the
+under-measurement -- macOS swaps anonymous pages out and they leave RSS, which is exactly why
+[status.md](status.md) says the `--rss-gb` cap is not an allocation bound there. Size a Linux run
+from a Linux number, or from three times the macOS one.
+
+Distribution of what `out_k8.txt` adds, which tempers expectations: 11,192,667 of its facts are at
+mass <=193 and only 22,798 above, while every state in this search has mass 212-330. They remain
+citable, because a cached negative discharges any query it is a sub-multiset of, and low mass makes
+that *more* likely, not less. But this is not the missing mass-330 layer; nothing is.
