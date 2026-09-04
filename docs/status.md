@@ -604,15 +604,14 @@ records with no final verdict. The live stack at that snapshot was the K=9 paren
 `Sb(28:19,40:13,37:12,26:15)`.
 
 A second AWS job started 2026-09-04: the `K=10` `Sb` vertical scan that decides `Sa(11)`. Run
-`20260904T202016Z` on `i-0fc694110b55d76ea` (`r7iz.2xlarge`, us-west-2a) runs five concurrent
-`radio_sb_walk` walkers at `n1=192`, `m_start = 136, 130, 120, 110, 100`, each ascending to
-`m_end=160` under a 48-hour and 10-GiB cap, warm-started from a 3,753,997-fact cache
-(run10's final checkpoint plus 338,869 new facts at mass 194-330 from the 2026-09-04 local
-probes, sha256 `c95248e5...`). Durable prefix
-`s3://radio-sa193-393287594714/sbwalk/20260904T202016Z/`; `STATUS` and per-walker logs refresh
-every ten minutes, and the final upload is done by the shell that waits on the walkers rather
-than by a poller. **No cell had completed anywhere as of launch**, so treat any absence of a
-`WALK` line as unknown, never as a refutation.
+`20260904T205613Z` on `i-0f8c55d221d7f5396` (`r7iz.xlarge`, us-west-2b) runs **one**
+`radio_sb_walk` walker at `n1=192`, `m_start=136`, ascending to `m_end=160`, capped at 7 days and
+24 GiB, warm-started from a 3,801,370-fact cache (sha256 `9623a4e6...`): run10's final checkpoint,
+plus 338,869 facts at mass 194-330 from the local probes, plus 47,373 harvested from a superseded
+five-walker run. Durable prefix `s3://radio-sa193-393287594714/sbwalk/20260904T205613Z/`; read it
+with `tools/sbwalk_status.sh`, and `--live` for resident memory, which the ten-minute heartbeat
+does not carry. **No cell at `n1=192` has ever completed**, locally or on AWS, so treat the absence
+of a `WALK` line as unknown and never as a refutation.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB

@@ -101,6 +101,7 @@ upload_all() {
       echo "walkers $M_LIST  (k=$K n1=$N1 m_end=$M_END)"
       echo "alive   \$(pgrep -c -x radio_sb_walk || echo 0)"
       echo "uptime  \$(uptime)"
+      echo "rss_kb  \$(ps -o rss= -C radio_sb_walk 2>/dev/null | tr '\\n' ' ')"
       echo
       echo "=== every WALK verdict so far ==="
       grep -h '^WALK' /root/run/walk_m*.txt 2>/dev/null || echo "(none yet)"

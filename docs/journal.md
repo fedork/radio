@@ -13487,13 +13487,24 @@ unknown `k=10` `Sb` frontier, whose column holds only `m=5` (985, exact) and `m=
 The paper's `Sa` table now shows `(197)` with prose saying plainly that it is a construction only
 and that the true value is expected near 329.
 
-**Launched on AWS.** Run `20260904T202016Z`, `i-0fc694110b55d76ea`, `r7iz.2xlarge`: five concurrent
-walkers at `m_start = 136, 130, 120, 110, 100`, each ascending to 160, 48-hour and 10-GiB caps,
+**Launched on AWS, then narrowed to one walker at Fedor's direction.** The run of record is
+`20260904T205613Z`, `i-0f8c55d221d7f5396`, `r7iz.xlarge`: a single walker at `m_start=136`
+ascending to 160, capped at 7 days and 24 GiB, warm-started from a 3,801,370-fact cache. The
+24-GiB cap replaced the 10-GiB one because a walker was already at 3.4 GB twenty minutes in and
+the trie only grows; `capped_run` kills at the cap, so a multi-day walk needs the headroom. Read it
+with `tools/sbwalk_status.sh`, which also takes `--live` for resident memory.
+
+The superseded first attempt was `20260904T202016Z`, `i-0fc694110b55d76ea`, `r7iz.2xlarge`: five
+concurrent walkers at `m_start = 136, 130, 120, 110, 100`, each ascending to 160, 48-hour and
+10-GiB caps,
 warm-started from a 3,753,997-fact cache -- run10's final checkpoint plus **338,869 new facts at
 mass 194-330** parsed out of today's local probes, which is exactly the mass band the `sa193` cache
-lacks. Several shots rather than one ascending walk, because the walk-up design needs a completed
-cell to seed it and there is not one yet; each walker still ascends on success, so a lucky low shot
-becomes the intended walk. About $0.744/h, so the 48-hour backstop bounds this to ~$36.
+lacks. It ran about 40 minutes and decided no cell, which is
+consistent with everything else measured today; its 47,373 facts were harvested into the
+single-walker run's cache before it was terminated, so nothing was wasted. The spread was a hedge
+against having no completed cell to walk up from; one walker with a longer horizon and more memory
+is the better bet once the hedge has told you nothing lands quickly at any `m`. At $0.372/h the
+seven-day backstop bounds the run of record to about $62.
 
 `tools/sbwalk_launch.sh` applies today's other lesson: the final upload is done by the shell that
 waits on the walkers, before anything can power the host off, rather than by a poller that can lose
