@@ -13342,3 +13342,95 @@ Straight scaling of the 0.711 root-1-to-3 ratio against run9's 419,353.1 CPU sec
 at roughly 298k CPU seconds, about 3.45 days against run9's 4.85. That is an estimate only: the
 extra necessity-only work is front-loaded, and so is its cache payoff. No new claim follows from any
 of this -- it is operational measurement of a run that has not reached a verdict.
+
+## 2026-09-04 -- run10 stopped itself at 13 of 16 roots, and the log tail is only on the volume
+
+The cold `Sa(193)` rerun is no longer running. Instance `i-0318c3349a0df835b` is `stopped` with
+`StateReason = Client.InstanceInitiatedShutdown`: the shutdown came from inside the OS, not from a
+`StopInstances` call. A CloudTrail lookup on that instance over 2026-09-04 00:00-17:00 UTC shows
+only the hourly instance-profile `AssumeRole` pairs -- the last at 10:33:29Z -- and no
+`StopInstances`, console action or SSM command. `--instance-initiated-shutdown-behavior stop` did
+its job, so the root volume `vol-020083ad3e3df88c4` survives. **It is `DeleteOnTermination=true`;
+do not terminate the instance before the tail is recovered.**
+
+The last evidence of health is 31 minutes before the last status write, and nothing was near a
+limit:
+
+    memprofile row  2026-09-04T10:35:51Z  solver_secs 299,172  rss 1.10 GB  vmpeak 1.107 GB
+    STATUS          2026-09-04T11:06:44Z  solver process alive, 13 of 16 roots, 3,329,514 verdicts,
+                                          cpu 301,012s, log 448 MB
+    wall backstop   14 days = 1,209,600s against 301,012s used
+    RSS guard       24 GiB against 1.10 GB
+    disk            50 GB against a 448 MB log
+
+So the shutdown happened between 11:06:44Z and the next ten-minute status write, with the solver
+alive and healthy. The cause is not diagnosable from S3: `/var/log/messages`, `/var/log/sa193.log`
+and `/root/run/sa193.err` are all on the preserved volume, and none of them was uploaded, because
+both upload paths that would have carried them require an *observed* solver exit. The user-data
+script uploads `sa193.err` and `instance.log` only after `wait $SOLVER_WRAPPER` returns, and
+`sa193_watchdog.sh`'s final `-19` full-log upload fires only from its `kill -0` GONE branch. A
+whole-instance shutdown kills watchdog and solver together, so neither ran.
+
+**That is the durable lesson, and it is a gap in the archive design, not bad luck.** What exists in
+S3 is the routine hourly snapshot written at 10:35Z:
+
+    run10/seg-20260831T232959Z/out_sa193.txt.zst    68,999,758 bytes  (zstd -3, 10:35:54Z)
+    run10/seg-20260831T232959Z/sa193.checkpoint    130,573,041 bytes
+    run10/sa193.checkpoint                        130,573,041 bytes
+    run10/seg-20260831T232959Z/memprofile.csv           68,158 bytes
+    run10/STATUS                                         2,392 bytes  (11:06:44Z)
+
+The archived log therefore ends 31+ minutes before the shutdown, mid-`k=7`-verdict, with no
+truncation marker. It contains **twelve** root verdicts, through `Sb(101:92)`; the thirteenth,
+`Sb(100:93)`, was decided between 10:35Z and 11:06Z -- the status counter proves it -- and that line
+exists only on the volume. The hourly cadence means any unobserved instance loss silently costs up
+to an hour of log, and the log is the evidence.
+
+The twelve archived root costs, in process CPU seconds, with final pass and root split count:
+
+    Sb(112:81) 100,723  pass 5  903      Sb(106:87)   9,555  pass 3  566
+    Sb(111:82)  64,173  pass 5  790      Sb(105:88)   7,017  pass 3  510
+    Sb(110:83)  42,252  pass 4  781      Sb(104:89)   5,274  pass 2  522
+    Sb(109:84)  28,163  pass 4  693      Sb(103:90)   3,944  pass 2  484
+    Sb(108:85)  19,168  pass 3  681      Sb(102:91)   2,852  pass 2  455
+    Sb(107:86)  13,392  pass 3  621      Sb(101:92)   2,002  pass 1  497
+    sum 298,515
+
+Root 14, `Sb(99:94)`, was 737 CPU seconds into pass 1 of an unbounded invocation (21 splits of
+6,240) when the machine went down. `Sb(98:95)` and `Sb(97:96)` had not started.
+
+**The run died about 0.8% from the end.** Successive root ratios have been 0.637, 0.658, 0.667,
+0.681, 0.699, 0.713, 0.734, 0.752, 0.748, 0.723, 0.702 -- mean 0.729 over the last six -- which
+extrapolates the four remaining roots at roughly 1,500 / 1,100 / 800 / 600 CPU seconds. That is
+about 2,400 seconds of work left after root 13, and a projected total near 303,000 CPU seconds
+against run9's measured 419,353.1, i.e. 27.6% cheaper. **Extrapolation, not measurement**; the
+27.6% is an estimate of the same kind as the 3.45-day projection in the 2026-09-03 entry, and the
+hardware confound recorded there still applies.
+
+Measured cost of what was spent: launch 2026-08-31T23:29:01Z to shutdown ~2026-09-04T11:10Z is
+3d 11h 41m, 83.7 instance-hours at the verified us-west-2 on-demand rate of **$0.372/h** for
+`r7iz.xlarge` (AWS pricing API, checked 2026-09-04), so about **$31** of compute plus a 50-GB gp3
+volume that keeps accruing about $0.13/day while the instance sits stopped.
+
+No claim follows and none is lost. `Sa(193)` is already `UNSOLVABLE` from the proof-safe cold run9
+derivation; run10 is the post-refutation diagnostic rerun, and it has produced no `Sa(193)` verdict
+of its own. Nothing in `data/` changes.
+
+What the next session can do, in order of increasing commitment. Starting the stopped instance is
+safe and does not restart anything: cloud-init's `scripts-user` module runs user-data once per
+instance, so a restart brings up the box with the log, the error file and `/var/log` intact and no
+solver. Recovering `/root/run/out_sa193.txt` gives the complete single-segment log through the
+shutdown, including root 13, and `/var/log/messages` should say what called for the shutdown --
+that answer is worth having before the same launcher is used again. Finishing the last three roots
+requires a warm restart, which makes the log two-segment; it is closed only if both segments are
+retained, and warm-starting from this run's own parsed output is the sound case the watchdog's
+checkpoint comment describes. Whether 2,400 seconds of diagnostic search is worth a second segment
+is a judgement call, not a necessity.
+
+The K=9 Pareto walk on the separate instance `i-007f24b8cbc1fb060` is unaffected and alive: at
+2026-09-04T16:03:22Z it was 1d 14h 47m in, still at 80 bootstrap decisions through
+`Sb(95:94)=SOLVABLE`, and still resolving `Sb(95:95)` -- now pass 6, 137,869 CPU seconds on that
+one state, 1,438 of 3,256 splits left. Memory is the reassuring part: 9.78 GiB at the 2026-09-03
+12:48Z snapshot against 9.79 GiB now, essentially flat across 27 hours, so the 24-GiB cap is not
+the binding constraint it looked like it might become. The two runs shared nothing, and run10's
+shutdown neither touched nor was touched by this one.

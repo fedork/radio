@@ -142,7 +142,8 @@ mentions but never wrote down, and which would let `n(9,11)` be predicted at all
 
 The old `run_pareto9.sh` restart path is superseded. Run `20260903T011520Z` is live on AWS using
 `radio_pareto --bootstrap-diagonal 9 55 55`: it freezes an exact current-semantics revision of the
-live `run10/sa193.checkpoint`, brackets the frontier from the diagonal, and then walks the complete
+`run10/sa193.checkpoint` as it stood at launch (that run has since stopped; the frozen input is
+unaffected), brackets the frontier from the diagonal, and then walks the complete
 staircase to `m=1`. It has no wall-time bound, a 24-GiB resident-memory cap, hourly cache/raw-log
 checkpoints, a persistent encrypted volume, and SNS progress mail. Read it with
 `tools/pareto9_status.sh 20260903T011520Z`; exact deployment and input hashes are in the

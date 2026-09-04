@@ -18,7 +18,7 @@ deliberately retained. See
 | uncolored level replay | terminated: `i-04126f6d3016378a9`, `c8a.4xlarge`, run `20260818T194508Z`; output archived |
 | colored level replay | terminated: `i-0901e2b2c266f7db2`, volume `vol-0bdc1e36eea39386c` confirmed deleted |
 | persistent oracle | **terminated** 2026-08-31 14:25:41 UTC: `i-002cabc654b2078ed`; encrypted 50-GiB volume `vol-04260ae18b515e7f5` remains unattached and `available` |
-| active `Sa` job | `run10` cold `Sa(193)` rerun on on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC; its `Sa(192)` control passed in 389.9 CPU seconds and the solver is live alone on that instance. |
+| stopped `Sa` job | `run10` cold `Sa(193)` rerun, on-demand `i-0318c3349a0df835b`, `r7iz.xlarge`, launched 2026-08-31 23:29:01 UTC, **stopped ~2026-09-04 11:10 UTC by `Client.InstanceInitiatedShutdown`** at 13 of 16 roots, 301,012 CPU seconds, cause unknown. Its `Sa(192)` control had passed in 389.9 CPU seconds. 83.7 instance-hours at the verified us-west-2 on-demand rate $0.372/h, about $31. Root volume `vol-020083ad3e3df88c4` is `DeleteOnTermination=true` and holds the only copy of the log's last 31+ minutes plus `/var/log` and `sa193.err`: recover before terminating. See the [2026-09-04 journal entry](journal.md). |
 | active Pareto job | run `20260903T011520Z` on on-demand `i-007f24b8cbc1fb060`, `r7iz.xlarge`; full diagonal-bootstrap K=9 walk from `Sb(55:55)`, no wall-time bound, 24-GiB RSS cap; exact record below. |
 | stopped K6 survey | stopped by request 2026-09-01 05:13:25 UTC at durable rank 34,000,000; the Spot Auto Scaling group has desired/minimum capacity zero and no instance; validated artifacts remain under `run10/k6-main-survey` |
 | retained oracle volumes | five unattached 50-GiB volumes, 250 GiB total: `vol-0053276ecc6d1adf4`, `vol-03a28c8c01ae591a1`, `vol-0621d09062d023bce`, `vol-0ef7c8664c6cab66e`, and the final instance's `vol-04260ae18b515e7f5`; not deleted because this request authorized instance termination, not data deletion |
@@ -140,7 +140,7 @@ fix. Run9 is the proof source.
 | `run7/` | progress-gated pass-2 `NO_DEADLINE` handoff (`e648e83`) | 2026-08-11 15:45:30 | stopped 2026-08-11 22:13:30; archived; `/root/run7/radio_sa193_v7` |
 | `run8/` | compact cache + bounded long-state probes (`9395218`) | 2026-08-11 22:46:06 | completed; performance only; 412561.4 CPU s, 1.32 GB peak RSS |
 | `run9/` | suppress rb-tainted implicit contractions (`e7fa747`) | 2026-08-12 03:21:12 | **completed proof source**; 419353.1 CPU s, 1.32 GB peak RSS |
-| `run10/` | post-refutation current main (`9e9e25a`) | 2026-08-31 23:29:01 | **live cold diagnostic rerun** on `i-0318c3349a0df835b`; build `54419a4988bb53065d8855cd66d09e6f133896816aecdea635692c0ef33a7492`; control passed |
+| `run10/` | post-refutation current main (`9e9e25a`) | 2026-08-31 23:29:01 | **stopped at 13 of 16 roots** ~2026-09-04 11:10 UTC by an instance-initiated shutdown, cause unknown; 301,012 CPU s, 1.05 GB RSS; build `54419a4988bb53065d8855cd66d09e6f133896816aecdea635692c0ef33a7492`; control passed; the archived segment ends 31+ minutes before the stop |
 
 The dedicated `K=6` census was stopped by request at 2026-09-01 05:13:25 UTC. Its nine validated,
 provenance-checked stages exhaust the exact prefix ranks 0 through 33,999,999: 34,000,000 queries,

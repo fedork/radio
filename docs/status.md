@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-09-03**.
+don't know it. Last refreshed **2026-09-04**.
 
 The central singleton question is now resolved negatively.  Necessity remains proved, but weak
 majorization by `G_K` is not sufficient.  The exact-support, full-mass state
@@ -150,15 +150,21 @@ group is retained at desired/minimum capacity zero and has no instance; all vali
 checkpoints and the final stopped status remain under `run10/k6-main-survey` in S3. See the
 [production survey record](../evidence/singleton_k6_main_solver_survey_2026-08-31.md).
 
-The post-refutation cold `Sa(193)` rerun is live on AWS under S3 prefix `run10`. Its current-main
-binary passed the mandatory `Sa(192)` control as solvable in 389.9 CPU seconds before entering the
-193 search. The on-demand `r7iz.xlarge` instance is `i-0318c3349a0df835b`; use
-`tools/sa193_status.sh` (now defaulting to `run10`) rather than the terminated historical instance.
-Its first three top-level states cost 207,148 CPU seconds against run9's 291,204, 28.9% less for the
-same search volume and one pass fewer per root; the earlier impression that run10 was slower came
-from a matched split index inside a pass, where its roughly 1.7x larger real-CPU pass budget puts it
-behind before it finishes ahead. Measurements and the hardware confound are in the
-[2026-09-03 journal entry](journal.md).
+The post-refutation cold `Sa(193)` rerun **stopped on 2026-09-04 at 13 of 16 top-level states**,
+about 0.8% short of the end, and is no longer running. Its current-main binary had passed the
+mandatory `Sa(192)` control as solvable in 389.9 CPU seconds, and the twelve archived roots cost
+298,515 CPU seconds against run9's matched figures -- 28.9% less on roots 1-3 for the same search
+volume and one pass fewer per root; the earlier impression that run10 was slower came from a matched
+split index inside a pass, where its roughly 1.7x larger real-CPU pass budget puts it behind before
+it finishes ahead. Measurements and the hardware confound are in the
+[2026-09-03 journal entry](journal.md). The instance `i-0318c3349a0df835b` is `stopped` by an
+`Client.InstanceInitiatedShutdown` with the solver alive and no limit near tripping, and the cause is
+still unknown: it is on the preserved volume `vol-020083ad3e3df88c4`, which must not be deleted. The
+S3 archive holds only the routine hourly snapshot from 10:35Z, so the log's last 31+ minutes --
+including the thirteenth root verdict `Sb(100:93)` -- exist nowhere else. Full account, per-root
+costs, the ~$31 measured cost and the recovery options are in the
+[2026-09-04 journal entry](journal.md). No `Sa(193)` claim depended on this run: the verdict
+`UNSOLVABLE` rests on the proof-safe cold run9 derivation.
 The stopped singleton survey remains under `run10/k6-main-survey`; use
 `tools/singleton_k6_survey_status.sh` to read its final S3 status. The Auto Scaling group is at
 desired/minimum capacity zero, has no worker, and cannot replace one until deliberately scaled up.
@@ -198,6 +204,7 @@ Each of these has already caused, or was one step from causing, a wrong result.
 | **A missing `can't solve` line does not mean unsolvable.** | `canSolveB` returns a tri-state and gives up with `MAYBE` on a finite budget, printing nothing. Absence of a verdict is not a verdict. (Briefly narrowed on 2026-08-04 when budgets were disabled; that change was reverted the same day — disabling them trapped a real run for six hours. In a proof-safe cache, a printed `can't solve` is exhaustive because it is emitted only when `!skipped_some`; the separate `rb_dead` trap explains why run3/run8 caches are not proof-safe.) |
 | **Do not restore either old budget extreme.** | `c13b5d3` could return before trying a complete child; `e648e83` required a new negative cache fact and then handed pass 2 an unbounded child. Run7 demonstrated the latter failure for 20,460 CPU seconds in a finite-parent k=5 state after 280,116,882,707 prefixes. Current policy permits zero-progress `MAYBE`, never refills an exhausted parent, keeps the reliable one/two-segment spine on the shared allowance, and probes longer states with a geometrically increasing local slice. New builds count accepted split prefixes deterministically at 20,000,000 units per nominal second; `-DRADIO_CPU_BUDGET` is the historical fallback. See [`../evidence/deadline_stall_2026-08-10.txt`](../evidence/deadline_stall_2026-08-10.txt) and [`../evidence/work_budget_rb_root_2026-08-13.txt`](../evidence/work_budget_rb_root_2026-08-13.txt). |
 | **`tools/capped_run.sh --rss-gb` cannot bound a long solver run on this machine.** | The result-cache trie grows unboundedly as it solves, and macOS swaps it out rather than keeping it resident, so RSS reads 0.2 GB while 27 GB sits in swap and the cap never fires. A k=8-rooted mapping run reached `VSZ 424 GB` and 6,395 swapins per 45 s, managing 2 of 35 roots in 9 h 20 m. Use the local supervisor, which guards macOS `top`'s documented physical-footprint field, plus `vm_stat` swapins. `vmmap -summary` is useful for one-off attribution but can itself hang indefinitely. The 2026-08-10 local `Sa(193)` trial independently reproduced the RSS gap: 2.77 GB peak RSS versus 7.1 GB footprint. |
+| **An hourly log snapshot is not the log, and a stopped instance is not a closed run.** | `sa193_watchdog.sh` uploads a full `-19` log and the `sa193.err`/`instance.log` pair only from its *observed* solver-GONE branch, and the user-data uploads only after `wait` returns. A whole-instance shutdown kills watchdog and solver together, so neither path runs and the newest archive is the routine hourly `-3` snapshot -- up to an hour behind, ending mid-line with no truncation marker. On 2026-09-04 `run10` stopped this way and its thirteenth root verdict `Sb(100:93)` exists only on the instance volume. Because shutdown behaviour is `stop`, the volume keeps the complete log and `/var/log`: recover them **before** terminating, since the root volume is `DeleteOnTermination=true`. Read the instance state line at the bottom of a status output, never the `solver process` line, which comes from the last `STATUS` object written while it was still alive. |
 | **Do not apply old oracle footprint estimates to the new cache.** | The pre-2026-08-10 pointer trie needed 4.04 GB at `MAX_N=132` and about 20 GB at `MAX_N=262`; those measurements remain explanations of old failed runs, not predictions for current `main`. The deployed last-segment cache is 11.2x smaller on the `MAX_N=193` checkpoint, but a full `MAX_N=262` oracle has not been measured. Cap and inventory any new mapping run rather than assuming either figure. |
 | **Benchmark against `radiobase.c`, not against a tool you wrote.** | Three times on 2026-08-09 a headline number came from comparing against the wrong baseline: a 40-state sample, a holdout that shared its *construction* with the training set, and a cold validation measured against a warm benchmark. The last one led to patching a "race" that did not exist. A per-part filter measured at 15.3x turned out to be already implemented by the per-split `s[4]` / `s[5]` loop in `canSolveB`, and a "200x" combined figure collapsed to ~5-13x. Before quoting a speedup, find the existing check that already does it. |
 | **`canSolveB_ctx` is not general permission to call the mutable solver concurrently.** | The context owns the accepted-prefix clock, exact L1 and reachability scratch, but ordinary solving still mutates the dominance trie/arenas, lazy split catalog, learned `s[4]`/`s[5]`/`FAST` metadata, and `sbb_to_min_k`. `radio_refute.c` is the narrow safe exception: it prepares cache and split metadata serially, checks their frozen checksum/allocation counts, permits only root enumeration plus k-1 CACHE_ONLY reads, and publishes no results. A thread pool around ordinary solving would still have C data races; see [parallel-solver.md](parallel-solver.md). |
@@ -567,24 +574,29 @@ Do not run `gh auth switch`.
 
 ## Running now
 
-**Two isolated on-demand computations are running.** The `run10` cold `Sa(193)` rerun is alive on
-`i-0318c3349a0df835b`; at the 2026-09-03 01:10 UTC status it had completed 2 of 16 roots, held
-2,273,018 verdicts, used 1.04 GB RSS, and was working on `Sb(110:83)@9`. Read current state with
-`tools/sa193_status.sh`.
+**One on-demand computation is running; the other stopped itself.** The `run10` cold `Sa(193)`
+rerun on `i-0318c3349a0df835b` is **down since 2026-09-04 ~11:10 UTC**, stopped by an
+instance-initiated shutdown at 13 of 16 roots with 3,329,514 verdicts, 301,012 CPU seconds and
+1.05 GB RSS. `tools/sa193_status.sh` still reads its last `STATUS` object, written 11:06:44Z, which
+reports the solver alive -- that snapshot predates the shutdown and is not current state; the
+instance line at the bottom of that output is the one to read. The instance is stopped, not
+terminated, so the volume, the complete on-disk log and `/var/log` survive.
 
 The full K=9 Pareto run `20260903T011520Z` is alive on `i-007f24b8cbc1fb060`. It passed its remote
 regression/build/provenance gates, froze the exact current run10 cache revision documented above,
 and launched `radio_pareto_k9 --bootstrap-diagonal 9 55 55 input-sa193.cache`. Read its ten-minute
 durable status with `tools/pareto9_status.sh 20260903T011520Z`. The two solvers have separate
 instances, disks, processes, S3 prefixes and caches; launching the Pareto walk did not interrupt or
-mutate the Sa run. As of the 2026-09-03 12:48:03 UTC snapshot it had completed 80 bootstrap
-decisions through `Sb(95:94)=SOLVABLE` and was still resolving `Sb(95:95)`, at 9.78 GiB RSS. The
+mutate the Sa run. As of the 2026-09-04 16:03:22 UTC snapshot, 1d 14h 47m in, it had completed 80 bootstrap
+decisions through `Sb(95:94)=SOLVABLE` and was still resolving `Sb(95:95)` -- pass 6, 137,869 CPU
+seconds on that single state, 1,438 of 3,256 splits left -- at 9.79 GiB RSS against 9.78 GiB
+27 hours earlier, so memory is flat and the 24-GiB cap is not the binding constraint. The
 status helper now appends a live level stack, a top-ten slow-fact ranking using the maximum of each
 fact's final `took` time and highest printed progress `elapsed`, and a separate completed-only top
 ten ranked strictly by final `took`. Its labels distinguish completed verdicts from progress
 records with no final verdict. The live stack at that snapshot was the K=9 parent
-`Sb(95:95)`, K=8 child `Sb(56:40,55:39)`, and K=7 child
-`Sb(28:19,28:18,37:12,37:11)`.
+`Sb(95:95)`, K=8 child `Sb(58:48,47:37)`, and K=7 child
+`Sb(28:19,40:13,37:12,26:15)`.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB
@@ -1534,8 +1546,8 @@ that model to settle that case.  This formula comes from a checked 19-node relax
    acting on is that in all 26,876 winning classes across both censuses the *mixed* child is
    strictly the largest, against 59%/57% among random cap-feasible splits. If it holds beyond
    residual k=5/6 it is a free necessary condition worth putting in front of the solver's split
-   loop. Test it on another corpus before using it. The live AWS compute is the isolated `run10`
-   Sa rerun plus Pareto run `20260903T011520Z`; the retired oracle's persistent volume remains
+   loop. Test it on another corpus before using it. The only live AWS compute is Pareto run
+   `20260903T011520Z`; the isolated `run10` Sa rerun stopped itself on 2026-09-04; the retired oracle's persistent volume remains
    available, while the old replay hosts are terminated. Do not restart either retired independent-checker
    coloring pipeline or the superseded independent ordinary audit.
 
