@@ -1,0 +1,143 @@
+# Canonical witness tree, produced by radio_canon_search_generic.
+# command : ./canon10 3 10 192 5   (build MAX_K=10 MAX_N=330 MAX_STATE_SIZE=1024)
+# source  : canon_192_5.txt (2026-09-04 probe)
+# format  : indented '<state> @k --[split]-->' / '<state> @k [canonical U_k]'
+# checked : tools/check_witness.py
+#
+192:5 @10 --[192:5]-->
+  192:5 @9 --[192:5]-->
+    192:5 @8 --[109:5]-->
+      109:5 @7 --[58:3]-->
+        58:3 @6 --[31:2]-->
+          31:2 @5 --[16:1]-->
+            16:1 @4 [canonical U_4]
+            16:1,15:1 @4 [canonical U_4]
+            15:1 @4 [canonical U_4]
+          27:2,31:1 @5 --[15:2,15:0]-->
+            15:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1,7:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+            12:2,15:1 @4 --[4:1,8:1]-->
+              8:1,4:1 @3 [canonical U_3]
+              8:1,7:1,4:1 @3 [canonical U_3]
+              8:1 @3 [canonical U_3]
+            16:1 @4 [canonical U_4]
+          27:1 @5 --[16:1]-->
+            16:1 @4 [canonical U_4]
+            11:1 @4 [canonical U_4]
+            0:0 @4 [canonical U_4]
+        51:3,58:2 @6 --[31:2,27:0]-->
+          31:2 @5 --[16:1]-->
+            16:1 @4 [canonical U_4]
+            16:1,15:1 @4 [canonical U_4]
+            15:1 @4 [canonical U_4]
+          27:2,20:2,31:1 @5 --[12:1,15:2,15:0]-->
+            15:2,12:1 @4 --[7:1,8:1]-->
+              8:1,7:1 @3 [canonical U_3]
+              8:1,7:1,4:1 @3 [canonical U_3]
+              8:1 @3 [canonical U_3]
+            15:1,15:1,12:1,5:2 @4 --[8:1,7:1,4:0,4:1]-->
+              8:1,7:1,4:1 @3 [canonical U_3]
+              8:1,7:1,4:1,4:1,1:1 @3 [canonical U_3]
+              8:1,1:1 @3 [canonical U_3]
+            16:1,15:1 @4 [canonical U_4]
+          31:2,20:1 @5 --[16:1,15:1]-->
+            16:1,15:1 @4 [canonical U_4]
+            16:1,15:1,5:1 @4 [canonical U_4]
+            15:1 @4 [canonical U_4]
+        51:2 @6 --[31:2]-->
+          31:2 @5 --[16:1]-->
+            16:1 @4 [canonical U_4]
+            16:1,15:1 @4 [canonical U_4]
+            15:1 @4 [canonical U_4]
+          20:2 @5 --[15:2]-->
+            15:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1,7:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+            5:2 @4 --[4:1]-->
+              4:1 @3 [canonical U_3]
+              4:1,1:1 @3 [canonical U_3]
+              1:1 @3 [canonical U_3]
+            0:0 @4 [canonical U_4]
+          0:0 @5 [canonical U_5]
+      83:5 @7 --[47:5]-->
+        47:5 @6 --[27:3]-->
+          27:3 @5 --[15:2]-->
+            15:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1,7:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+            12:2,15:1 @4 --[4:1,8:1]-->
+              8:1,4:1 @3 [canonical U_3]
+              8:1,7:1,4:1 @3 [canonical U_3]
+              8:1 @3 [canonical U_3]
+            12:1 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              4:1 @3 [canonical U_3]
+              0:0 @3 [canonical U_3]
+          20:3,27:2 @5 --[15:2,12:0]-->
+            15:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1,7:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+            12:2,15:1,5:2 @4 --[4:1,8:1,4:1]-->
+              8:1,4:1,4:1 @3 [canonical U_3]
+              8:1,7:1,4:1,4:1,1:1 @3 [canonical U_3]
+              8:1,1:1 @3 [canonical U_3]
+            15:2,5:1 @4 --[8:1,4:1]-->
+              8:1,4:1 @3 [canonical U_3]
+              8:1,7:1,1:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+          20:2 @5 --[15:2]-->
+            15:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1,7:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+            5:2 @4 --[4:1]-->
+              4:1 @3 [canonical U_3]
+              4:1,1:1 @3 [canonical U_3]
+              1:1 @3 [canonical U_3]
+            0:0 @4 [canonical U_4]
+        36:5 @6 --[23:4]-->
+          23:4 @5 --[15:2]-->
+            15:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1,7:1 @3 [canonical U_3]
+              7:1 @3 [canonical U_3]
+            15:2,8:2 @4 --[8:1,4:1]-->
+              8:1,4:1 @3 [canonical U_3]
+              8:1,7:1,4:1,4:1 @3 [canonical U_3]
+              7:1,4:1 @3 [canonical U_3]
+            8:2 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              8:1 @3 [canonical U_3]
+              0:0 @3 [canonical U_3]
+          13:4,23:1 @5 --[12:2,15:1]-->
+            12:2,15:1 @4 --[4:1,8:1]-->
+              8:1,4:1 @3 [canonical U_3]
+              8:1,7:1,4:1 @3 [canonical U_3]
+              8:1 @3 [canonical U_3]
+            12:2,8:1,2:1 @4 --[8:1,7:1,1:1]-->
+              8:1,7:1,1:1 @3 [canonical U_3]
+              8:1,4:1,1:1,1:1 @3 [canonical U_3]
+              4:1 @3 [canonical U_3]
+            2:1 @4 --[1:1]-->
+              1:1 @3 [canonical U_3]
+              1:1 @3 [canonical U_3]
+              0:0 @3 [canonical U_3]
+          13:1 @5 --[12:1]-->
+            12:1 @4 --[8:1]-->
+              8:1 @3 [canonical U_3]
+              4:1 @3 [canonical U_3]
+              0:0 @3 [canonical U_3]
+            1:1 @4 [canonical U_4]
+            0:0 @4 [canonical U_4]
+        0:0 @6 [canonical U_6]
+      0:0 @7 [canonical U_7]
+    0:0 @8 [canonical U_8]
+    0:0 @8 [canonical U_8]
+  0:0 @9 [canonical U_9]
+  0:0 @9 [canonical U_9]
+

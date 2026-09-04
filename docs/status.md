@@ -301,9 +301,9 @@ Facts live in `data/*.csv` with per-cell `bound`, `status` and `source`;
   text now supplies the matching `Sa` definition and Figure 2.13, while a full Chapter 2 copy
   remains unobtained. See
   [aigner-1988-scan.md](aigner-1988-scan.md).
-- **18 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
+- **19 structurally checked witness trees** — `Sa(38)` through `Sa(192)`, plus recursive trees for
   `Sb(248:3)@8`, `Sb(496:4)@9`, the old 480 and new 481 `m=5` constructions,
-  `Sb(473:6)@9`, their two-sided variants where available, and the unsupported
+  `Sb(473:6)@9`, `Sb(192:5)@10`, their two-sided variants where available, and the unsupported
   singleton-majorized derivation for `Sb(973:6)@10`, plus the exact three-level atomization of
   the decisive `m=5` majorized leaf at `P_7`. All pass structural checking; the two
   `majorized_*` files are explicitly reported as unsupported terminals.
@@ -602,6 +602,17 @@ ten ranked strictly by final `took`. Its labels distinguish completed verdicts f
 records with no final verdict. The live stack at that snapshot was the K=9 parent
 `Sb(95:95)`, K=8 child `Sb(58:48,47:37)`, and K=7 child
 `Sb(28:19,40:13,37:12,26:15)`.
+
+A second AWS job started 2026-09-04: the `K=10` `Sb` vertical scan that decides `Sa(11)`. Run
+`20260904T202016Z` on `i-0fc694110b55d76ea` (`r7iz.2xlarge`, us-west-2a) runs five concurrent
+`radio_sb_walk` walkers at `n1=192`, `m_start = 136, 130, 120, 110, 100`, each ascending to
+`m_end=160` under a 48-hour and 10-GiB cap, warm-started from a 3,753,997-fact cache
+(run10's final checkpoint plus 338,869 new facts at mass 194-330 from the 2026-09-04 local
+probes, sha256 `c95248e5...`). Durable prefix
+`s3://radio-sa193-393287594714/sbwalk/20260904T202016Z/`; `STATUS` and per-walker logs refresh
+every ten minutes, and the final upload is done by the shell that waits on the walkers rather
+than by a poller. **No cell had completed anywhere as of launch**, so treat any absence of a
+`WALK` line as unknown, never as a refutation.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB

@@ -154,13 +154,16 @@ failure level. Full statements, reductions, and verification records are collect
 
 ### 5.1 Complete-graph states
 
-The following are the exact values of `A(K)` through ten tests. Every bare entry is a maximum,
-not merely a construction.
+The following are the exact values of `A(K)` through ten tests, followed by a lower bound at
+eleven. Every bare entry is a maximum, not merely a construction; the parenthesised entry is a
+construction only, and a weak one - it comes from the single first test of 192 out of 197 whose
+three outcomes land on states already known to be solvable, and the true value is expected near
+329. Closing that gap needs the `K=10` `Sb` frontier near `m = 137`, which is open.
 
 <!-- generated:pareto_sa -->
-| k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
+| k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 | (197) |
 
 Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
 <!-- /generated -->

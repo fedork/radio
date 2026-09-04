@@ -13426,3 +13426,80 @@ One thing not to over-read: the shutdown was harmless *this* time only because t
 Had `--instance-initiated-shutdown-behavior` been `terminate`, a completed 3.5-day derivation would
 have been destroyed 63 seconds after printing its answer, and the last durable evidence would have
 said "13 of 16, solver alive".
+
+## 2026-09-04 -- what a `k=11` run actually is, and why it is a `k=10` `Sb` question
+
+Asked whether we can build and run the solver for `k=11` at `Sa` around 330, warm-started from the
+`sa193` log. The estimate is right, the build is trivial, and the run is the wrong shape.
+
+**330 is well calibrated.** Three independent routes agree: the ladder ratio `192 x (192/112) =
+329.1`; the information-bound fraction, where `Sa(k)/sqrt(2*3^k)` drifts 0.575, 0.567, 0.564,
+0.559 and extrapolates to 329.2; and the structural route below, 192 + 137 = 329.
+
+**The identity.** `Sa(n)` in `k+1` is solvable iff some first test of size `t` leaves `Sa(t)@k`,
+`Sa(n-t)@k` and `Sb(t : n-t)@k` all solvable. With `Sa(10)=192`,
+
+    Sa(11) = max_m [ min(192, n(10,m)) + m ],
+
+so the deciding number is `max{m : n(10,m) >= 192}` -- a **vertical scan at `n1=192`**, not a
+`k=11` search and not the `radio_pareto` staircase, which walks the other axis. The identity is
+exact and it reproduces the level below: `Sa(193)`'s sixteen roots are `Sb(112:81)..Sb(97:96)`,
+exactly `t` in `[81,112]` up to symmetry, and run10 refuting `Sb(112:81)@9` *is* the statement
+`max{m : n(9,m) >= 112} = 80`, giving `Sa(10) = 112 + 80 = 192`.
+
+New driver `radio_sb_walk.c` does that scan, ascending in `m` so each cell's memo warms the next.
+**Validated against the known ladder at three levels**, each crossing landing exactly where the
+identity predicts: `k=5` at `m=9` (`Sa(6)=22`), `k=6` at `m=16` (`Sa(7)=38`), `k=7` at `m=27`
+(`Sa(8)=65`). At those levels both the positives and the refutation at the crossing are instant.
+
+**The cost wall, measured.** `Sa(113)@9` refutation 489 s (warm, inside the 1,521 s ladder run) ->
+`Sa(193)@10` 301,127.6 s cold is ~300-600x per level. The single hardest fact run10 needed,
+`Sb(112:81)@9`, cost 100,723 CPU s alone; its `k=10` analogue `Sb(192:138)@10` is ~1-2 CPU-years,
+and an `Sa(331)@11` refutation needs ~27 such roots. Memory is the harder wall: 3.28M printed
+verdicts / 1.05 GB at mass 193 implies ~1e9 facts at `k=11`. **Refutation at `k=11` is out of
+reach**, so the achievable target is a lower bound plus, at best, a putative maximum -- which the
+repo's vocabulary already supports as `lower`/`witness` plus a `conjecture`, never `max`.
+
+**What the cache does and does not buy.** Negatives lift upward by Subgraph Monotonicity, so a
+mass-193 negative discharges any mass-330 superstate, and the checkpoint holds 2,561,962 `k=7`
+negatives while the `k=7` layer was 96.2% of run10's cost. Real leverage, but: it has exactly one
+`k=10` fact and 95 `k=9` facts, and **every state in this computation has mass 212-329 while the
+cache tops out at 193**. So it helps at depth and not at the levels where the search branches.
+`checkCacheTrie_ctx` being positional (`radiobase.c:1330`) costs further citations. Measured cost
+of the cache itself: 273 CPU s to load 3.33M facts at `MAX_N=330`, ~0.6 GB, after which a cached
+fact answers in 0.0 s (`Sb(112:81)@9` verified as a smoke test).
+
+**Local probes, ~2.5 CPU-hours total, no cell decided.** Canonical search: `Sb(192:137)@10` at
+target_k=3 for 600 s and at target_k=6 for 240 s, both SIGXCPU with no verdict; `m=16, 32, 64, 96`
+each produced zero candidate trees in 80-90 s. `Sb(192:5)@10` **succeeded** and its tree verifies
+unconditionally -- 136 nodes, 45 splits, 91 checked terminals, all `[canonical U_k]` -- committed as
+`witnesses/canon_192_5_at10.tree`. The exhaustive solver did no better on the near-frontier cells:
+`Sb(192:137)@10` reached 42% of its 19,282 pass-1 splits in 45 min with the split rate decaying
+1.2 -> 0.58 -> 0.25 per CPU s; `Sb(192:100)@10` 15% in 20 min; and an ascending walk from `m=20`
+spent 30 minutes without finishing its **first** cell. So the difficulty is driven by `n1=192`
+making the state large, not by proximity to the frontier, and there is currently nothing to walk
+up from.
+
+**One real result.** `Sa(11) >= 197`, recorded as `lower`/`witness` in `data/pareto_sa.csv`: test
+192 of 197, outcome 2 -> `Sa(192)@10` (verified tree), outcome 0 -> `Sa(5)@10` (5 coins solve in
+3), outcome 1 -> `Sb(192:5)@10` (the new tree). Weak against ~329, and the whole gap is the
+unknown `k=10` `Sb` frontier, whose column holds only `m=5` (985, exact) and `m=6` (<=973, upper).
+The paper's `Sa` table now shows `(197)` with prose saying plainly that it is a construction only
+and that the true value is expected near 329.
+
+**Launched on AWS.** Run `20260904T202016Z`, `i-0fc694110b55d76ea`, `r7iz.2xlarge`: five concurrent
+walkers at `m_start = 136, 130, 120, 110, 100`, each ascending to 160, 48-hour and 10-GiB caps,
+warm-started from a 3,753,997-fact cache -- run10's final checkpoint plus **338,869 new facts at
+mass 194-330** parsed out of today's local probes, which is exactly the mass band the `sa193` cache
+lacks. Several shots rather than one ascending walk, because the walk-up design needs a completed
+cell to seed it and there is not one yet; each walker still ascends on success, so a lucky low shot
+becomes the intended walk. About $0.744/h, so the 48-hour backstop bounds this to ~$36.
+
+`tools/sbwalk_launch.sh` applies today's other lesson: the final upload is done by the shell that
+waits on the walkers, before anything can power the host off, rather than by a poller that can lose
+the race. No idle-shutdown watcher is installed.
+
+Expect no `WALK` line for a long time, and read its absence as unknown. A positive can appear at
+any point in a cell's split enumeration; pass-1 exhaustion without one would take an estimated
+12-24 CPU-hours per cell and still would not be a refutation, since run10's roots needed up to five
+passes.

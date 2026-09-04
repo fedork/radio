@@ -10,3 +10,4 @@ k,n,bound,status,source,note
 8,65,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(65) and can't-solve Sa(66) both logged
 9,112,max,proven-exhaustive,sa-2026-04-27:out_radio_1.txt,can-solve Sa(112) and can't-solve Sa(113) both logged
 10,192,max,proven-exhaustive,witnesses/sa192_k10_a.tree+sa193-cold-2026-08-16:run9_out_sa193.txt,"verified witness proves Sa(192) achievable; proof-safe cold single-session run9 exhaustively rejects every one of the 16 possible first-test Sb states for Sa(193)"
+11,197,lower,witness,witnesses/canon_192_5_at10.tree+witnesses/sa192_k10_a.tree,"first test of 192 of 197: outcome 2 gives Sa(192)@10 (verified tree), outcome 0 gives Sa(5)@10 (5 coins solve in 3), outcome 1 gives Sb(192:5)@10 (verified tree). Far below the ~329 the ladder ratio, information-bound fraction and the identity max_m[min(192,n(10,m))+m] all predict; the gap is the unknown k=10 Sb frontier, whose column holds only m=5 and m=6"

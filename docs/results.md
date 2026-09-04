@@ -13,9 +13,9 @@ predicted but not established.
 Largest `n` such that `Sa(n)` is solvable in `k` tests.
 
 <!-- generated:pareto_sa -->
-| k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 |
+| k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| max n | 2 | 2 | 3 | 5 | 8 | 13 | 22 | 38 | 65 | 112 | 192 | (197) |
 
 Parenthesised means lower bound only. Evidence per row in `data/pareto_sa.csv`.
 <!-- /generated -->
