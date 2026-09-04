@@ -13499,6 +13499,14 @@ becomes the intended walk. About $0.744/h, so the 48-hour backstop bounds this t
 waits on the walkers, before anything can power the host off, rather than by a poller that can lose
 the race. No idle-shutdown watcher is installed.
 
+Its ten-minute heartbeat still shipped with a bug, caught live 20 minutes in: guarding the loop
+with `while pgrep -x radio_sb_walk` raced the walkers' own startup, because `capped_run` had not
+yet exec'd a solver when the first `pgrep` ran, so the loop exited at once and nothing was being
+uploaded. Repaired in place on the instance with a replacement uploader -- no walker work lost --
+and the launcher's loop is now unconditional, stopped by the explicit `kill` after the waits. The
+general shape is worth remembering: **a readiness guard that runs before the thing it guards is a
+guard that always fails open**, and it fails silently when its only symptom is a missing upload.
+
 Expect no `WALK` line for a long time, and read its absence as unknown. A positive can appear at
 any point in a cell's split enumeration; pass-1 exhaustion without one would take an estimated
 12-24 CPU-hours per cell and still would not be a refutation, since run10's roots needed up to five
