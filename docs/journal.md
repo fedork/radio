@@ -13729,3 +13729,35 @@ and each carries the same risk one level down if it too leans on cached positive
 reading is that **verifying a warm-started positive costs a chain of re-derivations**, and the
 cheapest way to avoid it next time is to keep every contributing log decompressible and to prefer
 re-deriving a child over citing a cache entry whose log is gone.
+
+## 2026-09-05 -- restart on trusted sources only: every fact traces to a log we can still read
+
+Fedor's call after the verification failure: rebuild the cache from the three sources whose raw
+logs are retained and decompressible, and drop everything else. Run `20260905T171755Z`,
+`i-012df1398f462964f`, `x2iedn.xlarge`, `Sb(192:135)@10` ascending to 160, insert limit 1024,
+110-GiB guard, 3 days.
+
+The principle is the one the previous run violated: **a cache entry is only as good as the log that
+can reconstruct it.** Each source was verified before use, not assumed:
+
+    sa193    run10_out_sa193.txt      470,935,285 B, sha256 5622c3f3... matches the release exactly
+    pareto9  seg-20260903011609Z.out  zstd -t passes, 86,856,161 B compressed
+    pareto8  out_k8.txt             1,329,497,429 B, hash-verified by artifacts.sh on pull
+
+Parsed from the raw logs rather than from checkpoints, so nothing enters the cache whose strategy
+is not sitting in a file we hold: 3,329,802 + 610,346 + 11,400,114 facts, 15,004,127 unique. The
+cache header names all three sources and states the exclusion, so a later session can reconstruct
+any positive without archaeology.
+
+**Deliberately excluded: every sbwalk harvest.** Their facts were sound -- they came from the same
+engine and epoch -- but their logs are truncated archives from terminated instances, so a positive
+resting on them cannot be verified. That is exactly how `Sa(11) >= 327` became unprovable.
+
+The previous run's log was archived first, verified: 473,666,089 bytes, sha256 `f88e1004...`, under
+`sbwalk/20260905T011753Z/final/`. It retains `WALK Sb(192:135) in 10 = SOLVABLE (4432.4 s)` and its
+`with [...]` line. That positive is still a real solver result and still unverifiable, because the
+gap is in *its* children, not in its own record.
+
+If this run reproduces the m=135 positive, the reconstruction should close: every citation it can
+make now traces to a readable log. That is the point of the restart, and it is also the test of
+whether the diagnosis was right.

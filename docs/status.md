@@ -605,27 +605,21 @@ records with no final verdict. The live stack at that snapshot was the K=9 paren
 `Sb(95:95)`, K=8 child `Sb(58:48,47:37)`, and K=7 child
 `Sb(28:19,40:13,37:12,26:15)`.
 
-The `K=10` `Sb` vertical scan that decides `Sa(11)` is **running again and has produced its first
-cell.** Run `20260905T011753Z` on `i-0226ff43f55c393a9` (`x2iedn.xlarge`, 4 vCPU, 128 GiB), built
-with `-DRADIO_CACHE_INSERT_NODE_LIMIT=1024ULL`, printed
+The `K=10` `Sb` vertical scan that decides `Sa(11)` is running on **trusted sources only**. Run
+`20260905T171755Z` on `i-012df1398f462964f` (`x2iedn.xlarge`, 4 vCPU, 128 GiB), `Sb(192:135)@10`
+ascending to `m=160`, `-DRADIO_CACHE_INSERT_NODE_LIMIT=1024ULL`, 110-GiB guard, 3 days. Its
+15,004,127-fact cache is parsed from three raw logs that were each verified before use -- run10's
+(`sha256 5622c3f3...`, matching the release), pareto9's live segment (`zstd -t` clean) and
+`k8-2026-05-12:out_k8.txt` (hash-checked on pull) -- so **every fact traces to a log that can still
+reconstruct its strategy**. All sbwalk harvests are excluded: sound facts, unreadable logs.
 
-    WALK Sb(192:135) in 10 = SOLVABLE  (4432.4 s)
-
-and ascended to `m=136`. **Bounding the insert closure fixed the memory blow-up**: 448 B/verdict
-against the unbounded run's 176 KB, 6.28 GB at 5h30m and 1.69M verdicts where the exact run died at
-24.58 GB in 101 minutes. Truncation fires on 9.8% of inserts, which costs cache hits and never a
-verdict (`radiobase.c:595-601`).
-
-**This is a lead, not a claim, and `data/pareto_sa.csv` still says `Sa(11) >= 197`.** The cache
-carries the current epoch marker, so its positives were trusted -- including 184,649 from
-`out_k8.txt`, which predates the 2026-08-30 sufficiency refutation. Before `Sa(11) >= 327` can be
-recorded, the root witness (raw log line 78,626, first cut `[107:83]`) must be reconstructed with
-`tools/extract_witness_tree.py` and pass `tools/check_witness.py`. **That reconstruction has been
-attempted and it fails**: children `Sb(107:83)@9` and `Sb(85:83,107:52)@9` have no logged strategy
-in this run, in run10's log or in pareto9's, and the m=136 log that supplied the cached positive is
-a truncated archive from a terminated instance. Closing the gap needs a fresh derivation of those
-two states. Details in the
-[2026-09-05 journal entry](journal.md).
+The earlier run `20260905T011753Z` printed `WALK Sb(192:135) in 10 = SOLVABLE (4432.4 s)` and that
+result stands as a solver lead, but **it cannot be verified** -- its children `Sb(107:83)@9` and
+`Sb(85:83,107:52)@9` cite a cached positive whose only log is a truncated archive from a terminated
+instance. Its final log is retained and verified at `sbwalk/20260905T011753Z/final/`.
+`data/pareto_sa.csv` therefore still records `Sa(11) >= 197`, and the ~329 expectation remains an
+extrapolation. Bounding the insert closure did fix the memory wall outright: 448 B/verdict against
+176 KB unbounded, 6.5 GB steady where the exact run died at 24.58 GB in 101 minutes.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB
