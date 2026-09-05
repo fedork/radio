@@ -13761,3 +13761,38 @@ gap is in *its* children, not in its own record.
 If this run reproduces the m=135 positive, the reconstruction should close: every citation it can
 make now traces to a readable log. That is the point of the restart, and it is also the test of
 whether the diagnosis was right.
+
+## 2026-09-05 -- the sbwalk watcher gets a stack and mails milestones
+
+`tools/sbwalk_heartbeat.sh` is now a file in the repo rather than a function inside the launcher's
+heredoc. That move is the point: two bugs came from the embedding -- an awk field reference eaten
+by the surrounding quotes, which rendered the level histogram empty, and a `while pgrep` readiness
+guard that raced the walkers' own startup and exited immediately. Neither survives a file that can
+be `bash -n`'d and read.
+
+Two additions Fedor asked for.
+
+**The stack.** For each level `k`, the newest line that is either `still solving in k` or a
+completed verdict, printed high `k` first and aged in log lines:
+
+    k=10 [solving]     325 lines ago  still solving in 10 ... Sb(192:135)[25920,327] trying Sb(141:72)...
+    k=9  [done   ]     230 lines ago  can't solve Sb(177:70)[12390,247] in 9 took 0.000 ...
+    k=8  [done   ]     232 lines ago  can't solve Sb(76:40,65:32)[5120,213] in 8 ...
+    k=7  [done   ]       0 lines ago  can't solve Sb(37:15,49:11,28:19,22:20)[2066,201] in 7 took 0.433 ...
+
+Ages are in lines, not time, so an enclosing level with a large age reads as normal rather than
+stalled -- which is the confusion the root line caused this morning. The verdict regex has to match
+` in K (took|with)`, because a positive prints `in K with [...]` and only later `took`; matching
+`took` alone silently drops every positive from the histogram and the stack.
+
+**Mail.** SNS `radio-sa193-progress` (subscribed to fedor@retellai.com, and the instance role
+already carried `sns:Publish` on exactly that topic): immediately when a new `WALK` verdict appears
+-- that being the answer of record and not something to wait on a poll for -- a digest every six
+hours otherwise, and one notice when the run ends. Verified live: `NumberOfMessagesPublished` shows
+the first digest at 18:41 UTC, and the swapped-in watcher reports `log_upload_verified yes`.
+
+Installed on the running trusted-source run `20260905T171755Z` without disturbing it -- same
+subshell discriminator as before, heartbeat has one child and the parent has two, parent PID 4116
+verified intact afterwards -- and wired into `tools/sbwalk_launch.sh` for future runs, which now
+also ships the script in its source bundle. The launcher's own untracked-file guard caught the new
+script before it could be labelled with a commit it wasn't in, which is the guard working.

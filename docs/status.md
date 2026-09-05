@@ -618,7 +618,12 @@ result stands as a solver lead, but **it cannot be verified** -- its children `S
 `Sb(85:83,107:52)@9` cite a cached positive whose only log is a truncated archive from a terminated
 instance. Its final log is retained and verified at `sbwalk/20260905T011753Z/final/`.
 `data/pareto_sa.csv` therefore still records `Sa(11) >= 197`, and the ~329 expectation remains an
-extrapolation. Bounding the insert closure did fix the memory wall outright: 448 B/verdict against
+extrapolation. The watcher is `tools/sbwalk_heartbeat.sh`, shipped in the run bundle rather than
+inlined in the launcher: it verifies each archive with `zstd -t` before upload, leads with a
+verdict counter and rate, renders the per-level stack (newest solving/done line at each `k`, aged
+in log lines, so a rarely-reprinting enclosing level reads as normal rather than stalled), and
+mails `radio-sa193-progress` immediately on a new `WALK` verdict, every six hours otherwise, and
+once when the run ends. Bounding the insert closure did fix the memory wall outright: 448 B/verdict against
 176 KB unbounded, 6.5 GB steady where the exact run died at 24.58 GB in 101 minutes.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
