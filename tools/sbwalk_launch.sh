@@ -29,6 +29,7 @@ cd "$(dirname "$0")/.."
 
 K=10 N1=192 M_LIST=136,130,120,110,100 M_END=160
 DAYS=2 TYPE=r7iz.2xlarge RSS_GB=10 CACHE_KEY= INSERT_LIMIT=0 DRY=0
+TOPIC=arn:aws:sns:us-west-2:393287594714:radio-sa193-progress
 while (( $# )); do
     case "$1" in
         --k) K="$2"; shift 2 ;;
@@ -40,6 +41,8 @@ while (( $# )); do
         --rss-gb) RSS_GB="$2"; shift 2 ;;
         --cache-key) CACHE_KEY="$2"; shift 2 ;;
         --insert-limit) INSERT_LIMIT="$2"; shift 2 ;;
+        --topic) TOPIC="$2"; shift 2 ;;
+        --no-mail) TOPIC=""; shift ;;
         --dry-run) DRY=1; shift ;;
         *) echo "unknown arg $1" >&2; exit 2 ;;
     esac
@@ -60,7 +63,7 @@ FULL_SHA=$(git rev-parse HEAD)
 SHA=$(git rev-parse --short HEAD)
 
 BUNDLE_FILES=(radiobase.c radio_sb_walk.c parse_out.sh tools/build_radio.py \
-              tools/check_provenance.py tools/capped_run.sh)
+              tools/check_provenance.py tools/capped_run.sh tools/sbwalk_heartbeat.sh)
 for file in "${BUNDLE_FILES[@]}"; do
     git ls-files --error-unmatch -- "$file" >/dev/null 2>&1 || {
         echo "refusing to label an untracked source as commit $FULL_SHA: $file" >&2; exit 65; }
@@ -98,66 +101,6 @@ RADIO_SOURCE_COMMIT=$FULL_SHA python3 tools/build_radio.py \\
     -DRADIO_CACHE_INSERT_NODE_LIMIT=${INSERT_LIMIT}ULL radio_sb_walk.c -o radio_sb_walk
 python3 tools/check_provenance.py radio_sb_walk.provenance
 
-upload_all() {
-    # Compress to a file and VERIFY before uploading. Streaming `zstd -c | aws s3 cp -` produced
-    # truncated objects on 2026-09-05: the m=136 run's archived log decoded to 20,316,160 bytes and
-    # the live one to 314,966,016 - both exact 0.375 MiB offsets - losing the `with [...]` lines that
-    # witness reconstruction needs, from a run whose volume was already gone. A log that cannot be
-    # decompressed is not an archive.
-    for f in /root/run/walk_m*.txt; do
-        [ -s "\$f" ] || continue
-        b=\$(basename "\$f" .txt)
-        cp "\$f" /root/.up.txt || continue
-        if zstd -q -3 -f /root/.up.txt -o /root/.up.zst && zstd -t /root/.up.zst 2>/dev/null; then
-            aws s3 cp /root/.up.zst "s3://$BUCKET/$PREFIX/logs/\$b.txt.zst" --no-progress >/dev/null 2>&1 || true
-        fi
-        rm -f /root/.up.txt /root/.up.zst
-    done
-    # Liveness first. The k=$K root line reprints only on a 20e9 work-unit threshold, so it can
-    # sit byte-identical for half an hour while the solver does ten verdicts a second underneath -
-    # which reads as a hung run. Verdict count and its rate are what answer "is it moving".
-    local now verdicts prev_t prev_v rate
-    now=\$(date +%s)
-    verdicts=\$(grep -chE " in [0-9]+ took" /root/run/walk_m*.txt 2>/dev/null | paste -sd+ - | bc)
-    verdicts=\${verdicts:-0}
-    rate="n/a (first snapshot)"
-    if [ -r /root/.hb_state ]; then
-        read -r prev_t prev_v < /root/.hb_state
-        if [ "\${prev_t:-0}" -gt 0 ] && [ "\$now" -gt "\$prev_t" ]; then
-            rate="\$(( (verdicts - prev_v) * 60 / (now - prev_t) )) verdicts/min over the last \$(( (now - prev_t) / 60 )) min"
-        fi
-    fi
-    printf '%s %s\\n' "\$now" "\$verdicts" > /root/.hb_state
-
-    { echo "run_id    $RUN_ID"
-      echo "written   \$(date -u +%FT%TZ)"
-      echo "walkers   $M_LIST  (k=$K n1=$N1 m_end=$M_END)"
-      echo "alive     \$(pgrep -c -x radio_sb_walk || echo 0)"
-      echo "cpu       \$(ps -o time= -C radio_sb_walk 2>/dev/null | tr -d ' ' | tr '\\n' ' ')"
-      echo "rss_kb    \$(ps -o rss= -C radio_sb_walk 2>/dev/null | tr '\\n' ' ')"
-      echo "uptime    \$(uptime)"
-      echo
-      echo "LIVENESS  verdicts \$verdicts   \$rate"
-      echo "          insert-closure limit $INSERT_LIMIT, truncated inserts so far: \$(grep -oh 'cache=partial:' /root/run/walk_m*.txt 2>/dev/null | wc -l)"
-      # awk field refs must survive both this heredoc and the surrounding double quotes; cut/sort
-      # avoids the escaping entirely, which is why the first version rendered an empty histogram.
-      echo "          by level: \$(grep -ohE ' in [0-9]+ took' /root/run/walk_m*.txt 2>/dev/null \\
-                    | cut -d' ' -f3 | sort -n | uniq -c | tr '\\n' ' ')"
-      echo "          newest verdict, any level:"
-      echo "            \$(grep -hE '^can' /root/run/walk_m*.txt 2>/dev/null | tail -1 | cut -c1-200)"
-      echo
-      echo "=== every WALK verdict so far (the answer of record) ==="
-      grep -h '^WALK' /root/run/walk_m*.txt 2>/dev/null || echo "(none yet)"
-      echo
-      echo "=== newest k=$K root progress per walker ==="
-      echo "(reprints only on a 20e9 work-unit threshold; a stale line here is normal)"
-      for f in /root/run/walk_m*.txt; do
-          echo "--- \$(basename \$f)"
-          grep '^still solving in $K' "\$f" 2>/dev/null | tail -1 | cut -c1-240
-      done
-    } | aws s3 cp - "s3://$BUCKET/$PREFIX/STATUS" --content-type text/plain >/dev/null 2>&1 || true
-}
-
 WALKERS=()
 for m in \$(echo "$M_LIST" | tr ',' ' '); do
     ( RADIO_RUN_CONTEXT="sbwalk m_start=\$m" \\
@@ -167,21 +110,21 @@ for m in \$(echo "$M_LIST" | tr ',' ' '); do
     WALKERS+=(\$!)
 done
 
-# Ten-minute durable snapshot. This is a convenience, NOT the archival path.
-# Unconditional on purpose: guarding the loop with \`while pgrep -x radio_sb_walk\` raced the
-# walkers' own startup on 2026-09-04 - capped_run had not yet exec'd a solver when the first pgrep
-# ran, so the loop exited immediately and the run went 20 minutes with no durable snapshot. The
-# explicit kill after the waits below is what stops it.
-( while true; do sleep 600; upload_all; done ) &
+# The heartbeat lives in tools/sbwalk_heartbeat.sh, not inline: it verifies each archive with
+# `zstd -t` before upload, leads with liveness, renders the per-level stack and mails milestones.
+# It polls for the walkers itself and exits after a final upload plus a "run ended" notice, so the
+# wait below also waits for that.
+tools/sbwalk_heartbeat.sh --bucket $BUCKET --prefix $PREFIX --k $K \\
+    ${TOPIC:+--topic $TOPIC} >/var/log/sbwalk-heartbeat.log 2>&1 &
 HEARTBEAT=\$!
 
-# Wait on the walkers by explicit pid. Deriving the list from \`jobs -p\` would also match the
-# heartbeat and is order-dependent; the archival upload below must not be reached early.
+# Wait on the walkers by explicit pid; deriving the list from \`jobs -p\` would also match the
+# heartbeat and is order-dependent.
 for pid in "\${WALKERS[@]}"; do wait "\$pid" || true; done
-kill \$HEARTBEAT 2>/dev/null || true
+wait \$HEARTBEAT 2>/dev/null || true
 
 # The archival path: this shell owns it, and it runs before anything can power the host off.
-upload_all
+tools/sbwalk_heartbeat.sh --bucket $BUCKET --prefix $PREFIX --k $K --once >/dev/null 2>&1 || true
 for f in /root/run/walk_m*.err; do
     aws s3 cp "\$f" "s3://$BUCKET/$PREFIX/logs/\$(basename \$f)" || true
 done
