@@ -604,21 +604,24 @@ records with no final verdict. The live stack at that snapshot was the K=9 paren
 `Sb(95:95)`, K=8 child `Sb(58:48,47:37)`, and K=7 child
 `Sb(28:19,40:13,37:12,26:15)`.
 
-The `K=10` `Sb` vertical scan that would decide `Sa(11)` is **stopped, and the blocker is memory,
-not time.** Run `20260904T221247Z` (one walker, `Sb(192:135)@10`, 15,459,274-fact cache, 24-GiB
-guard) was killed by its own cap after 101m33s at 24.58 GB peak, with no `WALK` line: the root had
-covered 8,189 of 19,410 splits. Growth was flat at 6.7 GB for eleven minutes and then took on
-17.9 GB in twenty-seven, at **176 KB per verdict** against run10's 344 B, during a k=5/k=6 fan-out.
-The suspected consumer is the dominance-cache insert closure at mass 327, and
-`RADIO_CACHE_INSERT_NODE_LIMIT` is the documented knob for that shape -- safe for a positive search,
-where bounding the closure costs completeness and re-search but never a verdict. Renting memory
-does not fix it: the explosive leg ran at ~40 GB/h against a 12-24 CPU-hour pass-1 estimate for one
-cell. All four instances from the day's three attempts are terminated; every log, stderr and
-checkpoint is under `s3://radio-sa193-393287594714/sbwalk/`. Details in the
-[2026-09-05 journal entry](journal.md).
+The `K=10` `Sb` vertical scan that decides `Sa(11)` is **running again and has produced its first
+cell.** Run `20260905T011753Z` on `i-0226ff43f55c393a9` (`x2iedn.xlarge`, 4 vCPU, 128 GiB), built
+with `-DRADIO_CACHE_INSERT_NODE_LIMIT=1024ULL`, printed
 
-`Sa(11) >= 197` (`lower`/`witness`, `data/pareto_sa.csv`) remains the only proven statement about
-the cell; ~329 is a three-way extrapolation, not a claim.
+    WALK Sb(192:135) in 10 = SOLVABLE  (4432.4 s)
+
+and ascended to `m=136`. **Bounding the insert closure fixed the memory blow-up**: 448 B/verdict
+against the unbounded run's 176 KB, 6.28 GB at 5h30m and 1.69M verdicts where the exact run died at
+24.58 GB in 101 minutes. Truncation fires on 9.8% of inserts, which costs cache hits and never a
+verdict (`radiobase.c:595-601`).
+
+**This is a lead, not a claim, and `data/pareto_sa.csv` still says `Sa(11) >= 197`.** The cache
+carries the current epoch marker, so its positives were trusted -- including 184,649 from
+`out_k8.txt`, which predates the 2026-08-30 sufficiency refutation. Before `Sa(11) >= 327` can be
+recorded, the root witness (raw log line 78,626, first cut `[107:83]`) must be reconstructed with
+`tools/extract_witness_tree.py` and pass `tools/check_witness.py`; a warm-started log is not closed
+under SPLITS, so expect gaps to fill from the source logs. Details in the
+[2026-09-05 journal entry](journal.md).
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB

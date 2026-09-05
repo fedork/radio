@@ -13639,3 +13639,44 @@ decided. What was bought is the measurement: **`Sb(192:m)@10` at mass ~327 is ou
 current engine on ordinary hardware, memory-first**, and the next thing to try is a bounded insert
 closure rather than a bigger machine or a lower `m`. `Sa(11) >= 197` remains the only proven
 statement, and the expected ~329 remains a three-way extrapolation.
+
+## 2026-09-05 -- the insert limit works, and `Sb(192:135)@10` comes back SOLVABLE
+
+Bounding the dominance-cache insert closure fixed the memory blow-up outright, and the cell landed.
+
+    WALK Sb(192:135) in 10 = SOLVABLE  (4432.4 s)  Sb(192:135)[25920,327]
+    can solve Sb(192:135)[25920,327] in 10 with [107:83]
+        Sb(107:83)[8881,190] Sb(85:83,107:52)[12619,327] Sb(85:52)[4420,137]
+        took 4432 totalsplits=84 pass=1
+
+Run `20260905T011753Z`, `i-0226ff43f55c393a9`, `x2iedn.xlarge` (4 vCPU, 128 GiB, $0.834/h -- the
+right shape for a single-threaded memory-hungry job, and 44% under `r7iz.4xlarge` for the same
+RAM), built with `-DRADIO_CACHE_INSERT_NODE_LIMIT=1024ULL`.
+
+**The memory fix is unambiguous.** Same state, same cache, same engine:
+
+    unbounded (2026-09-04)   5.10 -> 6.65 -> 6.66 -> 24.58 GB, dead at 101 min, 176 KB/verdict
+    limit 1024               4.10 -> 4.106 GB over 22 min (+4 MB, 9,365 verdicts), 448 B/verdict
+                             6.28 GB at 5h30m, 1,685,290 verdicts
+
+448 B/verdict is in line with run10's 344 B. Truncation fired on 164,317 of 1,685,290 inserts
+(9.8%) -- enough to catch the pathological closures, far from crippling the cache. The verdict cost
+4,432 CPU seconds at `pass=1` with only 84 root splits searched, so the positive was found early in
+the enumeration rather than after exhausting it, which is the usual shape for a solvable cell.
+
+**Status of the number.** This would give `Sa(11) >= 192 + 135 = 327`, two short of the expected
+329 -- but it is **a lead, not a claim**, exactly as recorded when the cache was assembled. The
+cache carries the current epoch marker, so `parse_file` trusted its positives, including the
+184,649 from `out_k8.txt` that predate the 2026-08-30 sufficiency refutation. Any one of them could
+in principle sit under this positive. `data/pareto_sa.csv` therefore still says 197, and will until
+the witness is verified.
+
+**The verification path**, which is now the priority: the root's `with [...]` witness is in the raw
+log at line 78,626, `tools/extract_witness_tree.py` reconstructs a tree from it, and
+`tools/check_witness.py` is the gate. Expect gaps -- a warm-started log is not closed under SPLITS,
+so subtrees whose positives came from the cache have no strategy recorded *in this log*. Filling
+them means going back to the source logs (run10's, `out_k8.txt`, pareto9's), all of which are
+retained. That is the "gaps are cheap to fill" bet being called in.
+
+The walker did not stop: it ascended to `m=136` on the success and is at 9,860 of 19,345 splits
+there. If 136 and 137 also land, the bound reaches 329 without further work.
