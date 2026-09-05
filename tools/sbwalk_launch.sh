@@ -3,7 +3,7 @@
 #
 #   tools/sbwalk_launch.sh --cache-key sbwalk/<run>/input/combined.cache.zst \
 #       [--k 10] [--n1 192] [--m-list 136,130,120,110,100] [--m-end 160] \
-#       [--days 2] [--type r7iz.2xlarge] [--rss-gb 10] [--dry-run]
+#       [--days 2] [--type r7iz.2xlarge] [--rss-gb 10] [--insert-limit N] [--dry-run]
 #
 # **Why several walkers instead of one ascending walk.** The walk-up design banks on memo reuse:
 # on 2026-08-03 Sa(112)@9 cost an eighth of Sa(111)@9 purely because the k<=8 memo was already
@@ -28,7 +28,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 K=10 N1=192 M_LIST=136,130,120,110,100 M_END=160
-DAYS=2 TYPE=r7iz.2xlarge RSS_GB=10 CACHE_KEY= DRY=0
+DAYS=2 TYPE=r7iz.2xlarge RSS_GB=10 CACHE_KEY= INSERT_LIMIT=0 DRY=0
 while (( $# )); do
     case "$1" in
         --k) K="$2"; shift 2 ;;
@@ -39,6 +39,7 @@ while (( $# )); do
         --type) TYPE="$2"; shift 2 ;;
         --rss-gb) RSS_GB="$2"; shift 2 ;;
         --cache-key) CACHE_KEY="$2"; shift 2 ;;
+        --insert-limit) INSERT_LIMIT="$2"; shift 2 ;;
         --dry-run) DRY=1; shift ;;
         *) echo "unknown arg $1" >&2; exit 2 ;;
     esac
@@ -47,6 +48,7 @@ done
 [[ "$M_LIST" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "--m-list must be comma-separated integers" >&2; exit 64; }
 [[ "$DAYS" =~ ^[1-9][0-9]*$ && "$RSS_GB" =~ ^[1-9][0-9]*$ ]] || { echo "--days/--rss-gb must be positive" >&2; exit 64; }
 [[ -n "$CACHE_KEY" ]] || { echo "--cache-key is required (s3 key of the zstd cache)" >&2; exit 64; }
+[[ "$INSERT_LIMIT" =~ ^[0-9]+$ ]] || { echo "--insert-limit must be a non-negative integer" >&2; exit 64; }
 
 BUCKET=radio-sa193-393287594714
 REGION=us-west-2
@@ -86,8 +88,14 @@ wc -l input.cache
 
 # MAX_N is n1 + m_end: every state this run touches has that mass or less. One first-test
 # component can span the whole width, so MAX_PART_N cannot be reduced independently.
+# RADIO_CACHE_INSERT_NODE_LIMIT bounds the dominance-cache insert closure. 0 is exact and the
+# production default; a nonzero value is the documented override for a pathological closure, and
+# it is safe here because truncation sacrifices cache hits, never a verdict (radiobase.c:595-601).
+# Needed at mass ~327: on 2026-09-04 an exact run took 17.9 GB in 27 minutes, 176 KB per verdict
+# against run10's 344 B. The value is recorded in the binary's provenance.
 RADIO_SOURCE_COMMIT=$FULL_SHA python3 tools/build_radio.py \\
-    -O3 -DMAX_K=$K -DMAX_N=$MAX_N -DMAX_PART_N=$MAX_N radio_sb_walk.c -o radio_sb_walk
+    -O3 -DMAX_K=$K -DMAX_N=$MAX_N -DMAX_PART_N=$MAX_N \\
+    -DRADIO_CACHE_INSERT_NODE_LIMIT=${INSERT_LIMIT}ULL radio_sb_walk.c -o radio_sb_walk
 python3 tools/check_provenance.py radio_sb_walk.provenance
 
 upload_all() {
@@ -121,6 +129,7 @@ upload_all() {
       echo "uptime    \$(uptime)"
       echo
       echo "LIVENESS  verdicts \$verdicts   \$rate"
+      echo "          insert-closure limit $INSERT_LIMIT, truncated inserts so far: \$(grep -oh 'cache=partial:' /root/run/walk_m*.txt 2>/dev/null | wc -l)"
       echo "          by level: \$(grep -ohE ' in [0-9]+ took' /root/run/walk_m*.txt 2>/dev/null \\
                     | awk '{print \$2}' | sort -n | uniq -c | awk '{printf \"k=%s:%s  \",\$2,\$1}')"
       echo "          newest verdict, any level:"
