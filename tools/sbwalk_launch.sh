@@ -99,10 +99,19 @@ RADIO_SOURCE_COMMIT=$FULL_SHA python3 tools/build_radio.py \\
 python3 tools/check_provenance.py radio_sb_walk.provenance
 
 upload_all() {
+    # Compress to a file and VERIFY before uploading. Streaming `zstd -c | aws s3 cp -` produced
+    # truncated objects on 2026-09-05: the m=136 run's archived log decoded to 20,316,160 bytes and
+    # the live one to 314,966,016 - both exact 0.375 MiB offsets - losing the `with [...]` lines that
+    # witness reconstruction needs, from a run whose volume was already gone. A log that cannot be
+    # decompressed is not an archive.
     for f in /root/run/walk_m*.txt; do
         [ -s "\$f" ] || continue
         b=\$(basename "\$f" .txt)
-        zstd -q -3 -c "\$f" | aws s3 cp - "s3://$BUCKET/$PREFIX/logs/\$b.txt.zst" >/dev/null 2>&1 || true
+        cp "\$f" /root/.up.txt || continue
+        if zstd -q -3 -f /root/.up.txt -o /root/.up.zst && zstd -t /root/.up.zst 2>/dev/null; then
+            aws s3 cp /root/.up.zst "s3://$BUCKET/$PREFIX/logs/\$b.txt.zst" --no-progress >/dev/null 2>&1 || true
+        fi
+        rm -f /root/.up.txt /root/.up.zst
     done
     # Liveness first. The k=$K root line reprints only on a 20e9 work-unit threshold, so it can
     # sit byte-identical for half an hour while the solver does ten verdicts a second underneath -
@@ -130,8 +139,10 @@ upload_all() {
       echo
       echo "LIVENESS  verdicts \$verdicts   \$rate"
       echo "          insert-closure limit $INSERT_LIMIT, truncated inserts so far: \$(grep -oh 'cache=partial:' /root/run/walk_m*.txt 2>/dev/null | wc -l)"
+      # awk field refs must survive both this heredoc and the surrounding double quotes; cut/sort
+      # avoids the escaping entirely, which is why the first version rendered an empty histogram.
       echo "          by level: \$(grep -ohE ' in [0-9]+ took' /root/run/walk_m*.txt 2>/dev/null \\
-                    | awk '{print \$2}' | sort -n | uniq -c | awk '{printf \"k=%s:%s  \",\$2,\$1}')"
+                    | cut -d' ' -f3 | sort -n | uniq -c | tr '\\n' ' ')"
       echo "          newest verdict, any level:"
       echo "            \$(grep -hE '^can' /root/run/walk_m*.txt 2>/dev/null | tail -1 | cut -c1-200)"
       echo

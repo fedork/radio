@@ -13680,3 +13680,52 @@ retained. That is the "gaps are cheap to fill" bet being called in.
 
 The walker did not stop: it ascended to `m=136` on the success and is at 9,860 of 19,345 splits
 there. If 136 and 137 also land, the bound reaches 329 without further work.
+
+## 2026-09-05 -- verifying the `Sb(192:135)` positive: a real gap, and a corrupt archive behind it
+
+Started the witness reconstruction that gates `Sa(11) >= 327`. It failed, twice, and the second
+failure is an infrastructure bug I introduced.
+
+`tools/extract_witness_tree.py` on the run's own log:
+
+    Sb(192:135) in 10: failed (tried line 78626: child 0 failed; child 1 failed; child 2 proved)
+
+The root's cut is `[107:83]`, children `Sb(107:83)@9`, `Sb(85:83,107:52)@9`, `Sb(85:52)@9`. The
+third proves from this log; the first two do not, which is the expected warm-start gap -- a log that
+cites cached positives is not closed under SPLITS. Adding run10's complete log and pareto9's
+segment (881 MB, 222,945 indexed can-solve lines) did not help: neither contains
+`can solve Sb(107:83)[...]` at all.
+
+Tracing the fact to its source: `+ b 107 83 t 8881 190 9` entered the cache from `h136.cache`, the
+harvest of the m=136 run `20260904T205613Z`, whose raw log is retained in S3. So the strategy
+should be recoverable. **It is not, because the archived object is corrupt.**
+
+    m=136 archived log   decodes to  20,316,160 bytes  (19.375 MiB) then "Data corruption detected"
+    live m=135 log       decodes to 314,966,016 bytes (300.375 MiB) then the same
+    a file-based snapshot of the same live log   decompresses clean, 323,349,843 bytes
+
+Both truncate at an exact 0.375 MiB offset. The common factor is the upload path: `upload_all`
+streamed `zstd -q -3 -c "$f" | aws s3 cp - s3://...`, inherited from `sa193_watchdog.sh`, where it
+has always worked. Here it truncates. The mechanism is not established -- the reproducible fact is
+that the streamed objects are short and a compress-to-file-then-verify upload is not.
+
+**Fixed both places.** `tools/sbwalk_launch.sh` now copies the log, compresses to a file, runs
+`zstd -t`, and uploads only on success, reporting `log_upload_verified` in `STATUS`. The same
+uploader was swapped onto the running instance; its archived log now decompresses cleanly at
+330,362,693 bytes. Swapping it meant killing a subshell on a live host again -- same discriminator
+as before, the heartbeat subshell has exactly one child while the parent has two, and the parent
+(PID 4115) was verified intact afterwards.
+
+**What it cost.** The m=136 instance was terminated with its volume, so the only copy of that log
+is the truncated object, and the strategy for `Sb(107:83)@9` is gone with it. That is precisely the
+failure CLAUDE.md names: a run warm-started from caches whose own logs were discarded cites facts
+whose proofs are gone. I terminated that instance believing its harvest had preserved what mattered
+-- the *facts* were preserved, the *strategies* were not, and only the strategies verify.
+
+**Where that leaves the claim.** `Sa(11) >= 327` is still unverified and `data/pareto_sa.csv` still
+says 197. The gap is now two specific k=9 states rather than an unknown: `Sb(107:83)@9` (mass 190)
+and `Sb(85:83,107:52)@9` (mass 327). Both need a fresh derivation that logs its own `with [...]`,
+and each carries the same risk one level down if it too leans on cached positives. The honest
+reading is that **verifying a warm-started positive costs a chain of re-derivations**, and the
+cheapest way to avoid it next time is to keep every contributing log decompressible and to prefer
+re-deriving a child over citing a cache entry whose log is gone.
