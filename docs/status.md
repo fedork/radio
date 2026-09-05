@@ -1,7 +1,7 @@
 # Status
 
 **Read this first.** Where everything stands, and what will silently ruin your work if you
-don't know it. Last refreshed **2026-09-04**.
+don't know it. Last refreshed **2026-09-05**.
 
 The central singleton question is now resolved negatively.  Necessity remains proved, but weak
 majorization by `G_K` is not sufficient.  The exact-support, full-mass state
@@ -604,24 +604,21 @@ records with no final verdict. The live stack at that snapshot was the K=9 paren
 `Sb(95:95)`, K=8 child `Sb(58:48,47:37)`, and K=7 child
 `Sb(28:19,40:13,37:12,26:15)`.
 
-A second AWS job started 2026-09-04: the `K=10` `Sb` vertical scan that decides `Sa(11)`. Run
-`20260904T221247Z` on `i-03f8c577e8d771049` (`r7iz.xlarge`, us-west-2b) runs one `radio_sb_walk`
-walker at `n1=192`, `m_start=135`, ascending to `m_end=160`, capped at 7 days and 24 GiB. Its cache
-is **15,459,274 facts** (sha256 `e0e24f51...`, 663 MB raw, ~18 min to load): run10's final
-checkpoint, the local probe facts at mass 194-330, the live `pareto9` checkpoint, all of
-`k8-2026-05-12:out_k8.txt`, and harvests from the two superseded runs. Durable prefix
-`s3://radio-sa193-393287594714/sbwalk/20260904T221247Z/`; read it with `tools/sbwalk_status.sh`,
-and `--live` for resident memory.
+The `K=10` `Sb` vertical scan that would decide `Sa(11)` is **stopped, and the blocker is memory,
+not time.** Run `20260904T221247Z` (one walker, `Sb(192:135)@10`, 15,459,274-fact cache, 24-GiB
+guard) was killed by its own cap after 101m33s at 24.58 GB peak, with no `WALK` line: the root had
+covered 8,189 of 19,410 splits. Growth was flat at 6.7 GB for eleven minutes and then took on
+17.9 GB in twenty-seven, at **176 KB per verdict** against run10's 344 B, during a k=5/k=6 fan-out.
+The suspected consumer is the dominance-cache insert closure at mass 327, and
+`RADIO_CACHE_INSERT_NODE_LIMIT` is the documented knob for that shape -- safe for a positive search,
+where bounding the closure costs completeness and re-search but never a verdict. Renting memory
+does not fix it: the explosive leg ran at ~40 GB/h against a 12-24 CPU-hour pass-1 estimate for one
+cell. All four instances from the day's three attempts are terminated; every log, stderr and
+checkpoint is under `s3://radio-sa193-393287594714/sbwalk/`. Details in the
+[2026-09-05 journal entry](journal.md).
 
-**Any `SOLVABLE` this run prints is a lead, not a claim.** The cache carries the current epoch
-marker, so `parse_file` accepts its positives as trusted -- including the 184,649 from
-`out_k8.txt`, which predates the 2026-08-30 singleton-majorization refutation and could in
-principle rest on the retired sufficiency shortcut. That was a deliberate choice: gaps are cheap to
-fill and the positives raise the chance a cell lands. The discipline it requires is that a `WALK
-... = SOLVABLE` line must have its witness tree reconstructed and passed through
-`tools/check_witness.py` before any bound is recorded. Negatives are unaffected -- majorization is
-rejection-only and necessity still holds. **No cell at `n1=192` has ever completed**, so the
-absence of a `WALK` line remains unknown, never a refutation.
+`Sa(11) >= 197` (`lower`/`witness`, `data/pareto_sa.csv`) remains the only proven statement about
+the cell; ~329 is a three-way extrapolation, not a claim.
 
 The historical persistent oracle `i-002cabc654b2078ed` remains terminated. Its build and mixed
 cache predated the singleton-majorization refutation and must not be reused. Its encrypted 50-GiB

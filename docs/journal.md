@@ -13593,3 +13593,49 @@ discriminator is the child count: the parent has two children (walker subshell, 
 subshell), the heartbeat subshell has exactly one (its `sleep`). Guarded on that, killed the right
 one, and verified afterwards that PID 3198 still held the walker as its child.
 
+
+## 2026-09-05 -- the `Sa(11)` walk dies on memory, not time: 24 GB in 101 minutes
+
+Run `20260904T221247Z` (one walker, `Sb(192:135)@10`, 15,459,274-fact cache) was killed by its own
+guard after 101m33s:
+
+    [capped_run] walk_m135: MEMORY KILL at 24 GB (cap 24 GB) | exit 137 | wall 6093s | peak RSS 24.58 GB
+
+No `WALK` line. The root reached 8,189 of its 19,410 splits (`left=11221`, root cpu 4,150 s) and
+produced 133,766 verdicts, harvested as 142,563 facts into
+`sbwalk/20260904T221247Z/walk.checkpoint`. **The archival path worked exactly as designed** -- the
+waiting shell uploaded logs, stderr, checkpoint and instance log before `shutdown`, so nothing was
+lost this time. That part of the run10 lesson is now proven in practice.
+
+**Memory is the binding constraint here, and it is not linear.**
+
+    time            RSS GB   verdicts   delta
+    22:50 load done   5.10          0
+    23:17             6.65     19,536   +1.55 GB
+    23:28             6.66     27,150   +0.01 GB   <- flat for 11 minutes
+    23:55 killed     24.58    133,766   +17.92 GB, +106,616 verdicts in 27 minutes
+
+Flat, then explosive. The last leg cost **176 KB per verdict** against run10's **344 B** -- three
+orders of magnitude. The verdicts themselves are not the consumer: the level histogram shows the
+explosive phase was k=5 (50,782) and k=6 (50,813), i.e. a deep low-level fan-out, and the plausible
+consumer is the dominance-cache insert closure, whose star expansion at mass 327 is far larger than
+anything at mass 193. `RADIO_CACHE_INSERT_NODE_LIMIT` exists for exactly this shape and is
+documented as a diagnostic override rather than a production default; **this is the case that
+motivates trying it**, and for a *positive* search it is safe -- bounding the closure costs
+completeness, which means more re-search, never a wrong verdict.
+
+Scaling says bigger memory is not the answer on its own. The explosive leg ran at ~40 GB/h, so
+64 GiB buys about an hour past where this died and 512 GiB about twelve, against a pass-1 estimate
+of 12-24 CPU-hours for one cell. Renting memory does not reach a verdict.
+
+**The local memory measurements were worthless and I should have said so earlier.** `capped_run`
+reported peak RSS 0.79 GB for the 45-minute `Sb(192:137)@10` local probe and 1.57 GB for the 15.28M
+cache load; the same workload on Linux is 5 GB at load and 24.58 GB at death. macOS swaps anonymous
+pages out and they leave RSS, which [status.md](status.md) already warns about -- I quoted those
+figures anyway when sizing the box. Size a Linux run from a Linux number.
+
+Cost of the three attempts today: about $2 of instance time, four terminated instances, and no cell
+decided. What was bought is the measurement: **`Sb(192:m)@10` at mass ~327 is out of reach of the
+current engine on ordinary hardware, memory-first**, and the next thing to try is a bounded insert
+closure rather than a bigger machine or a lower `m`. `Sa(11) >= 197` remains the only proven
+statement, and the expected ~329 remains a three-way extrapolation.
